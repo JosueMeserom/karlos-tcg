@@ -559,11 +559,25 @@ async function ejecutarEscenario(cual, esc) {
 // Comparación
 // ---------------------------------------------------------------------------
 
+// El boilerplate AL_CONSUMIR de la nueva "lava" la Ayuda con game.resetCard()
+// antes de descartarla; la vieja la descartaba tal cual. resetCard CREA dos
+// campos que antes no existían y que son inertes para el juego (el motor solo
+// los consulta por truthiness): counters={} y hasAttackedThisTurn=false.
+// Solo se ignora la dirección undefined→valor-inerte; cualquier otro cambio
+// en esos campos sigue siendo un fallo.
+function esDiffInerte(ruta, a, b) {
+    if (a !== undefined) return false;
+    if (ruta.endsWith('.counters') && b && typeof b === 'object' && Object.keys(b).length === 0) return true;
+    if (ruta.endsWith('.hasAttackedThisTurn') && b === false) return true;
+    return false;
+}
+
 function diffProfundo(a, b, ruta, salida) {
     if (salida.length >= 25) return; // suficiente para diagnosticar
     if (a === b) return;
     const ta = typeof a, tb = typeof b;
     if (ta !== 'object' || tb !== 'object' || a === null || b === null) {
+        if (esDiffInerte(ruta, a, b)) return;
         salida.push(`${ruta}: vieja=${JSON.stringify(a)} · nueva=${JSON.stringify(b)}`);
         return;
     }
@@ -596,7 +610,22 @@ function compararCapturas(esc, vieja, nueva) {
     }
 
     diffProfundo(vieja.estado, nueva.estado, 'estado', diffs);
-    return diffs;
+
+    // Diferencias de COMPORTAMIENTO esperadas (p. ej. bug latente de la base
+    // vieja corregido en la migración). Estricto en ambos sentidos: falla si
+    // aparece un diff no declarado Y si un diff declarado deja de aparecer.
+    const esperadas = esc.diferenciasEsperadas || [];
+    if (esperadas.length) {
+        for (const e of esperadas) {
+            if (!e.motivo) throw new Error(`escenario "${esc.nombre}": diferenciasEsperadas sin "motivo" documentado`);
+        }
+        const sinDeclarar = diffs.filter(d => !esperadas.some(e => d.includes(e.contiene)));
+        const sinAparecer = esperadas.filter(e => !diffs.some(d => d.includes(e.contiene)));
+        const fallos = [...sinDeclarar];
+        sinAparecer.forEach(e => fallos.push(`diferencia esperada que ya NO aparece (¿cambió el comportamiento?): "${e.contiene}"`));
+        return { fallos, nota: fallos.length ? null : `${esperadas.length} diferencia(s) de comportamiento esperadas y documentadas` };
+    }
+    return { fallos: diffs, nota: null };
 }
 
 // ---------------------------------------------------------------------------
@@ -612,9 +641,9 @@ async function correrSuite(nombreSuite, escenarios) {
         try {
             const vieja = await ejecutarEscenario('vieja', esc);
             const nueva = await ejecutarEscenario('nueva', esc);
-            const diffs = compararCapturas(esc, vieja, nueva);
+            const { fallos: diffs, nota } = compararCapturas(esc, vieja, nueva);
             if (diffs.length === 0) {
-                console.log(`  ✔ ${esc.nombre}`);
+                console.log(`  ✔ ${esc.nombre}${nota ? ` (${nota})` : ''}`);
             } else {
                 fallos++;
                 console.log(`  ✘ ${esc.nombre}`);
