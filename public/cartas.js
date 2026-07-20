@@ -6539,69 +6539,33 @@ const CARD_DB = [
     {
         name: "Feria del cómic", type: "Evento", rarity: "A", cost: 1, duration: 2, series: 2,
         text: "2 turnos. Mientras esté en juego, todos los que NO tengan la etiqueta 'Otaku' están Silenciados (no pueden usar Habilidades), y al final de tu turno echas una moneda: con cara, buscas una carta 'Otaku' en tu mazo, la añades a tu mano y barajas.",
-        onPlay: function(card, game) { game.logMsg("¡Empieza la Feria del Cómic! Hay demasiado ruido para concentrarse...", 'ability'); },
-        
-        onUpdatePassive: function(card, game, p) {
-            ['p1', 'p2'].forEach(pid => {
-                [...game.players[pid].vanguard, ...game.players[pid].rearguard].forEach(c => {
-                    if (!c.tags || (!c.tags.includes("Otaku") && !c.tags.includes("otaku"))) {
-                        c.isSilenced = true; // Inyecta el silencio al motor lógico
-                    }
-                });
-            });
-        },
-
-        // ¡AQUÍ ESTÁ LA MAGIA PARA EL HOVER (Afectado por...)!
-        onGlobalGetPreviewEffects: function(evCard, targetCard, game) {
-            if (!targetCard.tags || (!targetCard.tags.includes("Otaku") && !targetCard.tags.includes("otaku"))) {
-                return [`Silenciado, fuente: ${evCard.name} (Evento activo)`];
-            }
-            return [];
-        },
-        
-        onEndTurn: async function(card, game, playerId) {
-            if (playerId !== card.owner) return;
-            game.logMsg(`Feria del cómic: Buscando merchandising exclusivo...`, 'system');
-            
-            const results = await game.triggerCoinFlips(1, card.owner);
-            if (results && results[0] === 'heads') {
-                game.logMsg("Moneda: CARA - ¡Has encontrado algo genial en la Feria!", 'ability');
-                const p = game.players[playerId];
-                const otakus = p.deck.filter(c => c.tags && (c.tags.includes('Otaku') || c.tags.includes('otaku')));
-                
-                if (otakus.length > 0) {
-                    const wantSearch = await new Promise(resolve => {
-                        game.openChoiceModal('FERIA DEL CÓMIC', [
-                            { label: 'COMPRAR MERCHANDISING (BUSCAR OTAKU)', action: () => resolve(true) },
-                            { label: 'NO COMPRAR', action: () => resolve(false) }
-                        ], card.owner);
-                    });
-
-                    if (wantSearch) {
-                        const chosen = await game.openVisualSearchModal('COMPRAR CARTA OTAKU', otakus, 1, false, card.owner);
-                        if (chosen && chosen.length > 0) {
-                            const target = chosen[0];
-                            const idx = p.deck.findIndex(c => c.instanceId === target.instanceId);
-                            p.deck.splice(idx, 1);
-                            if (typeof animateStackToHand === 'function') await animateStackToHand(`${playerId}-deck-stack`, playerId, target.id);
-                            target.location = 'hand';
-                            p.hand.push(target);
-                            game.logMsg(`Añades ${target.name} a tu mano.`, 'ability');
-                        }
-                        
-                        game.logMsg("Barajando el mazo...", 'system');
-                        if (typeof animateShuffle === 'function') await animateShuffle(playerId);
-                        game.shuffle(p.deck);
-                        game.render();
-                    }
-                } else {
-                    game.logMsg("Has mirado en todos los puestos, pero no quedan cartas Otaku en tu mazo.", 'system');
-                }
-            } else {
-                game.logMsg("Moneda: CRUZ - Había demasiada cola y te fuiste con las manos vacías.", 'neutral');
-            }
-        },
-        onExpire: function(card, game, playerId) { game.logMsg("La Feria del cómic cierra sus puertas.", 'system'); }
+        // Migrada al DSL (fase interceptores). Fidelidad: el AURA no exime a los
+        // Avatares (la imperativa silenciaba también a Kami); se baraja aunque la
+        // compra se cancele (la búsqueda ya revolvió el mazo); silencio si no hay
+        // Otakus... solo el aviso, sin barajar. Logs visibles pasados a 3ª persona.
+        abilities: [
+            { trigger: "AL_JUGAR", log: "¡Empieza la Feria del Cómic! Hay demasiado ruido para concentrarse..." },
+            { trigger: "AURA", quien: "CUALQUIERA",
+              filtros: [ { no: true, campo: "tags", op: "includes", valor: "Otaku" }, { no: true, campo: "tags", op: "includes", valor: "otaku" } ],
+              marcar: { campo: "isSilenced", valor: true } },
+            { trigger: "PREVIEW_GLOBAL", lineas: [
+                { quien: "CUALQUIERA", filtros: [ { no: true, campo: "tags", op: "includes", valor: "Otaku" }, { no: true, campo: "tags", op: "includes", valor: "otaku" } ],
+                  texto: "Silenciado" } ] },
+            { trigger: "FIN_TURNO", soloTurnoPropio: true, log: "Feria del cómic: Buscando merchandising exclusivo...", logTipo: "system",
+              efectos: [
+                { op: "MONEDA",
+                  logCara: { msg: "Moneda: CARA - ¡{jugador} ha encontrado algo genial en la Feria!", tipo: "ability" },
+                  cara: [
+                    { op: "BUSCAR", en: "MAZO", cantidad: 1, destino: "MANO",
+                      algunFiltro: [ { campo: "tags", op: "includes", valor: "Otaku" }, { campo: "tags", op: "includes", valor: "otaku" } ],
+                      confirmar: { titulo: "FERIA DEL CÓMIC", si: "COMPRAR MERCHANDISING (BUSCAR OTAKU)", no: "NO COMPRAR" },
+                      titulo: "COMPRAR CARTA OTAKU",
+                      log: "{jugador} añade {objetivo} a su mano.",
+                      logNoValidas: "{jugador} ha mirado en todos los puestos, pero no quedan cartas Otaku en su mazo.",
+                      barajarDespues: { log: "Barajando el mazo..." } } ],
+                  logCruz: { msg: "Moneda: CRUZ - Había demasiada cola y {jugador} se fue con las manos vacías.", tipo: "neutral" } } ] },
+            { trigger: "AL_CADUCAR", log: "La Feria del cómic cierra sus puertas.", logTipo: "system" }
+        ],
     },
     {
         name: "Deuda con la mafia", type: "Evento", rarity: "A", cost: 1, duration: 2, series: 2,
@@ -7992,7 +7956,7 @@ const KARLOS_RULES = {
 //  Valores: número | {COUNT:{...}} | {REF:"objetivo.furorMax"} (campos computados)
 // ===================================================================
 const DSL = {
-    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE'],
+    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE', 'AURA', 'ANTES_DE_JUGAR'],
     OPS_EFECTO: ['MODIFICAR_STAT', 'CURAR', 'DAÑO', 'APLICAR_ESTADO', 'MODIFICAR_CONTADORES', 'ATACAR', 'MONEDA', 'ROBAR', 'BUSCAR', 'MARCAR', 'VER_MANO', 'LIMPIAR_ESTADOS', 'ELEGIR', 'DESTRUIR_EVENTO', 'MARCAR_TEMPORAL', 'DESCARTAR', 'EQUIPAR', 'MARCAR_JUGADOR', 'FLOTANTE', 'FIJAR_STAT'],
     OPS_CMP: ['==', '!=', '<=', '>=', '<', '>', 'includes', 'truthy', 'falsy'],
     QUIEN: ['SELF', 'ALIADO', 'ENEMIGO', 'TODOS', 'ATACANTE', 'DEFENSOR'], // los dos últimos solo tienen sentido en GLOBAL_TRAS_ATAQUE
@@ -8200,11 +8164,13 @@ const DSL = {
         if (e.op === 'MONEDA') {
             const res = await game.triggerCoinFlips(e.cantidad || 1, ownerId);
             const cruz = res && res[0] === 'tails'; // sin resultado (cancelado) => rama de cara, como las cartas originales
+            const dnM = typeof game.getDisplayName === 'function' ? game.getDisplayName(ownerId) : ownerId;
+            const FM = (t) => DSL._fill(t, { carta: sourceCard.name, jugador: dnM });
             if (cruz) {
-                if (e.logCruz) game.logMsg(e.logCruz.msg, e.logCruz.tipo || 'combat');
+                if (e.logCruz) game.logMsg(FM(e.logCruz.msg), e.logCruz.tipo || 'combat');
                 if (Array.isArray(e.cruz)) await DSL._runEffectList(e.cruz, sourceCard, game, ownerId, [target], habilidad);
             } else {
-                if (e.logCara) game.logMsg(e.logCara.msg, e.logCara.tipo || 'neutral');
+                if (e.logCara) game.logMsg(FM(e.logCara.msg), e.logCara.tipo || 'neutral');
                 if (Array.isArray(e.cara)) await DSL._runEffectList(e.cara, sourceCard, game, ownerId, [target], habilidad);
             }
             return true;
@@ -8594,7 +8560,10 @@ const DSL = {
         const alJugar = abs.find(a => a.trigger === 'AL_JUGAR');
         if (alJugar && typeof tmpl.onPlay !== 'function') {
             tmpl.onPlay = async function (card, game) {
-                if (alJugar.log) game.logMsg(DSL._fill(alJugar.log, { carta: card.name, jugador: (typeof game.getDisplayName === 'function' ? game.getDisplayName(card.owner) : card.owner) }), alJugar.logTipo || 'ability');
+                // El relleno incluye las vars de la carta (p. ej. lo guardado por un
+                // ELEGIR de ANTES_DE_JUGAR, como el deudor de Deuda con la mafia).
+                const varsJ = (DSL._vars && DSL._vars[card.instanceId]) || {};
+                if (alJugar.log) game.logMsg(DSL._fill(alJugar.log, Object.assign({}, varsJ, { carta: card.name, jugador: (typeof game.getDisplayName === 'function' ? game.getDisplayName(card.owner) : card.owner) })), alJugar.logTipo || 'ability');
                 await DSL._runEffectList(alJugar.efectos || [], card, game, card.owner, null);
             };
         }
@@ -8882,6 +8851,30 @@ const DSL = {
                     return eff ? [tmpl.tempEffectText + ', fuente: ' + tmpl.name] : [];
                 };
             }
+        }
+
+        // AURA -> onUpdatePassive (eventos y cartas en mesa): marca campos de forma
+        // CONTINUA en las cartas que cumplan los filtros (updatePassives limpia y
+        // reaplica en cada pasada). Fiel a las auras imperativas que sustituye:
+        // sin exención de Avatar (la Feria imperativa silenciaba también a Kami).
+        const auras = abs.filter(a => a.trigger === 'AURA');
+        if (auras.length && typeof tmpl.onUpdatePassive !== 'function') {
+            tmpl.onUpdatePassive = function (ev, game, p) {
+                const propio = game.players[ev.owner];
+                const rival = game.players[ev.owner === 'p1' ? 'p2' : 'p1'];
+                for (const a of auras) {
+                    const lados = a.quien === 'ENEMIGO' ? [rival] : a.quien === 'CUALQUIERA' ? [propio, rival] : [propio];
+                    for (const lado of lados) {
+                        [...lado.vanguard, ...lado.rearguard].forEach(c => {
+                            if (a.soloSelfId && c.instanceId !== ev[a.soloSelfId]) return;
+                            if (a.algunaEtiqueta && !(c.tags && a.algunaEtiqueta.some(t => c.tags.includes(t)))) return;
+                            if (a.sinAlgunaEtiqueta && c.tags && a.sinAlgunaEtiqueta.some(t => c.tags.includes(t))) return;
+                            if (a.filtros && !a.filtros.every(f => DSL._match(c, f))) return;
+                            if (a.marcar) c[a.marcar.campo] = a.marcar.valor !== undefined ? a.marcar.valor : true;
+                        });
+                    }
+                }
+            };
         }
 
         const alEntrar = abs.find(a => a.trigger === 'AL_ENTRAR');
