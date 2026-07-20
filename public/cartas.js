@@ -4385,52 +4385,28 @@ const CARD_DB = [
     {
         name: "Plan de equipo", type: "Evento", rarity: "C", cost: 1, duration: 1, series: 1,
         text: "1 turno. Requiere no haber atacado este turno y tener 2 o más aliados. Mientras esté en juego, solo puedes atacar 1 vez: el Atq del atacante será la suma del Atq de 2 aliados que elijas.",
+        // Migrada al DSL sobre el punto único de intercepción (§11). Cambio de estado
+        // deliberado respecto a la imperativa: el candado de un-ataque vive en la
+        // PROPIA carta de evento (planUsado, viaja con exportGameState) en vez de en
+        // flags sueltos del jugador; muere con la carta, así que no necesita onExpire.
         abilities: [
             { trigger: "PREVIEW_GLOBAL", lineas: [ { quien: "ALIADO", soloTipos: ["Personaje", "Esbirro"], texto: "Puede aportar su Atq al único ataque combinado del turno" } ] },
-            { trigger: "PREVIEW_GLOBAL", lineas: [ { quien: "ALIADO", soloTipos: ["Personaje", "Esbirro"], texto: "Plan de equipo: solo 1 ataque este turno (Atq = suma de 2 aliados elegidos)" } ] }
+            { trigger: "PREVIEW_GLOBAL", lineas: [ { quien: "ALIADO", soloTipos: ["Personaje", "Esbirro"], texto: "Plan de equipo: solo 1 ataque este turno (Atq = suma de 2 aliados elegidos)" } ] },
+            { trigger: "JUGAR", requisitos: [
+                { count: { filtros: [ { campo: "hasAttackedThisTurn", op: "truthy" } ] }, op: "==", valor: 0, msg: "Ya has atacado este turno." },
+                { count: {}, op: ">=", valor: 2, msg: "Necesitas al menos 2 aliados en campo." } ] },
+            { trigger: "AL_JUGAR", log: "¡Plan de equipo activado! ¡Tus aliados sincronizan sus fuerzas!" },
+            { trigger: "GLOBAL_ANTES_DE_ATAQUE",
+              soloAtacante: "PROPIO",
+              unaVez: { campoSelf: "planUsado", logRepite: "Con 'Plan de equipo' sólo puedes atacar una vez este turno." },
+              efectos: [
+                { op: "ELEGIR", de: "ALIADOS", cantidad: 2, forzarModal: true, opcional: true,
+                  titulo: "PLAN DE EQUIPO: ELIGE 2 ALIADOS PARA SUMAR SU ATQ",
+                  guardaSuma: { campo: "currentAtk", en: "sumaAtq" }, guardaNombres: "duo" },
+                { op: "FIJAR_STAT", stat: "currentAtk", valor: { REF: "vars.sumaAtq" },
+                  log: "¡{duo} unen fuerzas! El ATQ de {objetivo} sube a {valor}.",
+                  floating: { texto: "ATQ = {valor}", estilo: "ft-ability", offset: -40 } } ] }
         ],
-        canPlayCard: function(card, game, p) {
-            const hasAttacked = [...p.vanguard, ...p.rearguard].some(c => c.hasAttackedThisTurn);
-            if (hasAttacked) { game.logError("Ya has atacado este turno."); return false; }
-            if (p.vanguard.length + p.rearguard.length < 2) { game.logError("Necesitas al menos 2 aliados en campo."); return false; }
-            return true;
-        },
-        onPlay: async function(card, game) {
-            const p = game.players[card.owner];
-            p.planDeEquipoActive = true;
-            p.planDeEquipoUsed = false;
-            game.logMsg("¡Plan de equipo activado! ¡Tus aliados sincronizan sus fuerzas!", 'ability');
-        },
-        onGlobalBeforeAttack: async function(eventCard, attacker, defender, game) {
-            if (attacker.owner === eventCard.owner) {
-                const p = game.players[attacker.owner];
-                if (!p.planDeEquipoActive) return true; // Fail-safe
-                
-                if (p.planDeEquipoUsed) {
-                    game.logError("Con 'Plan de equipo' sólo puedes atacar una vez este turno.");
-                    return false; // Impide nuevos ataques
-                }
-                
-                p.planDeEquipoUsed = true;
-                const allies = [...p.vanguard, ...p.rearguard];
-                
-                const chosen = await game.openVisualSearchModal('PLAN DE EQUIPO: ELIGE 2 ALIADOS PARA SUMAR SU ATQ', allies, 2, false, attacker.owner);
-                if (chosen && chosen.length === 2) {
-                    const sum = chosen[0].currentAtk + chosen[1].currentAtk;
-                    // Dopamos el stat directamente en la base, updatePassives lo limpiará después del ataque
-                    attacker.currentAtk = sum; 
-                    game.logMsg(`¡${chosen[0].name} y ${chosen[1].name} unen fuerzas! El ATQ de ${attacker.name} sube a ${sum}.`, 'ability');
-                    showFloatingText(attacker.instanceId, `ATQ = ${sum}`, "ft-ability", -40);
-                }
-                return true;
-            }
-            return true;
-        },
-        onExpire: function(card, game, playerId) {
-            const p = game.players[playerId];
-            delete p.planDeEquipoActive;
-            delete p.planDeEquipoUsed;
-        }
     },
     {
         name: "Jarabe amargo", type: "Ayuda", subtype: "Ingerible", tags: ["Consumible"], rarity: "C", cost: 1, series: 1,
@@ -8017,7 +7993,7 @@ const KARLOS_RULES = {
 // ===================================================================
 const DSL = {
     TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE'],
-    OPS_EFECTO: ['MODIFICAR_STAT', 'CURAR', 'DAÑO', 'APLICAR_ESTADO', 'MODIFICAR_CONTADORES', 'ATACAR', 'MONEDA', 'ROBAR', 'BUSCAR', 'MARCAR', 'VER_MANO', 'LIMPIAR_ESTADOS', 'ELEGIR', 'DESTRUIR_EVENTO', 'MARCAR_TEMPORAL', 'DESCARTAR', 'EQUIPAR', 'MARCAR_JUGADOR', 'FLOTANTE'],
+    OPS_EFECTO: ['MODIFICAR_STAT', 'CURAR', 'DAÑO', 'APLICAR_ESTADO', 'MODIFICAR_CONTADORES', 'ATACAR', 'MONEDA', 'ROBAR', 'BUSCAR', 'MARCAR', 'VER_MANO', 'LIMPIAR_ESTADOS', 'ELEGIR', 'DESTRUIR_EVENTO', 'MARCAR_TEMPORAL', 'DESCARTAR', 'EQUIPAR', 'MARCAR_JUGADOR', 'FLOTANTE', 'FIJAR_STAT'],
     OPS_CMP: ['==', '!=', '<=', '>=', '<', '>', 'includes', 'truthy', 'falsy'],
     QUIEN: ['SELF', 'ALIADO', 'ENEMIGO', 'TODOS', 'ATACANTE', 'DEFENSOR'], // los dos últimos solo tienen sentido en GLOBAL_TRAS_ATAQUE
 
@@ -8030,8 +8006,9 @@ const DSL = {
         if (k === 'furorMax') return KARLOS_RULES.getFurorMax(c); // campo computado (capa de reglas)
         return c[k];
     },
-    _ref(path, ctx) { // "objetivo.furorMax" | "self.atk"
+    _ref(path, ctx) { // "objetivo.furorMax" | "self.atk" | "vars.sumaAtq" (guardado por ELEGIR)
         const [who, campo] = String(path).split('.');
+        if (who === 'vars') return ctx && ctx.vars ? ctx.vars[campo] : undefined;
         const c = who === 'objetivo' ? ctx.objetivo : ctx.self;
         return c ? DSL._field(c, campo) : undefined;
     },
@@ -8328,6 +8305,19 @@ const DSL = {
             if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
             return true;
         }
+        if (e.op === 'FIJAR_STAT') {
+            // Fija (no suma) un stat del objetivo; complementa el delta de MODIFICAR_STAT.
+            // valor admite número o {REF:"vars.x"} (p. ej. la suma guardada por un ELEGIR).
+            // Si el valor no resuelve (elección cancelada), se omite sin abortar la cadena.
+            const vars = (DSL._vars && DSL._vars[sourceCard.instanceId]) || {};
+            const v = DSL._value(ownerId, game, e.valor, sourceCard, { self: sourceCard, vars });
+            if (v === undefined || v === null || Number.isNaN(v)) return 'skip';
+            target[e.stat] = v;
+            const relleno = Object.assign({}, vars, { carta: sourceCard.name, objetivo: DSL._nombre(game, target), valor: v });
+            if (e.log) game.logMsg(DSL._fill(e.log, relleno), e.logTipo || 'ability');
+            if (e.floating && typeof showFloatingText === 'function') showFloatingText(target.instanceId, DSL._fill(e.floating.texto, relleno), e.floating.estilo || 'ft-ability', e.floating.offset !== undefined ? e.floating.offset : -40);
+            return true;
+        }
         if (e.op === 'MARCAR_JUGADOR') {
             game.players[ownerId][e.campo] = e.valor !== undefined ? e.valor : true;
             return true;
@@ -8376,12 +8366,24 @@ const DSL = {
                 const els = lista.map(x => DSL._nombre(game, x)).join(' y ');
                 game.logMsg(DSL._fill(e.logAntes, Object.assign({}, (DSL._vars && DSL._vars[sourceCard.instanceId]) || {}, { carta: sourceCard.name, elegidos: els })), e.logAntesTipo || 'ability');
             };
+            // guardaSuma/guardaNombres: dejan en vars el agregado de los elegidos para
+            // efectos posteriores (p. ej. FIJAR_STAT con {REF:"vars.x"}). Se limpian
+            // ANTES de elegir para que una cancelación no herede valores de una
+            // ejecución anterior de la misma carta.
+            const _vs = () => { DSL._vars = DSL._vars || {}; return DSL._vars[sourceCard.instanceId] = DSL._vars[sourceCard.instanceId] || {}; };
+            if (e.guardaSuma) delete _vs()[e.guardaSuma.en];
+            if (e.guardaNombres) delete _vs()[e.guardaNombres];
+            const _guarda = (lista) => {
+                if (e.guardaSuma) _vs()[e.guardaSuma.en] = lista.reduce((acc, x) => acc + (Number(DSL._field(x, e.guardaSuma.campo)) || 0), 0);
+                if (e.guardaNombres) _vs()[e.guardaNombres] = lista.map(x => DSL._nombre(game, x)).join(' y ');
+            };
             const dn = typeof game.getDisplayName === 'function' ? game.getDisplayName(ownerId) : ownerId;
             const F = (t) => DSL._fill(t, { carta: sourceCard.name, jugador: dn });
             if (pool.length < n) return e.opcional ? 'skip' : false;
             if (e.autoSiUnica && pool.length === n) {
                 // Única opción posible: se toma sola, sin preguntar (como el pagador único del Té)
                 if (e.guardaEn) { DSL._vars = DSL._vars || {}; (DSL._vars[sourceCard.instanceId] = DSL._vars[sourceCard.instanceId] || {})[e.guardaEn] = DSL._nombre(game, pool[0]); }
+                _guarda(pool);
                 _logAntes(pool);
                 for (const t of pool) {
                     const r = await DSL._runEffectList(e.efectos || [], sourceCard, game, ownerId, [t], habilidad);
@@ -8395,6 +8397,7 @@ const DSL = {
                 const sel = await game.pickBoardTargets(pool, n, DSL._fill(e.titulo || 'Elige objetivo', { carta: sourceCard.name }) + ' (clic en el tablero; X para cancelar)', sourceCard);
                 if (!sel) { if (e.logCancela && !e.opcional) game.logError(F(e.logCancela)); return e.opcional ? 'skip' : false; }
                 if (e.guardaEn && sel[0]) { DSL._vars = DSL._vars || {}; (DSL._vars[sourceCard.instanceId] = DSL._vars[sourceCard.instanceId] || {})[e.guardaEn] = DSL._nombre(game, sel[0]); }
+                _guarda(sel);
                 _logAntes(sel);
                 for (const t of sel) {
                     const r = await DSL._runEffectList(e.efectos || [], sourceCard, game, ownerId, [t], habilidad);
@@ -8415,6 +8418,7 @@ const DSL = {
             const sel = await game.openVisualSearchModal(F(e.titulo || 'ELIGE'), pool, n, e.autoSeleccion !== false, ownerId);
             if (!sel || sel.length < n) { if (e.logCancela && !e.opcional) game.logError(F(e.logCancela)); return e.opcional ? 'skip' : false; }
             if (e.guardaEn && sel[0]) { DSL._vars = DSL._vars || {}; (DSL._vars[sourceCard.instanceId] = DSL._vars[sourceCard.instanceId] || {})[e.guardaEn] = DSL._nombre(game, sel[0]); }
+            _guarda(sel);
             _logAntes(sel);
             for (const t of sel) {
                 const r = await DSL._runEffectList(e.efectos || [], sourceCard, game, ownerId, [t], habilidad);
@@ -8792,11 +8796,28 @@ const DSL = {
         if (antesAtaque && typeof tmpl.onGlobalBeforeAttack !== 'function') {
             tmpl.onGlobalBeforeAttack = async function (ev, attacker, defender, game) {
                 if ((getCardTemplate(attacker.id) || {}).isAvatar || (defender && (getCardTemplate(defender.id) || {}).isAvatar)) return true; // Kami: ni monedas ni vetos de Eventos
+                if (antesAtaque.soloAtacante === 'PROPIO' && attacker.owner !== ev.owner) return true;
+                if (antesAtaque.soloAtacante === 'RIVAL' && attacker.owner === ev.owner) return true;
                 if (antesAtaque.exentoPlantilla) {
                     const at = DSL._tmpl(attacker.id);
                     if (at && at[antesAtaque.exentoPlantilla]) return true; // p. ej. Simon con immuneToApagon
                 }
+                // unaVez: candado en la PROPIA carta de evento (viaja con el estado exportado).
+                // Repetición: aviso privado al actor y BLOQUEAR (salvo resultado: 'PERMITIR').
+                if (antesAtaque.unaVez) {
+                    const u = antesAtaque.unaVez;
+                    if (ev[u.campoSelf]) {
+                        if (u.logRepite) game.logError(u.logRepite);
+                        return u.resultado === 'PERMITIR';
+                    }
+                    ev[u.campoSelf] = true; // se marca ANTES de los efectos, como la versión imperativa
+                }
                 if (antesAtaque.log) game.logMsg(String(antesAtaque.log.msg).replace('{atacante}', attacker.name), antesAtaque.log.tipo || 'system');
+                // efectos: corren con el ATACANTE como objetivo implícito (p. ej. el
+                // ELEGIR + FIJAR_STAT del ataque combinado de Plan de equipo).
+                if (Array.isArray(antesAtaque.efectos)) {
+                    await DSL._runEffectList(antesAtaque.efectos, ev, game, ev.owner, [attacker]);
+                }
                 const m = antesAtaque.moneda;
                 if (!m) return true;
                 const res = await game.triggerCoinFlips(1, attacker.owner);

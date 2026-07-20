@@ -461,7 +461,10 @@ async function aplicarRespuesta(ctx, inst, paso) {
         if (pend.tipo !== 'confirmar') throw new Error(`[${ctx.cual}] esperaba responder a "${pend.tipo}", el paso es {confirmar}`);
         lanzar(ctx, inst.confirmAction());
     } else if (paso.cancelar !== undefined) {
-        inst.cancelAction();
+        // Sobre una búsqueda visual equivale al botón Cancelar del modal (resuelve
+        // con lista vacía); en el resto de estados, al clic de cancelación general.
+        if (pend.tipo === 'busqueda') pend.resolver([]);
+        else inst.cancelAction();
     } else if (paso.opcion !== undefined) {
         if (pend.tipo !== 'opcion') throw new Error(`[${ctx.cual}] esperaba responder a "${pend.tipo}", el paso es {opcion}`);
         let idx;

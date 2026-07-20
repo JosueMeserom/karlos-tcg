@@ -73,6 +73,17 @@ const escenarios = [
             { atacar: 'Oso con armadura', objetivo: 'Droide antidisturbios' },
             { elegir: ['Mini-tigre', 'Robot de seguridad SP'] }, // suma de Atq para el ataque
         ],
+        // Actualizado en feat/interceptores: la nueva migró Plan de equipo al DSL
+        // (§11). Mismas dos diferencias intencionadas que documenta regresion13.
+        logsIntencionados: [
+            { de: '¡Mini-tigre y Robot de seguridad SP unen fuerzas! El ATQ de Oso con armadura sube a 4.',
+              a: '¡Mini-tigre (J1 (Jugador 1)) y Robot de seguridad SP (J1 (Jugador 1)) unen fuerzas! El ATQ de Oso con armadura (J1 (Jugador 1)) sube a 4.',
+              motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba chosen[n].name y attacker.name a secas; la nueva rellena {duo}/{objetivo} con DSL._nombre' },
+        ],
+        diferenciasEsperadas: [
+            { contiene: 'estado.p1.activeEvent.planUsado',
+              motivo: 'candado movido a la carta de evento (exportado y sincronizable); la vieja usaba p.planDeEquipoUsed, que no viajaba en exportGameState' },
+        ],
     },
     {
         nombre: 'Deuda con la mafia rechazada sin ningún aliado en el campo',
