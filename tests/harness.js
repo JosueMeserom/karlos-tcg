@@ -424,10 +424,17 @@ function buscarInstancia(ctx, inst, ref, zonas, jugador, indice) {
     return encontradas[0];
 }
 
-const RESPUESTAS = new Set(['confirmar', 'cancelar', 'opcion', 'elegirTablero', 'busqueda', 'elegir']);
+const RESPUESTAS = new Set(['confirmar', 'cancelar', 'opcion', 'elegirTablero', 'busqueda']);
 
+// 'elegir' es doblemente polimórfico: además de responder a un modal abierto
+// (búsqueda visual / tablero DSL / opción), en algunos flujos NINGUNA base
+// registra una interacción pendiente porque el propio selectCard() gestiona
+// el estado (SELECT_ABILITY_TARGETS de la vieja, SELECT_DSL_TARGETS de la
+// nueva vía _dslPickClick) — igual que un objetivo de ataque normal. Por eso
+// decide su rama en ejecutarPaso, mirando si hay algo pendiente o no.
 function esPasoRespuesta(paso) {
-    return Object.keys(paso).some(k => RESPUESTAS.has(k));
+    if (Object.keys(paso).some(k => RESPUESTAS.has(k))) return true;
+    return false;
 }
 
 function lanzar(ctx, promesa) {
@@ -487,8 +494,21 @@ async function aplicarRespuesta(ctx, inst, paso) {
 async function ejecutarPaso(ctx, inst, paso) {
     if (esPasoRespuesta(paso)) return aplicarRespuesta(ctx, inst, paso);
 
+    if (paso.elegir !== undefined && ctx.pendientes.length) return aplicarRespuesta(ctx, inst, paso);
+
     if (ctx.pendientes.length) {
         throw new Error(`[${ctx.cual}] hay una interacción pendiente (${ctx.pendientes[0].tipo}) sin responder antes del paso ${JSON.stringify(paso)}`);
+    }
+
+    if (paso.elegir !== undefined) {
+        // Sin interacción registrada: el propio selectCard() gestiona el
+        // estado (clic directo en el tablero, una carta por paso).
+        for (const ref of paso.elegir) {
+            const c = buscarInstancia(ctx, inst, ref, ['vanguardia', 'retaguardia'], undefined);
+            lanzar(ctx, inst.selectCard(c.instanceId));
+            await asentar(ctx);
+        }
+        return;
     }
 
     if (paso.jugar !== undefined) {
@@ -578,6 +598,12 @@ function esDiffInerte(ruta, a, b) {
     if (ruta.endsWith('.counters') && b && typeof b === 'object' && Object.keys(b).length === 0) return true;
     if (ruta.endsWith('.hasAttackedThisTurn') && b === false) return true;
     if (ruta.includes('.tempEffects.') && ruta.endsWith('.sourceInstanceId') && typeof b === 'string') return true;
+    // hastaFinDeTurnoPropio: la nueva declara explícitamente en la marca que se
+    // limpia al terminar el turno del dueño; la vieja lograba lo mismo con un
+    // onStartTurnTempEffect que devolvía false sin condiciones. Verificado
+    // empíricamente (no solo leído) que ambos puntos de limpieza caen en el
+    // mismo hueco del ciclo de turno: no hay divergencia observable de estado.
+    if (ruta.endsWith('.hastaFinDeTurnoPropio') && b === true) return true;
     return false;
 }
 
