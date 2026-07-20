@@ -397,7 +397,7 @@ function construirEstado(ctx, inst, esc) {
 // Pasos del escenario
 // ---------------------------------------------------------------------------
 
-function buscarInstancia(ctx, inst, ref, zonas, jugador) {
+function buscarInstancia(ctx, inst, ref, zonas, jugador, indice) {
     const pids = jugador ? [jugador] : ['p1', 'p2'];
     const encontradas = [];
     for (const pid of pids) {
@@ -416,7 +416,11 @@ function buscarInstancia(ctx, inst, ref, zonas, jugador) {
         }
     }
     if (encontradas.length === 0) throw new Error(`[${ctx.cual}] no encuentro "${ref}" en ${zonas.join('/')}${jugador ? ' de ' + jugador : ''}`);
-    if (encontradas.length > 1) throw new Error(`[${ctx.cual}] "${ref}" es ambigua (${encontradas.length} copias): usar instanceId o {jugador}`);
+    if (indice !== undefined) {
+        if (!encontradas[indice]) throw new Error(`[${ctx.cual}] "${ref}": indice ${indice} fuera de rango (${encontradas.length} copias)`);
+        return encontradas[indice];
+    }
+    if (encontradas.length > 1) throw new Error(`[${ctx.cual}] "${ref}" es ambigua (${encontradas.length} copias): usar instanceId, {jugador} o {indice}`);
     return encontradas[0];
 }
 
@@ -488,7 +492,7 @@ async function ejecutarPaso(ctx, inst, paso) {
     }
 
     if (paso.jugar !== undefined) {
-        const c = buscarInstancia(ctx, inst, paso.jugar, ['mano'], paso.jugador || inst.activePlayerId);
+        const c = buscarInstancia(ctx, inst, paso.jugar, ['mano'], paso.jugador || inst.activePlayerId, paso.indice);
         lanzar(ctx, inst.playCard(c.instanceId));
     } else if (paso.seleccionar !== undefined) {
         const c = buscarInstancia(ctx, inst, paso.seleccionar, ['vanguardia', 'retaguardia', 'mano'], paso.jugador);
