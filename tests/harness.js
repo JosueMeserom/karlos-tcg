@@ -420,7 +420,7 @@ function buscarInstancia(ctx, inst, ref, zonas, jugador) {
     return encontradas[0];
 }
 
-const RESPUESTAS = new Set(['confirmar', 'cancelar', 'opcion', 'elegirTablero', 'busqueda']);
+const RESPUESTAS = new Set(['confirmar', 'cancelar', 'opcion', 'elegirTablero', 'busqueda', 'elegir']);
 
 function esPasoRespuesta(paso) {
     return Object.keys(paso).some(k => RESPUESTAS.has(k));
@@ -435,6 +435,16 @@ function lanzar(ctx, promesa) {
 async function aplicarRespuesta(ctx, inst, paso) {
     const pend = ctx.pendientes.shift();
     if (!pend) throw new Error(`[${ctx.cual}] paso de respuesta ${JSON.stringify(paso)} sin interacción pendiente`);
+
+    // {elegir: [...]} es polimórfico: responde a lo que esté abierto. Necesario
+    // porque la base vieja y la nueva pueden abrir modales distintos para la
+    // misma elección (p. ej. Té helado: búsqueda visual vieja vs tablero nueva).
+    if (paso.elegir !== undefined) {
+        if (pend.tipo === 'elegirTablero') paso = { elegirTablero: paso.elegir };
+        else if (pend.tipo === 'busqueda') paso = { busqueda: paso.elegir };
+        else if (pend.tipo === 'opcion') paso = { opcion: paso.elegir[0] };
+        else throw new Error(`[${ctx.cual}] {elegir} no sabe responder a "${pend.tipo}"`);
+    }
 
     if (paso.confirmar !== undefined) {
         if (pend.tipo !== 'confirmar') throw new Error(`[${ctx.cual}] esperaba responder a "${pend.tipo}", el paso es {confirmar}`);
