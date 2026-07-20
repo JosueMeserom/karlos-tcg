@@ -6,24 +6,22 @@
 // el intérprete compartido corriendo el flujo REAL de ataque del motor, y
 // que añadir el preview no perturbó la compilación de los hooks globales.
 //
-// HALLAZGO DOCUMENTADO (bug del motor, compartido por ambas bases, verificado
-// empíricamente con la pila de llamadas): checkAttackStatus invoca
-// onGlobalBeforeAttack de los eventos activos en DOS bucles distintos (el de
-// "Eventos activos" y otro duplicado tras las auras de vanguardia/retaguardia).
-// Resultado: Apagón tira DOS monedas por ataque (con doble log visible)
-// cuando el texto de la carta dice una; basta una cruz en cualquiera de las
-// dos para bloquear. Ambas bases se comportan igual, así que la regresión
-// pasa — pero es un argumento directo para el "punto único de intercepción
-// en performAttack" de la tarea de interceptores (docs/DSL_cartas_diseno.md
-// §10-11), que debería eliminar el bucle duplicado.
+// HISTORIAL: esta suite documentó primero un bug del motor (checkAttackStatus
+// invocaba onGlobalBeforeAttack de los eventos en DOS bucles: Apagón tiraba
+// dos monedas por ataque con doble log, cuando su texto dice una). El punto
+// único de intercepción de §11 (rama feat/interceptores) eliminó el bucle
+// duplicado: Apagón tira ahora UNA moneda por ataque, en ambas bases por
+// igual (el motor es común). Los escenarios de doble moneda se reescribieron
+// para la semántica correcta; el harness los habría detectado igualmente
+// (cola de monedas estricta en ambos sentidos).
 
 'use strict';
 const { correrSuite } = require('./harness');
 
 const escenarios = [
     {
-        nombre: 'Apagón jugado desde la mano: doble cara y el ataque procede (doble moneda documentada)',
-        monedas: ['cara', 'cara'],
+        nombre: 'Apagón jugado desde la mano: cara y el ataque procede (una sola moneda tras §11)',
+        monedas: ['cara'],
         turnoDe: 'p1',
         p1: { vanguardia: [{ carta: 'Gallina del infinito', furor: 0 }], mano: ['Apagón'] },
         p2: { vanguardia: [{ carta: 'Oso con armadura', furor: 0 }] },
@@ -43,18 +41,22 @@ const escenarios = [
         ],
     },
     {
-        nombre: 'Apagón: cara y luego cruz — la segunda invocación del bucle duplicado bloquea',
+        nombre: 'Apagón: dos ataques en el mismo turno, una moneda cada uno (cara y cruz)',
         monedas: ['cara', 'cruz'],
         turnoDe: 'p1',
-        p1: { vanguardia: [{ carta: 'Gallina del infinito', furor: 0 }], evento: { carta: 'Apagón', duracion: 2 } },
-        p2: { vanguardia: [{ carta: 'Mini-tigre', vida: 3 }] },
+        p1: {
+            vanguardia: [{ carta: 'Gallina del infinito', furor: 0 }, { carta: 'Droide antidisturbios', furor: 0 }],
+            evento: { carta: 'Apagón', duracion: 2 },
+        },
+        p2: { vanguardia: [{ carta: 'Oso con armadura', furor: 0 }, { carta: 'Mini-tigre', vida: 3 }] },
         pasos: [
-            { atacar: 'Gallina del infinito', objetivo: 'Mini-tigre' },
+            { atacar: 'Gallina del infinito', objetivo: 'Oso con armadura' }, // cara: procede
+            { atacar: 'Droide antidisturbios', objetivo: 'Mini-tigre' },      // cruz: falla y se agota
         ],
     },
     {
         nombre: 'Apagón afecta también al rival del dueño (p2 ataca bajo el Apagón de p1)',
-        monedas: ['cara', 'cara'],
+        monedas: ['cara'],
         turnoDe: 'p2',
         p1: { vanguardia: [{ carta: 'Oso con armadura', furor: 0 }], evento: { carta: 'Apagón', duracion: 3 } },
         p2: { vanguardia: [{ carta: 'Gallina del infinito', furor: 0 }] },

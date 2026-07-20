@@ -5429,6 +5429,33 @@
                 }
             }
 
+            // --- PUNTO ÚNICO DE INTERCEPCIÓN DE ATAQUE (docs/DSL_cartas_diseno.md §11) ---
+            // Construye la cola de interceptores de un ataque, ordenada por prioridad:
+            // evento activo (100) → equipos del atacante/defensor (200) → pasivas en mesa (300).
+            // Una carta puede fijar la suya con `attackInterceptPriority` en su plantilla.
+            // A igual prioridad se conserva el orden de recogida (sort estable).
+            collectAttackInterceptors(attacker, defender) {
+                const cola = [];
+                const anota = (carta, prioridadBase) => {
+                    const t = getCardTemplate(carta.id);
+                    if (typeof t.onGlobalBeforeAttack !== 'function') return;
+                    const prioridad = typeof t.attackInterceptPriority === 'number' ? t.attackInterceptPriority : prioridadBase;
+                    cola.push({ prioridad, carta, fn: () => t.onGlobalBeforeAttack(carta, attacker, defender, this) });
+                };
+                for (const pid of ['p1', 'p2']) {
+                    const ev = this.players[pid].activeEvent;
+                    if (ev) anota(ev, 100);
+                }
+                for (const portador of [attacker, defender]) {
+                    if (portador && portador.equippedCards) portador.equippedCards.forEach(eq => anota(eq, 200));
+                }
+                for (const pid of ['p1', 'p2']) {
+                    const p = this.players[pid];
+                    [...p.vanguard, ...p.rearguard].forEach(c => anota(c, 300));
+                }
+                return cola.sort((a, b) => a.prioridad - b.prioridad);
+            }
+
             async checkAttackStatus(attacker, defender) {
                 // --- Intercepción de Estados Temporales (Genérico, por ejemplo para Clarise) ---
                 if (attacker.tempEffects) {
@@ -5441,48 +5468,14 @@
                     }
                 }
 
-                // --- Eventos activos: intercepción global antes de atacar (p. ej. Apagón) ---
-                for (let evPid of ['p1', 'p2']) {
-                    const evAtq = this.players[evPid].activeEvent;
-                    if (evAtq) {
-                        const evTemp = getCardTemplate(evAtq.id);
-                        if (typeof evTemp.onGlobalBeforeAttack === 'function') {
-                            const canProceed = await evTemp.onGlobalBeforeAttack(evAtq, attacker, defender, this);
-                            if (!canProceed) return false;
-                        }
-                    }
+                // --- Punto único de intercepción (§11): cola ordenada evento → equipos → pasivas.
+                // Sustituye a los tres bucles históricos, uno de los cuales consultaba los
+                // eventos DOS veces (Apagón tiraba dos monedas por ataque; ahora tira una).
+                for (const interceptor of this.collectAttackInterceptors(attacker, defender)) {
+                    const canProceed = await interceptor.fn();
+                    if (!canProceed) return false;
                 }
 
-                // --- Auras Globales Antes de Atacar (Personajes y Esbirros) ---
-                for (let pid of ['p1', 'p2']) {
-                    const p = this.players[pid];
-                    for (let vanCard of p.vanguard) {
-                        const vanTemp = getCardTemplate(vanCard.id);
-                        if (typeof vanTemp.onGlobalBeforeAttack === 'function') {
-                            const canProceed = await vanTemp.onGlobalBeforeAttack(vanCard, attacker, defender, this);
-                            if (!canProceed) return false; 
-                        }
-                    }
-                    for (let rearCard of p.rearguard) {
-                        const rearTemp = getCardTemplate(rearCard.id);
-                        if (typeof rearTemp.onGlobalBeforeAttack === 'function') {
-                            const canProceed = await rearTemp.onGlobalBeforeAttack(rearCard, attacker, defender, this);
-                            if (!canProceed) return false; 
-                        }
-                    }
-                }
-
-                for (let pid of ['p1', 'p2']) {
-                    let ev = this.players[pid].activeEvent;
-                    if (ev) {
-                        const evTemplate = getCardTemplate(ev.id);
-                        if (typeof evTemplate.onGlobalBeforeAttack === 'function') {
-                            const canProceed = await evTemplate.onGlobalBeforeAttack(ev, attacker, defender, this);
-                            if (!canProceed) return false; 
-                        }
-                    }
-                }
-                
                 if (attacker.status && attacker.status.confusion && attacker.status.confusion.duration > 0) {
                     this.logMsg(`${this.getCardNameWithOwner(attacker)} está Confundido. Lanzando moneda...`, 'system');
                     const results = await this.triggerCoinFlips(1, attacker.owner);
