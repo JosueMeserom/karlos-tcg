@@ -4323,6 +4323,15 @@
                 }
 
                 if (card.type === 'Evento') {
+                    // Igual que en Personaje/Esbirro: la carta puede exigir pasos previos a
+                    // colocarse (p. ej. Deuda con la mafia elige a su deudor) y cancelarse.
+                    // La rama Evento NUNCA consultaba este hook: la Deuda imperativa entraba
+                    // sin deudor (sin silencio ni corte de Furor). Bug latente compartido,
+                    // detectado al migrar la carta al DSL en feat/interceptores.
+                    if (typeof template.onBeforePlayAsync === 'function') {
+                        const proceed = await template.onBeforePlayAsync(card, this, p);
+                        if (!proceed) return;
+                    }
                     if (p.activeEvent && template.canReplaceEvent) {
                         await this.destroyEvent(this.activePlayerId);
                     }

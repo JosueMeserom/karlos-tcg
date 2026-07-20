@@ -107,6 +107,13 @@ const escenarios = [
             { finTurno: true }, // pasa a p2
             { finTurno: true }, // vuelve a p1: fase de Furor propia
         ],
+        // Actualizado en feat/interceptores: la nueva migró Deuda con la mafia al
+        // DSL (ANTES_DE_JUGAR + AURA + objetivoSelfId); ciclo completo en r15.
+        logsIntencionados: [
+            { de: '¡Oso con armadura se ha endeudado con la mafia! Queda silenciado y sin cobrar Furor.',
+              a: '¡Oso con armadura (J1 (Jugador 1)) se ha endeudado con la mafia! Queda silenciado y sin cobrar Furor.',
+              motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba target.name a secas; la nueva rellena {deudor} con DSL._nombre' },
+        ],
     },
 ];
 

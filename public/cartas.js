@@ -6570,84 +6570,34 @@ const CARD_DB = [
     {
         name: "Deuda con la mafia", type: "Evento", rarity: "A", cost: 1, duration: 2, series: 2,
         text: "2 turnos. Al colocarla, elige un aliado: queda Silenciado y no gana Furor mientras dure. Al expirar, busca en tu mazo una carta 'Mafia', añádela a la mano y baraja; el rival puede hacer lo mismo.",
+        // Migrada al DSL (fase interceptores). El deudor se ancla en la propia
+        // carta (mafiaTargetId, mismo campo que la imperativa: estado exportado
+        // idéntico). El silencio es un AURA sobre ese id; el corte de Furor, una
+        // regla GLOBAL_MODIFICAR_FUROR con objetivoSelfId. La elección previa a
+        // la colocación (cancelable) vive en ANTES_DE_JUGAR.
         abilities: [
-            { trigger: "PREVIEW_GLOBAL", lineas: [ { campoSelfId: "mafiaTargetId", texto: "Silenciado y sin ganar Furor por su deuda" } ] }
+            { trigger: "PREVIEW_GLOBAL", lineas: [ { campoSelfId: "mafiaTargetId", texto: "Silenciado y sin ganar Furor por su deuda" } ] },
+            { trigger: "JUGAR", requisitos: [
+                { count: {}, op: ">=", valor: 1, msg: "Necesitas al menos 1 aliado en el campo para contraer la deuda." } ] },
+            { trigger: "ANTES_DE_JUGAR",
+              efectos: [
+                { op: "ELEGIR", de: "ALIADOS", cantidad: 1, forzarModal: true,
+                  titulo: "¿QUIÉN CONTRAE LA DEUDA?",
+                  guardaIdEnSelf: "mafiaTargetId", guardaEn: "deudor" } ] },
+            { trigger: "AL_JUGAR", log: "¡{deudor} se ha endeudado con la mafia! Queda silenciado y sin cobrar Furor." },
+            { trigger: "AURA", quien: "ALIADO", soloSelfId: "mafiaTargetId",
+              marcar: { campo: "isSilenced", valor: true } },
+            { trigger: "GLOBAL_MODIFICAR_FUROR", reglas: [
+                { si: { origen: "fase_furor", objetivoSelfId: "mafiaTargetId" }, accion: { fijar: 0 } } ] },
+            { trigger: "AL_CADUCAR", log: "¡La Deuda ha sido saldada! Ambos jugadores pueden contactar a la Mafia.",
+              efectos: [
+                { op: "BUSCAR", en: "MAZO", deQuien: "AMBOS", cantidad: 1, destino: "MANO",
+                  algunFiltro: [ { campo: "tags", op: "includes", valor: "Mafia" }, { campo: "tags", op: "includes", valor: "mafia" } ],
+                  confirmar: { titulo: "{jugador}: COBRAR FAVOR A LA MAFIA", si: "BUSCAR MAFIA EN EL MAZO", no: "NO BUSCAR" },
+                  titulo: "{jugador}: Llama a un contacto",
+                  log: "{jugador} recibe a {objetivo} desde el submundo.", logTipo: "system",
+                  barajarDespues: { log: "Barajando el mazo..." } } ] }
         ],
-        canPlayCard: function(card, game, p) {
-            if (p.vanguard.length === 0 && p.rearguard.length === 0) {
-                game.logError("Necesitas al menos 1 aliado en el campo para contraer la deuda.");
-                return false;
-            }
-            return true;
-        },
-        onBeforePlayAsync: async function(card, game, p) {
-            const allies = [...p.vanguard, ...p.rearguard].filter(c => !getCardTemplate(c.id).isAvatar);
-            if (allies.length === 0) return false;
-            
-            const chosen = await game.openVisualSearchModal('¿QUIÉN CONTRAE LA DEUDA?', allies, 1, true, card.owner);
-            if (chosen && chosen.length > 0) {
-                card.mafiaTargetId = chosen[0].instanceId;
-                return true;
-            }
-            return false;
-        },
-        onPlay: function(card, game) {
-            const target = game.findCard(card.mafiaTargetId);
-            if (target) {
-                game.logMsg(`¡${target.name} se ha endeudado con la mafia! Queda silenciado y sin cobrar Furor.`, 'ability');
-            }
-        },
-        onUpdatePassive: function(card, game, p) {
-            if (card.mafiaTargetId) {
-                const target = game.findCard(card.mafiaTargetId);
-                if (target && (target.location === 'vanguard' || target.location === 'rearguard')) {
-                    target.isSilenced = true; // Silencio forzado
-                }
-            }
-        },
-        onGlobalBeforeGainFuror: function(eventCard, targetCard, amount, game, source) {
-            if (source === 'fase_furor' && targetCard.instanceId === eventCard.mafiaTargetId) {
-                return 0; // Cortamos el grifo de furor
-            }
-            return amount;
-        },
-        onExpire: async function(card, game, playerId) {
-            game.logMsg(`¡La Deuda ha sido saldada! Ambos jugadores pueden contactar a la Mafia.`, 'ability');
-            
-            for (let pid of ['p1', 'p2']) {
-                const p = game.players[pid];
-                const validCards = p.deck.filter(c => c.tags && (c.tags.includes('Mafia') || c.tags.includes('mafia')));
-                
-                if (validCards.length > 0) {
-                    const wantSearch = await new Promise(resolve => {
-                        game.openChoiceModal(`${game.getDisplayName(pid)}: COBRAR FAVOR A LA MAFIA`, [
-                            { label: 'BUSCAR MAFIA EN EL MAZO', action: () => resolve(true) },
-                            { label: 'NO BUSCAR', action: () => resolve(false) }
-                        ], pid); // Ojo aquí: El modal le sale al jugador correcto en online
-                    });
-
-                    if (wantSearch) {
-                        const chosen = await game.openVisualSearchModal(`${game.getDisplayName(pid)}: Llama a un contacto`, validCards, 1, false, pid);
-                        if (chosen && chosen.length > 0) {
-                            const c = chosen[0];
-                            const idx = p.deck.findIndex(x => x.instanceId === c.instanceId);
-                            if (idx !== -1) {
-                                p.deck.splice(idx, 1);
-                                if (typeof animateStackToHand === 'function') await animateStackToHand(`${pid}-deck-stack`, pid, c.id);
-                                c.location = 'hand';
-                                p.hand.push(c);
-                                game.logMsg(`${game.getDisplayName(pid)} recibe a ${c.name} desde el submundo.`, 'system');
-                            }
-                        }
-                        
-                        game.logMsg("Barajando el mazo...", 'system');
-                        if (typeof animateShuffle === 'function') await animateShuffle(pid);
-                        game.shuffle(p.deck);
-                        game.render();
-                    }
-                }
-            }
-        }
     },
     {
         name: "Escape con bomba de humo", type: "Evento", rarity: "C", cost: 1, duration: 1, series: 2,
@@ -8342,6 +8292,10 @@ const DSL = {
             const _guarda = (lista) => {
                 if (e.guardaSuma) _vs()[e.guardaSuma.en] = lista.reduce((acc, x) => acc + (Number(DSL._field(x, e.guardaSuma.campo)) || 0), 0);
                 if (e.guardaNombres) _vs()[e.guardaNombres] = lista.map(x => DSL._nombre(game, x)).join(' y ');
+                // guardaIdEnSelf: ancla el instanceId del elegido EN LA PROPIA CARTA
+                // (viaja con exportGameState; lo leen AURA soloSelfId, las reglas de
+                // Furor con objetivoSelfId y el PREVIEW_GLOBAL campoSelfId).
+                if (e.guardaIdEnSelf && lista[0]) sourceCard[e.guardaIdEnSelf] = lista[0].instanceId;
             };
             const dn = typeof game.getDisplayName === 'function' ? game.getDisplayName(ownerId) : ownerId;
             const F = (t) => DSL._fill(t, { carta: sourceCard.name, jugador: dn });
@@ -8706,6 +8660,7 @@ const DSL = {
                 for (const r of (modFuror.reglas || [])) {
                     const si = r.si || {};
                     if (si.origen && source !== si.origen) continue;
+                    if (si.objetivoSelfId && targetCard.instanceId !== ev[si.objetivoSelfId]) continue; // solo la carta anclada (p. ej. el deudor)
                     if (si.objetivoDe === 'PROPIO' && targetCard.owner !== ev.owner) continue;
                     if (si.objetivoDe === 'RIVAL' && targetCard.owner === ev.owner) continue;
                     if (si.algunaEtiqueta && !(targetCard.tags && si.algunaEtiqueta.some(t => targetCard.tags.includes(t)))) continue;
@@ -8726,6 +8681,7 @@ const DSL = {
                     for (const r of (modFuror.reglas || [])) {
                         if (!r.preview) continue;
                         const si = r.si || {};
+                        if (si.objetivoSelfId && targetCard.instanceId !== ev[si.objetivoSelfId]) continue;
                         if (si.objetivoDe === 'PROPIO' && targetCard.owner !== ev.owner) continue;
                         if (si.objetivoDe === 'RIVAL' && targetCard.owner === ev.owner) continue;
                         if (si.algunaEtiqueta && !(targetCard.tags && si.algunaEtiqueta.some(t => targetCard.tags.includes(t)))) continue;
@@ -8851,6 +8807,17 @@ const DSL = {
                     return eff ? [tmpl.tempEffectText + ', fuente: ' + tmpl.name] : [];
                 };
             }
+        }
+
+        // ANTES_DE_JUGAR -> onBeforePlayAsync: efectos previos a la colocación
+        // (p. ej. el ELEGIR del deudor de Deuda con la mafia). Si un efecto no
+        // opcional se cancela, la carta NO se coloca (sigue en la mano).
+        const antesJugar = abs.find(a => a.trigger === 'ANTES_DE_JUGAR');
+        if (antesJugar && typeof tmpl.onBeforePlayAsync !== 'function') {
+            tmpl.onBeforePlayAsync = async function (card, game, p) {
+                const res = await DSL._runEffectList(antesJugar.efectos || [], card, game, card.owner, null);
+                return !(res && res.ok === false);
+            };
         }
 
         // AURA -> onUpdatePassive (eventos y cartas en mesa): marca campos de forma
