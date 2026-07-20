@@ -641,10 +641,23 @@ function compararCapturas(esc, vieja, nueva) {
         }
     }
 
-    const maxL = Math.max(logsViejos.length, nueva.logs.length);
+    // Líneas que SOLO la nueva emite: casos donde la vieja tenía el mismo
+    // aviso pero en logError (privado, fuera del historial) y la nueva lo
+    // pasó a logMsg público. Estricto en el mismo sentido que logsSoloVieja.
+    let logsNuevos = nueva.logs;
+    for (const regla of (esc.logsSoloNueva || [])) {
+        if (!regla.motivo) throw new Error(`escenario "${esc.nombre}": logsSoloNueva sin "motivo" documentado`);
+        const antes = logsNuevos.length;
+        logsNuevos = logsNuevos.filter(l => !l.includes(regla.linea));
+        if (logsNuevos.length === antes) {
+            diffs.push(`logsSoloNueva: la línea declarada "${regla.linea}" no aparece en la salida nueva`);
+        }
+    }
+
+    const maxL = Math.max(logsViejos.length, logsNuevos.length);
     for (let i = 0; i < maxL; i++) {
-        if (logsViejos[i] !== nueva.logs[i]) {
-            diffs.push(`log[${i}]:\n      vieja: ${logsViejos[i]}\n      nueva: ${nueva.logs[i]}`);
+        if (logsViejos[i] !== logsNuevos[i]) {
+            diffs.push(`log[${i}]:\n      vieja: ${logsViejos[i]}\n      nueva: ${logsNuevos[i]}`);
         }
     }
 

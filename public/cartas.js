@@ -4999,7 +4999,7 @@ const CARD_DB = [
                   titulo: "BUSCAR DIOS/A EN EL MAZO",
                   log: "¡La deidad {objetivo} acude a la mano de {jugador}!",
                   logNoValidas: "No quedan Dioses ni Diosas en el mazo de {jugador}.",
-                  barajarDespues: { log: "Barajando el mazo..." } } ] }
+                  barajarDespues: { log: "Barajando el mazo...", inclusoSinValidas: true } } ] }
         ],
     },
     {
