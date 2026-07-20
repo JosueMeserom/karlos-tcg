@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Karlos TCG - Lobby Central</title>
+    <link rel="stylesheet" href="global.css">
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body {
+            display: flex; justify-content: center; align-items: center;
+            background-color: #0f172a; 
+            color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            height: 100vh; margin: 0;
+            visibility: hidden; /* FOUC FIX */
+        }
+        
+        .lobby-container {
+            background: rgba(15, 23, 42, 0.8); border: 2px solid #3b82f6;
+            border-radius: 12px; padding: 40px; width: 600px;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.6); text-align: center;
+        }
+        .lobby-title {
+            color: #fbbf24; font-size: 2rem; font-weight: 900;
+            margin-bottom: 10px; text-transform: uppercase; letter-spacing: 2px;
+        }
+        .lobby-subtitle {
+            color: #94a3b8; margin-bottom: 30px; font-size: 1.1rem;
+        }
+        .players-setup {
+            display: flex; justify-content: center; gap: 20px; margin-bottom: 20px;
+        }
+        .player-box {
+            background: #1e293b; padding: 15px; border-radius: 8px;
+            border: 1px solid #475569; display: flex; flex-direction: column; gap: 10px;
+            box-sizing: border-box;
+        }
+        .p1-title { color: #60a5fa; font-weight: bold; font-size: 1.2rem; }
+        .p2-title { color: #f87171; font-weight: bold; font-size: 1.2rem; }
+        
+        select, input[type="text"] {
+            padding: 10px; border-radius: 5px; border: 1px solid #475569;
+            background: #0f172a; color: white; font-size: 1rem; outline: none;
+            width: 100%; box-sizing: border-box; text-align: center; margin: 0;
+        }
+        select { cursor: pointer; }
+        input[type="text"] { cursor: text; }
+        select:focus, input[type="text"]:focus { border-color: #fbbf24; }
+        
+        /* BOTONES ORIGINALES INTACTOS */
+        .start-btn {
+            background: #10b981; color: white; font-size: 1.2rem; font-weight: bold;
+            padding: 12px 30px; border: none; border-radius: 8px; cursor: pointer;
+            transition: 0.2s; text-transform: uppercase; letter-spacing: 2px;
+            box-shadow: 0 5px 15px rgba(16, 185, 129, 0.4); margin-bottom: 15px; width: 100%;
+        }
+        .start-btn:hover { background: #059669; transform: scale(1.05); }
+        
+        .btn-create { background: #8b5cf6; box-shadow: 0 5px 15px rgba(139, 92, 246, 0.4); }
+        .btn-create:hover { background: #7c3aed; }
+
+        .btn-join { background: #f59e0b; box-shadow: 0 5px 15px rgba(245, 158, 11, 0.4); color: black;}
+        .btn-join:hover { background: #d97706; color: white; }
+
+        .back-btn { background: transparent; color: #94a3b8; border: none; margin-top: 30px; cursor: pointer; text-decoration: underline; font-family: inherit; font-size: 1rem;}
+        .back-btn:hover { color: white; }
+        
+        .options-panel {
+            background: #0f172a; padding: 15px; border-radius: 8px; border: 1px solid #475569;
+            margin-bottom: 30px; display: flex; flex-direction: column; gap: 15px; text-align: left;
+        }
+        .opt-row { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+        .opt-row input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
+
+        /* CHATS Y CAJAS ONLINE (Aprovechan todo el espacio vertical sin romper bordes) */
+        .chat-box { 
+            flex: 1; min-height: 0; overflow-y: auto; 
+            background: #0f172a; border: 1px solid #334155; 
+            padding: 10px; border-radius: 5px; margin-bottom: 10px; 
+            display: flex; flex-direction: column; gap: 5px;
+        }
+        .chat-msg { font-size: 0.9rem; color: #cbd5e1; word-wrap: break-word; text-align: left; }
+        .room-item { background: #334155; padding: 10px; border-radius: 5px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;}
+        
+        .btn-spectate { background: #64748b; padding: 6px 12px; font-size: 0.8rem; border:none; border-radius:4px; color:white; cursor:pointer; transition: 0.2s;}
+        .btn-spectate:hover { background: #475569; transform: scale(1.05); }
+
+        .online-col {
+            flex: 1; display: flex; flex-direction: column; background: #1e293b; 
+            border-radius: 8px; border: 1px solid #475569; padding: 15px;
+            box-sizing: border-box; height: 100%;
+        }
+
+        /* Contenedor maestro de vistas online (Fija altura a 500px para que no salte) */
+        .online-view-container {
+            display: flex; gap: 20px; text-align: left; height: 500px;
+        }
+    </style>
+    <script src="guardian.js"></script>
+</head>
+<body>
+
+    <button class="game-btn" style="position:absolute; top:20px; left:20px; background:#475569;" onclick="mostrarReglas()">Reglas</button>
+
+    <div class="lobby-container" id="lobby-main">
+        <div class="lobby-title">Preparación</div>
+        <div class="lobby-subtitle" id="mode-subtitle">Cargando...</div>
+
+        <div id="local-view" style="display: none; flex-direction: column;">
+            <div class="players-setup">
+                <div class="player-box" style="flex: 1; border-top: 4px solid #3b82f6;">
+                    <div class="p1-title">Jugador 1</div>
+                    <select id="p1-deck-select"><option value="random">🎲 Mazo aleatorio</option></select>
+                </div>
+                <div class="player-box" style="flex: 1; border-top: 4px solid #ef4444;">
+                    <div class="p2-title">Jugador 2</div>
+                    <select id="p2-deck-select"><option value="random">🎲 Mazo aleatorio</option></select>
+                </div>
+            </div>
+            <div class="options-panel" id="local-options">
+                <label class="opt-row"><input type="checkbox" id="fast-start-check"><span style="color:#cbd5e1; font-size:0.95rem;">Inicio rápido (no aparta cartas, mano inicial instantánea)</span></label>
+                <div class="opt-row" style="cursor: default;">
+                    <span style="color:#cbd5e1; font-size:0.95rem; flex: 1;">Jugador inicial:</span>
+                    <select id="force-start-select" style="flex: 2; padding: 6px;">
+                        <option value="random">🎲 Aleatorio (lanzar moneda)</option>
+                        <option value="p1">Forzar jugador 1</option>
+                        <option value="p2">Forzar jugador 2</option>
+                    </select>
+                </div>
+            </div>
+            <div id="local-controls">
+                <button class="start-btn" onclick="startLocalMatch()">¡Al campo de batalla!</button>
+            </div>
+        </div>
+
+        <div id="ai-view" style="display: none; flex-direction: column;">
+            <div class="players-setup">
+                <div class="player-box" style="flex: 1; border-top: 4px solid #3b82f6;">
+                    <div class="p1-title">Tú (Jugador)</div>
+                    <select id="ai-p1-deck-select"><option value="random">🎲 Mazo aleatorio</option></select>
+                </div>
+                <div class="player-box" style="flex: 1; border-top: 4px solid #0ea5e9;">
+                    <div class="p2-title" style="color: #0ea5e9;">Contrincante IA</div>
+                    <select id="ai-bot-select">
+                        <option value="random">🤖 Bot aleatorio (Mazo al azar)</option>
+                        </select>
+                </div>
+            </div>
+            <div class="options-panel">
+                <label class="opt-row"><input type="checkbox" id="ai-fast-start-check"><span style="color:#cbd5e1; font-size:0.95rem;">Inicio rápido (no aparta cartas, mano inicial instantánea)</span></label>
+                <div class="opt-row" style="cursor: default;">
+                    <span style="color:#cbd5e1; font-size:0.95rem; flex: 1;">Jugador inicial:</span>
+                    <select id="ai-force-start-select" style="flex: 2; padding: 6px;">
+                        <option value="random">🎲 Aleatorio (lanzar moneda)</option>
+                        <option value="p1">Empiezas tú</option>
+                        <option value="p2">Empieza la IA</option>
+                    </select>
+                </div>
+            </div>
+            <div id="local-controls">
+                <button class="start-btn" style="background: #0ea5e9; box-shadow: 0 5px 15px rgba(14, 165, 233, 0.4);" onclick="startAIMatch()">¡Enfrentarse a la Máquina!</button>
+            </div>
+        </div>
+
+        <div id="online-lobby-view" class="online-view-container" style="display: none;">
+            <div class="online-col">
+                <h3 style="margin-top: 0; color: #60a5fa;">💬 Chat global</h3>
+                <div id="global-chat-box" class="chat-box"></div>
+                <div style="display: flex; gap: 5px;">
+                    <input type="text" id="global-chat-input" style="text-align:left;" placeholder="Mensaje..." onkeypress="if(event.key==='Enter') sendGlobalChat()">
+                    <button class="start-btn" style="width: auto; padding: 10px 14px; margin: 0; font-size: 1rem;" onclick="sendGlobalChat()">➤</button>
+                </div>
+            </div>
+            <div class="online-col" style="background: transparent; border: none; padding: 0;">
+                <div style="margin-top: 15px; margin-bottom: 15px; display: flex; flex-direction: column; align-items: center; gap: 8px;">
+                    <label style="cursor: pointer; color: #fbbf24; font-size: 0.9rem;">
+                        <input type="checkbox" id="allow-spec-check" checked> 
+                        Permitir espectadores
+                    </label>
+                    <label style="cursor: pointer; color: #fbbf24; font-size: 0.9rem;">
+                        <input type="checkbox" id="omni-check" checked> 
+                        Espectador omnisciente (ve todo)
+                    </label>
+                </div>
+                <div style="display: flex; gap: 10px; flex-direction: column; align-items: center; width: 100%;">
+                    <button class="start-btn btn-create" style="margin-bottom: 0;" onclick="createOnlineRoom()">Crear partida</button>
+                    <div style="color: #94a3b8; font-weight: bold;">- O -</div>
+                    <div style="display: flex; width: 100%; gap: 10px;">
+                        <input type="text" id="room-code-input" placeholder="CÓDIGO (EJ: A4X9)" maxlength="4" style="text-transform: uppercase;">
+                        <button class="start-btn btn-join" style="margin: 0; width: auto; padding: 12px 20px;" onclick="joinRoomByCode(null, false)">Unirse</button>
+                        <button class="start-btn" style="background: #64748b; margin: 0; width: auto; padding: 12px 15px;" title="Espectar" onclick="joinRoomByCode(null, true)">👁️</button>
+                    </div>
+                </div>
+                
+                <h3 style="margin-top: 20px; margin-bottom: 10px; color: #fbbf24; border-bottom: 1px solid #475569; padding-bottom: 5px;">Salas activas</h3>
+                <div id="rooms-list" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; border: 1px solid #334155; padding: 10px; border-radius: 5px; background: #0f172a;"></div>
+            </div>
+        </div>
+
+        <div id="online-room-view" style="display: none; flex-direction: column; gap: 15px; text-align: left; height: 500px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; background: #0f172a; padding: 10px 20px; border-radius: 8px; border: 1px dashed #4ade80; height: 50px; box-sizing: border-box;">
+                <div style="font-size: 1.2rem; color: #4ade80; font-weight: bold;">SALA: <span id="current-room-code" style="letter-spacing: 2px; font-size: 1.5rem; color: white;">----</span></div>
+                <div id="grace-control" style="display:none; align-items:center; gap:4px;"></div>
+                <button class="back-btn" style="margin: 0; padding: 0; color: #f87171;" onclick="leaveRoomView()">Abandonar sala</button>
+            </div>
+            
+            <div style="display: flex; gap: 20px; flex: 1; min-height: 0;">
+                <div class="online-col">
+                    <h3 style="margin-top: 0; color: #fbbf24;">💬 Chat privado</h3>
+                    <div id="room-chat-box" class="chat-box"></div>
+                    <div style="display: flex; gap: 5px;">
+                        <input type="text" id="room-chat-input" style="text-align:left;" placeholder="Escribe..." onkeypress="if(event.key==='Enter') sendRoomChat()">
+                        <button class="start-btn" style="width: auto; padding: 10px 14px; margin: 0; font-size: 1rem;" onclick="sendRoomChat()">➤</button>
+                    </div>
+                </div>
+                
+                <div class="online-col" style="background: transparent; border: none; padding: 0; gap: 10px;">
+                    <div class="player-box" style="border-top: 4px solid #3b82f6;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span class="p1-title" id="room-p1-name" style="font-size: 1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 130px;">Esperando...</span>
+                            <span id="room-p1-status" style="color: #94a3b8; font-size: 0.8rem; text-align: right;">⏳ Eligiendo mazo</span>
+                        </div>
+                    </div>
+                    <div class="player-box" style="border-top: 4px solid #ef4444;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span class="p2-title" id="room-p2-name" style="font-size: 1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 130px;">Esperando rival...</span>
+                            <span id="room-p2-status" style="color: #94a3b8; font-size: 0.8rem; text-align: right;">---</span>
+                        </div>
+                    </div>
+                    
+                    <div class="player-box" style="border-top: 4px solid #64748b; flex: 1; min-height: 0; overflow-y: auto; padding: 10px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 5px;">
+                            <span style="color: #94a3b8; font-size: 0.9rem; font-weight: bold;">👁️ Espectadores</span>
+                            <button id="btn-to-spectators" onclick="becomeSpectator()" style="display:none; background:#64748b; color:#fff; border:none; border-radius:6px; padding:3px 10px; font-size:0.8rem; cursor:pointer;">👁️ Ir a espectadores</button>
+                        </div>
+                        <div id="room-spectators-list" style="font-size: 0.85rem; color: #cbd5e1;">Ninguno</div>
+                    </div>
+
+                    <div id="test-panel-wrap" style="width:100%;"></div>
+
+                    <div style="margin-top: auto; width: 100%;">
+                        <div id="rematch-area" style="width:100%; text-align:center; margin-bottom:10px;"></div>
+                        <select id="online-deck-select" style="margin-bottom: 10px;"><option value="random">🎲 Mazo aleatorio</option></select>
+                        <button class="start-btn" id="btn-ready" style="background: #f59e0b; color: black; margin: 0;" onclick="toggleReady()">¡ESTOY LISTO!</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div style="text-align: center;">
+            <button class="back-btn" onclick="location.href='landing.html'">Volver al menú principal</button>
+        </div>
+    </div>
+
+    <script src="reglas.js"></script>
+    <script src="cartas.js"></script>
+    <script>
+        let userDecks = [];
+        let myUsername = 'Invitado_' + Math.floor(Math.random() * 1000);
+        let socket = null;
+        let currentRoom = null;
+        let myRole = null;
+        let isReadyLocal = false;
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        const gameMode = urlParams.get('mode') || 'local';
+
+        async function init() {
+            try {
+                const res = await fetch('/api/session');
+                const data = await res.json();
+                if (data.loggedIn) myUsername = data.username;
+
+                const decksRes = await fetch('/api/decks');
+                const decksData = await decksRes.json();
+                if (decksData.success && decksData.decks.length > 0) {
+                    userDecks = decksData.decks;
+                    let optionsHTML = '<option value="random">🎲 Mazo aleatorio</option>';
+                    userDecks.forEach(d => optionsHTML += `<option value="${d.id}">📦 ${d.name}</option>`);
+                    document.getElementById('p1-deck-select').innerHTML = optionsHTML;
+                    document.getElementById('p2-deck-select').innerHTML = optionsHTML;
+                    document.getElementById('online-deck-select').innerHTML = optionsHTML;
+                    document.getElementById('ai-p1-deck-select').innerHTML = optionsHTML; // <--- AÑADIDO
+                }
+            } catch(e) {}
+
+            if (gameMode === 'online') {
+                document.getElementById('mode-subtitle').innerText = "Multijugador online";
+                document.getElementById('lobby-main').style.width = '850px'; 
+                // Si volvemos a una sala terminada, no parpadeamos la vista general: esperamos a entrar en la sala.
+                if (!localStorage.getItem('karlos_return_room')) {
+                    document.getElementById('online-lobby-view').style.display = 'flex';
+                }
+                initSockets();
+            } else if (gameMode === 'ai') { // VISTA DE IA
+                document.getElementById('mode-subtitle').innerText = "Jugar contra la IA";
+                document.getElementById('ai-view').style.display = 'flex';
+            } else {
+                document.getElementById('mode-subtitle').innerText = "Modo local";
+                document.getElementById('local-view').style.display = 'flex';
+            }
+
+            document.body.style.visibility = 'visible'; // Adiós FOUC absoluto
+        }
+
+        function initSockets() {
+            socket = io();
+
+            // Reingreso a una sala TERMINADA tras pulsar "Volver a la sala" en el cartel.
+            socket.on('seatOccupied', (data) => {
+                myRole = data.role;
+                localStorage.setItem('karlos_online_role', myRole);
+                if (data.roomData && data.roomData.status === 'waiting') {
+                    document.getElementById('btn-ready').style.display = 'inline-block';
+                    document.getElementById('online-deck-select').style.display = 'inline-block';
+                }
+                updateRoomUI(data.roomData);
+            });
+            socket.on('becameSpectator', (data) => {
+                myRole = 'spectator';
+                localStorage.setItem('karlos_online_role', 'spectator');
+                document.getElementById('btn-ready').style.display = 'none';
+                document.getElementById('online-deck-select').style.display = 'none';
+            });
+            socket.on('returnedToFinishedRoom', (data) => {
+                currentRoom = data.roomCode;
+                myRole = data.role;
+                localStorage.setItem('karlos_room_code', currentRoom);
+                localStorage.setItem('karlos_online_role', myRole);
+                document.getElementById('online-lobby-view').style.display = 'none';
+                document.getElementById('online-room-view').style.display = 'flex';
+                document.getElementById('current-room-code').innerText = currentRoom;
+                document.getElementById('btn-ready').style.display = 'none';
+                document.getElementById('online-deck-select').style.display = 'none';
+                updateRoomUI(data.roomData);
+            });
+            socket.on('finishedRoomClosed', (data) => {
+                if (window._lastClosedAt && Date.now() - window._lastClosedAt < 3000) return;
+                window._lastClosedAt = Date.now();
+                alert((data && data.msg) ? data.msg : 'La sala se ha cerrado.');
+                currentRoom = null; myRole = null;
+                localStorage.removeItem('karlos_room_code');
+                localStorage.removeItem('karlos_online_role');
+                localStorage.removeItem('karlos_return_room');
+                document.getElementById('online-room-view').style.display = 'none';
+                document.getElementById('online-lobby-view').style.display = 'flex';
+            });
+            const _returnRoom = localStorage.getItem('karlos_return_room');
+            if (_returnRoom) {
+                localStorage.removeItem('karlos_return_room');
+                socket.emit('returnToFinishedRoom', { roomCode: _returnRoom, username: myUsername });
+            }
+
+            socket.on('roomListUpdate', (rooms) => {
+                const list = document.getElementById('rooms-list');
+                list.innerHTML = '';
+                if (rooms.length === 0) {
+                    list.innerHTML = '<div style="color:#64748b; padding: 10px; text-align: center; margin-top: 20px;">No hay salas activas.<br>¡Crea la tuya!</div>';
+                    return;
+                }
+                
+                const isAdmin = localStorage.getItem('karlos_is_admin') === '1';
+
+                rooms.forEach(r => {
+                    const div = document.createElement('div');
+                    div.className = 'room-item';
+                    
+                    // Si es admin, generamos el botón rojo. Si no, lo dejamos vacío.
+                    const adminBtn = isAdmin ? `<button class="btn-spectate" style="background:#ef4444;" title="Forzar Cierre" onclick="adminCloseRoom('${r.code}')">🗑️</button>` : '';
+
+                    div.innerHTML = `
+                        <span style="color: white; font-weight:bold; font-size:0.9rem;">${r.host} <span style="color:#fbbf24; font-size:0.8rem; font-weight:normal;">(${r.playersCount}/2)</span></span>
+                        <div style="display:flex; gap:5px;">
+                            ${r.status === 'waiting' && r.playersCount < 2 ? `<button class="btn-spectate" style="background:#10b981;" onclick="joinRoomByCode('${r.code}', false)">Unirse</button>` : ''}
+                            <button class="btn-spectate" title="Espectar" onclick="joinRoomByCode('${r.code}', true)">👁️</button>
+                            ${adminBtn} </div>
+                    `;
+                    list.appendChild(div);
+                });
+            });
+
+            socket.on('globalChat', (data) => {
+                const box = document.getElementById('global-chat-box');
+                const color = data.username === myUsername ? '#fbbf24' : '#60a5fa';
+                box.innerHTML += `<div class="chat-msg"><strong style="color:${color};">${data.username}:</strong> ${data.msg}</div>`;
+                box.scrollTop = box.scrollHeight;
+            });
+
+            socket.on('roomChatHistory', (arr) => {
+                const box = document.getElementById('room-chat-box');
+                if (!box) return;
+                box.innerHTML = '';
+                (arr || []).forEach(data => {
+                    const color = data.username === 'Sistema' ? '#94a3b8' : (data.username === myUsername ? '#fbbf24' : '#60a5fa');
+                    box.innerHTML += `<div class="chat-msg"><strong style="color:${color};">${data.username}:</strong> ${data.msg}</div>`;
+                });
+                box.scrollTop = box.scrollHeight;
+            });
+
+            socket.on('roomChat', (data) => {
+                const box = document.getElementById('room-chat-box');
+                const color = data.username === 'Sistema' ? '#94a3b8' : (data.username === myUsername ? '#fbbf24' : '#60a5fa');
+                box.innerHTML += `<div class="chat-msg"><strong style="color:${color};">${data.username}:</strong> ${data.msg}</div>`;
+                box.scrollTop = box.scrollHeight;
+            });
+
+            socket.on('roomJoined', (data) => {
+                currentRoom = data.roomCode;
+                myRole = data.role;
+                
+                // Guardamos si la sala permite verlo todo
+                if (data.roomData && data.roomData.omniscient !== undefined) {
+                    localStorage.setItem('karlos_omniscient', data.roomData.omniscient);
+                }
+
+                // Si entras como espectador en una partida iniciada O ya terminada, vamos directo al tablero/cartel
+                if (myRole === 'spectator' && data.roomData && (data.roomData.status === 'playing' || data.roomData.status === 'finished')) {
+                    localStorage.setItem('karlos_room_code', currentRoom);
+                    localStorage.setItem('karlos_online_role', 'spectator');
+                    localStorage.setItem('karlos_game_mode', 'online');
+                    localStorage.setItem('karlos_partida_en_curso', currentRoom);
+                    if (data.roomData.players) {
+                        if (data.roomData.players.p1) localStorage.setItem('karlos_p1_name', data.roomData.players.p1.name);
+                        if (data.roomData.players.p2) localStorage.setItem('karlos_p2_name', data.roomData.players.p2.name);
+                    }
+                    window.location.href = 'index.html';
+                    return;
+                }
+                
+                document.getElementById('online-lobby-view').style.display = 'none';
+                document.getElementById('online-room-view').style.display = 'flex';
+                document.getElementById('current-room-code').innerText = data.roomCode;
+                
+                if (myRole === 'spectator') {
+                    document.getElementById('btn-ready').style.display = 'none';
+                    document.getElementById('online-deck-select').style.display = 'none';
+                }
+                updateRoomUI(data.roomData);
+                // Solo un admin publica su config de pruebas guardada, y solo si la sala está por defecto (no pisa la de otro admin).
+                const _saved = loadTestCfg();
+                if (localStorage.getItem('karlos_is_admin') === '1' && isTestNonDefault(_saved) && !isTestNonDefault(data.roomData.testConfig)) {
+                    testCfg = _saved; pushTestCfg();
+                }
+            });
+
+            socket.on('roomUpdate', (roomData) => updateRoomUI(roomData));
+
+            socket.on('gameStart', (data) => {
+                localStorage.setItem('karlos_game_mode', 'online');
+                localStorage.setItem('karlos_online_role', myRole);
+                localStorage.setItem('karlos_room_code', currentRoom);
+                
+                // Guardamos la configuración visual
+                if (data.omniscient !== undefined) {
+                    localStorage.setItem('karlos_omniscient', data.omniscient);
+                }
+                
+                localStorage.setItem('karlos_p1_deck', typeof data.p1Deck === 'string' ? data.p1Deck : JSON.stringify(data.p1Deck));
+                localStorage.setItem('karlos_p2_deck', typeof data.p2Deck === 'string' ? data.p2Deck : JSON.stringify(data.p2Deck));
+                localStorage.setItem('karlos_username', myUsername);
+                localStorage.setItem('karlos_test_active', JSON.stringify(data.testConfig || { fastStart: false, startingPlayer: 'random', forcedHands: { p1: [], p2: [] } }));
+                
+                // Guardar los nombres de ambos jugadores
+                localStorage.setItem('karlos_p1_name', data.p1Name);
+                localStorage.setItem('karlos_p2_name', data.p2Name);
+                
+                window.location.href = 'index.html';
+            });
+
+            socket.on('roomError', (msg) => { alert("⚠️ " + msg); location.reload(); });
+        }
+
+        // ===== PANEL DE PRUEBAS (ADMIN) =====
+        const DEFAULT_TEST_CONFIG = { fastStart: false, startingPlayer: 'random', forcedHands: { p1: [], p2: [] } };
+        let testCfg = loadTestCfg();
+        let _tpLastRoom = null;
+
+        function loadTestCfg() {
+            try {
+                const c = JSON.parse(localStorage.getItem('karlos_test_config'));
+                if (c && typeof c === 'object') {
+                    return {
+                        fastStart: !!c.fastStart,
+                        startingPlayer: (c.startingPlayer === 'p1' || c.startingPlayer === 'p2') ? c.startingPlayer : 'random',
+                        forcedHands: {
+                            p1: Array.isArray(c.forcedHands && c.forcedHands.p1) ? c.forcedHands.p1.slice(0, 6) : [],
+                            p2: Array.isArray(c.forcedHands && c.forcedHands.p2) ? c.forcedHands.p2.slice(0, 6) : []
+                        }
+                    };
+                }
+            } catch (e) {}
+            return JSON.parse(JSON.stringify(DEFAULT_TEST_CONFIG));
+        }
+        function saveTestCfg() { localStorage.setItem('karlos_test_config', JSON.stringify(testCfg)); }
+        function isTestNonDefault(c) {
+            return !!(c && (c.fastStart || (c.startingPlayer && c.startingPlayer !== 'random') ||
+                (c.forcedHands && ((c.forcedHands.p1 && c.forcedHands.p1.length) || (c.forcedHands.p2 && c.forcedHands.p2.length)))));
+        }
+        function pushTestCfg() {
+            saveTestCfg();
+            if (_tpLastRoom) _tpLastRoom.testConfig = JSON.parse(JSON.stringify(testCfg)); // optimista: ya queda reflejado en la sala local
+            if (currentRoom) socket.emit('setTestConfig', { roomCode: currentRoom, config: testCfg });
+        }
+        function tpCardName(id) { const c = CARD_DB.find(x => x.id == id); return c ? c.name : ('#' + id); }
+
+        function renderTestPanel(room) {
+            const wrap = document.getElementById('test-panel-wrap');
+            if (!wrap) return;
+            // El config vivo es el de la sala: así, si hay varios admins, todos lo ven sincronizado en tiempo real.
+            if (room && room.testConfig) testCfg = JSON.parse(JSON.stringify(room.testConfig));
+            // El panel EDITABLE es exclusivo de admins (mismo criterio que el botón de debug en partida).
+            const isAdmin = localStorage.getItem('karlos_is_admin') === '1';
+            const inGame = room && room.status && room.status !== 'waiting';
+            if (isAdmin && !inGame) { wrap.innerHTML = renderAdminPanel(); wireAdminPanel(); return; }
+            const cfg = (room && room.testConfig) ? room.testConfig : null;
+            wrap.innerHTML = isTestNonDefault(cfg) ? renderReadonlySummary(cfg) : '';
+        }
+        function summaryLines(cfg) {
+            const lines = [];
+            if (cfg.fastStart) lines.push('Inicio rápido');
+            if (cfg.startingPlayer === 'p1') lines.push('Empieza J1');
+            else if (cfg.startingPlayer === 'p2') lines.push('Empieza J2');
+            if (cfg.forcedHands && cfg.forcedHands.p1 && cfg.forcedHands.p1.length) lines.push('Mano J1: ' + cfg.forcedHands.p1.map(tpCardName).join(', '));
+            if (cfg.forcedHands && cfg.forcedHands.p2 && cfg.forcedHands.p2.length) lines.push('Mano J2: ' + cfg.forcedHands.p2.map(tpCardName).join(', '));
+            return lines;
+        }
+        function renderReadonlySummary(cfg) {
+            return `<div style="background:#1f2937; border:1px solid #f59e0b; border-radius:8px; padding:8px 12px; font-size:0.78rem; color:#fcd34d;">⚙️ <b>El anfitrión activó opciones de prueba:</b><br>${summaryLines(cfg).map(l => '• ' + l).join('<br>')}</div>`;
+        }
+        function renderAdminPanel() {
+            const open = localStorage.getItem('karlos_test_panel_open') === '1';
+            const nd = isTestNonDefault(testCfg);
+            const head = `<div id="tp-head" style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; background:#0f172a; border:1px solid #475569; border-radius:8px; padding:7px 12px;"><span style="font-size:0.82rem; color:#fbbf24; font-weight:bold;">⚙️ Opciones de prueba${nd ? ' <span style="color:#4ade80;">●</span>' : ''}</span><span style="color:#94a3b8; font-size:0.9rem;">${open ? '▾' : '▸'}</span></div>`;
+            if (!open) return head;
+            const seatBlock = (seat) => {
+                const list = testCfg.forcedHands[seat] || [];
+                const chips = list.map((id, i) => `<span style="display:inline-flex; align-items:center; gap:4px; background:#334155; border-radius:12px; padding:2px 8px; margin:2px; font-size:0.72rem; color:#e2e8f0;">${tpCardName(id)} <span data-rm="${seat}:${i}" style="cursor:pointer; color:#f87171;">✕</span></span>`).join('');
+                return `<div style="margin-top:6px;"><div style="font-size:0.72rem; color:#94a3b8; margin-bottom:2px;">Mano forzada ${seat === 'p1' ? 'J1' : 'J2'} (máx. 6):</div><div>${chips || '<span style="color:#64748b; font-size:0.72rem;">— ninguna —</span>'}</div><button data-add="${seat}" style="margin-top:4px; background:#1e293b; color:#cbd5e1; border:1px dashed #475569; border-radius:6px; padding:3px 8px; font-size:0.72rem; cursor:pointer;">＋ Añadir carta</button><div id="tp-picker-${seat}" style="display:none; margin-top:4px;"></div></div>`;
+            };
+            const body = `<div style="background:#0f172a; border:1px solid #475569; border-top:none; border-radius:0 0 8px 8px; padding:10px 12px; max-height:240px; overflow-y:auto;"><label style="display:flex; align-items:center; gap:8px; font-size:0.8rem; color:#e2e8f0; cursor:pointer;"><input type="checkbox" id="tp-fast" ${testCfg.fastStart ? 'checked' : ''}> Inicio rápido (saltar apartar 3 cartas)</label><div style="margin-top:8px; font-size:0.8rem; color:#e2e8f0;">Empieza: <select id="tp-start" style="margin-left:6px; width:auto; display:inline-block;"><option value="random" ${testCfg.startingPlayer === 'random' ? 'selected' : ''}>🎲 Aleatorio</option><option value="p1" ${testCfg.startingPlayer === 'p1' ? 'selected' : ''}>J1</option><option value="p2" ${testCfg.startingPlayer === 'p2' ? 'selected' : ''}>J2</option></select></div>${seatBlock('p1')}${seatBlock('p2')}<button id="tp-reset" style="margin-top:10px; background:#7f1d1d; color:#fecaca; border:none; border-radius:6px; padding:4px 10px; font-size:0.72rem; cursor:pointer;">Restablecer a por defecto</button></div>`;
+            return head + body;
+        }
+        function wireAdminPanel() {
+            const head = document.getElementById('tp-head');
+            if (head) head.onclick = () => {
+                const open = localStorage.getItem('karlos_test_panel_open') === '1';
+                localStorage.setItem('karlos_test_panel_open', open ? '0' : '1');
+                renderTestPanel(_tpLastRoom);
+            };
+            const fast = document.getElementById('tp-fast');
+            if (fast) fast.onchange = () => { testCfg.fastStart = fast.checked; pushTestCfg(); renderTestPanel(_tpLastRoom); };
+            const start = document.getElementById('tp-start');
+            if (start) start.onchange = () => { testCfg.startingPlayer = start.value; pushTestCfg(); renderTestPanel(_tpLastRoom); };
+            document.querySelectorAll('#test-panel-wrap [data-rm]').forEach(el => el.onclick = () => {
+                const parts = el.getAttribute('data-rm').split(':');
+                testCfg.forcedHands[parts[0]].splice(parseInt(parts[1]), 1); pushTestCfg(); renderTestPanel(_tpLastRoom);
+            });
+            document.querySelectorAll('#test-panel-wrap [data-add]').forEach(el => el.onclick = () => openCardPicker(el.getAttribute('data-add')));
+            const reset = document.getElementById('tp-reset');
+            if (reset) reset.onclick = () => { testCfg = JSON.parse(JSON.stringify(DEFAULT_TEST_CONFIG)); pushTestCfg(); renderTestPanel(_tpLastRoom); };
+        }
+        function openCardPicker(seat) {
+            const box = document.getElementById('tp-picker-' + seat);
+            if (!box) return;
+            if (testCfg.forcedHands[seat].length >= 6) { alert('Máximo 6 cartas forzadas por jugador.'); return; }
+            box.style.display = 'block';
+            box.innerHTML = `<input type="text" id="tp-search-${seat}" placeholder="🔍 Buscar carta..." style="width:100%; box-sizing:border-box; font-size:0.75rem; padding:4px;"><div id="tp-results-${seat}" style="max-height:120px; overflow-y:auto; margin-top:3px;"></div>`;
+            const input = document.getElementById('tp-search-' + seat);
+            const results = document.getElementById('tp-results-' + seat);
+            const renderResults = () => {
+                const q = (input.value || '').toLowerCase();
+                const matches = CARD_DB.filter(c => !c.isToken && c.name && c.name.toLowerCase().includes(q)).slice(0, 12);
+                results.innerHTML = matches.map(c => `<button data-pick="${c.id}" style="display:block; width:100%; text-align:left; background:#1e293b; color:#e2e8f0; border:none; border-bottom:1px solid #334155; padding:4px 6px; font-size:0.74rem; cursor:pointer;">${c.name} <span style="color:#64748b;">(${c.type})</span></button>`).join('') || '<div style="color:#64748b; font-size:0.72rem; padding:4px;">Sin resultados</div>';
+                results.querySelectorAll('[data-pick]').forEach(b => b.onclick = () => {
+                    testCfg.forcedHands[seat].push(parseInt(b.getAttribute('data-pick')));
+                    pushTestCfg(); renderTestPanel(_tpLastRoom);
+                });
+            };
+            input.oninput = renderResults;
+            renderResults();
+            input.focus();
+        }
+
+        function updateRoomUI(room) {
+            _tpLastRoom = room;
+            const p1Name = document.getElementById('room-p1-name');
+            const p1Status = document.getElementById('room-p1-status');
+            const p2Name = document.getElementById('room-p2-name');
+            const p2Status = document.getElementById('room-p2-status');
+            const specsList = document.getElementById('room-spectators-list');
+
+            const finished = (room.status === 'finished');
+            const winRole = (finished && room.winner) ? room.winner.role : null;
+            const fStatus = (pl) => {
+                if (!pl || !pl.connected) return { txt: '⚪ Fuera de la sala', col: '#64748b' };
+                if (pl.inIndexHtml) return { txt: '🏆 Viendo resultados', col: '#22c55e' };
+                return { txt: '🟡 En la sala', col: '#f59e0b' };
+            };
+
+            const renderSeat = (pl, nameEl, statusEl, seat) => {
+                if (!pl) {
+                    nameEl.innerText = "Asiento libre";
+                    const outOfGame = (room.status === 'waiting' || room.status === 'finished');
+                    const amSeated = (myRole === 'p1' || myRole === 'p2');
+                    if (outOfGame && (myRole === 'spectator' || amSeated)) {
+                        statusEl.innerHTML = `<button onclick="occupySeat('${seat}')" style="background:#10b981; color:#fff; border:none; border-radius:6px; padding:3px 10px; font-size:0.8rem; cursor:pointer;">🪑 Sentarse aquí</button>`;
+                    } else {
+                        statusEl.innerText = "🪑 Libre";
+                        statusEl.style.color = "#64748b";
+                    }
+                    return;
+                }
+                const crown = (winRole === seat) ? ' 👑' : ((!finished && room.leader === seat) ? ' 👑' : '');
+                nameEl.innerText = pl.name + crown;
+                if (finished) { const s = fStatus(pl); statusEl.innerText = s.txt; statusEl.style.color = s.col; }
+                else if (pl.inIndexHtml) { statusEl.innerText = '👁️ Viendo resultados'; statusEl.style.color = '#fbbf24'; }
+                else { statusEl.innerText = pl.ready ? '✅ LISTO' : '⏳ Eligiendo mazo'; statusEl.style.color = pl.ready ? '#10b981' : '#94a3b8'; }
+            };
+            renderSeat(room.players.p1, p1Name, p1Status, 'p1');
+            renderSeat(room.players.p2, p2Name, p2Status, 'p2');
+
+            if (room.spectators && room.spectators.length > 0) {
+                specsList.innerHTML = room.spectators.map(s => s.name).join('<br>');
+            } else {
+                specsList.innerHTML = "Ninguno";
+            }
+
+            const btnToSpec = document.getElementById('btn-to-spectators');
+            if (btnToSpec) {
+                const otherSeat = myRole === 'p1' ? 'p2' : (myRole === 'p2' ? 'p1' : null);
+                const otherOccupied = otherSeat && !!room.players[otherSeat];
+                btnToSpec.style.display = ((myRole === 'p1' || myRole === 'p2') && room.status !== 'playing' && otherOccupied) ? 'inline-block' : 'none';
+            }
+
+            const gc = document.getElementById('grace-control');
+            if (gc) {
+                const sec = Math.round((room.graceMs || 60000) / 1000);
+                const isLeader = (myRole === room.leader);
+                if (isLeader) {
+                    let inp = document.getElementById('grace-input');
+                    if (!inp) {
+                        gc.innerHTML = `<span style="color:#94a3b8; font-size:0.8rem;">⏱️ Gracia:</span><input type="number" id="grace-input" min="10" max="600" style="width:52px; margin:0 2px; text-align:center; font-size:0.85rem; background:#0f172a; color:#e2e8f0; border:1px solid #334155; border-radius:4px;" onchange="setRoomGrace(this.value)"><span style="color:#94a3b8; font-size:0.8rem;">s</span>`;
+                        inp = document.getElementById('grace-input');
+                    }
+                    if (inp && document.activeElement !== inp) inp.value = sec;
+                } else {
+                    gc.innerHTML = `<span style="color:#94a3b8; font-size:0.8rem;">⏱️ Gracia: ${sec}s</span>`;
+                }
+                gc.style.display = 'flex';
+            }
+
+            // Normalización del botón de listo: al entrar/volver a una sala en espera, el botón
+            // vuelve a su estado base (evita quedarse pillado tras una revancha o cambio de sala).
+            if (room.status === 'waiting') {
+                const br = document.getElementById('btn-ready');
+                const sel = document.getElementById('online-deck-select');
+                const meServer = (myRole === 'p1' || myRole === 'p2') ? room.players[myRole] : null;
+                const readyServer = !!(meServer && meServer.ready);
+                if (br) {
+                    br.style.display = 'inline-block';
+                    if (!readyServer && isReadyLocal) { isReadyLocal = false; }
+                    if (!isReadyLocal) { br.innerText = '¡ESTOY LISTO!'; br.style.background = '#f59e0b'; br.style.color = 'black'; if (sel) sel.disabled = false; }
+                }
+            }
+
+            const rmArea = document.getElementById('rematch-area');
+            if (rmArea) rmArea.innerHTML = ''; // (rework) sin estado de revancha
+
+            renderTestPanel(room);
+        }
+
+        function sendGlobalChat() {
+            const input = document.getElementById('global-chat-input');
+            if (input.value.trim()) { socket.emit('globalChat', { username: myUsername, msg: input.value.trim() }); input.value = ''; }
+        }
+
+        function sendRoomChat() {
+            const input = document.getElementById('room-chat-input');
+            if (input.value.trim()) { socket.emit('roomChat', { roomCode: currentRoom, username: myUsername, msg: input.value.trim() }); input.value = ''; }
+        }
+
+        function adminCloseRoom(code) {
+            if (confirm(`[ADMIN] ¿Estás seguro de que quieres destruir la sala ${code} y expulsar a todos?`)) {
+                socket.emit('adminCloseRoom', code);
+            }
+        }
+
+
+        // === FUNCIONES DE SALA (restauradas; sus definiciones se perdieron en una edición anterior) ===
+        function occupySeat(seat) {
+            socket.emit('occupySeat', { roomCode: currentRoom, username: myUsername, seat: seat });
+        }
+        function becomeSpectator() {
+            socket.emit('becomeSpectator', { roomCode: currentRoom, username: myUsername });
+        }
+        function setRoomGrace(v) {
+            socket.emit('setRoomGrace', { roomCode: currentRoom, seconds: parseInt(v) });
+        }
+        function leaveRoomView() {
+            if (currentRoom) socket.emit('abandonGame', { roomCode: currentRoom, username: myUsername, role: myRole });
+            currentRoom = null; myRole = null;
+            localStorage.removeItem('karlos_room_code');
+            localStorage.removeItem('karlos_online_role');
+            document.getElementById('online-room-view').style.display = 'none';
+            document.getElementById('online-lobby-view').style.display = '';
+        }
+
+        function createOnlineRoom() { 
+            // Capturamos si las casillas están marcadas
+            const allowSpec = document.getElementById('allow-spec-check').checked;
+            const isOmni = document.getElementById('omni-check').checked;
+
+            // Lo enviamos todo al servidor
+            socket.emit('createRoom', { 
+                username: myUsername, 
+                allowSpectators: allowSpec, 
+                omniscient: isOmni 
+            }); 
+        }
+
+        function joinRoomByCode(code, asSpectator = false) {
+            code = code || document.getElementById('room-code-input').value.trim().toUpperCase();
+            if (code.length !== 4) return alert("El código debe tener 4 caracteres.");
+            
+            localStorage.setItem('karlos_username', myUsername); // <--- Evita el null
+            
+            socket.emit('joinRoom', { code, username: myUsername, asSpectator });
+        }
+
+        function toggleReady() {
+            try {
+                isReadyLocal = !isReadyLocal;
+                const btn = document.getElementById('btn-ready');
+                const select = document.getElementById('online-deck-select');
+                
+                if (isReadyLocal) {
+                    btn.innerText = "CANCELAR LISTO";
+                    btn.style.background = "#ef4444"; btn.style.color = "white";
+                    select.disabled = true;
+                } else {
+                    btn.innerText = "¡ESTOY LISTO!";
+                    btn.style.background = "#f59e0b"; btn.style.color = "black";
+                    select.disabled = false;
+                }
+                
+                let deckCards = null;
+                if (select.value !== 'random') {
+                    const deck = userDecks.find(d => d.id == select.value);
+                    if (deck) deckCards = deck.cards;
+                }
+
+                if (!deckCards) {
+                    const personajes = CARD_DB.filter(c => c.type === 'Personaje').map(c => c.id);
+                    const otros = CARD_DB.filter(c => c.type !== 'Personaje').map(c => c.id);
+                    
+                    for(let i = personajes.length - 1; i > 0; i--) { 
+                        const j = Math.floor(Math.random()*(i+1)); 
+                        [personajes[i], personajes[j]] = [personajes[j], personajes[i]]; 
+                    }
+                    
+                    const numPersonajes = Math.min(personajes.length, Math.floor(Math.random()*4)+4);
+                    deckCards = personajes.slice(0, numPersonajes);
+                    
+                    while(deckCards.length < 40) {
+                        deckCards.push(otros[Math.floor(Math.random()*otros.length)]);
+                    }
+                }
+                
+                socket.emit('playerReady', { roomCode: currentRoom, isReady: isReadyLocal, deck: deckCards });
+            } catch (e) {
+                console.error("Error al dar listo:", e);
+                alert("Error al preparar el mazo. Por favor, recarga la página.");
+            }
+        }
+
+        const getDeckCards = (val) => {
+            if (val === 'random') return 'random';
+            const deck = userDecks.find(d => d.id == val);
+            return deck ? JSON.stringify(deck.cards) : 'random';
+        };
+
+        function startLocalMatch() {
+            localStorage.setItem('karlos_game_mode', 'local');
+            localStorage.setItem('karlos_game_mode', 'local');
+            localStorage.setItem('karlos_p1_name', 'Jugador 1');
+            localStorage.setItem('karlos_p2_name', 'Jugador 2');
+            localStorage.setItem('karlos_p1_deck', getDeckCards(document.getElementById('p1-deck-select').value));
+            localStorage.setItem('karlos_p2_deck', getDeckCards(document.getElementById('p2-deck-select').value));
+            localStorage.setItem('karlos_fast_start', document.getElementById('fast-start-check').checked);
+            localStorage.setItem('karlos_force_start', document.getElementById('force-start-select').value);
+            window.location.href = 'index.html';
+        }
+
+        function startAIMatch() {
+            localStorage.setItem('karlos_game_mode', 'ai');
+            localStorage.setItem('karlos_p1_name', myUsername || 'Jugador');
+            
+            const botType = document.getElementById('ai-bot-select').value;
+            localStorage.setItem('karlos_ai_type', botType); 
+            
+            if (botType === 'random') {
+                localStorage.setItem('karlos_p2_name', 'Bot aleatorio');
+                localStorage.setItem('karlos_p2_deck', 'random');
+            }
+            
+            localStorage.setItem('karlos_p1_deck', getDeckCards(document.getElementById('ai-p1-deck-select').value));
+            localStorage.setItem('karlos_fast_start', document.getElementById('ai-fast-start-check').checked);
+            localStorage.setItem('karlos_force_start', document.getElementById('ai-force-start-select').value);
+            window.location.href = 'index.html';
+        }
+
+        init();
+        inicializarReglas();
+    </script>
+</body>
+</html>

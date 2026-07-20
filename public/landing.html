@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <link rel="stylesheet" href="global.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Karlos TCG - Inicio</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #0f172a;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+        .logo {
+            font-size: 4rem;
+            font-weight: 900;
+            color: #fbbf24;
+            text-shadow: 0 0 20px rgba(251, 191, 36, 0.5);
+            margin-bottom: 40px;
+            text-transform: uppercase;
+        }
+        .menu-container {
+            background: #1e293b;
+            padding: 30px;
+            border-radius: 10px;
+            border: 2px solid #3b82f6;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 300px;
+        }
+        .menu-btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 15px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            text-align: center;
+        }
+        .menu-btn:hover {
+            background: #2563eb;
+            transform: scale(1.05);
+        }
+        .btn-test {
+            background: #10b981;
+        }
+        .btn-test:hover { background: #059669; }
+        .disabled {
+            background: #475569 !important;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+        .disabled:hover { transform: none; }
+
+        .auth-input {
+            padding: 12px;
+            border-radius: 5px;
+            border: 1px solid #334155;
+            background: #0f172a;
+            color: white;
+            font-size: 1rem;
+        }
+        .auth-input:focus {
+            outline: none;
+            border-color: #fbbf24;
+        }
+        #auth-msg {
+            font-size: 0.85rem;
+            text-align: center;
+            min-height: 1.2rem;
+            margin-top: 5px;
+        }
+        /* Estilo para el título dinámico del formulario */
+        .auth-title {
+            color: #fbbf24;
+            font-size: 0.9rem;
+            text-transform: lowercase;
+            font-weight: bold;
+            margin-bottom: 5px;
+            text-align: center;
+        }
+    </style>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="guardian.js"></script>
+</head>
+<body style="visibility: hidden;">
+
+    <div class="logo">KARLOS TCG</div>
+
+    <div class="menu-container">
+        <div id="guest-ui" style="display: flex; flex-direction: column; gap: 15px;">
+            <button class="menu-btn" onclick="showAuth('login')">Iniciar sesión</button>
+            <button class="menu-btn" onclick="showAuth('register')">Crear cuenta</button>
+        </div>
+
+        <div id="auth-form" style="display: none; flex-direction: column; gap: 10px; border-top: 1px solid #334155; padding-top: 15px;">
+            <div id="form-title" class="auth-title"></div>
+            <input type="text" id="username" class="auth-input" placeholder="usuario">
+            <input type="password" id="password" class="auth-input" placeholder="contraseña">
+            <button id="submit-btn" class="menu-btn" style="background: #fbbf24; color: black;" onclick="submitAuth()">Confirmar</button>
+            <div id="auth-msg"></div>
+        </div>
+
+        <div id="user-ui" style="display: none; flex-direction: column; gap: 15px;">
+            <div id="welcome-msg" style="text-align: center; color: #fbbf24; font-weight: bold; margin-bottom: 5px;"></div>
+            <button class="menu-btn" style="background: #D08523;" onclick="location.href='deckbuilder.html'">Constructor de mazos</button>
+            <button id="btn-editor" class="menu-btn" style="background: #7c3aed; display: none;" onclick="location.href='editor.html'">🛠️ Editor de cartas</button>
+            <button class="menu-btn" style="background: #ef4444;" onclick="logout()">Cerrar sesión</button>
+        </div>
+        
+        <a href="lobby.html?mode=online" class="menu-btn" style="background: #8b5cf6; margin-top: 15px;">Jugar partida (Online)</a>
+        
+        <a href="lobby.html?mode=local" class="menu-btn btn-test">Jugar partida (Local)</a>
+
+        <a href="lobby.html?mode=ai" class="menu-btn" style="background: #0ea5e9;">Jugar contra la IA</a>
+    </div>
+    </div>
+    
+    <button class="menu-btn" style="background: #475569;" onclick="mostrarReglas()">Reglas del juego</button>
+
+    <script src="reglas.js"></script>
+    <script>
+        let authMode = 'login';
+
+        function showAuth(mode) {
+            authMode = mode;
+            const form = document.getElementById('auth-form');
+            const title = document.getElementById('form-title');
+            const btn = document.getElementById('submit-btn');
+            
+            form.style.display = 'flex';
+            document.getElementById('auth-msg').innerText = '';
+            
+            // Cambiamos los textos según el modo
+            if (mode === 'login') {
+                title.innerText = 'acceder a tu cuenta';
+                btn.innerText = 'Iniciar sesión';
+            } else {
+                title.innerText = 'registrar nueva cuenta';
+                btn.innerText = 'Crear cuenta';
+            }
+            
+            document.getElementById('username').focus();
+        }
+
+        async function submitAuth() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const msgEl = document.getElementById('auth-msg');
+
+            const endpoint = authMode === 'login' ? '/api/login' : '/api/register';
+
+            try {
+                const res = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    if (authMode === 'register') {
+                        msgEl.style.color = '#10b981';
+                        msgEl.innerText = 'Cuenta creada. Ya puedes entrar.';
+                        // Cambiamos a modo login automáticamente tras registrar
+                        showAuth('login');
+                    } else {
+                        checkSession();
+                    }
+                } else {
+                    msgEl.style.color = '#f87171';
+                    msgEl.innerText = data.error;
+                }
+            } catch (e) {
+                msgEl.innerText = 'Error de conexión con el servidor';
+            }
+        }
+
+        async function checkSession() {
+            const res = await fetch('/api/session');
+            const data = await res.json();
+
+            const guestUI = document.getElementById('guest-ui');
+            const userUI = document.getElementById('user-ui');
+            const authForm = document.getElementById('auth-form');
+            const welcome = document.getElementById('welcome-msg');
+
+            if (data.loggedIn) {
+                guestUI.style.display = 'none';
+                authForm.style.display = 'none';
+                userUI.style.display = 'flex';
+                
+                let adminTag = data.isAdmin ? ' <span style="color:#ef4444; font-size:0.7rem;">[ADMIN]</span>' : '';
+                welcome.innerHTML = `Hola, ${data.username}${adminTag}`;
+                
+                // Guardamos el poder de admin
+                localStorage.setItem('karlos_is_admin', data.isAdmin ? '1' : '0');
+                document.getElementById('btn-editor').style.display = data.isAdmin ? 'block' : 'none';
+            } else {
+                guestUI.style.display = 'flex';
+                userUI.style.display = 'none';
+                welcome.innerHTML = '';
+                localStorage.setItem('karlos_is_admin', '0');
+                document.getElementById('btn-editor').style.display = 'none';
+            }
+            
+            document.body.style.visibility = 'visible';
+        }
+
+        async function logout() {
+            await fetch('/api/logout', { method: 'POST' });
+            checkSession();
+        }
+
+        checkSession();
+        inicializarReglas();
+    </script>
+</body>
+</html>

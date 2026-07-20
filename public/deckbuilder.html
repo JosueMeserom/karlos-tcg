@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Karlos TCG - Constructor de mazos</title>
+    <link rel="stylesheet" href="global.css">
+    <script src="cartas.js"></script>
+    <script src="guardian.js"></script>
+    <style>
+        /* CABECERA REDISEÑADA CON DESPLEGABLE */
+        header { background: #0b1120; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #3b82f6; }
+        .logo-mini { color: #fbbf24; font-weight: 900; font-size: 1.5rem; text-decoration: none; text-transform: uppercase; }
+        .header-controls { display: flex; gap: 10px; align-items: center; }
+        
+        .deck-select { background: #1e293b; color: #fbbf24; font-weight: bold; border: 1px solid #475569; padding: 8px 12px; border-radius: 5px; outline: none; cursor: pointer; }
+        .deck-select:focus { border-color: #3b82f6; }
+        
+        .header-btn { background: #3b82f6; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .header-btn:hover { background: #2563eb; }
+        .header-btn.save { background: #10b981; }
+        .header-btn.save:hover { background: #059669; }
+        .header-btn.delete { background: #ef4444; }
+        .header-btn.delete:hover { background: #dc2626; }
+        
+        input[type="text"] { padding: 8px 12px; border-radius: 5px; border: 1px solid #475569; background: #0f172a; color: white; font-weight: bold; }
+
+        .main-container { display: flex; flex: 1; overflow: hidden; }
+
+        .catalog-panel { flex: 3; display: flex; flex-direction: column; background: #1e293b; border-right: 2px solid #334155; }
+        .filters { padding: 15px; display: flex; gap: 10px; background: #0f172a; border-bottom: 1px solid #334155; }
+        .filter-btn { background: #334155; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.9rem; }
+        .filter-btn.active { background: #3b82f6; }
+        .search-bar { flex: 1; }
+        .card-grid { flex: 1; padding: 20px; display: flex; flex-wrap: wrap; gap: 15px; overflow-y: auto; align-content: flex-start; }
+
+        .deck-panel { flex: 1; min-width: 320px; display: flex; flex-direction: column; background: #0f172a; padding: 20px; }
+        .deck-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #475569; padding-bottom: 10px; margin-bottom: 10px; }
+        .deck-count { font-size: 1.5rem; font-weight: bold; color: #fbbf24; display: flex; flex-direction: column; align-items: flex-end; }
+        .deck-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; }
+        
+        .deck-item { display: flex; justify-content: space-between; align-items: center; background: #1e293b; padding: 8px 12px; border-radius: 4px; border-left: 4px solid gray; cursor: pointer; transition: 0.1s; }
+        .deck-item:hover { background: #334155; filter: brightness(1.2); }
+        .deck-item.type-personaje { border-color: #fcd34d; }
+        .deck-item.type-ayuda { border-color: #f9a8d4; }
+        .deck-item.type-evento { border-color: #c084fc; }
+        .deck-item.type-esbirro { border-color: #94a3b8; }
+        
+        .item-count { background: #fbbf24; color: black; font-weight: bold; padding: 2px 6px; border-radius: 12px; font-size: 0.8rem; }
+
+        /* MINIATURAS DEL CATÁLOGO HEREDAN DEL GLOBAL.CSS */
+        .card-mini { width: 140px; height: 196px; border-radius: 8px; border: 2px solid #475569; position: relative; cursor: pointer; transition: transform 0.2s; display: flex; flex-direction: column; overflow: hidden; }
+        .card-mini:hover { transform: translateY(-5px) scale(1.05); z-index: 10; box-shadow: 0 10px 20px rgba(0,0,0,0.5); }
+        
+        .c-cost { position: absolute; top: 5px; left: 5px; background: #fbbf24; color: black; width: 20px; height: 20px; border-radius: 50%; text-align: center; line-height: 20px; font-weight: bold; font-size: 0.8rem; border: 1px solid black; }
+        .c-rarity { position: absolute; top: 5px; right: 5px; font-weight: bold; font-size: 0.8rem; color: #cbd5e1; text-shadow: 1px 1px 0 #000; }
+        .c-name { margin-top: 30px; text-align: center; font-size: 0.8rem; font-weight: bold; padding: 0 5px; }
+        .c-type { text-align: center; font-size: 0.6rem; margin-top: 2px; opacity: 0.8; }
+        
+        /* Ajuste de fondo para que el texto sea legible en cualquier carta */
+        .c-text { flex: 1; font-size: 0.6rem; padding: 5px; margin-top: 5px; background: rgba(255,255,255,0.3); overflow-y: auto; text-align: center; }
+        
+        /* COLORES DE STATS EXACTOS A LAS REGLAS */
+        .c-stats { display: flex; justify-content: space-around; background: rgba(0,0,0,0.8); padding: 4px 0; font-size: 0.85rem; font-weight: bold; }
+        .c-hp { color: #60a5fa; } /* Vida Azul */
+        .c-def { color: #facc15; } /* Def Amarilla */
+        .c-atk { color: #ef4444; } /* Atq Rojo */
+        
+        .c-copies { position: absolute; bottom: 30px; right: 5px; background: rgba(16, 185, 129, 0.9); padding: 2px 6px; border-radius: 10px; font-size: 0.7rem; font-weight: bold; color:white; display: none; border: 1px solid black; }
+
+        .status-msg { margin-left: 10px; font-size: 0.9rem; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <a href="landing.html" class="logo-mini">KARLOS TCG</a>
+        <div class="header-controls">
+            <button class="header-btn" style="background: #475569;" onclick="mostrarReglas()">Reglas</button>
+            <span id="save-status" class="status-msg"></span>
+            
+            <select id="deck-selector" class="deck-select" onchange="cambiarMazoSeleccionado()">
+                <option value="new">-- Crear Nuevo Mazo --</option>
+            </select>
+            
+            <input type="text" id="deck-name" placeholder="Nombre del mazo..." value="Mi Mazo">
+            <button class="header-btn save" onclick="saveDeck()">Guardar</button>
+            <button class="header-btn delete" id="btn-delete" style="display:none;" onclick="deleteDeck()">Borrar</button>
+            <button class="header-btn" style="background: #64748b;" onclick="location.href='landing.html'">Menú</button>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <div class="catalog-panel">
+            <div class="filters">
+                <input type="text" id="search-input" class="search-bar" placeholder="Buscar por nombre o texto..." onkeyup="renderCatalog()">
+                <button class="filter-btn active" onclick="setFilter('All', this)">Todos</button>
+                <button class="filter-btn" onclick="setFilter('Personaje', this)">Personajes</button>
+                <button class="filter-btn" onclick="setFilter('Esbirro', this)">Esbirros</button>
+                <button class="filter-btn" onclick="setFilter('Ayuda', this)">Ayudas</button>
+                <button class="filter-btn" onclick="setFilter('Evento', this)">Eventos</button>
+            </div>
+            <div class="card-grid" id="catalog-grid"></div>
+        </div>
+
+        <div class="deck-panel">
+            <div class="deck-header">
+                <div>
+                    Lista de cartas
+                    <br><span id="pers-count" style="font-size:0.8rem; color:#94a3b8;">Personajes: 0/8</span>
+                </div>
+                <div class="deck-count">
+                    <span id="deck-total">0</span>
+                    <span style="font-size: 0.7rem; color: #94a3b8; font-weight: normal;">(mínimo 40)</span>
+                </div>
+            </div>
+            <div class="deck-list" id="deck-list"></div>
+        </div>
+    </div>
+
+    <script src="reglas.js"></script>
+    <script>
+        let allDecks = []; 
+        let currentDeckId = null; 
+        let currentDeck = {}; 
+        let currentFilter = 'All';
+
+        async function checkSession() {
+            try {
+                const res = await fetch('/api/session');
+                const data = await res.json();
+                
+                if (!data.loggedIn) {
+                    alert("Debes iniciar sesión para editar mazos.");
+                    location.href = 'landing.html';
+                    return;
+                }
+                
+                inicializarReglas(); 
+                await fetchDecksFromServer(); 
+                
+                renderCatalog();
+                renderDeck();
+            } catch (error) {
+                console.error("Error crítico:", error);
+            }
+        }
+
+        async function fetchDecksFromServer() {
+            try {
+                const res = await fetch('/api/decks');
+                const data = await res.json();
+                
+                if (data.success && Array.isArray(data.decks)) {
+                    allDecks = data.decks;
+                    actualizarDesplegable();
+                    
+                    if (allDecks.length > 0) {
+                        const ultimo = allDecks[allDecks.length - 1];
+                        document.getElementById('deck-selector').value = ultimo.id;
+                        cambiarMazoSeleccionado(); 
+                    }
+                }
+            } catch (e) {
+                console.error("Fallo al obtener mazos:", e);
+            }
+        }
+
+        function actualizarDesplegable() {
+            const select = document.getElementById('deck-selector');
+            select.innerHTML = '<option value="new">-- Crear Nuevo Mazo --</option>';
+            allDecks.forEach(deck => {
+                const opt = document.createElement('option');
+                opt.value = deck.id;
+                opt.text = deck.name;
+                select.appendChild(opt);
+            });
+        }
+
+        function cambiarMazoSeleccionado() {
+            const selectVal = document.getElementById('deck-selector').value;
+            const deleteBtn = document.getElementById('btn-delete');
+            
+            if (selectVal === 'new') {
+                currentDeckId = null;
+                currentDeck = {};
+                document.getElementById('deck-name').value = "Mi Mazo";
+                deleteBtn.style.display = 'none'; 
+            } else {
+                const deckId = parseInt(selectVal);
+                const selectedDeckData = allDecks.find(d => d.id === deckId);
+                
+                if (selectedDeckData) {
+                    currentDeckId = deckId;
+                    document.getElementById('deck-name').value = selectedDeckData.name;
+                    currentDeck = {};
+                    selectedDeckData.cards.forEach(id => {
+                        currentDeck[id] = (currentDeck[id] || 0) + 1;
+                    });
+                    deleteBtn.style.display = 'block'; 
+                }
+            }
+            renderCatalog();
+            renderDeck();
+        }
+
+        async function saveDeck() {
+            const total = getTotalCards();
+            if (total < 40) { showMsg(`Faltan ${40 - total} cartas. El mínimo es 40.`, '#f87171'); return; }
+
+            const name = document.getElementById('deck-name').value || "Mazo sin nombre";
+            let flatDeckList = [];
+            for (let id in currentDeck) {
+                for (let i = 0; i < currentDeck[id]; i++) flatDeckList.push(parseInt(id));
+            }
+
+            try {
+                const res = await fetch('/api/decks', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: currentDeckId, name: name, cards: flatDeckList })
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    showMsg("¡Mazo guardado con éxito!", '#4ade80');
+                    await fetchDecksFromServer(); 
+                    document.getElementById('deck-selector').value = data.deckId;
+                    currentDeckId = data.deckId;
+                    document.getElementById('btn-delete').style.display = 'block';
+                } else {
+                    showMsg(data.error, '#f87171');
+                }
+            } catch (e) { showMsg("Error de conexión.", '#f87171'); }
+        }
+
+        async function deleteDeck() {
+            if (!currentDeckId) return;
+            const confirmar = confirm("¿Estás seguro de que quieres borrar este mazo de forma permanente?");
+            if (!confirmar) return;
+
+            try {
+                const res = await fetch(`/api/decks/${currentDeckId}`, { method: 'DELETE' });
+                const data = await res.json();
+                
+                if (data.success) {
+                    showMsg("Mazo eliminado.", '#4ade80');
+                    document.getElementById('deck-selector').value = 'new'; 
+                    cambiarMazoSeleccionado(); 
+                    await fetchDecksFromServer(); 
+                }
+            } catch (e) { showMsg("Error al borrar.", '#f87171'); }
+        }
+
+        function renderCatalog() {
+            const grid = document.getElementById('catalog-grid');
+            const search = document.getElementById('search-input').value.toLowerCase();
+            grid.innerHTML = '';
+
+            CARD_DB.forEach(card => {
+                if (card.isToken) return; // <--- Oculta los clones y tokens del catálogo
+                if (currentFilter !== 'All' && card.type !== currentFilter) return;
+                const matchName = card.name.toLowerCase().includes(search);
+                const matchText = (card.text || '').toLowerCase().includes(search);
+                if (!matchName && !matchText) return;
+
+                // ... (resto del código igual)
+
+                const el = document.createElement('div');
+                // IMPORTANTE: Al heredar la clase "type-X" de global.css, toma el color exacto del juego
+                el.className = `card-mini type-${card.type}`;
+                
+                const copies = currentDeck[card.id] || 0;
+                const maxCopies = card.type === 'Personaje' ? 1 : 4;
+                
+                let statsHtml = '';
+                if (card.type === 'Personaje' || card.type === 'Esbirro') {
+                    statsHtml = `<div class="c-stats">
+                        <span class="c-hp">♥${card.hp}</span>
+                        <span class="c-def">🛡${card.def}</span>
+                        <span class="c-atk">⚔${card.atk}</span>
+                    </div>`;
+                }
+
+                // Antes la primera línea de lo siguiente era: <div class="c-cost">${card.cost !== undefined ? card.cost : '-'}</div>
+                el.innerHTML = `
+                    <div class="c-rarity">${card.rarity || ''}</div>
+                    <div class="c-name">${card.name}</div>
+                    <div class="c-type">${card.type} - ${card.subtype || ''}</div>
+                    <div class="c-text">${card.text || ''}</div>
+                    <div class="c-copies" style="display: ${copies > 0 ? 'block' : 'none'}">${copies}/${maxCopies}</div>
+                    ${statsHtml}
+                `;
+
+                el.onclick = () => addCard(card.id);
+                grid.appendChild(el);
+            });
+        }
+
+        function setFilter(type, btnEl) {
+            currentFilter = type;
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            btnEl.classList.add('active');
+            renderCatalog();
+        }
+
+        function getTotalCards() { return Object.values(currentDeck).reduce((a, b) => a + b, 0); }
+        function getPersonajesCount() {
+            let count = 0;
+            for (let id in currentDeck) {
+                const card = CARD_DB.find(c => c.id == id);
+                if (card && card.type === 'Personaje') count += currentDeck[id];
+            }
+            return count;
+        }
+
+        function addCard(id) {
+            const card = CARD_DB.find(c => c.id == id);
+            const count = currentDeck[id] || 0;
+            
+            if (card.type === 'Personaje') {
+                if (count >= 1) { showMsg("Solo 1 copia de este Personaje.", '#f87171'); return; }
+                if (getPersonajesCount() >= 8) { showMsg("Máximo 8 Personajes en total.", '#f87171'); return; }
+            } else {
+                if (count >= 4) { showMsg("Máximo 4 copias de esta carta.", '#f87171'); return; }
+            }
+            
+            currentDeck[id] = count + 1;
+            renderCatalog(); renderDeck();
+        }
+
+        function removeCard(id) {
+            if (currentDeck[id] > 1) currentDeck[id]--;
+            else delete currentDeck[id];
+            renderCatalog(); renderDeck();
+        }
+
+        function renderDeck() {
+            const list = document.getElementById('deck-list');
+            const totalEl = document.getElementById('deck-total');
+            const persCountEl = document.getElementById('pers-count');
+            list.innerHTML = '';
+            
+            const total = getTotalCards();
+            const persCount = getPersonajesCount();
+            
+            totalEl.innerText = total;
+            totalEl.style.color = total >= 40 ? '#4ade80' : '#fbbf24';
+            
+            persCountEl.innerText = `Personajes: ${persCount}/8`;
+            persCountEl.style.color = persCount === 8 ? '#f87171' : '#94a3b8';
+
+            const deckCards = Object.keys(currentDeck).map(id => {
+                return { card: CARD_DB.find(c => c.id == id), count: currentDeck[id] };
+            }).sort((a, b) => a.card.name.localeCompare(b.card.name));
+
+            deckCards.forEach(item => {
+                const el = document.createElement('div');
+                el.className = `deck-item type-${item.card.type.toLowerCase()}`;
+                el.innerHTML = `
+                    <span><span class="item-count">${item.count}</span> <span style="color:white; font-size:0.9rem;">${item.card.name}</span></span>
+                    <span style="color:#94a3b8; font-size:0.8rem;">C:${item.card.cost !== undefined ? item.card.cost : '-'}</span>
+                `;
+                el.title = "Click para quitar 1 copia";
+                el.onclick = () => removeCard(item.card.id);
+                list.appendChild(el);
+            });
+        }
+
+        function showMsg(text, color) {
+            const el = document.getElementById('save-status');
+            el.innerText = text;
+            el.style.color = color;
+            setTimeout(() => el.innerText = '', 3000);
+        }
+
+        checkSession();
+    </script>
+</body>
+</html>

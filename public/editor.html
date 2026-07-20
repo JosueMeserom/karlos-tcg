@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Karlos TCG — Editor de cartas</title>
+<script>
+    document.documentElement.setAttribute('data-theme', localStorage.getItem('karlos_theme') === 'light' ? 'light' : 'dark');
+</script>
+<style>
+    :root, [data-theme="dark"] {
+        --bg: #0f172a; --panel: #1e293b; --panel2: #0f172a; --borde: #334155;
+        --texto: #e2e8f0; --apagado: #64748b; --etiqueta: #94a3b8; --titulo: #fbbf24;
+        --efecto-bg: #16213a; --rama-bg: #101a30; --hab-bg: #0f172a;
+        --btn: #334155; --btn-hover: #475569; --btn-texto: #e2e8f0;
+        --ok-bg: #064e3b; --ok-tx: #6ee7b7; --mal-bg: #4c1d24; --mal-tx: #fca5a5;
+        --efecto-tit: #93c5fd; --rama-tit: #a78bfa; --plantilla: #3f3f46; --plantilla-h: #52525b;
+    }
+    [data-theme="light"] {
+        --bg: #eef2f7; --panel: #ffffff; --panel2: #f8fafc; --borde: #cbd5e1;
+        --texto: #1e293b; --apagado: #64748b; --etiqueta: #475569; --titulo: #b45309;
+        --efecto-bg: #f1f5f9; --rama-bg: #f5f3ff; --hab-bg: #f8fafc;
+        --btn: #e2e8f0; --btn-hover: #cbd5e1; --btn-texto: #1e293b;
+        --ok-bg: #d1fae5; --ok-tx: #065f46; --mal-bg: #fee2e2; --mal-tx: #991b1b;
+        --efecto-tit: #1d4ed8; --rama-tit: #6d28d9; --plantilla: #e2e8f0; --plantilla-h: #cbd5e1;
+    }
+    body { background: var(--bg); color: var(--texto); font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; padding: 20px; }
+    h1 { color: var(--titulo); font-size: 1.4rem; margin: 0 0 4px 0; display: inline-block; }
+    .sub { color: var(--apagado); font-size: 0.82rem; margin-bottom: 14px; }
+    .cols { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+    .panel { background: var(--panel); border: 1px solid var(--borde); border-radius: 10px; padding: 14px; flex: 1; min-width: 340px; }
+    .panel h2 { font-size: 0.95rem; color: var(--etiqueta); margin: 0 0 10px 0; text-transform: uppercase; letter-spacing: 1px; }
+    label { display: block; font-size: 0.75rem; color: var(--etiqueta); margin: 6px 0 2px; }
+    input, select, textarea { width: 100%; box-sizing: border-box; background: var(--panel2); color: var(--texto); border: 1px solid var(--borde); border-radius: 6px; padding: 5px 8px; font-size: 0.84rem; }
+    textarea { font-family: Consolas, monospace; font-size: 0.76rem; }
+    .fila, .b-fila { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
+    .fila > div, .b-campo { flex: 1; min-width: 90px; }
+    .chk { display: inline-flex; align-items: center; gap: 5px; margin: 6px 12px 0 0; font-size: 0.8rem; color: var(--texto); cursor: pointer; }
+    .chk input { width: auto; }
+    button { background: var(--btn); color: var(--btn-texto); border: none; border-radius: 6px; padding: 6px 12px; font-size: 0.8rem; font-weight: bold; cursor: pointer; margin: 3px 4px 3px 0; }
+    button:hover { background: var(--btn-hover); }
+    .btn-verde { background: #10b981; color: #06281a; }
+    .btn-verde:hover { background: #059669; }
+    .btn-add { background: #1d4ed8; color: #fff; font-size: 0.75rem; padding: 4px 10px; }
+    .btn-add:hover { background: #2563eb; }
+    .btn-x { background: #7f1d1d; color: #fecaca; font-size: 0.7rem; padding: 3px 8px; float: right; }
+    .btn-x:hover { background: #991b1b; }
+    #btn-tema { float: right; }
+    .ayuda { color: var(--apagado); font-size: 0.7rem; margin-top: 2px; min-height: 12px; }
+    .hab { background: var(--hab-bg); border: 1px solid var(--borde); border-radius: 8px; padding: 10px; margin-bottom: 10px; }
+    .hab-titulo { color: var(--titulo); font-weight: bold; font-size: 0.85rem; }
+    .efecto { background: var(--efecto-bg); border-left: 3px solid #1d4ed8; border-radius: 6px; padding: 8px; margin: 6px 0; }
+    .rama { background: var(--rama-bg); border-left: 3px solid #7c3aed; border-radius: 6px; padding: 8px; margin: 6px 0 6px 12px; }
+    .rama-titulo { color: var(--rama-tit); font-size: 0.75rem; font-weight: bold; }
+    .seccion { margin-top: 8px; border-top: 1px dashed var(--borde); padding-top: 6px; }
+    .seccion-titulo { color: var(--etiqueta); font-size: 0.75rem; font-weight: bold; }
+    #salida { min-height: 260px; white-space: pre; overflow: auto; }
+    #estado-validacion { border-radius: 6px; padding: 8px 10px; font-size: 0.8rem; margin-top: 8px; white-space: pre-wrap; }
+    .ok { background: var(--ok-bg); color: var(--ok-tx); }
+    .mal { background: var(--mal-bg); color: var(--mal-tx); }
+    .plantillas button { font-size: 0.7rem; padding: 3px 8px; background: var(--plantilla); color: var(--btn-texto); }
+    .plantillas button:hover { background: var(--plantilla-h); }
+    a.volver { color: var(--apagado); font-size: 0.8rem; text-decoration: none; }
+    details { margin-top: 10px; }
+    summary { color: var(--etiqueta); font-size: 0.8rem; cursor: pointer; }
+</style>
+</head>
+<body>
+<a class="volver" href="landing.html">&larr; Volver al menú</a>
+<button id="btn-tema" onclick="alternarTema()">Tema</button>
+<h1>🛠️ Editor de cartas</h1>
+<div class="sub">Monta cartas declarativas a golpe de clic. La validación usa el intérprete real de <code>cartas.js</code>. El resultado se pega en <code>CARD_DB</code>, antes del <code>];</code> que lo cierra. Lo que el DSL aún no cubre (evoluciones, búsquedas, reacciones…) se sigue haciendo con código.</div>
+
+<div class="cols">
+    <!-- ================= ESTRUCTURA ================= -->
+    <div class="panel" style="max-width: 340px;">
+        <h2>1 · Estructura</h2>
+        <div class="fila">
+            <div><label>Nombre</label><input id="f-name" placeholder="Nombre de la carta"></div>
+            <div style="max-width:80px;"><label>ID (opc.)</label><input id="f-id" type="number" placeholder="auto"></div>
+        </div>
+        <div class="fila">
+            <div><label>Tipo</label>
+                <select id="f-type" onchange="tipoCambiado()">
+                    <option>Personaje</option><option>Esbirro</option><option>Ayuda</option><option>Evento</option>
+                </select></div>
+            <div><label>Subtipo</label><input id="f-subtype" list="subtipos" placeholder="Ser vivo, Ingerible…"><datalist id="subtipos"></datalist></div>
+        </div>
+        <label>Etiquetas (separadas por comas)</label><input id="f-tags" placeholder="Mercenario, Ninja">
+        <div class="fila">
+            <div><label>Rareza</label><select id="f-rarity"><option>S</option><option>A</option><option selected>B</option><option>C</option></select></div>
+            <div><label>Coste</label><input id="f-cost" type="number" value="1"></div>
+            <div><label>Serie</label><input id="f-series" type="number" value="2"></div>
+        </div>
+        <div class="fila" id="fila-stats">
+            <div><label>Vida</label><input id="f-hp" type="number" value="3"></div>
+            <div><label>Def</label><input id="f-def" type="number" value="3"></div>
+            <div><label>Atq</label><input id="f-atk" type="number" value="3"></div>
+        </div>
+        <div id="fila-duracion" style="display:none;"><label>Duración (turnos)</label><input id="f-duration" type="number" value="2"></div>
+        <label>Texto de la carta</label><textarea id="f-text" rows="3" placeholder="P: NOMBRE: descripción… A: NOMBRE (1F): descripción…"></textarea>
+        <div class="fila">
+            <div><label>Nombre Pasiva</label><input id="f-passiveName"></div>
+            <div><label>Nombre Activa</label><input id="f-activeName"></div>
+            <div style="max-width:70px;"><label>Coste Act.</label><input id="f-activeCost" type="number" placeholder="1"></div>
+        </div>
+        <div style="margin-top:6px;">
+            <span class="chk"><input type="checkbox" id="f-isTaunt">Provocar</span>
+            <span class="chk"><input type="checkbox" id="f-stealth">Ocultarse</span>
+            <span class="chk"><input type="checkbox" id="f-uncopyable">No copiable</span>
+        </div>
+        <label>Furor máx. (vacío = regla por defecto, 4)</label><input id="f-furorMax" type="number">
+    </div>
+
+    <!-- ================= HABILIDADES ================= -->
+    <div class="panel" style="flex: 1.6;">
+        <h2>2 · Habilidades</h2>
+        <div id="constructor"></div>
+        <div id="selector-trigger" style="display:none;" class="hab"></div>
+        <button class="btn-add" id="btn-add-hab" onclick="mostrarSelectorTrigger()">+ Añadir habilidad</button>
+        <div class="plantillas" style="margin-top:6px;">
+            <span style="color:#64748b; font-size:0.72rem;">Plantillas (cartas reales): </span><span id="plantillas"></span>
+        </div>
+        <div id="estado-validacion" class="ok">Sin habilidades (carta vainilla): válido.</div>
+        <details>
+            <summary>Vista avanzada (JSON)</summary>
+            <textarea id="f-abilities" rows="14" spellcheck="false">[]</textarea>
+            <button class="btn-add" onclick="aplicarJson()">Aplicar JSON al constructor</button>
+        </details>
+    </div>
+
+    <!-- ================= SALIDA ================= -->
+    <div class="panel" style="max-width: 380px;">
+        <h2>3 · Resultado</h2>
+        <button class="btn-verde" onclick="generar()">Generar y validar</button>
+        <button onclick="copiar(event)">📋 Copiar</button>
+        <div id="aviso-duplicado" style="color:#fbbf24; font-size:0.78rem; margin-top:4px;"></div>
+        <label>Pega esto antes del <code>];</code> que cierra <code>CARD_DB</code>:</label>
+        <textarea id="salida" rows="22" spellcheck="false" readonly></textarea>
+    </div>
+</div>
+
+<script src="cartas.js"></script>
+<script>
+    if (localStorage.getItem('karlos_is_admin') !== '1') {
+        document.body.innerHTML = '<div style="color:#e2e8f0; font-family:sans-serif; text-align:center; margin-top:80px;">' +
+            '<h2>🔒 Acceso restringido</h2><p>El editor de cartas es solo para administradores.</p>' +
+            '<a href="landing.html" style="color:#fbbf24;">Volver al menú</a></div>';
+        throw new Error('No admin');
+    }
+
+    // ================== TEMA CLARO/OSCURO ==================
+    function aplicarTema(t, guardar) {
+        document.documentElement.setAttribute('data-theme', t);
+        localStorage.setItem('karlos_theme', t);
+        const b = document.getElementById('btn-tema');
+        if (b) b.textContent = t === 'light' ? '🌙 Tema oscuro' : '☀️ Tema claro';
+        if (guardar) fetch('/api/prefs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ theme: t }) }).catch(function () {});
+    }
+    function alternarTema() {
+        const t = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+        aplicarTema(t, true); // localStorage siempre; servidor si hay sesion (invitados: 401 y no pasa nada)
+    }
+    aplicarTema(document.documentElement.getAttribute('data-theme'), false);
+    fetch('/api/prefs').then(function (r) { return r.json(); }).then(function (d) { if (d.loggedIn && d.theme) aplicarTema(d.theme, false); }).catch(function () {});
+
+    (function () {
+        const subs = [...new Set(CARD_DB.map(c => c.subtype).filter(Boolean))].sort();
+        document.getElementById('subtipos').innerHTML = subs.map(s => '<option value="' + s + '">').join('');
+    })();
+    function tipoCambiado() {
+        const t = document.getElementById('f-type').value;
+        document.getElementById('fila-stats').style.display = (t === 'Personaje' || t === 'Esbirro') ? 'flex' : 'none';
+        document.getElementById('fila-duracion').style.display = (t === 'Evento') ? 'block' : 'none';
+    }
+
+    // ================== ESTADO Y METADATOS ==================
+    let abilities = [];
+
+    const TRIGGERS_META = {
+        PASIVA_CONTINUA: { l: 'Pasiva continua', d: 'Se recalcula constantemente mientras la carta está en mesa. Modifica Atq/Def de forma continua (ej.: FURIA del Bersérker).', def: () => ({ trigger: 'PASIVA_CONTINUA', then: [] }) },
+        JUGAR: { l: 'Requisitos para jugarla', d: 'Condiciones para poder jugar la carta desde la mano. Si fallan, la carta no se puede jugar (ej.: Ayudas que exigen aliados en mesa).', def: () => ({ trigger: 'JUGAR', requisitos: [{ count: { quien: 'ALIADO' }, op: '>=', valor: 1, msg: 'No tienes aliados en mesa para usar {carta}.' }] }) },
+        AL_JUGAR: { l: 'Al jugarse', d: 'Se dispara al colocar la carta en mesa. En Eventos el motor la espera; el DAÑO aquí es solo para Eventos.', def: () => ({ trigger: 'AL_JUGAR', efectos: [] }) },
+        AL_USAR_AYUDA: { l: 'Al usar la Ayuda sobre un objetivo', d: 'Para Ayudas (Ingeribles) que se aplican a un aliado elegido. Si un requisito del objetivo falla o el efecto no procede, la carta NO se consume.', def: () => ({ trigger: 'AL_USAR_AYUDA', requisitosObjetivo: [], efectos: [] }) },
+        AL_CADUCAR: { l: 'Al caducar (Eventos)', d: 'Se dispara cuando un Evento agota su duración.', def: () => ({ trigger: 'AL_CADUCAR', efectos: [] }) },
+        AL_ENTRAR: { l: 'Cuando una carta entra en juego', d: 'Reacciona a cartas que ENTRAN mientras esta esté en mesa/activa (con marcador anti-repetición). Solo efectos síncronos: stats, estados, contadores.', def: () => ({ trigger: 'AL_ENTRAR', si: { quien: 'ALIADO' }, efectos: [] }) },
+        INICIO_TURNO: { l: 'Al inicio del turno', d: 'Se dispara al empezar el turno (por defecto, solo el del dueño). Ideal para regeneraciones y reseteos.', def: () => ({ trigger: 'INICIO_TURNO', soloTurnoPropio: true, efectos: [] }) },
+        FIN_TURNO: { l: 'Al final del turno', d: 'Se dispara al terminar el turno (por defecto, solo el del dueño de la carta). Ideal para Eventos tipo De compras.', def: () => ({ trigger: 'FIN_TURNO', soloTurnoPropio: true, efectos: [] }) },
+        ACTIVA: { l: 'Habilidad Activa', d: 'Habilidad manual con coste de Furor y selección de objetivos (ej.: PUÑALADA, BOMBAZO).', def: () => ({ trigger: 'ACTIVA', nombre: '', coste: { furor: 1 }, requisitos: [{ count: { quien: 'ENEMIGO', zona: 'vanguardia' }, op: '>=', valor: 1 }], target: { quien: 'ENEMIGO', cantidad: 1 }, efectos: [] }) },
+        GLOBAL_TRAS_ATAQUE: { l: 'Global: tras cada ataque (Eventos)', d: 'El Evento activo reacciona a CUALQUIER ataque resuelto en la mesa (ej.: Sifón de maná). Se edita en la Vista avanzada (JSON).', def: () => ({ trigger: 'GLOBAL_TRAS_ATAQUE', si: { atacante: 'PROPIO', soloAtaqueNormal: true, dañoMinimo: 1 }, efectos: [] }) },
+        GLOBAL_MODIFICAR_FUROR: { l: 'Global: modificar ganancia de Furor (Eventos)', d: 'El Evento activo intercepta la ganancia de Furor de cualquier carta y la fija o suma (ej.: Investigar y desarrollar). Se edita en la Vista avanzada (JSON).', def: () => ({ trigger: 'GLOBAL_MODIFICAR_FUROR', reglas: [{ si: { origen: 'fase_furor', objetivoDe: 'PROPIO' }, accion: { sumar: 1 } }] }) },
+        GLOBAL_INICIO_TURNO: { l: 'Global: al inicio de turno (Eventos)', d: 'El Evento activo actúa al empezar un turno, ANTES de la fase de Furor (ej.: la moneda de Apuesta). Se edita en la Vista avanzada (JSON).', def: () => ({ trigger: 'GLOBAL_INICIO_TURNO', turnoDe: 'RIVAL', moneda: { cara: {}, cruz: {} } }) },
+        GLOBAL_ANTES_DE_ATAQUE: { l: 'Global: antes de cada ataque (Eventos)', d: 'El Evento activo intercepta cualquier ataque y puede permitirlo o bloquearlo (ej.: Apagón). Se edita en la Vista avanzada (JSON).', def: () => ({ trigger: 'GLOBAL_ANTES_DE_ATAQUE', moneda: { cara: { resultado: 'PERMITIR' }, cruz: { resultado: 'BLOQUEAR' }, sinResultado: 'BLOQUEAR' } }) }
+    };
+
+    const OPS_META = {
+        MODIFICAR_STAT: { l: 'Modificar estadística', d: 'Suma o resta a una estadística (Furor, Vida…). En pasivas: Atq/Def continuos.' },
+        CURAR: { l: 'Curar', d: 'Restaura Vida. Variante estándar (Ingeribles: respeta límites y falla si está llena) o grupal simple.' },
+        DAÑO: { l: 'Daño directo', d: 'Inflige daño de efecto (no es un ataque) y comprueba muertes. En AL_JUGAR, solo para Eventos.' },
+        APLICAR_ESTADO: { l: 'Aplicar estado', d: 'Aplica un estado alterado con duración (Daño por tiempo, Confuso…). No se renueva si ya lo sufre.' },
+        MODIFICAR_CONTADORES: { l: 'Contadores', d: 'Añade o quita contadores con nombre e icono propios (ej.: los de Diego Antonio).' },
+        ATACAR: { l: 'Realizar ataque', d: 'Ataque real contra el objetivo (con Def, esquivas, reacciones…). Puede llevar bono de Atq temporal y efectos "si acierta".' },
+        MONEDA: { l: 'Lanzar moneda', d: 'Echa una moneda (sincronizada online) y ejecuta la rama de Cara o la de Cruz.' },
+        ROBAR: { l: 'Robar cartas', d: 'Un jugador roba N cartas del mazo (si se agota, se rebaraja el descarte, como siempre).' },
+        BUSCAR: { l: 'Buscar carta (descartes/mazo)', d: 'Abre el modal visual para elegir cartas que cumplan los filtros y llevarlas a la mano. Confirmación previa opcional.' }
+    };
+
+    const QUIEN_OPTS_ACCION = [
+        { v: 'OBJETIVO', l: 'El objetivo elegido', d: 'La carta seleccionada por el jugador (Activas y Ayudas).' },
+        { v: 'SELF', l: 'Esta misma carta', d: 'La propia carta que tiene la habilidad.' },
+        { v: 'ALIADO', l: 'Aliados', d: 'Todas tus cartas en mesa (filtrable).' },
+        { v: 'ENEMIGO', l: 'Enemigos', d: 'Todas las cartas rivales en mesa (filtrable).' },
+        { v: 'TODOS', l: 'Todas las cartas', d: 'Ambos lados de la mesa (filtrable).' }
+    ];
+    const ZONA_OPTS = [
+        { v: '', l: 'Vanguardia y retaguardia', d: '' },
+        { v: 'vanguardia', l: 'Solo vanguardia', d: '' },
+        { v: 'retaguardia', l: 'Solo retaguardia', d: '' }
+    ];
+    const OPS_COMP = [
+        { v: '<=', l: '≤ (menor o igual)' }, { v: '<', l: '< (menor)' }, { v: '>=', l: '≥ (mayor o igual)' },
+        { v: '>', l: '> (mayor)' }, { v: '==', l: '= (igual)' }, { v: '!=', l: '≠ (distinto)' },
+        { v: 'truthy', l: 'tiene valor' }, { v: 'falsy', l: 'no tiene valor' }
+    ];
+    const CAMPOS_COND = [
+        { v: 'self.hp', l: 'Vida actual (propia)', d: '' }, { v: 'self.atk', l: 'Atq actual (propio)', d: '' },
+        { v: 'self.def', l: 'Def actual (propia)', d: '' }, { v: 'furor', l: 'Furor', d: '' },
+        { v: 'currentHp', l: 'Vida actual', d: '' }, { v: 'maxHp', l: 'Vida máxima', d: '' }
+    ];
+    const CAMPOS_REQ_OBJ = [
+        { v: 'furor', l: 'Furor del objetivo', d: '' },
+        { v: 'currentHp', l: 'Vida actual del objetivo', d: '' },
+        { v: 'attachedTo', l: 'Zombificado (attachedTo)', d: 'Usa "no tiene valor" para exigir que NO esté Zombificado.' },
+        { v: 'stealth', l: 'Ocultarse', d: '' }
+    ];
+    const LOG_TIPOS = [
+        { v: 'ability', l: 'ability (habilidad)' }, { v: 'system', l: 'system (sistema)' },
+        { v: 'neutral', l: 'neutral' }, { v: 'combat', l: 'combat (combate)' }, { v: 'healing', l: 'healing (curación)' }
+    ];
+    const ESTADOS = [
+        { v: 'dot', l: 'Daño por tiempo (dot)', d: 'Pierde vida cada turno.' },
+        { v: 'confusion', l: 'Confuso (confusion)', d: '' },
+        { v: '__otro', l: 'Otro (escribir)…', d: 'Escribe el identificador exacto del estado.' }
+    ];
+    const FILTRO_TIPOS = [
+        { v: 'tag', l: 'Tiene la etiqueta…' }, { v: 'subtype', l: 'Su subtipo es…' },
+        { v: 'type', l: 'Su tipo es…' }, { v: 'no-stealth', l: 'Sin Ocultarse' }
+    ];
+
+    // ================== HELPERS DOM ==================
+    function el(tag, attrs, ...kids) {
+        const n = document.createElement(tag);
+        if (attrs) for (const k in attrs) {
+            if (k === 'text') n.textContent = attrs[k];
+            else if (k === 'class') n.className = attrs[k];
+            else if (k.indexOf('on') === 0) n[k] = attrs[k];
+            else n.setAttribute(k, attrs[k]);
+        }
+        kids.forEach(c => { if (c) n.append(c); });
+        return n;
+    }
+    function campo(lbl, inputEl, maxw) {
+        const w = el('div', { class: 'b-campo' }, el('label', { text: lbl }), inputEl);
+        if (maxw) w.style.maxWidth = maxw;
+        return w;
+    }
+    function inNum(obj, key, ph) {
+        const i = el('input', { type: 'number' });
+        if (obj[key] !== undefined && obj[key] !== null) i.value = obj[key];
+        if (ph) i.placeholder = ph;
+        i.oninput = () => { if (i.value === '') delete obj[key]; else obj[key] = Number(i.value); sync(); };
+        return i;
+    }
+    function inTxt(obj, key, ph) {
+        const i = el('input', { type: 'text' });
+        i.value = obj[key] || '';
+        if (ph) i.placeholder = ph;
+        i.oninput = () => { if (i.value.trim() === '') delete obj[key]; else obj[key] = i.value; sync(); };
+        return i;
+    }
+    function inSel(obj, key, opts, onCambio) {
+        const s = el('select');
+        opts.forEach(o => s.append(el('option', { value: o.v, text: o.l })));
+        if (obj[key] !== undefined) s.value = obj[key];
+        else obj[key] = s.value;
+        const ayuda = el('div', { class: 'ayuda' });
+        const act = () => { const o = opts.find(x => x.v === s.value); ayuda.textContent = (o && o.d) ? o.d : ''; };
+        s.onchange = () => { obj[key] = s.value; act(); sync(); if (onCambio) onCambio(); };
+        act();
+        return el('div', {}, s, ayuda);
+    }
+    function inChk(obj, key, lbl, onCambio) {
+        const c = el('input', { type: 'checkbox' });
+        c.checked = !!obj[key];
+        c.onchange = () => { if (c.checked) obj[key] = true; else delete obj[key]; sync(); if (onCambio) onCambio(); };
+        return el('label', { class: 'chk' }, c, el('span', { text: lbl }));
+    }
+    function btnX(fn) { return el('button', { class: 'btn-x', text: '✕', onclick: fn }); }
+
+    // ================== BLOQUES REUTILIZABLES ==================
+    // Objetivo de un efecto: 'OBJETIVO' = sin e.target (usa el elegido); resto = e.target {quien, zona, filtros}
+    function bloqueTarget(e, permitirObjetivo) {
+        const wrap = el('div', {});
+        const estado = { sel: e.target ? e.target.quien : (permitirObjetivo ? 'OBJETIVO' : 'ENEMIGO') };
+        if (!e.target && !permitirObjetivo) e.target = { quien: estado.sel };
+        const opts = permitirObjetivo ? QUIEN_OPTS_ACCION : QUIEN_OPTS_ACCION.filter(o => o.v !== 'OBJETIVO');
+        const detalle = el('div', {});
+        const pintar = () => {
+            detalle.innerHTML = '';
+            if (estado.sel === 'OBJETIVO' || estado.sel === 'SELF') return;
+            const t = e.target;
+            detalle.append(el('div', { class: 'b-fila' }, campo('Zona', inSel(t, 'zona', ZONA_OPTS)), bloqueFiltros(t)));
+        };
+        const selObj = { v: estado.sel };
+        const s = inSel(selObj, 'v', opts, () => {
+            estado.sel = selObj.v;
+            if (estado.sel === 'OBJETIVO') delete e.target;
+            else { e.target = { quien: estado.sel }; if (estado.sel === 'SELF') { } }
+            pintar(); sync();
+        });
+        wrap.append(campo('A quién afecta', s));
+        wrap.append(detalle);
+        pintar();
+        return wrap;
+    }
+    // Filtros de un pool (target o COUNT): lista de filas tipo etiqueta/subtipo/tipo/sin-ocultarse
+    function bloqueFiltros(spec, key = 'filtros', etiqueta = 'Filtros') {
+        const wrap = el('div', { class: 'b-campo' });
+        const lista = el('div', {});
+        const pintar = () => {
+            lista.innerHTML = '';
+            (spec[key] || []).forEach((f, i) => {
+                const tipo = f.campo === 'tags' ? 'tag' : (f.campo === 'stealth' ? 'no-stealth' : f.campo);
+                const selObj = { v: tipo };
+                const fila = el('div', { class: 'b-fila' });
+                fila.append(campo('Filtro', inSel(selObj, 'v', FILTRO_TIPOS, () => {
+                    const v = selObj.v;
+                    if (v === 'tag') { spec[key][i] = { campo: 'tags', op: 'includes', valor: f.valor || '' }; }
+                    else if (v === 'no-stealth') { spec[key][i] = { campo: 'stealth', op: 'falsy' }; }
+                    else { spec[key][i] = { campo: v, op: '==', valor: f.valor || '' }; }
+                    pintar(); sync();
+                })));
+                if (tipo !== 'no-stealth') fila.append(campo('Valor', inTxt(spec[key][i], 'valor', tipo === 'tag' ? 'Ninja' : 'Ser vivo')));
+                fila.append(btnX(() => { spec[key].splice(i, 1); if (!spec[key].length) delete spec[key]; pintar(); sync(); }));
+                lista.append(fila);
+            });
+        };
+        wrap.append(el('label', { text: etiqueta }), lista,
+            el('button', { class: 'btn-add', text: '+ filtro', onclick: () => { if (!spec[key]) spec[key] = []; spec[key].push({ campo: 'tags', op: 'includes', valor: '' }); pintar(); sync(); } }));
+        pintar();
+        return wrap;
+    }
+    // Valor numérico O recuento (COUNT)
+    function bloqueValor(e, key, etiqueta) {
+        const wrap = el('div', { class: 'b-campo' });
+        const esCount = () => e[key] && typeof e[key] === 'object' && e[key].COUNT;
+        const zona = el('div', {});
+        const pintar = () => {
+            zona.innerHTML = '';
+            if (!esCount()) { zona.append(campo(etiqueta, inNum(e, key, '2'))); return; }
+            const c = e[key].COUNT;
+            zona.append(el('div', { class: 'b-fila' },
+                campo('Cuenta cartas de', inSel(c, 'quien', QUIEN_OPTS_ACCION.filter(o => o.v !== 'OBJETIVO' && o.v !== 'SELF'))),
+                campo('Máximo', inNum(c, 'max', 'sin tope'), '90px')));
+            const fila2 = el('div', { class: 'b-fila' }, bloqueFiltros(c));
+            fila2.append(el('span', {}, inChk(c, 'excludeSelf', 'sin contarse a sí misma')));
+            zona.append(fila2);
+        };
+        const chkObj = { v: esCount() };
+        const c = el('input', { type: 'checkbox' });
+        c.checked = !!esCount();
+        c.onchange = () => { if (c.checked) e[key] = { COUNT: { quien: 'ALIADO' } }; else e[key] = 1; pintar(); sync(); };
+        wrap.append(el('label', { class: 'chk' }, c, el('span', { text: 'valor por recuento (1 por carta que cumpla)' })), zona);
+        pintar();
+        return wrap;
+    }
+    // Condición opcional {campo, op, valor} colgada de holder[key]
+    function bloqueCondicion(holder, key, titulo, campos) {
+        const wrap = el('div', {});
+        const zona = el('div', {});
+        const pintar = () => {
+            zona.innerHTML = '';
+            if (!holder[key]) return;
+            const cnd = holder[key];
+            zona.append(el('div', { class: 'b-fila' },
+                campo('Campo', inSel(cnd, 'campo', campos || CAMPOS_COND)),
+                campo('Comparación', inSel(cnd, 'op', OPS_COMP)),
+                campo('Valor', inNum(cnd, 'valor'), '90px')));
+        };
+        const c = el('input', { type: 'checkbox' });
+        c.checked = !!holder[key];
+        c.onchange = () => { if (c.checked) holder[key] = { campo: 'self.hp', op: '<=', valor: 3 }; else delete holder[key]; pintar(); sync(); };
+        wrap.append(el('label', { class: 'chk' }, c, el('span', { text: titulo })), zona);
+        pintar();
+        return wrap;
+    }
+    // Log opcional {msg, tipo} plano (logCara/logCruz/logSiAplicado)
+    function bloqueLogObj(holder, key, titulo) {
+        const wrap = el('div', {});
+        const zona = el('div', {});
+        const pintar = () => {
+            zona.innerHTML = '';
+            if (!holder[key]) return;
+            zona.append(el('div', { class: 'b-fila' },
+                campo('Mensaje', inTxt(holder[key], 'msg', 'Texto en el historial…')),
+                campo('Tipo', inSel(holder[key], 'tipo', LOG_TIPOS), '150px')));
+        };
+        const c = el('input', { type: 'checkbox' });
+        c.checked = !!holder[key];
+        c.onchange = () => { if (c.checked) holder[key] = { msg: '', tipo: 'ability' }; else delete holder[key]; pintar(); sync(); };
+        wrap.append(el('label', { class: 'chk' }, c, el('span', { text: titulo })), zona);
+        pintar();
+        return wrap;
+    }
+
+    // ================== EFECTOS ==================
+    function seccionEfectos(titulo, holder, key, ctx) {
+        const wrap = el('div', { class: ctx.rama ? 'rama' : 'seccion' });
+        wrap.append(el('div', { class: ctx.rama ? 'rama-titulo' : 'seccion-titulo', text: titulo }));
+        const lista = el('div', {});
+        const pintar = () => {
+            lista.innerHTML = '';
+            (holder[key] || []).forEach((e, i) => lista.append(efectoCard(e, holder[key], i, ctx, pintar)));
+        };
+        const addSel = el('select');
+        const ops = ctx.pasiva ? ['MODIFICAR_STAT'] : Object.keys(OPS_META);
+        ops.forEach(o => addSel.append(el('option', { value: o, text: OPS_META[o].l })));
+        wrap.append(lista, el('div', { class: 'b-fila' },
+            el('div', { class: 'b-campo', style: 'max-width:220px;' }, addSel),
+            el('button', { class: 'btn-add', text: '+ Añadir efecto', onclick: () => {
+                if (!holder[key]) holder[key] = [];
+                holder[key].push(nuevoEfecto(addSel.value, ctx));
+                pintar(); sync();
+            } })));
+        pintar();
+        return wrap;
+    }
+    function nuevoEfecto(op, ctx) {
+        if (op === 'MODIFICAR_STAT') return ctx.pasiva ? { op: op, stat: 'atk', delta: 1 } : { op: op, stat: 'furor', delta: 1 };
+        if (op === 'CURAR') return { op: op, valor: 2 };
+        if (op === 'DAÑO') return { op: op, valor: 2 };
+        if (op === 'APLICAR_ESTADO') return { op: op, estado: 'dot', duracion: 3 };
+        if (op === 'MODIFICAR_CONTADORES') return { op: op, contador: 'mi_contador', delta: 1, nombreContador: 'Contadores', icono: '⚙️' };
+        if (op === 'ATACAR') return { op: op };
+        if (op === 'ROBAR') return { op: op, cantidad: 2, jugador: 'PROPIO' };
+        if (op === 'BUSCAR') return { op: op, en: 'DESCARTES', cantidad: 1, destino: 'MANO', titulo: 'ELIGE UNA CARTA', filtros: [], algunFiltro: [] };
+        if (op === 'MONEDA') return { op: op, logCara: { msg: 'Moneda: CARA', tipo: 'neutral' }, logCruz: { msg: 'Moneda: CRUZ', tipo: 'combat' } };
+        return { op: op };
+    }
+    function efectoCard(e, arr, idx, ctx, repintarLista) {
+        const card = el('div', { class: 'efecto' });
+        card.append(btnX(() => { arr.splice(idx, 1); repintarLista(); sync(); }));
+        card.append(el('div', { style: 'color:#93c5fd; font-weight:bold; font-size:0.8rem;', text: (OPS_META[e.op] || { l: e.op }).l }));
+        card.append(el('div', { class: 'ayuda', text: (OPS_META[e.op] || { d: '' }).d }));
+
+        if (ctx.pasiva) { // pasivas: solo stat atk/def + delta (nº o COUNT)
+            card.append(el('div', { class: 'b-fila' },
+                campo('Estadística', inSel(e, 'stat', [{ v: 'atk', l: 'Atq' }, { v: 'def', l: 'Def' }]), '110px')));
+            card.append(bloqueValor(e, 'delta', 'Cuánto (+/-)'));
+            return card;
+        }
+
+        // Comunes de acción
+        card.append(bloqueCondicion(e, 'if', 'Solo si esta carta cumple una condición (ej.: sigue viva)', CAMPOS_COND));
+        if (e.op !== 'ROBAR' && e.op !== 'BUSCAR') card.append(bloqueTarget(e, ctx.permitirObjetivo));
+
+        if (e.op === 'MODIFICAR_STAT') {
+            card.append(el('div', { class: 'b-fila' },
+                campo('Estadística', inSel(e, 'stat', [{ v: 'furor', l: 'Furor' }, { v: 'currentHp', l: 'Vida' }]), '110px')));
+            card.append(bloqueValor(e, 'delta', 'Cuánto (+/-)'));
+            card.append(el('div', {}, inChk(e, 'comprobarMuerte', 'comprobar muerte después (para restas de Vida)')));
+            card.append(campo('Log (opcional; {carta} {objetivo} {antes} {despues})', inTxt(e, 'log', '{carta} da 1 de Furor a {objetivo} ({antes} -> {despues}).')));
+        } else if (e.op === 'CURAR') {
+            card.append(campo('Cantidad', inNum(e, 'valor'), '90px'));
+            const esSimple = e.conBeforeHealed === false;
+            const selObj = { v: esSimple ? 'grupal' : 'estandar' };
+            card.append(campo('Variante', inSel(selObj, 'v', [
+                { v: 'estandar', l: 'Estándar (Ingeribles)', d: 'Respeta límites de Vida, pasa por resistencias y NO consume la carta si ya está llena.' },
+                { v: 'grupal', l: 'Grupal simple', d: 'Cura directa; salta a los ilesos; texto flotante e historial propios (patrón Escape con bomba de humo).' }
+            ], () => {
+                if (selObj.v === 'grupal') { e.conBeforeHealed = false; e.soloSiHerido = true; e.floating = e.floating || 'CURADO'; e.floatingStyle = e.floatingStyle || 'ft-green'; }
+                else { delete e.conBeforeHealed; delete e.soloSiHerido; delete e.floatingStyle; delete e.fuente; delete e.offsetY; }
+                sync();
+            })));
+            card.append(campo('Texto flotante (opcional)', inTxt(e, 'floating', 'CURADO')));
+            card.append(campo('Log (opcional)', inTxt(e, 'log', '{carta} cura 2 de Vida a {objetivo} ({antes} -> {despues}).')));
+        } else if (e.op === 'DAÑO') {
+            card.append(campo('Cantidad de daño', inNum(e, 'valor'), '110px'));
+            card.append(campo('Log (opcional)', inTxt(e, 'log')));
+        } else if (e.op === 'APLICAR_ESTADO') {
+            const esConocido = ESTADOS.some(x => x.v === e.estado);
+            const selObj = { v: esConocido ? e.estado : '__otro' };
+            const zonaOtro = el('div', {});
+            const pintarOtro = () => { zonaOtro.innerHTML = ''; if (selObj.v === '__otro') zonaOtro.append(campo('Identificador del estado', inTxt(e, 'estado'))); };
+            card.append(el('div', { class: 'b-fila' },
+                campo('Estado', inSel(selObj, 'v', ESTADOS, () => { if (selObj.v !== '__otro') e.estado = selObj.v; pintarOtro(); sync(); })),
+                campo('Duración (turnos)', inNum(e, 'duracion'), '120px')));
+            card.append(zonaOtro); pintarOtro();
+            card.append(campo('Log (opcional, se muestra antes de aplicar)', inTxt(e, 'log', '¡Envenenado!')));
+        } else if (e.op === 'ROBAR') {
+            card.append(el('div', { class: 'b-fila' },
+                campo('Cuantas cartas', inNum(e, 'cantidad'), '110px'),
+                campo('Quien roba', inSel(e, 'jugador', [{ v: 'PROPIO', l: 'El dueno de la carta', d: '' }, { v: 'RIVAL', l: 'El rival', d: '' }]))));
+            card.append(campo('Log (opcional; se admite {carta})', inTxt(e, 'log')));
+        } else if (e.op === 'BUSCAR') {
+            card.append(el('div', { class: 'b-fila' },
+                campo('Dónde buscar', inSel(e, 'en', [{ v: 'DESCARTES', l: 'En los descartes', d: '' }, { v: 'MAZO', l: 'En el mazo', d: '' }])),
+                campo('Cuántas elegir', inNum(e, 'cantidad'), '110px'),
+                campo('De quién', inSel(e, 'deQuien', [{ v: 'PROPIO', l: 'Zona propia', d: '' }, { v: 'RIVAL', l: 'Zona rival', d: '' }, { v: 'AMBOS', l: 'Ambos jugadores (p1 y luego p2)', d: '' }]))));
+            card.append(campo('Título del modal de búsqueda', inTxt(e, 'titulo', 'RECUPERAR ESBIRRO')));
+            card.append(campo('Log al llevarse cada carta (admite {objetivo} y {carta})', inTxt(e, 'log', '{objetivo} vuelve a la mano.')));
+            if (!e.confirmar) e.confirmar = undefined;
+            const cWrap = el('div', {});
+            const chk = el('input', { type: 'checkbox' });
+            chk.checked = !!e.confirmar;
+            const cCampos = el('div', { class: 'b-fila', style: e.confirmar ? '' : 'display:none;' });
+            const asegura = () => { if (!e.confirmar) e.confirmar = { titulo: 'RESULTADO', si: 'BUSCAR', no: 'IGNORAR' }; };
+            chk.onchange = () => { if (chk.checked) { asegura(); cCampos.style.display = ''; } else { delete e.confirmar; cCampos.style.display = 'none'; } sync(); };
+            if (e.confirmar) {
+                cCampos.append(campo('Título', inTxt(e.confirmar, 'titulo')), campo('Botón SÍ', inTxt(e.confirmar, 'si')), campo('Botón NO', inTxt(e.confirmar, 'no')));
+            }
+            cWrap.append(el('label', { style: 'font-size:0.85rem; display:flex; gap:6px; align-items:center;' }, chk, document.createTextNode(' Preguntar antes de abrir la búsqueda (modal de confirmación)')), cCampos);
+            card.append(cWrap);
+            card.append(bloqueFiltros(e, 'filtros', 'Filtros (debe cumplir TODOS)'));
+            card.append(bloqueFiltros(e, 'algunFiltro', 'Y al menos UNO de estos (opcional)'));
+            card.append(el('div', { class: 'b-nota' }, 'Flags avanzados (vista JSON): seleccion:"PRIMERA", autoSeleccion, sinAnimacion, logIntro, logNoEncontrada, logNoValidas, logSinEleccion, confirmar.logNo, barajarDespues:{log}.'));
+        } else if (e.op === 'MODIFICAR_CONTADORES') {
+            card.append(el('div', { class: 'b-fila' },
+                campo('ID del contador', inTxt(e, 'contador', 'mi_contador')),
+                campo('Cuántos (+/-)', inNum(e, 'delta'), '100px')));
+            card.append(el('div', { class: 'b-fila' },
+                campo('Nombre visible', inTxt(e, 'nombreContador', 'Turnos de X')),
+                campo('Icono', inTxt(e, 'icono', '⚙️'), '80px')));
+        } else if (e.op === 'ATACAR') {
+            card.append(campo('Bono de Atq durante el golpe (opcional)', inNum(e, 'bonoAtq', '0'), '220px'));
+            card.append(seccionEfectos('Si el ataque acierta (dañó y sigue vivo):', e, 'siExito', { rama: true, permitirObjetivo: true }));
+        } else if (e.op === 'MONEDA') {
+            card.append(bloqueLogObj(e, 'logCara', 'Mensaje si sale CARA'));
+            card.append(seccionEfectos('Rama CARA:', e, 'cara', { rama: true, permitirObjetivo: ctx.permitirObjetivo }));
+            card.append(bloqueLogObj(e, 'logCruz', 'Mensaje si sale CRUZ'));
+            card.append(seccionEfectos('Rama CRUZ:', e, 'cruz', { rama: true, permitirObjetivo: ctx.permitirObjetivo }));
+        }
+        return card;
+    }
+
+    // ================== HABILIDADES (por trigger) ==================
+    function mostrarSelectorTrigger() {
+        const box = document.getElementById('selector-trigger');
+        box.style.display = 'block'; box.innerHTML = '';
+        box.append(el('div', { class: 'hab-titulo', text: '¿Cuándo se dispara la habilidad?' }));
+        Object.keys(TRIGGERS_META).forEach(t => {
+            const m = TRIGGERS_META[t];
+            box.append(el('div', { style: 'margin:6px 0;' },
+                el('button', { class: 'btn-add', text: m.l, onclick: () => { abilities.push(m.def()); box.style.display = 'none'; renderBuilder(); sync(); } }),
+                el('span', { class: 'ayuda', text: ' ' + m.d })));
+        });
+        box.append(el('button', { text: 'Cancelar', onclick: () => box.style.display = 'none' }));
+    }
+    // Lista de requisitos por recuento (JUGAR / ACTIVA)
+    function bloqueRequisitosCount(ab, conMsg) {
+        const wrap = el('div', { class: 'seccion' });
+        wrap.append(el('div', { class: 'seccion-titulo', text: 'Requisitos (recuento de cartas en mesa):' }));
+        const lista = el('div', {});
+        const pintar = () => {
+            lista.innerHTML = '';
+            (ab.requisitos || []).forEach((r, i) => {
+                if (!r.count) return;
+                const fila = el('div', { class: 'efecto' });
+                fila.append(btnX(() => { ab.requisitos.splice(i, 1); if (!ab.requisitos.length) delete ab.requisitos; pintar(); sync(); }));
+                fila.append(el('div', { class: 'b-fila' },
+                    campo('Cuenta', inSel(r.count, 'quien', QUIEN_OPTS_ACCION.filter(o => o.v === 'ALIADO' || o.v === 'ENEMIGO' || o.v === 'TODOS'))),
+                    campo('Zona', inSel(r.count, 'zona', ZONA_OPTS)),
+                    campo('Cond.', inSel(r, 'op', OPS_COMP.slice(0, 6)), '110px'),
+                    campo('Nº', inNum(r, 'valor'), '70px')));
+                fila.append(bloqueFiltros(r.count));
+                if (conMsg) fila.append(campo('Mensaje si falla (opcional; {carta})', inTxt(r, 'msg')));
+                lista.append(fila);
+            });
+        };
+        wrap.append(lista, el('button', { class: 'btn-add', text: '+ requisito', onclick: () => { if (!ab.requisitos) ab.requisitos = []; ab.requisitos.push({ count: { quien: 'ENEMIGO', zona: 'vanguardia' }, op: '>=', valor: 1 }); pintar(); sync(); } }));
+        pintar();
+        return wrap;
+    }
+    function habilidadCard(ab, idx) {
+        const card = el('div', { class: 'hab' });
+        const m = TRIGGERS_META[ab.trigger] || { l: ab.trigger, d: '' };
+        card.append(btnX(() => { abilities.splice(idx, 1); renderBuilder(); sync(); }));
+        card.append(el('div', { class: 'hab-titulo', text: (idx + 1) + ' · ' + m.l }));
+        card.append(el('div', { class: 'ayuda', text: m.d }));
+
+        if (ab.trigger === 'PASIVA_CONTINUA') {
+            card.append(campo('Nombre de la pasiva (para tooltips)', inTxt(ab, 'nombre', 'FURIA')));
+            card.append(bloqueCondicion(ab, 'if', 'Solo si se cumple una condición (si no, no aplica nada)', CAMPOS_COND));
+            card.append(seccionEfectos('Efectos continuos:', ab, 'then', { pasiva: true }));
+        } else if (ab.trigger === 'JUGAR') {
+            card.append(bloqueRequisitosCount(ab, true));
+        } else if (ab.trigger === 'AL_JUGAR') {
+            card.append(campo('Mensaje al jugarse (opcional)', inTxt(ab, 'log', '¡La carta entra en juego!')));
+            card.append(seccionEfectos('Efectos:', ab, 'efectos', { permitirObjetivo: false }));
+        } else if (ab.trigger === 'AL_USAR_AYUDA') {
+            // requisitos del objetivo
+            const wrap = el('div', { class: 'seccion' });
+            wrap.append(el('div', { class: 'seccion-titulo', text: 'Requisitos del objetivo (si fallan, la carta no se consume):' }));
+            const lista = el('div', {});
+            const pintar = () => {
+                lista.innerHTML = '';
+                (ab.requisitosObjetivo || []).forEach((r, i) => {
+                    const fila = el('div', { class: 'efecto' });
+                    fila.append(btnX(() => { ab.requisitosObjetivo.splice(i, 1); pintar(); sync(); }));
+                    const esRef = r.valor && typeof r.valor === 'object' && r.valor.REF;
+                    fila.append(el('div', { class: 'b-fila' },
+                        campo('Campo', inSel(r, 'campo', CAMPOS_REQ_OBJ)),
+                        campo('Comparación', inSel(r, 'op', OPS_COMP)),
+                        esRef ? el('div', { class: 'b-campo', style: 'max-width:150px;' }, el('label', { text: 'Valor' }), el('div', { class: 'ayuda', text: 'Furor máx. del objetivo' })) : campo('Valor', inNum(r, 'valor'), '90px')));
+                    const c = el('input', { type: 'checkbox' });
+                    c.checked = !!esRef;
+                    c.onchange = () => { if (c.checked) r.valor = { REF: 'objetivo.furorMax' }; else r.valor = 4; pintar(); sync(); };
+                    fila.append(el('label', { class: 'chk' }, c, el('span', { text: 'comparar contra el Furor máx. del objetivo (respeta overrides)' })));
+                    fila.append(campo('Mensaje si falla ({objetivo})', inTxt(r, 'msg')));
+                    lista.append(fila);
+                });
+            };
+            wrap.append(lista, el('button', { class: 'btn-add', text: '+ requisito del objetivo', onclick: () => { if (!ab.requisitosObjetivo) ab.requisitosObjetivo = []; ab.requisitosObjetivo.push({ campo: 'furor', op: '<', valor: { REF: 'objetivo.furorMax' }, msg: '{objetivo} ya tiene Furor máximo.' }); pintar(); sync(); } }));
+            pintar();
+            card.append(wrap);
+            card.append(seccionEfectos('Efectos sobre el objetivo:', ab, 'efectos', { permitirObjetivo: true }));
+        } else if (ab.trigger === 'AL_CADUCAR') {
+            card.append(el('div', { class: 'b-fila' },
+                campo('Mensaje al caducar (opcional)', inTxt(ab, 'log', 'El efecto se disipa.')),
+                campo('Tipo', inSel(ab, 'logTipo', LOG_TIPOS), '150px')));
+            card.append(seccionEfectos('Efectos:', ab, 'efectos', { permitirObjetivo: false }));
+            card.append(bloqueLogObj(ab, 'logSiAplicado', 'Mensaje extra solo si algún efecto llegó a aplicarse'));
+        } else if (ab.trigger === 'AL_ENTRAR') {
+            if (!ab.si) ab.si = { quien: 'ALIADO' };
+            card.append(el('div', { class: 'b-fila' },
+                campo('Quién entra', inSel(ab.si, 'quien', [{ v: 'ALIADO', l: 'Un aliado', d: '' }, { v: 'ENEMIGO', l: 'Un enemigo', d: '' }, { v: 'CUALQUIERA', l: 'Cualquiera', d: '' }])),
+                campo('Marcador (anti-repetición, opcional)', inTxt(ab, 'marcador', 'miAuraBuff'))));
+            const tagsObj = { v: (ab.si.algunaEtiqueta || []).join(', ') };
+            card.append(campo('Alguna de estas etiquetas (separadas por coma; vacío = todas)', inTxt(tagsObj, 'v', 'Guardia Real, Ninja', () => {
+                const arr = tagsObj.v.split(',').map(s => s.trim()).filter(Boolean);
+                if (arr.length) ab.si.algunaEtiqueta = arr; else delete ab.si.algunaEtiqueta;
+                sync();
+            })));
+            card.append(seccionEfectos('Efectos sobre la carta que entra (síncronos):', ab, 'efectos', { permitirObjetivo: false }));
+            card.append(el('div', { class: 'b-nota' }, 'Ops válidas aquí: MODIFICAR_STAT, APLICAR_ESTADO, MODIFICAR_CONTADORES (sin modales ni robos).'));
+        } else if (ab.trigger === 'INICIO_TURNO') {
+            const chk = el('input', { type: 'checkbox' });
+            chk.checked = ab.soloTurnoPropio !== false;
+            chk.onchange = () => { ab.soloTurnoPropio = chk.checked; sync(); };
+            card.append(el('label', { style: 'font-size:0.85rem; display:flex; gap:6px; align-items:center;' }, chk, document.createTextNode(' Solo en el turno del dueño de la carta')));
+            card.append(campo('Log (opcional; admite {carta} y {jugador})', inTxt(ab, 'log')));
+            card.append(seccionEfectos('Efectos al inicio del turno:', ab, 'efectos', { permitirObjetivo: true }));
+        } else if (ab.trigger === 'FIN_TURNO') {
+            const chk = el('input', { type: 'checkbox' });
+            chk.checked = ab.soloTurnoPropio !== false;
+            chk.onchange = () => { ab.soloTurnoPropio = chk.checked; sync(); };
+            card.append(el('label', { style: 'font-size:0.85rem; display:flex; gap:6px; align-items:center;' }, chk, document.createTextNode(' Solo en el turno del dueño de la carta')));
+            card.append(campo('Log (opcional; admite {carta} y {jugador})', inTxt(ab, 'log')));
+            card.append(seccionEfectos('Efectos al final del turno:', ab, 'efectos', { permitirObjetivo: true }));
+        } else if (ab.trigger === 'ACTIVA') {
+            if (!ab.coste) ab.coste = { furor: 1 };
+            if (!ab.target) ab.target = { quien: 'ENEMIGO', cantidad: 1 };
+            card.append(el('div', { class: 'b-fila' },
+                campo('Nombre (en mayúsculas)', inTxt(ab, 'nombre', 'MI ACTIVA')),
+                campo('Coste de Furor', inNum(ab.coste, 'furor'), '110px')));
+            card.append(el('div', { class: 'b-fila' },
+                campo('Objetivos a elegir', inSel(ab.target, 'quien', [{ v: 'ENEMIGO', l: 'Enemigos', d: '' }, { v: 'ALIADO', l: 'Aliados', d: '' }])),
+                campo('Cuántos', inNum(ab.target, 'cantidad'), '90px')));
+            card.append(el('div', {}, inChk(ab, 'ataqueNormal', 'los ataques de esta Activa cuentan como ATAQUE NORMAL (les afecta Provocar, etc.)')));
+            card.append(bloqueRequisitosCount(ab, false));
+            // validar objetivo
+            const wrapV = el('div', { class: 'seccion' });
+            wrapV.append(el('div', { class: 'seccion-titulo', text: 'Validación de cada objetivo al hacer clic (opcional):' }));
+            const listaV = el('div', {});
+            const pintarV = () => {
+                listaV.innerHTML = '';
+                (ab.validarObjetivo || []).forEach((v, i) => {
+                    const fila = el('div', { class: 'efecto' });
+                    fila.append(btnX(() => { ab.validarObjetivo.splice(i, 1); if (!ab.validarObjetivo.length) delete ab.validarObjetivo; pintarV(); sync(); }));
+                    fila.append(el('div', { class: 'b-fila' },
+                        campo('Campo', inSel(v, 'campo', [{ v: 'location', l: 'Zona (location)', d: 'vanguard / rearguard' }, { v: 'stealth', l: 'Ocultarse', d: '' }, { v: 'furor', l: 'Furor', d: '' }])),
+                        campo('Comparación', inSel(v, 'op', OPS_COMP)),
+                        campo('Valor', inTxt(v, 'valor', 'vanguard'), '110px')));
+                    fila.append(campo('Mensaje si no vale', inTxt(v, 'msg', 'Debe estar en vanguardia.')));
+                    listaV.append(fila);
+                });
+            };
+            wrapV.append(listaV, el('button', { class: 'btn-add', text: '+ validación', onclick: () => { if (!ab.validarObjetivo) ab.validarObjetivo = []; ab.validarObjetivo.push({ campo: 'location', op: '==', valor: 'vanguard', msg: 'Debe estar en vanguardia.' }); pintarV(); sync(); } }));
+            pintarV();
+            card.append(wrapV);
+            card.append(seccionEfectos('Efectos (sobre los objetivos elegidos):', ab, 'efectos', { permitirObjetivo: true }));
+        } else {
+            card.append(el('div', { class: 'ayuda', text: 'Este disparador aún no tiene formulario visual: ajústalo desde la Vista avanzada (JSON) de abajo. La plantilla insertada sirve de base y la validación en vivo te avisa de errores.' }));
+        }
+        return card;
+    }
+    function renderBuilder() {
+        const cont = document.getElementById('constructor');
+        cont.innerHTML = '';
+        abilities.forEach((ab, i) => cont.append(habilidadCard(ab, i)));
+    }
+
+    // ================== SINCRONIZACIÓN + VALIDACIÓN ==================
+    function sync() {
+        document.getElementById('f-abilities').value = JSON.stringify(abilities, null, 2);
+        validar();
+    }
+    function validar() {
+        const est = document.getElementById('estado-validacion');
+        if (!abilities.length) { est.className = 'ok'; est.textContent = 'Sin habilidades (carta vainilla): válido.'; return true; }
+        const errores = [];
+        const orig = console.error;
+        console.error = function () { errores.push(Array.prototype.join.call(arguments, ' ')); };
+        const ok = DSL.validate({ name: document.getElementById('f-name').value || '(sin nombre)', abilities: abilities });
+        console.error = orig;
+        if (ok) { est.className = 'ok'; est.textContent = '✓ ' + abilities.length + ' habilidad(es) válidas según el intérprete.'; }
+        else { est.className = 'mal'; est.textContent = errores.join('\n'); }
+        return ok;
+    }
+    function aplicarJson() {
+        try {
+            const arr = JSON.parse(document.getElementById('f-abilities').value || '[]');
+            if (!Array.isArray(arr)) throw new Error('Debe ser una lista [ ... ]');
+            abilities = arr;
+            renderBuilder(); sync();
+        } catch (e) { alert('JSON inválido: ' + e.message); }
+    }
+
+    // ================== PLANTILLAS (cartas reales) ==================
+    const PLANTILLAS = {
+        'Pasiva +Atq condicional': { trigger: "PASIVA_CONTINUA", nombre: "FURIA", if: { campo: "self.hp", op: "<=", valor: 3 }, then: [{ op: "MODIFICAR_STAT", stat: "atk", delta: 3 }] },
+        'Pasiva por aliados (COUNT)': { trigger: "PASIVA_CONTINUA", nombre: "COMUNIÓN", then: [{ op: "MODIFICAR_STAT", stat: "atk", delta: { COUNT: { quien: "ALIADO", excludeSelf: true, filtros: [{ campo: "tags", op: "includes", valor: "Prueba" }], max: 3 } } }] },
+        'Requisito jugar (Ayuda)': { trigger: "JUGAR", requisitos: [{ count: { quien: "ALIADO" }, op: ">=", valor: 1, msg: "No tienes aliados en mesa para usar {carta}." }] },
+        'Ayuda: dar Furor': { trigger: "AL_USAR_AYUDA", requisitosObjetivo: [{ campo: "furor", op: "<", valor: { REF: "objetivo.furorMax" }, msg: "{objetivo} ya tiene Furor máximo." }], efectos: [{ op: "MODIFICAR_STAT", stat: "furor", delta: 1, log: "{carta} da 1 de Furor a {objetivo} ({antes} -> {despues})." }] },
+        'Ayuda: curar': { trigger: "AL_USAR_AYUDA", requisitosObjetivo: [{ campo: "attachedTo", op: "falsy", msg: "{objetivo} está Zombificado y rechaza la Ayuda." }], efectos: [{ op: "CURAR", valor: 2, floating: "MI CARTA", log: "{carta} cura 2 de Vida a {objetivo} ({antes} -> {despues})." }] },
+        'Evento: daño al jugarse': { trigger: "AL_JUGAR", log: "¡Impacto! Llueve fuego sobre la vanguardia enemiga.", efectos: [{ op: "DAÑO", valor: 2, target: { quien: "ENEMIGO", zona: "vanguardia" } }] },
+        'Evento caduca: Furor a enemigos': { trigger: "AL_CADUCAR", log: "Efecto de expiración: Enemigos de vanguardia ganan 3 Furor.", efectos: [{ op: "MODIFICAR_STAT", stat: "furor", delta: 3, target: { quien: "ENEMIGO", zona: "vanguardia" } }] },
+        'Aura de bienvenida (+1 Furor a etiqueta)': { trigger: "AL_ENTRAR", si: { quien: "ALIADO", algunaEtiqueta: ["Guardia Real"] }, efectos: [{ op: "MODIFICAR_STAT", stat: "furor", valor: 1, floating: "+1 FUR", floatingStyle: "ft-green", offsetFloating: -20, log: "¡{carta} inspira a {objetivo}!" }] },
+        'Regeneración al inicio del turno': { trigger: "INICIO_TURNO", soloTurnoPropio: true, efectos: [{ op: "CURAR", completa: true, log: "¡{carta} restaura toda su Vida!", floating: "RESTAURADA", floatingStyle: "ft-green", offsetFloating: -30, target: { quien: "SELF" } }] },
+        'Evento: busca en el mazo al final del turno': { trigger: "FIN_TURNO", soloTurnoPropio: true, efectos: [{ op: "BUSCAR", en: "MAZO", seleccion: "PRIMERA", cantidad: 1, destino: "MANO", logIntro: "¡Evento activo: {carta}!", filtros: [{ campo: "type", op: "==", valor: "Ayuda" }], log: "Encuentras: {objetivo}.", logNoEncontrada: "No había nada.", barajarDespues: { log: "Barajando el mazo..." } }] },
+        'Evento caduca: cura grupal': { trigger: "AL_CADUCAR", log: "La niebla se disipa.", logTipo: "system", efectos: [{ op: "CURAR", valor: 3, conBeforeHealed: false, soloSiHerido: true, floating: "CURADO", floatingStyle: "ft-green", offsetY: -20, fuente: "healing", target: { quien: "ALIADO", filtros: [{ campo: "tags", op: "includes", valor: "Ninja" }] } }], logSiAplicado: { msg: "Emergen revitalizados.", tipo: "healing" } },
+        'Activa: ataque + estado': { trigger: "ACTIVA", nombre: "MI ACTIVA", coste: { furor: 1 }, requisitos: [{ count: { quien: "ENEMIGO", zona: "vanguardia" }, op: ">=", valor: 1 }], target: { quien: "ENEMIGO", cantidad: 1 }, ataqueNormal: true, efectos: [{ op: "ATACAR", siExito: [{ op: "APLICAR_ESTADO", estado: "dot", duracion: 3, log: "¡Envenenado!" }] }] },
+        'Global: moneda por ataque (Apagón)': { trigger: "GLOBAL_ANTES_DE_ATAQUE", exentoPlantilla: "immuneToApagon", log: { msg: "¡Interferencia! Moneda para el ataque de {atacante}...", tipo: "system" }, moneda: { cruz: { log: { msg: "Moneda: CRUZ - ¡El ataque de {atacante} falla!", tipo: "neutral" }, agotarAtacante: true, resultado: "BLOQUEAR" }, cara: { log: { msg: "Moneda: CARA - El ataque procede.", tipo: "ability" }, resultado: "PERMITIR" }, sinResultado: "BLOQUEAR" } },
+        'Global: moneda al inicio de turno (Apuesta)': { trigger: "GLOBAL_INICIO_TURNO", turnoDe: "RIVAL", log: { msg: "¡El azar decide el destino de {jugador}...", tipo: "ability" }, moneda: { cruz: { log: { msg: "Moneda: CRUZ", tipo: "combat" }, marcar: [{ campo: "miFlag", valor: true }, { campo: "misCruces", sumar: 1 }] }, cara: { log: { msg: "Moneda: CARA", tipo: "neutral" }, marcar: [{ campo: "miFlag", valor: false }] } } },
+        'Global: robar Furor tras ataque (Sifón)': { trigger: "GLOBAL_TRAS_ATAQUE", si: { atacante: "PROPIO", soloAtaqueNormal: true, dañoMinimo: 1, defensor: { campo: "furor", op: ">", valor: 0 } }, log: { msg: "¡Se roba energía de {defensor}!", tipo: "ability" }, efectos: [{ op: "MODIFICAR_STAT", stat: "furor", delta: -1, fuente: null, target: { quien: "DEFENSOR" } }, { op: "MODIFICAR_STAT", stat: "furor", delta: 1, fuente: null, target: { quien: "ATACANTE" } }] },
+        'Global: Furor extra a etiqueta (Investigar)': { trigger: "GLOBAL_MODIFICAR_FUROR", reglas: [{ si: { origen: "fase_furor", objetivoDe: "PROPIO", algunaEtiqueta: ["Científico", "Científica"] }, log: { msg: "¡{objetivo} gana Furor extra!", tipo: "ability" }, accion: { sumar: 1 } }] },
+        'Activa: ataque con bono + moneda': { trigger: "ACTIVA", nombre: "MI ACTIVA", coste: { furor: 1 }, requisitos: [{ count: { quien: "ENEMIGO", zona: "vanguardia" }, op: ">=", valor: 1 }], target: { quien: "ENEMIGO", cantidad: 1 }, ataqueNormal: true, floatingExtra: [{ texto: "+2 ATQ", estilo: "ft-green", offset: -10 }], efectos: [{ op: "ATACAR", bonoAtq: 2 }, { if: { campo: "self.hp", op: ">", valor: 0 }, op: "MONEDA", target: { quien: "SELF" }, logCruz: { msg: "Moneda: CRUZ - ¡Retroceso!", tipo: "combat" }, cruz: [{ op: "MODIFICAR_STAT", stat: "currentHp", delta: -1, fuente: null, comprobarMuerte: true }], logCara: { msg: "Moneda: CARA - Aguanta intacta.", tipo: "neutral" } }] }
+    };
+    (function () {
+        const cont = document.getElementById('plantillas');
+        Object.keys(PLANTILLAS).forEach(k => {
+            cont.append(el('button', { text: '+ ' + k, onclick: () => { abilities.push(JSON.parse(JSON.stringify(PLANTILLAS[k]))); renderBuilder(); sync(); } }));
+        });
+    })();
+
+    // ================== GENERACIÓN ==================
+    function generar() {
+        const v = id => document.getElementById(id).value.trim();
+        const num = id => { const x = document.getElementById(id).value; return x === '' ? undefined : Number(x); };
+        if (!validar()) { document.getElementById('salida').value = '// Corrige las habilidades antes de generar.'; return; }
+        const type = v('f-type');
+        const carta = { name: v('f-name') || 'Sin nombre' };
+        if (num('f-id') !== undefined) carta.id = num('f-id');
+        if (type === 'Personaje' || type === 'Esbirro') { carta.hp = num('f-hp'); carta.def = num('f-def'); carta.atk = num('f-atk'); }
+        carta.type = type;
+        if (v('f-subtype')) carta.subtype = v('f-subtype');
+        const tags = v('f-tags') ? v('f-tags').split(',').map(s => s.trim()).filter(Boolean) : [];
+        if (tags.length) carta.tags = tags;
+        carta.rarity = v('f-rarity');
+        if (num('f-cost') !== undefined) carta.cost = num('f-cost');
+        if (num('f-series') !== undefined) carta.series = num('f-series');
+        if (type === 'Evento' && num('f-duration') !== undefined) carta.duration = num('f-duration');
+        if (v('f-text')) carta.text = v('f-text');
+        if (v('f-passiveName')) carta.passiveName = v('f-passiveName');
+        if (v('f-activeName')) carta.activeName = v('f-activeName');
+        if (num('f-activeCost') !== undefined) carta.activeCost = num('f-activeCost');
+        if (document.getElementById('f-isTaunt').checked) carta.isTaunt = true;
+        if (document.getElementById('f-stealth').checked) carta.stealth = true;
+        if (document.getElementById('f-uncopyable').checked) carta.uncopyable = true;
+        if (num('f-furorMax') !== undefined) carta.furorMax = num('f-furorMax');
+        if (abilities.length) carta.abilities = abilities;
+
+        const avisos = [];
+        if (CARD_DB.some(c => c.name === carta.name)) avisos.push('⚠️ Ya existe una carta llamada "' + carta.name + '".');
+        if (carta.id !== undefined && CARD_DB.some(c => c.id === carta.id)) avisos.push('⚠️ El id ' + carta.id + ' ya está en uso.');
+        document.getElementById('aviso-duplicado').textContent = avisos.join('  ');
+
+        document.getElementById('salida').value = '    ' + JSON.stringify(carta, null, 4).replace(/\n/g, '\n    ') + ',';
+    }
+    function copiar(ev) {
+        const t = document.getElementById('salida');
+        if (!t.value) generar();
+        navigator.clipboard.writeText(t.value).then(() => {
+            const b = ev.target; const old = b.textContent;
+            b.textContent = '✓ Copiado'; setTimeout(() => { b.textContent = old; }, 1200);
+        });
+    }
+
+    tipoCambiado();
+    renderBuilder();
+</script>
+</body>
+</html>
