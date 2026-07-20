@@ -565,10 +565,15 @@ async function ejecutarEscenario(cual, esc) {
 // los consulta por truthiness): counters={} y hasAttackedThisTurn=false.
 // Solo se ignora la dirección undefined→valor-inerte; cualquier otro cambio
 // en esos campos sigue siendo un fallo.
+// Además, MARCAR_TEMPORAL (nueva) guarda en la marca el sourceInstanceId de la
+// carta que la creó (lo necesita p. ej. sinMarcaTemporalPropia); las marcas
+// viejas solo llevaban {sourceId, ownerId}. Campo nuevo intencionado e inerte
+// para el comportamiento comparado.
 function esDiffInerte(ruta, a, b) {
     if (a !== undefined) return false;
     if (ruta.endsWith('.counters') && b && typeof b === 'object' && Object.keys(b).length === 0) return true;
     if (ruta.endsWith('.hasAttackedThisTurn') && b === false) return true;
+    if (ruta.includes('.tempEffects.') && ruta.endsWith('.sourceInstanceId') && typeof b === 'string') return true;
     return false;
 }
 
