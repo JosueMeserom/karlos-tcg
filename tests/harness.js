@@ -599,6 +599,17 @@ function compararCapturas(esc, vieja, nueva) {
         if (!regla.motivo) throw new Error(`escenario "${esc.nombre}": logsIntencionados sin "motivo" documentado`);
         logsViejos = logsViejos.map(l => l.split(regla.de).join(regla.a));
     }
+    // Líneas que la vieja emitía y la nueva eliminó a propósito (p. ej. el
+    // onExpire decorativo de De compras). Estricto: si la línea declarada no
+    // aparece en la vieja, el escenario falla (guion desincronizado).
+    for (const regla of (esc.logsSoloVieja || [])) {
+        if (!regla.motivo) throw new Error(`escenario "${esc.nombre}": logsSoloVieja sin "motivo" documentado`);
+        const antes = logsViejos.length;
+        logsViejos = logsViejos.filter(l => !l.includes(regla.linea));
+        if (logsViejos.length === antes) {
+            diffs.push(`logsSoloVieja: la línea declarada "${regla.linea}" no aparece en la salida vieja`);
+        }
+    }
 
     const maxL = Math.max(logsViejos.length, nueva.logs.length);
     for (let i = 0; i < maxL; i++) {
