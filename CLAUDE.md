@@ -9,6 +9,7 @@ Visión a largo plazo — esto es un juego completo, no solo un motor: quedan mu
 - El proyecto VIVE en el servidor Debian. Node, pm2, git y las suites se ejecutan ALLÍ.
 - Antes de asumir nada del entorno, comprobar dónde se ejecuta la sesión (uname, pwd) y que node esté disponible.
 - pm2 sirve la instancia viva del juego. No reiniciarla salvo que Toto lo pida.
+- OJO: pm2 sirve EL ÁRBOL DE TRABAJO (este directorio), no una rama git. Cualquier edición en disco sale al aire al recargar el navegador, aunque estés en una rama sin mergear; las ramas solo aíslan el historial. Toto betastea en la instancia viva (main): al terminar trabajo en rama, merge a main en cuanto la batería esté en verde para que git refleje lo servido. Cambios en server.js sí requieren reinicio de pm2 (pedirlo a Toto).
 
 ## Estructura real (raíz del proyecto)
 - `server.js` — servidor (lobby, salas, chat persistente).
