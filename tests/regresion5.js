@@ -4,9 +4,9 @@
 // Ejercitan el ciclo completo de turnos del harness: decremento de duración en
 // la fase de inicio del dueño, disparos de FIN_TURNO y expiración con modales.
 //
-// De compras: la vieja tenía un onExpire decorativo ("Termina tu día De
-// compras.") que la migración eliminó; se declara en logsSoloVieja.
-// PENDIENTE DE CONFIRMAR con Toto que la eliminación fue a propósito.
+// De compras: la nueva restaura el log decorativo de expiración ("Termina el
+// día De compras de {jugador}.") vía un trigger AL_CADUCAR sin efectos, a
+// petición de Toto, con la sintaxis/estilo 3ª-persona del resto del proyecto.
 
 'use strict';
 const { correrSuite } = require('./harness');
@@ -34,10 +34,8 @@ const escenarios = [
               motivo: 'norma del proyecto (3ª persona con {jugador}): la vieja hablaba en 2ª persona' },
             { de: 'Has mirado toda la tienda y no quedaba nada de eso.', a: 'J1 (Jugador 1) ha mirado toda la tienda y no quedaba nada de eso.',
               motivo: 'norma del proyecto (3ª persona con {jugador}): la vieja hablaba en 2ª persona' },
-        ],
-        logsSoloVieja: [
-            { linea: 'Termina tu día De compras.',
-              motivo: 'la migración eliminó el onExpire decorativo; la nueva solo emite el log genérico de expiración del motor (pendiente de confirmar con Toto)' },
+            { de: 'Termina tu día De compras.', a: 'Termina el día De compras de J1 (Jugador 1).',
+              motivo: 'norma del proyecto (3ª persona con {jugador}): a petición de Toto, restaurado como AL_CADUCAR en la nueva' },
         ],
     },
     {

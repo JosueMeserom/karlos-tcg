@@ -3116,7 +3116,8 @@ const CARD_DB = [
                   algunFiltro: [ { campo: "subtype", op: "==", valor: "Ingerible" }, { campo: "subtype", op: "==", valor: "Arma" }, { campo: "subtype", op: "==", valor: "Vestimenta" } ],
                   log: "{jugador} ha comprado: {objetivo}.",
                   logNoEncontrada: "{jugador} ha mirado toda la tienda y no quedaba nada de eso.",
-                  barajarDespues: { log: "Barajando el mazo..." } } ] }
+                  barajarDespues: { log: "Barajando el mazo..." } } ] },
+            { trigger: "AL_CADUCAR", log: "Termina el día De compras de {jugador}.", logTipo: "system" }
         ],
     },
     {
