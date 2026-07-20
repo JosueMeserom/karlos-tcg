@@ -35,7 +35,7 @@ Las 24 suites históricas (r1–r23 + humo) vivían en los transcripts de las se
 4. **Diferencias intencionadas** (p. ej. logs pasados a 3ª persona — norma del proyecto: todo log visible por ambos jugadores va en 3ª persona con el nombre del jugador) se normalizan con mapas documentados DENTRO de la suite, con comentario que explique el porqué. Nunca se ignoran en silencio.
 5. Cada suite imprime un mensaje de éxito explícito ("… IDÉNTICAS") o el recuento de FALLOS.
 
-Solo con la batería completa en verde se retoma la siguiente tarea de motor: **interceptores de ataque** (§10-11 de `docs/DSL_cartas_diseno.md`; punto único de intercepción en `performAttack` con cola ordenada evento → equipos → pasivas; migrar Plan de equipo primero, luego Feria y Deuda de sangre, con suite propia viejo-vs-nuevo).
+Solo con la batería completa en verde se retoma la siguiente tarea de motor: **interceptores de ataque** (§10-11 de `docs/DSL_cartas_diseno.md`; punto único de intercepción en `performAttack` con cola ordenada evento → equipos → pasivas; migrar Plan de equipo primero, luego Feria del cómic y Deuda con la mafia, con suite propia viejo-vs-nuevo). [Nombres corregidos por Toto: antes decía "Feria y Deuda de sangre", cartas que no existen.]
 
 ## Metodología (INNEGOCIABLE)
 1. Tras CUALQUIER cambio en `cartas.js` o el intérprete: pasada estricta de TODAS las suites (`for f in tests/regresion*.js tests/humo.js; do node "$f"; done`), exigiendo el mensaje de éxito explícito de cada una. No vale "parece que pasa".
