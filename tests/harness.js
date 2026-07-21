@@ -484,6 +484,14 @@ async function aplicarRespuesta(ctx, inst, paso) {
         // (resuelve null); en el resto de estados, al clic de cancelación general.
         if (pend.tipo === 'busqueda') pend.resolver([]);
         else if (pend.tipo === 'visorMazo') pend.resolver(null);
+        else if (pend.tipo === 'elegirTablero') {
+            // cancelable:false (Toto, 21-jul-2026): cancelAction() puede negarse a
+            // resolver el pick (coste/moneda ya comprometidos). Si sigue vivo tras
+            // el intento, la interacción NO se dio por respondida: se repone en la
+            // cola para que el escenario deba completar la elección de verdad.
+            inst.cancelAction();
+            if (inst.dslPick) { ctx.pendientes.unshift(pend); return; }
+        }
         else inst.cancelAction();
     } else if (paso.opcion !== undefined) {
         if (pend.tipo !== 'opcion') throw new Error(`[${ctx.cual}] esperaba responder a "${pend.tipo}", el paso es {opcion}`);

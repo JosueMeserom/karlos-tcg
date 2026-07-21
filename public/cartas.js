@@ -3190,7 +3190,7 @@ const CARD_DB = [
     },
     {
         name: "PEM", type: "Ayuda", subtype: "Técnica", tags: ["Consumible"], rarity: "C", cost: 0, series: 1,
-        tempEffectText: "Paralizado por PEM: se saltará su próximo turno (sin atacar, sin Habilidades y sin retirarse)",
+        tempEffectText: "{genero?Paralizado|Paralizada} por PEM: se saltará su próximo turno (sin atacar, sin Habilidades y sin retirarse)",
         text: "Coste: 1 de Furor. Elige un enemigo 'Máquina'. No podrá atacar, usar Habilidades ni retirarse en su próximo turno.",
         abilities: [
             { trigger: "JUGAR", requisitos: [
@@ -3201,7 +3201,7 @@ const CARD_DB = [
                 { op: "ELEGIR", de: "ALIADOS", filtros: [ { campo: "furor", op: ">=", valor: 1 } ], cantidad: 1,
                   titulo: "¿QUIÉN DISPARA EL PEM? (-1 FUROR)",
                   efectos: [ { op: "MODIFICAR_STAT", stat: "furor", delta: -1 } ] },
-                { op: "ELEGIR", de: "ENEMIGOS", filtros: [ { campo: "subtype", op: "==", valor: "Máquina" } ], cantidad: 1,
+                { op: "ELEGIR", de: "ENEMIGOS", filtros: [ { campo: "subtype", op: "==", valor: "Máquina" } ], cantidad: 1, cancelable: false,
                   titulo: "Elige al enemigo 'Máquina' para paralizarlo",
                   efectos: [
                     { op: "MARCAR_TEMPORAL", floating: "PARALIZADO", floatingStyle: "ft-ability", offsetFloating: -30,
@@ -3218,7 +3218,7 @@ const CARD_DB = [
     },
     {
         name: "Rebobinar", type: "Ayuda", subtype: "Técnica", tags: ["Consumible"], rarity: "C", cost: 0, series: 1,
-        tempEffectText: "Rebobinado: no puede volver a ser rebobinado este turno",
+        tempEffectText: "{genero?Rebobinado|Rebobinada}: no puede volver a ser rebobinado este turno",
         text: "Coste: 3 de Furor del aliado agotado que elijas. Ese aliado refresca su acción. Sólo 1 vez por aliado cada turno.",
         abilities: [
             { trigger: "JUGAR", requisitos: [ { count: { filtros: [ { campo: "exhausted", op: "truthy" }, { campo: "furor", op: ">=", valor: 3 } ], sinMarcaTemporalPropia: true }, op: ">=", valor: 1, msg: "No hay aliados válidos que no hayan sido rebobinados ya." } ] },
@@ -4443,7 +4443,7 @@ const CARD_DB = [
         ],
     },
     {
-        name: "Canceladora", tempEffectText: "Cancelado: perderá su próximo turno", type: "Ayuda", subtype: "Arma", tags: ["Consumible", "a distancia"], rarity: "B", cost: 1, series: 1,
+        name: "Canceladora", tempEffectText: "{genero?Cancelado|Cancelada}: perderá su próximo turno", type: "Ayuda", subtype: "Arma", tags: ["Consumible", "a distancia"], rarity: "B", cost: 1, series: 1,
         text: "Elige un enemigo con la etiqueta 'Usuario de VP'. Ese enemigo no podrá actuar (atacar, usar Habilidad o retirarse) en su próximo turno.",
         abilities: [
             { trigger: "JUGAR", requisitos: [ { count: { de: "ENEMIGOS", algunFiltro: [ { campo: "tags", op: "includes", valor: "Usuaria de VP" }, { campo: "tags", op: "includes", valor: "Usuario de VP" } ] }, op: ">=", valor: 1, msg: "El rival no tiene Usuarios de VP en el campo." } ] },
@@ -5709,7 +5709,7 @@ const CARD_DB = [
         name: "Época de estudio", type: "Evento", rarity: "C", cost: 1, duration: 3, series: 2,
         text: "3 turnos. Requiere un aliado 'Estudioso' en el campo. Mientras esté en juego, los aliados 'Estudiosos' no ganan Furor al inicio del turno y quedan Ocultos (inmunes a ataques normales). Al expirar, robas 2 cartas por cada aliado afectado.",
         abilities: [
-            { trigger: "PREVIEW_GLOBAL", lineas: [ { quien: "ALIADO", algunaEtiqueta: ["Estudioso", "Estudiosa"], texto: "No gana Furor al inicio del turno y permanece Oculto" } ] },
+            { trigger: "PREVIEW_GLOBAL", lineas: [ { quien: "ALIADO", algunaEtiqueta: ["Estudioso", "Estudiosa"], texto: "No gana Furor al inicio del turno y permanece {genero?Oculto|Oculta}" } ] },
             { trigger: "PREVIEW_GLOBAL", lineas: [ { quien: "ALIADO", algunaEtiqueta: ["Estudioso"], texto: "No gana Furor al inicio del turno (estudiando)" } ] }
         ],
         canPlayCard: function(card, game, p) {
@@ -6235,11 +6235,11 @@ const CARD_DB = [
                 { op: "MONEDA",
                   logCara: { msg: "Moneda: CARA - Tú eliges a quién vaciarle la mente.", tipo: "ability" },
                   cara: [
-                    { op: "ELEGIR", de: "ENEMIGOS", cantidad: 1, titulo: "ACERTIJO (CARA): TÚ ELIGES (-2 FUR)",
+                    { op: "ELEGIR", de: "ENEMIGOS", cantidad: 1, cancelable: false, titulo: "ACERTIJO (CARA): TÚ ELIGES (-2 FUR)",
                       efectos: [ { op: "MODIFICAR_STAT", stat: "furor", delta: -2, log: "¡{objetivo} no sabe la respuesta y pierde 2 de Furor!" } ] } ],
                   logCruz: { msg: "Moneda: CRUZ - El rival decide quién de sus tropas sufrirá la jaqueca.", tipo: "ability" },
                   cruz: [
-                    { op: "ELEGIR", de: "ENEMIGOS", elegidoPor: "RIVAL", cantidad: 1, titulo: "ACERTIJO (CRUZ): ELIGE UN ALIADO PARA PERDER 1 FUR",
+                    { op: "ELEGIR", de: "ENEMIGOS", elegidoPor: "RIVAL", cantidad: 1, cancelable: false, titulo: "ACERTIJO (CRUZ): ELIGE UN ALIADO PARA PERDER 1 FUR",
                       efectos: [ { op: "MODIFICAR_STAT", stat: "furor", delta: -1, log: "El rival decide sacrificar 1 Furor de {objetivo}." } ] } ] } ] }
         ],
     },
@@ -6490,7 +6490,7 @@ const CARD_DB = [
             { trigger: "PREVIEW_GLOBAL", lineas: [
                 { quien: "CUALQUIERA", soloTipos: ["Personaje", "Esbirro"],
                   filtros: [ { no: true, campo: "tags", op: "includes", valor: "Otaku" }, { no: true, campo: "tags", op: "includes", valor: "otaku" } ],
-                  texto: "Silenciado" } ] },
+                  texto: "{genero?Silenciado|Silenciada}" } ] },
             { trigger: "FIN_TURNO", soloTurnoPropio: true, log: "Feria del cómic: Buscando merchandising exclusivo...", logTipo: "system",
               efectos: [
                 { op: "MONEDA",
@@ -6517,7 +6517,7 @@ const CARD_DB = [
         // regla GLOBAL_MODIFICAR_FUROR con objetivoSelfId. La elección previa a
         // la colocación (cancelable) vive en ANTES_DE_JUGAR.
         abilities: [
-            { trigger: "PREVIEW_GLOBAL", lineas: [ { campoSelfId: "mafiaTargetId", texto: "Silenciado y sin ganar Furor al inicio de cada turno por su deuda" } ] },
+            { trigger: "PREVIEW_GLOBAL", lineas: [ { campoSelfId: "mafiaTargetId", texto: "{genero?Silenciado|Silenciada} y sin ganar Furor al inicio de cada turno por su deuda" } ] },
             { trigger: "JUGAR", requisitos: [
                 { count: {}, op: ">=", valor: 1, msg: "Necesitas al menos 1 aliado en el campo para contraer la deuda." } ] },
             { trigger: "ANTES_DE_JUGAR",
@@ -6525,7 +6525,7 @@ const CARD_DB = [
                 { op: "ELEGIR", de: "ALIADOS", cantidad: 1,
                   titulo: "¿QUIÉN CONTRAE LA DEUDA?",
                   guardaIdEnSelf: "mafiaTargetId", guardaEn: "deudor" } ] },
-            { trigger: "AL_JUGAR", log: "¡{deudor} se ha endeudado con la mafia! Queda silenciado y sin cobrar Furor." },
+            { trigger: "AL_JUGAR", log: "¡{deudor} se ha endeudado con la mafia! Queda {deudorG?silenciado|silenciada} y sin cobrar Furor." },
             { trigger: "AURA", quien: "ALIADO", soloSelfId: "mafiaTargetId",
               marcar: { campo: "isSilenced", valor: true } },
             { trigger: "GLOBAL_MODIFICAR_FUROR", reglas: [
@@ -7924,8 +7924,13 @@ const DSL = {
         return DSL._cmp(DSL._field(card, c.campo), c.op, DSL._value(card.owner, game, c.valor, card, { self: card }));
     },
     _fill(txt, ctx) {
-        // Genérico: cualquier {clave} presente en ctx se sustituye
-        let s = String(txt);
+        // Genérico: cualquier {clave} presente en ctx se sustituye.
+        // Género (Toto, 21-jul-2026): {clave?masculino|femenino} — clave es un
+        // código de género ('M'/'F'/'N'/'N/A') en ctx; 'F' usa la rama femenina,
+        // cualquier otra cosa (incluida ausencia de clave) usa la masculina.
+        // Reutiliza el campo card.gender que ya existía en el motor (antes solo
+        // se consultaba con ternarios sueltos, p. ej. "ha sido destruido/a").
+        let s = String(txt).replace(/\{(\w+)\?([^|{}]*)\|([^}]*)\}/g, (_, k, m, f) => ((ctx || {})[k] === 'F' ? f : m));
         for (const [k, val] of Object.entries(ctx || {})) s = s.split('{' + k + '}').join(val !== undefined && val !== null ? val : '');
         return s;
     },
@@ -8283,7 +8288,7 @@ const DSL = {
             if (pool.length < n) return e.opcional ? 'skip' : false;
             if (e.autoSiUnica && pool.length === n) {
                 // Única opción posible: se toma sola, sin preguntar (como el pagador único del Té)
-                if (e.guardaEn) { DSL._vars = DSL._vars || {}; (DSL._vars[sourceCard.instanceId] = DSL._vars[sourceCard.instanceId] || {})[e.guardaEn] = DSL._nombre(game, pool[0]); }
+                if (e.guardaEn) { DSL._vars = DSL._vars || {}; const _vg = (DSL._vars[sourceCard.instanceId] = DSL._vars[sourceCard.instanceId] || {}); _vg[e.guardaEn] = DSL._nombre(game, pool[0]); _vg[e.guardaEn + 'G'] = pool[0].gender; }
                 _guarda(pool);
                 _logAntes(pool);
                 for (const t of pool) {
@@ -8299,10 +8304,15 @@ const DSL = {
             // reborde verde en tablero, nunca el modal genérico — forzarModal debe
             // justificarse caso a caso. pickBoardTargets ya soporta un chooser
             // explícito (chooserId), así que elegidoPor:"RIVAL" también usa tablero.
+            // cancelable: false (Toto, 21-jul-2026) en las cartas cuyo coste/moneda ya
+            // se comprometió ANTES de llegar a esta elección concreta (ACERTIJO tras
+            // la moneda, el 2º ELEGIR de PEM tras pagar el 1º) — auditado caso a caso,
+            // no inferido automáticamente.
             if (e.de !== 'MANO' && !e.forzarModal && typeof game.pickBoardTargets === 'function') {
-                const sel = await game.pickBoardTargets(pool, n, DSL._fill(e.titulo || 'Elige objetivo', { carta: sourceCard.name }) + ' (clic en el tablero; X para cancelar)', sourceCard, chooserId);
+                const _texto = e.cancelable === false ? '' : ' (clic en el tablero; X para cancelar)';
+                const sel = await game.pickBoardTargets(pool, n, DSL._fill(e.titulo || 'Elige objetivo', { carta: sourceCard.name }) + _texto, sourceCard, chooserId, e.cancelable !== false);
                 if (!sel) { if (e.logCancela && !e.opcional) game.logError(F(e.logCancela)); return e.opcional ? 'skip' : false; }
-                if (e.guardaEn && sel[0]) { DSL._vars = DSL._vars || {}; (DSL._vars[sourceCard.instanceId] = DSL._vars[sourceCard.instanceId] || {})[e.guardaEn] = DSL._nombre(game, sel[0]); }
+                if (e.guardaEn && sel[0]) { DSL._vars = DSL._vars || {}; const _vg = (DSL._vars[sourceCard.instanceId] = DSL._vars[sourceCard.instanceId] || {}); _vg[e.guardaEn] = DSL._nombre(game, sel[0]); _vg[e.guardaEn + 'G'] = sel[0].gender; }
                 _guarda(sel);
                 _logAntes(sel);
                 for (const t of sel) {
@@ -8323,7 +8333,7 @@ const DSL = {
             }
             const sel = await game.openVisualSearchModal(F(e.titulo || 'ELIGE'), pool, n, e.autoSeleccion !== false, chooserId);
             if (!sel || sel.length < n) { if (e.logCancela && !e.opcional) game.logError(F(e.logCancela)); return e.opcional ? 'skip' : false; }
-            if (e.guardaEn && sel[0]) { DSL._vars = DSL._vars || {}; (DSL._vars[sourceCard.instanceId] = DSL._vars[sourceCard.instanceId] || {})[e.guardaEn] = DSL._nombre(game, sel[0]); }
+            if (e.guardaEn && sel[0]) { DSL._vars = DSL._vars || {}; const _vg = (DSL._vars[sourceCard.instanceId] = DSL._vars[sourceCard.instanceId] || {}); _vg[e.guardaEn] = DSL._nombre(game, sel[0]); _vg[e.guardaEn + 'G'] = sel[0].gender; }
             _guarda(sel);
             _logAntes(sel);
             for (const t of sel) {
@@ -8894,7 +8904,7 @@ const DSL = {
                     if (l.exentoPlantilla && tplT[l.exentoPlantilla]) continue;
                     if (l.campoSelfId && ev[l.campoSelfId] !== target.instanceId) continue;
                     if (l.campoSelfLista && !(Array.isArray(ev[l.campoSelfLista]) && ev[l.campoSelfLista].includes(target.instanceId))) continue;
-                    out.push(`${l.texto}, fuente: ${ev.name} (Evento de ${dn})`);
+                    out.push(`${DSL._fill(l.texto, { genero: target.gender })}, fuente: ${ev.name} (Evento de ${dn})`);
                 }
                 if (typeof _prevHook === 'function') out.push(...(_prevHook(ev, target, game) || []));
                 return out;
@@ -8910,7 +8920,7 @@ const DSL = {
             }
             if (tmpl.tempEffectText && typeof tmpl.onGetPreviewEffects !== 'function') {
                 tmpl.onGetPreviewEffects = function (card, game, eff) {
-                    return eff ? [tmpl.tempEffectText + ', fuente: ' + tmpl.name] : [];
+                    return eff ? [DSL._fill(tmpl.tempEffectText, { genero: card.gender }) + ', fuente: ' + tmpl.name] : [];
                 };
             }
         }

@@ -1901,6 +1901,14 @@
                 return `${name} (${ownerTag})`;
             }
 
+            // Concordancia de género (Toto, 21-jul-2026): reutiliza card.gender, que ya
+            // existía en el motor (antes solo se consultaba con ternarios sueltos como
+            // el de "ha sido destruido/a"). 'F' usa femenino; cualquier otra cosa
+            // (M/N/N-A/ausente) usa masculino.
+            generoTexto(card, masculino, femenino) {
+                return (card && card.gender === 'F') ? femenino : masculino;
+            }
+
             nCarta(c) {
                 if (!c) return '';
                 return c.name + ((c.type !== 'Personaje' && c.copyId) ? ` [${c.copyId}]` : '');
@@ -3171,7 +3179,7 @@
                                 effects.push(...extras);
                                 extras.forEach(t => {
                                     const tl = String(t).toLowerCase();
-                                    if (tl.includes('oculto')) curadoOculto = true;
+                                    if (tl.includes('ocult')) curadoOculto = true; // 'ocult' cubre oculto/oculta
                                     if (tl.includes('silenciad')) curadoSilencio = true;
                                 });
                             }
@@ -3199,8 +3207,8 @@
                         // ("+2 ATQ y +2 DEF, fuente: Overclock" en vez de una entrada por stat)
                         const porFuente = new Map();
                         mods.forEach(m => {
-                            if (m.stat === 'OCULTO') { if (!curadoOculto) effects.push(`Oculto, fuente: ${(m.srcId === card.instanceId) ? String(m.fuente).replace(`(${this.nCarta(card)})`, '(esta carta)') : m.fuente}`); return; }
-                            if (m.stat === 'SILENCIO') { if (!curadoSilencio) effects.push(`Silenciado, fuente: ${(m.srcId === card.instanceId) ? String(m.fuente).replace(`(${this.nCarta(card)})`, '(esta carta)') : m.fuente}`); return; }
+                            if (m.stat === 'OCULTO') { if (!curadoOculto) effects.push(`${this.generoTexto(card, 'Oculto', 'Oculta')}, fuente: ${(m.srcId === card.instanceId) ? String(m.fuente).replace(`(${this.nCarta(card)})`, '(esta carta)') : m.fuente}`); return; }
+                            if (m.stat === 'SILENCIO') { if (!curadoSilencio) effects.push(`${this.generoTexto(card, 'Silenciado', 'Silenciada')}, fuente: ${(m.srcId === card.instanceId) ? String(m.fuente).replace(`(${this.nCarta(card)})`, '(esta carta)') : m.fuente}`); return; }
                             const _fm = (m.srcId === card.instanceId) ? 'esta carta' : m.fuente;
                             const clave = (m.srcId || '') + '|' + _fm;
                             if (!porFuente.has(clave)) porFuente.set(clave, { partes: [], fuente: _fm });
@@ -3253,7 +3261,7 @@
                                         const tl = String(lin).toLowerCase();
                                         if (!curadoPorObjetivo.has(otra.instanceId)) curadoPorObjetivo.set(otra.instanceId, new Set());
                                         const _cs = curadoPorObjetivo.get(otra.instanceId);
-                                        if (tl.includes('oculto')) _cs.add('oculto');
+                                        if (tl.includes('ocult')) _cs.add('oculto'); // 'ocult' cubre oculto/oculta
                                         if (tl.includes('silenciad')) _cs.add('silencio');
                                     });
                                 });
@@ -3274,8 +3282,8 @@
                         ((this._statMods && this._statMods[otra.instanceId]) || []).forEach(m => {
                             if (m.srcId === card.instanceId || m.srcAltId === card.instanceId) {
                                 const _cs = curadoPorObjetivo.get(otra.instanceId);
-                                if (m.stat === 'OCULTO') { if (!_cs || !_cs.has('oculto')) _salientes.push(`Oculto, objetivo: ${this.getCardNameWithOwner(otra)}`); return; }
-                                if (m.stat === 'SILENCIO') { if (!_cs || !_cs.has('silencio')) _salientes.push(`Silenciado, objetivo: ${this.getCardNameWithOwner(otra)}`); return; }
+                                if (m.stat === 'OCULTO') { if (!_cs || !_cs.has('oculto')) _salientes.push(`${this.generoTexto(otra, 'Oculto', 'Oculta')}, objetivo: ${this.getCardNameWithOwner(otra)}`); return; }
+                                if (m.stat === 'SILENCIO') { if (!_cs || !_cs.has('silencio')) _salientes.push(`${this.generoTexto(otra, 'Silenciado', 'Silenciada')}, objetivo: ${this.getCardNameWithOwner(otra)}`); return; }
                                 _salientes.push(`${m.delta > 0 ? '+' : ''}${m.delta} ${m.stat}, objetivo: ${this.getCardNameWithOwner(otra)}`);
                             }
                         });
@@ -3382,11 +3390,18 @@
             // Habilidades con elección ajena (ACERTIJO en cruz: decide el rival) lo
             // fijan explícito; el render y el clic en el tablero se gatean contra
             // ESTE jugador, no contra activePlayerId (norma de targeting en tablero).
+            // cancelable (6º arg, por defecto true): pedido por Toto (21-jul-2026) —
+            // el criterio NO es "¿ha cambiado algo en la partida?" sino "¿ESTA
+            // habilidad ya pagó SU coste o lanzó SU moneda antes de llegar aquí?".
+            // Si sí, cancelar la elección desperdiciaría ese compromiso sin poder
+            // deshacerlo, así que no se ofrece la opción (ACERTIJO tras la moneda;
+            // el 2º ELEGIR de PEM tras pagar el Furor del 1º).
             pickBoardTargets(cards, n, prompt) {
                 const sourceCard = arguments.length > 3 ? arguments[3] : null;
                 const chooserId = arguments.length > 4 ? arguments[4] : this.activePlayerId;
+                const cancelable = arguments.length > 5 ? arguments[5] !== false : true;
                 return new Promise(resolve => {
-                    this.dslPick = { pool: new Set(cards.map(c => c.instanceId)), n: n, targets: [], resolve, byId: {}, chooserId };
+                    this.dslPick = { pool: new Set(cards.map(c => c.instanceId)), n: n, targets: [], resolve, byId: {}, chooserId, cancelable };
                     this.selectedCard = sourceCard; // la Ayuda origen: el render la necesita
                     cards.forEach(c => this.dslPick.byId[c.instanceId] = c);
                     this.inputState = 'SELECT_DSL_TARGETS';
@@ -5204,7 +5219,7 @@
                 // sin este gate, un replay remoto o un efecto podían activar la
                 // habilidad de una carta silenciada (p. ej. bajo Feria del cómic).
                 if (card.isSilenced || (card.status && card.status.silencio && card.status.silencio.duration > 0)) {
-                    if (!isRemote) this.logError(`${this.getCardNameWithOwner(card)} está Silenciada y no puede usar Habilidades.`);
+                    if (!isRemote) this.logError(`${this.getCardNameWithOwner(card)} está ${this.generoTexto(card, 'Silenciado', 'Silenciada')} y no puede usar Habilidades.`);
                     return;
                 }
 
@@ -5304,7 +5319,7 @@
 
                 // --- COMPROBACIÓN DE SUEÑO EN HABILIDAD ---
                 if (card.status && card.status.sueno && card.status.sueno.duration > 0) {
-                    this.logMsg(`${this.getCardNameWithOwner(card)} está dormido. Lanzando moneda para usar su habilidad...`, 'system');
+                    this.logMsg(`${this.getCardNameWithOwner(card)} está ${this.generoTexto(card, 'dormido', 'dormida')}. Lanzando moneda para usar su habilidad...`, 'system');
                     const results = await this.triggerCoinFlips(1, card.owner);
                     
                     if (results && results[0] === 'tails') {
@@ -5698,7 +5713,7 @@
                 }
 
                 if (attacker.status && attacker.status.confusion && attacker.status.confusion.duration > 0) {
-                    this.logMsg(`${this.getCardNameWithOwner(attacker)} está Confundido. Lanzando moneda...`, 'system');
+                    this.logMsg(`${this.getCardNameWithOwner(attacker)} está ${this.generoTexto(attacker, 'Confundido', 'Confundida')}. Lanzando moneda...`, 'system');
                     const results = await this.triggerCoinFlips(1, attacker.owner);
                     
                     if (results && results[0] === 'tails') {
@@ -5718,7 +5733,7 @@
                 }
 
                 if (attacker.status && attacker.status.ceguera && attacker.status.ceguera.duration > 0) {
-                    this.logMsg(`${this.getCardNameWithOwner(attacker)} está Cegado. Lanzando moneda...`, 'system');
+                    this.logMsg(`${this.getCardNameWithOwner(attacker)} está ${this.generoTexto(attacker, 'Cegado', 'Cegada')}. Lanzando moneda...`, 'system');
                     const results = await this.triggerCoinFlips(1, attacker.owner);
                     
                     if (results && results[0] === 'tails') {
@@ -5733,7 +5748,7 @@
                 }
 
                 if (attacker.status && attacker.status.sueno && attacker.status.sueno.duration > 0) {
-                    this.logMsg(`${this.getCardNameWithOwner(attacker)} está dormido. Lanzando moneda...`, 'system');
+                    this.logMsg(`${this.getCardNameWithOwner(attacker)} está ${this.generoTexto(attacker, 'dormido', 'dormida')}. Lanzando moneda...`, 'system');
                     const results = await this.triggerCoinFlips(1, attacker.owner);
                     
                     if (results && results[0] === 'tails') {
@@ -6086,6 +6101,14 @@
                 if (this.inputState === 'SELECT_DSL_TARGETS' && this.dslPick) {
                     const _chooser = this.dslPick.chooserId || this.activePlayerId;
                     if (this.gameMode === 'online' && !isRemote && this.myPlayerId !== _chooser) return;
+                    // No cancelable (pedido por Toto, 21-jul-2026): esta habilidad ya
+                    // pagó su coste o lanzó su moneda antes de llegar a esta elección
+                    // (ACERTIJO tras la moneda, el 2º ELEGIR de PEM tras pagar el 1º).
+                    // Cancelar desperdiciaría ese compromiso sin poder deshacerlo.
+                    if (this.dslPick.cancelable === false) {
+                        if (!isRemote && this.myPlayerId === _chooser) this.logMsg('Ya te has comprometido: no puedes cancelar esta elección.', 'system');
+                        return;
+                    }
                     if (this.gameMode === 'online' && !isRemote) {
                         this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'CANCEL_ACTION' });
                     }
@@ -6420,13 +6443,15 @@
                     uiHtml += `<button class="game-btn" id="btn-end-turn" onclick="event.stopPropagation(); game.confirmEndTurn()" ${disabled}>Pasar</button>`;
                 }
 
-                // SELECT_DSL_TARGETS es un caso especial en ambos sentidos: (a) a quién
+                // SELECT_DSL_TARGETS es un caso especial en tres sentidos: (a) a quién
                 // le toca puede ser el CHOOSER de la elección, no el jugador activo
                 // (ACERTIJO en cruz); (b) cancelAction() ya sabe resolver el pick sin
-                // pasar por isActionLocked (ver cancelAction), así que el candado no
-                // debe deshabilitar el botón aquí.
+                // pasar por isActionLocked, así que el candado no debe deshabilitar el
+                // botón aquí; (c) dslPick.cancelable === false cuando esta habilidad ya
+                // pagó su coste o lanzó su moneda antes de esta elección concreta
+                // (ACERTIJO, el 2º ELEGIR de PEM) — ahí el botón sí se deshabilita.
                 const _esDslPick = this.inputState === 'SELECT_DSL_TARGETS' && this.dslPick;
-                const _puedeCancelarDsl = _esDslPick && (this.gameMode === 'local' || this.myPlayerId === (this.dslPick.chooserId || this.activePlayerId));
+                const _puedeCancelarDsl = _esDslPick && this.dslPick.cancelable !== false && (this.gameMode === 'local' || this.myPlayerId === (this.dslPick.chooserId || this.activePlayerId));
                 const cancelDisabled = _esDslPick
                     ? (_puedeCancelarDsl ? '' : 'disabled')
                     : (!isMyTurn || this.inputState === 'IDLE' || this.inputState === 'WAITING_OPPONENT_DISCARD' || this.inputState === 'CONFIRM_ABILITY' || this.inputState === 'CONFIRM_RETREAT' || this.isActionLocked) ? 'disabled' : '';
