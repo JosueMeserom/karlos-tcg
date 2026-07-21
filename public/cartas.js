@@ -6608,7 +6608,11 @@ const CARD_DB = [
             efectos: [
                 { op: 'BUSCAR', en: 'MAZO', cantidad: 2,
                   filtros: [{ campo: 'subtype', op: '==', valor: 'Técnica' }],
-                  titulo: 'BUSCAR HASTA 2 TÉCNICAS', barajarDespues: {} },
+                  titulo: 'BUSCAR HASTA 2 TÉCNICAS',
+                  // Log por cada carta cogida, visible por ambos (sintaxis estándar): la
+                  // vieja las movía en silencio; pedido por Toto que se informe siempre.
+                  log: '{jugador} añade {objetivo} a su mano.', logTipo: 'ability',
+                  barajarDespues: {} },
             ],
         }],
     },

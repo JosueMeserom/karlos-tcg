@@ -317,7 +317,7 @@
     </style>
     <div id="discard-viewer">
         <div id="discard-title" style="margin-bottom: 5px;">PILA DE DESCARTES</div>
-        <div style="color: #94a3b8; font-size: 0.9rem; margin-bottom: 20px; font-style: italic; pointer-events: none;">(Haz clic en el fondo oscuro para cerrar)</div>
+        <div id="discard-close-hint" style="color: #94a3b8; font-size: 0.9rem; margin-bottom: 20px; font-style: italic; pointer-events: none;">(Haz clic en el fondo oscuro para cerrar)</div>
         <div id="discard-content"></div>
     </div>
 
@@ -3558,6 +3558,10 @@
                 const viewer = document.getElementById('discard-viewer');
                 const title = document.getElementById('discard-title');
                 const content = document.getElementById('discard-content');
+                // Los visores de solo-lectura (debug: descartes/mano/mazo/retribución) SÍ se
+                // cierran clicando el fondo: se muestra la pista de cierre.
+                const _hint = document.getElementById('discard-close-hint');
+                if (_hint) _hint.style.display = 'block';
                 content.innerHTML = '';
                 title.innerText = titleText;
 
@@ -3656,6 +3660,12 @@
                     }
                     avisoEl.innerText = aviso || '';
                     avisoEl.style.display = aviso ? 'block' : 'none';
+
+                    // La pista "(Haz clic en el fondo oscuro para cerrar)" solo vale cuando
+                    // el visor SÍ se puede cerrar sin elegir: con cartas elegibles la
+                    // elección es obligatoria (closeDiscardViewer lo impide), así que se oculta.
+                    const _hint = document.getElementById('discard-close-hint');
+                    if (_hint) _hint.style.display = idsElegibles.size > 0 ? 'none' : 'block';
 
                     // Botón CONFIRMAR: solo en modo multi. Se crea una vez y se reutiliza.
                     let confirmEl = document.getElementById('deck-search-confirm');

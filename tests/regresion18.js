@@ -117,6 +117,10 @@ const escenarios = [
             { de: '¡La adrenalina del combate te da Inspiración!', a: '¡La adrenalina del combate le da Inspiración a J2 (Jugador 2)!',
               motivo: 'norma del proyecto (3ª persona): la vieja decía "te da" (2ª persona); la nueva lo pasa a 3ª persona con {reactor}' },
         ],
+        logsSoloNueva: [
+            { linea: 'añade Atomización (J2 (Jugador 2)) a su mano.',
+              motivo: 'pedido por Toto: al coger cartas del mazo debe informarse siempre a ambos jugadores (sintaxis estándar "{jugador} añade {objetivo} a su mano."); la vieja las movía en silencio. Filtra las 2 líneas (una por Técnica cogida)' },
+        ],
     },
     {
         nombre: 'Escudo mágico: reacciona al daño, gasta 1 Furor del defensor y anula el golpe',
