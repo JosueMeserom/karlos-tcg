@@ -4664,11 +4664,20 @@
                     }
                 };
 
-                // Validamos que sea el turno del jugador (excepto si responde al descarte)
+                // Validamos que sea el turno del jugador (excepto si responde al descarte
+                // o si es el ELECTOR de una selección-en-tablero que le toca a él aunque
+                // no sea el jugador activo). Este último caso (Toto, betasteo 21-jul-2026):
+                // ACERTIJO en cruz y la redirección de Pequeña traición hacen elegir al
+                // RIVAL del jugador activo; sin esta excepción, su clic moría aquí en "No
+                // es tu turno" y la elección se quedaba pillada para siempre. Bug nacido al
+                // migrar esas elecciones a reborde-verde-en-tablero (antes iban por el
+                // botón de un modal, que no cruza este gate).
                 if (this.gameMode === 'online' && !isRemote) {
-                    if (this.myPlayerId === 'spectator') return; 
-                    if (this.inputState !== 'WAITING_OPPONENT_DISCARD' && this.activePlayerId !== this.myPlayerId) {
-                        this.logError("No es tu turno."); return; 
+                    if (this.myPlayerId === 'spectator') return;
+                    const soyElectorDsl = this.inputState === 'SELECT_DSL_TARGETS' && this.dslPick &&
+                        this.myPlayerId === (this.dslPick.chooserId || this.activePlayerId);
+                    if (this.inputState !== 'WAITING_OPPONENT_DISCARD' && !soyElectorDsl && this.activePlayerId !== this.myPlayerId) {
+                        this.logError("No es tu turno."); return;
                     }
                 }
 
