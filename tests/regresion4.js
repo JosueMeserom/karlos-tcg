@@ -18,7 +18,7 @@ const escenarios = [
             { seleccionar: 'Oso con armadura' },
         ],
         logsIntencionados: [
-            { de: '¡Oso con armadura desata', a: '¡Oso con armadura (J1 (Jugador 1)) desata',
+            { de: '¡Oso con armadura desata', a: '¡Oso con armadura [1] (J1 (Jugador 1)) desata',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño/jugador): la vieja usaba nombres a secas o 2ª persona; la nueva usa DSL._nombre / {jugador}' },
         ],
     },
@@ -44,7 +44,7 @@ const escenarios = [
             { seleccionar: 'Oso con armadura' },
         ],
         logsIntencionados: [
-            { de: '¡Oso con armadura desata', a: '¡Oso con armadura (J1 (Jugador 1)) desata',
+            { de: '¡Oso con armadura desata', a: '¡Oso con armadura [1] (J1 (Jugador 1)) desata',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño/jugador): la vieja usaba nombres a secas o 2ª persona; la nueva usa DSL._nombre / {jugador}' },
         ],
     },
@@ -58,7 +58,7 @@ const escenarios = [
             { elegir: ['Mini-tigre', 'Droide antidisturbios'] }, // vieja: modal visual · nueva: tablero
         ],
         logsIntencionados: [
-            { de: '¡Oso con armadura hace explotar', a: '¡Oso con armadura (J1 (Jugador 1)) hace explotar',
+            { de: '¡Oso con armadura hace explotar', a: '¡Oso con armadura [1] (J1 (Jugador 1)) hace explotar',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño/jugador): la vieja usaba nombres a secas o 2ª persona; la nueva usa DSL._nombre / {jugador}' },
         ],
     },

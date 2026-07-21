@@ -55,7 +55,7 @@ const escenarios = [
             { elegir: ['Mini-tigre'] },
         ],
         logsIntencionados: [
-            { de: 'Mini-tigre se pone la Chaqueta', a: 'Mini-tigre (J1 (Jugador 1)) se pone la Chaqueta',
+            { de: 'Mini-tigre se pone la Chaqueta', a: 'Mini-tigre [1] (J1 (Jugador 1)) se pone la Chaqueta',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba target.name a secas; la nueva rellena {objetivo} con DSL._nombre' },
         ],
     },

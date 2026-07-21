@@ -53,7 +53,7 @@ const escenarios = [
         ],
         logsIntencionados: [
             { de: '¡Oso con armadura y Droide antidisturbios unen fuerzas! El ATQ de Mini-tigre sube a 7.',
-              a: '¡Oso con armadura (J1 (Jugador 1)) y Droide antidisturbios (J1 (Jugador 1)) unen fuerzas! El ATQ de Mini-tigre (J1 (Jugador 1)) sube a 7.',
+              a: '¡Oso con armadura [1] (J1 (Jugador 1)) y Droide antidisturbios [1] (J1 (Jugador 1)) unen fuerzas! El ATQ de Mini-tigre [1] (J1 (Jugador 1)) sube a 7.',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba chosen[n].name y attacker.name a secas; la nueva rellena {duo}/{objetivo} con DSL._nombre' },
         ],
         diferenciasEsperadas: [PLAN_USADO],
@@ -81,7 +81,7 @@ const escenarios = [
         ],
         logsIntencionados: [
             { de: '¡Oso con armadura y Droide antidisturbios unen fuerzas! El ATQ de Mini-tigre sube a 7.',
-              a: '¡Oso con armadura (J1 (Jugador 1)) y Droide antidisturbios (J1 (Jugador 1)) unen fuerzas! El ATQ de Mini-tigre (J1 (Jugador 1)) sube a 7.',
+              a: '¡Oso con armadura [1] (J1 (Jugador 1)) y Droide antidisturbios [1] (J1 (Jugador 1)) unen fuerzas! El ATQ de Mini-tigre [1] (J1 (Jugador 1)) sube a 7.',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba chosen[n].name y attacker.name a secas; la nueva rellena {duo}/{objetivo} con DSL._nombre' },
         ],
         diferenciasEsperadas: [

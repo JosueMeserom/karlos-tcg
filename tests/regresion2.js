@@ -81,7 +81,7 @@ const escenarios = [
             { elegir: ['Oso con armadura', 'Mini-tigre'] },
         ],
         logsIntencionados: [
-            { de: '¡Oso con armadura y Mini-tigre comen', a: '¡Oso con armadura (J1 (Jugador 1)) y Mini-tigre (J1 (Jugador 1)) comen',
+            { de: '¡Oso con armadura y Mini-tigre comen', a: '¡Oso con armadura [1] (J1 (Jugador 1)) y Mini-tigre [1] (J1 (Jugador 1)) comen',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba chosen[n].name a secas; la nueva rellena {elegidos} con DSL._nombre' },
         ],
         diferenciasEsperadas: [

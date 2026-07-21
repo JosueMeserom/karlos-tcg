@@ -76,7 +76,7 @@ const escenarios = [
             { elegir: ['Robot de seguridad SP'] },
         ],
         logsIntencionados: [
-            { de: '¡El PEM fríe los circuitos de Robot de seguridad SP! Se saltará', a: '¡El PEM fríe los circuitos de Robot de seguridad SP (J2 (Jugador 2))! Se saltará',
+            { de: '¡El PEM fríe los circuitos de Robot de seguridad SP! Se saltará', a: '¡El PEM fríe los circuitos de Robot de seguridad SP [1] (J2 (Jugador 2))! Se saltará',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba target.name a secas; la nueva rellena {objetivo} con DSL._nombre' },
         ],
         logsSoloVieja: [
@@ -96,7 +96,7 @@ const escenarios = [
             { elegir: ['Oso con armadura'] },
         ],
         logsIntencionados: [
-            { de: '¡Oso con armadura rebobina su tiempo', a: '¡Oso con armadura (J1 (Jugador 1)) rebobina su tiempo',
+            { de: '¡Oso con armadura rebobina su tiempo', a: '¡Oso con armadura [1] (J1 (Jugador 1)) rebobina su tiempo',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño/jugador): la vieja usaba nombres a secas o 2ª persona; la nueva usa DSL._nombre / {jugador}' },
         ],
     },

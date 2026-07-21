@@ -3232,7 +3232,7 @@
                             if (typeof _tpl.onGlobalGetPreviewEffects === 'function') {
                                 _mesaAll.forEach(otra => {
                                     (_tpl.onGlobalGetPreviewEffects(_ev, otra, this) || []).forEach(lin => {
-                                        _salientes.push(`${String(lin).replace(/,\s*fuente:.*$/, '')}, objetivo: ${this.nCarta(otra)}`);
+                                        _salientes.push(`${String(lin).replace(/,\s*fuente:.*$/, '')}, objetivo: ${this.getCardNameWithOwner(otra)}`);
                                     });
                                 });
                             }
@@ -3243,20 +3243,20 @@
                         if (otra.status) for (const [k, v2] of Object.entries(otra.status)) {
                             if (v2 && v2.duration > 0 && ((v2.sourceInstanceId && v2.sourceInstanceId === card.instanceId) || v2.sourceName === card.name || v2.source === card.name)) {
                                 const nm = k === 'dot' ? 'Daño por tiempo' : k === 'confusion' ? 'Confusión' : k === 'ceguera' ? 'Ceguera' : k === 'sueno' ? 'Sueño' : k;
-                                _salientes.push(`${nm} (${v2.duration} turno${v2.duration === 1 ? '' : 's'})${v2.sourceAbility ? ' por ' + v2.sourceAbility : ''}, objetivo: ${this.nCarta(otra)}`);
+                                _salientes.push(`${nm} (${v2.duration} turno${v2.duration === 1 ? '' : 's'})${v2.sourceAbility ? ' por ' + v2.sourceAbility : ''}, objetivo: ${this.getCardNameWithOwner(otra)}`);
                             }
                         }
                         if (otra.counters) for (const [k, d] of Object.entries(otra.counters)) {
-                            if (d && d.count > 0 && d.source === card.name) _salientes.push(`${d.name || k} x${d.count}, objetivo: ${this.nCarta(otra)}`);
+                            if (d && d.count > 0 && d.source === card.name) _salientes.push(`${d.name || k} x${d.count}, objetivo: ${this.getCardNameWithOwner(otra)}`);
                         }
                         ((this._statMods && this._statMods[otra.instanceId]) || []).forEach(m => {
                             if (m.srcId === card.instanceId || m.srcAltId === card.instanceId) {
-                                _salientes.push(m.stat === 'OCULTO' ? `Oculto, objetivo: ${this.nCarta(otra)}` : `${m.delta > 0 ? '+' : ''}${m.delta} ${m.stat}, objetivo: ${this.nCarta(otra)}`);
+                                _salientes.push(m.stat === 'OCULTO' ? `Oculto, objetivo: ${this.getCardNameWithOwner(otra)}` : `${m.delta > 0 ? '+' : ''}${m.delta} ${m.stat}, objetivo: ${this.getCardNameWithOwner(otra)}`);
                             }
                         });
                         [...(otra.tempEffects || []), ...(otra.activeEffects || [])].forEach(eff => {
                             const t = getCardTemplate(eff.sourceId);
-                            if (eff.sourceInstanceId ? eff.sourceInstanceId === card.instanceId : (t && t.name === card.name)) _salientes.push(`${t ? t.name : 'Efecto'} (temporal), objetivo: ${this.nCarta(otra)}`);
+                            if (eff.sourceInstanceId ? eff.sourceInstanceId === card.instanceId : (t && t.name === card.name)) _salientes.push(`${t ? t.name : 'Efecto'} (temporal), objetivo: ${this.getCardNameWithOwner(otra)}`);
                         });
                     });
 
@@ -4156,6 +4156,16 @@
             }
             
             updatePassives() {
+                // El [n] de copia "nace al salir de la mano", pero las cartas que ENTRAN
+                // EN MESA por efectos (tokens como Lolita, regeneraciones, clones) se lo
+                // saltaban y el detalle las mostraba sin número (betasteo de Toto).
+                // Barrido en el punto único por el que todo pasa: quien esté en mesa sin
+                // copyId, lo recibe aquí (assignCopyId ya ignora Personajes y asignados).
+                ['p1', 'p2'].forEach(pid => {
+                    const pl = this.players[pid];
+                    [...pl.vanguard, ...pl.rearguard].forEach(c => { if (!c.copyId) this.assignCopyId(c); });
+                });
+
                 // --- Vaciamos la visión de TODAS las manos ANTES de empezar el bucle ---
                 this.players.p1.handExposedTo = null;
                 this.players.p2.handExposedTo = null;
@@ -6711,7 +6721,11 @@
 
                 const isMyTurn = this.gameMode === 'local' || this.activePlayerId === this.myPlayerId;
 
-                if (isMyTurn && this.selectedCard && this.selectedCard.instanceId === card.instanceId) {
+                // El reborde de "carta seleccionada" NO se hereda dentro de los modales
+                // de búsqueda (isVisualOnly): confundía al ver al atacante ya rebordeado
+                // con "Seleccionadas: 0/2" (betasteo de Toto, Plan de equipo). En el
+                // campo se mantiene, por consistencia.
+                if (isMyTurn && !isVisualOnly && this.selectedCard && this.selectedCard.instanceId === card.instanceId) {
                     el.classList.add('selected');
                 }
 

@@ -11,7 +11,7 @@ const { correrSuite } = require('./harness');
 
 const MAPA_ENDEUDADO = {
     de: '¡Oso con armadura se ha endeudado con la mafia! Queda silenciado y sin cobrar Furor.',
-    a: '¡Oso con armadura (J1 (Jugador 1)) se ha endeudado con la mafia! Queda silenciado y sin cobrar Furor.',
+    a: '¡Oso con armadura [1] (J1 (Jugador 1)) se ha endeudado con la mafia! Queda silenciado y sin cobrar Furor.',
     motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba target.name a secas; la nueva rellena {deudor} con DSL._nombre',
 };
 

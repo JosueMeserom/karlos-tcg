@@ -70,7 +70,7 @@ const escenarios = [
             { elegir: ['Robot de seguridad SP'] }, // vieja: modal visual · nueva: selección-en-tablero
         ],
         logsIntencionados: [
-            { de: '¡Robot de seguridad SP recibe Overclock!', a: '¡Robot de seguridad SP (J1 (Jugador 1)) recibe Overclock!',
+            { de: '¡Robot de seguridad SP recibe Overclock!', a: '¡Robot de seguridad SP [1] (J1 (Jugador 1)) recibe Overclock!',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba target.name a secas; la nueva rellena {objetivo} con DSL._nombre' },
         ],
     },
@@ -86,7 +86,7 @@ const escenarios = [
             { finTurno: true },   // vuelve a p1 (roba Mini-tigre): el Overclock se apaga
         ],
         logsIntencionados: [
-            { de: '¡Robot de seguridad SP recibe Overclock!', a: '¡Robot de seguridad SP (J1 (Jugador 1)) recibe Overclock!',
+            { de: '¡Robot de seguridad SP recibe Overclock!', a: '¡Robot de seguridad SP [1] (J1 (Jugador 1)) recibe Overclock!',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba target.name a secas; la nueva rellena {objetivo} con DSL._nombre' },
         ],
     },

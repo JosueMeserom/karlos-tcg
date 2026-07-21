@@ -24,7 +24,7 @@ const escenarios = [
             { seleccionar: 'Oso con armadura' },
         ],
         logsIntencionados: [
-            { de: '¡Oso con armadura canaliza maná puro', a: '¡Oso con armadura (J1 (Jugador 1)) canaliza maná puro',
+            { de: '¡Oso con armadura canaliza maná puro', a: '¡Oso con armadura [1] (J1 (Jugador 1)) canaliza maná puro',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba target.name a secas; la nueva rellena {objetivo} con DSL._nombre' },
         ],
     },
@@ -82,7 +82,7 @@ const escenarios = [
             { finTurno: true }, // pasa a p2: al empezar, la Canceladora lo agota
         ],
         logsIntencionados: [
-            { de: '¡La Canceladora golpea a Alumno con VP! Perderá', a: '¡La Canceladora golpea a Alumno con VP (J2 (Jugador 2))! Perderá',
+            { de: '¡La Canceladora golpea a Alumno con VP! Perderá', a: '¡La Canceladora golpea a Alumno con VP [1] (J2 (Jugador 2))! Perderá',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba target.name a secas; la nueva rellena {objetivo} con DSL._nombre' },
         ],
     },
