@@ -1822,35 +1822,21 @@ const CARD_DB = [
         }
     },
     {
-        id: 26, name: "Escudo mágico", type: "Ayuda", subtype: "Técnica", tags: ["Consumible"], rarity: "C", 
+        id: 26, name: "Escudo mágico", type: "Ayuda", subtype: "Técnica", tags: ["Consumible"], rarity: "C",
         text: "Reacción: Se activa automáticamente si un aliado con al menos 1 de Furor recibe un ataque. Gasta 1 de su Furor para evitar el daño (pero no los otros efectos).", cost: 0, series: 1,
-        canPlayCard: function(card, game, p) {
-            game.logMsg("El Escudo mágico es una carta de reacción. Déjala en tu mano.", 'system');
-            return false;
-        },
-        onHandReactionToDamage: async function(handCard, defender, attacker, dmg, isSpecial, game, p) {
-            if (defender.owner === handCard.owner && defender.furor >= 1) {
-                const reactor = handCard.owner === 'p1' ? 'JUGADOR 1' : 'JUGADOR 2';
-                const active = game.activePlayerId === 'p1' ? 'JUGADOR 1' : 'JUGADOR 2';
-
-                const used = await new Promise(resolve => {
-                    const modalTitle = `REACCIÓN DE ${reactor}\n\n¡${attacker.name.toUpperCase()} va a atacar a ${defender.name.toUpperCase()}! ¿Usar Escudo mágico (-1 FUROR)?`;
-                    
-                    game.openChoiceModal(modalTitle, [
-                        { label: `SÍ: PROTEGER A ${defender.name.toUpperCase()} (-1 FUROR)`, action: () => resolve(true) },
-                        { label: 'NO REACCIONAR', action: () => resolve(false) }
-                    ], handCard.owner);
-                });
-
-                if (used) {
-                    game.modifyStat(defender, 'furor', -1);
-                    game.logMsg(`¡${reactor} usa ${handCard.name} para proteger a ${game.getCardNameWithOwner(defender)}!`, 'ability');
-                    showFloatingText(defender.instanceId, "ESCUDO", "ft-ability", -30);
-                    return { used: true, newDmg: 0 };
-                }
-            }
-            return { used: false, newDmg: dmg };
-        }
+        // Migrada a DSL (trigger REACCION sobre DAÑO, 21-jul-2026).
+        abilities: [{
+            trigger: 'REACCION', sobre: 'DAÑO',
+            si: { defensorEsPropio: true, defensor: { campo: 'furor', op: '>=', valor: 1 } },
+            prompt: '¡{atacante} va a atacar a {defensor}! ¿Usar Escudo mágico (-1 FUROR)?',
+            log: { msg: '¡{reactor} usa {carta} para proteger a {defensor}!', tipo: 'ability' },
+            efectos: [
+                { op: 'MODIFICAR_STAT', quien: 'DEFENSOR', stat: 'furor', delta: -1 },
+                { op: 'FLOTANTE', quien: 'DEFENSOR', texto: 'ESCUDO', estilo: 'ft-ability', offset: -30 },
+                { op: 'FIJAR_DAÑO', valor: 0 },
+            ],
+        }],
+        avisoNoJugable: "El Escudo mágico es una carta de reacción. Déjala en tu mano.",
     },
     { 
         id: 27, name: "Atomización", type: "Ayuda", subtype: "Técnica", tags: ["Consumible"], rarity: "B", text: "Elige un aliado no agotado. Gasta su acción para quitar 2 de Vida a un enemigo (ignora Def). Si lo mata, vuelve a la mano.", cost: 0,
@@ -6596,128 +6582,64 @@ const CARD_DB = [
     {
         name: "Pequeña traición", type: "Ayuda", subtype: "Técnica", tags: ["Consumible"], rarity: "C", cost: 1, series: 2,
         text: "Reacción. Úsala justo antes de que un aliado reciba un ataque. Elige un aliado distinto para que reciba el ataque en su lugar, ignorando los demás efectos del ataque original.",
-        canPlayCard: function() { return false; },
-        onHandReactionToAttack: async function(handCard, attacker, defender, game) {
-            const p = game.players[handCard.owner];
-            const validTargets = [...p.vanguard, ...p.rearguard].filter(c => c.instanceId !== defender.instanceId);
-            
-            if (validTargets.length === 0) return { used: false };
-
-            const reactor = handCard.owner === 'p1' ? 'JUGADOR 1' : 'JUGADOR 2';
-            const wantUse = await new Promise(resolve => {
-                game.openChoiceModal(`REACCIÓN DE ${reactor}\n\n¿Usar Pequeña traición para desviar el ataque hacia otro aliado?`, [
-                    { label: 'SÍ', action: () => resolve(true) },
-                    { label: 'NO REACCIONAR', action: () => resolve(false) }
-                ], handCard.owner);
-            });
-
-            if (wantUse) {
-                const chosen = await game.openVisualSearchModal('ELIGE A LA NUEVA VÍCTIMA', validTargets, 1, false, handCard.owner);
-                if (chosen && chosen.length > 0) {
-                    game.logMsg(`¡Pequeña traición! El ataque es redirigido vilmente hacia ${chosen[0].name}.`, 'ability');
-                    showFloatingText(chosen[0].instanceId, "OBJETIVO", "ft-purple", -30);
-                    return { used: true, newDefender: chosen[0] };
-                }
-            }
-            return { used: false };
-        }
+        // Migrada a DSL (trigger REACCION, 21-jul-2026). REDIRIGIR ahora elige la
+        // nueva víctima con reborde verde en el tablero (norma de targeting), no con
+        // el modal de búsqueda visual que usaba la vieja.
+        abilities: [{
+            trigger: 'REACCION', sobre: 'ATAQUE',
+            prompt: '¿Usar Pequeña traición para desviar el ataque hacia otro aliado?',
+            efectos: [
+                { op: 'REDIRIGIR', titulo: 'ELIGE A LA NUEVA VÍCTIMA',
+                  log: { msg: '¡Pequeña traición! El ataque es redirigido vilmente hacia {objetivo}.', tipo: 'ability' },
+                  floating: { texto: 'OBJETIVO', estilo: 'ft-purple', offset: -30 } },
+            ],
+        }],
     },
     {
         name: "Inspiración", type: "Ayuda", subtype: "Técnica", tags: ["Consumible"], rarity: "C", cost: 1, series: 2,
         text: "Reacción. Úsala antes de recibir un ataque normal. Busca hasta dos 'Ayuda - Técnica' en tu mazo, añádelas y baraja.",
-        canPlayCard: function() { return false; },
-        onHandReactionToAttack: async function(handCard, attacker, defender, game) {
-            const isNormal = !game.abilityContext || game.abilityContext.isNormalAttack;
-            if (!isNormal) return { used: false };
-
-            const reactor = handCard.owner === 'p1' ? 'JUGADOR 1' : 'JUGADOR 2';
-            const wantUse = await new Promise(resolve => {
-                game.openChoiceModal(`REACCIÓN DE ${reactor}\n\n¿Usar Inspiración mientras te atacan?`, [
-                    { label: 'SÍ', action: () => resolve(true) },
-                    { label: 'NO REACCIONAR', action: () => resolve(false) }
-                ], handCard.owner);
-            });
-
-            if (wantUse) {
-                game.logMsg(`¡La adrenalina del combate te da Inspiración!`, 'ability');
-                const p = game.players[handCard.owner];
-                const validCards = p.deck.filter(c => c.subtype === 'Técnica');
-                
-                if (validCards.length > 0) {
-                    const chosen = await game.openVisualSearchModal('BUSCAR HASTA 2 TÉCNICAS', validCards, 2, false, handCard.owner);
-                    if (chosen && chosen.length > 0) {
-                        for (let c of chosen) {
-                            const idx = p.deck.findIndex(x => x.instanceId === c.instanceId);
-                            if (idx !== -1) {
-                                p.deck.splice(idx, 1);
-                                if (typeof animateStackToHand === 'function') await animateStackToHand(`${handCard.owner}-deck-stack`, handCard.owner, c.id);
-                                c.location = 'hand';
-                                p.hand.push(c);
-                            }
-                        }
-                    }
-                    if (typeof animateShuffle === 'function') await animateShuffle(handCard.owner);
-                    game.shuffle(p.deck);
-                }
-                return { used: true };
-            }
-            return { used: false };
-        }
+        abilities: [{
+            trigger: 'REACCION', sobre: 'ATAQUE',
+            si: { soloAtaqueNormal: true },
+            prompt: '¿Usar Inspiración mientras te atacan?',
+            // 3ª persona (antes: "te da Inspiración", 2ª persona).
+            log: { msg: '¡La adrenalina del combate le da Inspiración a {reactor}!', tipo: 'ability' },
+            efectos: [
+                { op: 'BUSCAR', en: 'MAZO', cantidad: 2,
+                  filtros: [{ campo: 'subtype', op: '==', valor: 'Técnica' }],
+                  titulo: 'BUSCAR HASTA 2 TÉCNICAS', barajarDespues: {} },
+            ],
+        }],
     },
     {
         name: "Jugada arriesgada", type: "Ayuda", subtype: "Técnica", tags: ["Consumible"], rarity: "B", cost: 1, series: 2,
         text: "Reacción. Moneda. Cara = el atacante se ataca a sí mismo. Cruz = el ataque ocurre y el atacante pierde 1 Furor.",
-        canPlayCard: function() { return false; },
-        onHandReactionToAttack: async function(handCard, attacker, defender, game) {
-            const reactor = handCard.owner === 'p1' ? 'JUGADOR 1' : 'JUGADOR 2';
-            const wantUse = await new Promise(resolve => {
-                game.openChoiceModal(`REACCIÓN DE ${reactor}\n\n¿Lanzar Jugada arriesgada ante el ataque de ${attacker.name}?`, [
-                    { label: 'SÍ (Lanzar moneda)', action: () => resolve(true) },
-                    { label: 'NO REACCIONAR', action: () => resolve(false) }
-                ], handCard.owner);
-            });
-
-            if (wantUse) {
-                game.logMsg(`¡${reactor} opta por una Jugada arriesgada!`, 'ability');
-                const results = await game.triggerCoinFlips(1, handCard.owner);
-                
-                if (results[0] === 'heads') {
-                    game.logMsg(`Moneda: CARA - ¡El ataque de ${attacker.name} rebota contra sí mismo!`, 'combat');
-                    let dmg = attacker.currentAtk - attacker.currentDef;
-                    if (dmg <= 0) dmg = 1;
-                    
-                    await game.dealDamage(attacker, attacker, dmg, false);
-                    return { used: true, cancelAttack: true };
-                } else {
-                    game.logError(`Moneda: CRUZ - El ataque procede, pero le costará energía.`);
-                    return { used: true, drainFurorAfter: true };
-                }
-            }
-            return { used: false };
-        }
+        abilities: [{
+            trigger: 'REACCION', sobre: 'ATAQUE',
+            prompt: '¿Lanzar Jugada arriesgada ante el ataque de {atacante}?',
+            log: { msg: '¡{reactor} opta por una Jugada arriesgada!', tipo: 'ability' },
+            efectos: [
+                { op: 'MONEDA',
+                  logCara: { msg: 'Moneda: CARA - ¡El ataque de {atacante} rebota contra sí mismo!', tipo: 'combat' },
+                  // 3ª persona compartida (antes: logError privado, solo lo veía el reactor).
+                  logCruz: { msg: 'Moneda: CRUZ - El ataque procede, pero le costará energía.', tipo: 'combat' },
+                  cara: [ { op: 'ATACANTE_SE_AUTOATACA' }, { op: 'CANCELAR_ATAQUE' } ],
+                  cruz: [ { op: 'MARCAR_DRENAJE' } ] },
+            ],
+        }],
     },
     {
         name: "Cortarrollos", type: "Ayuda", subtype: "Técnica", tags: ["Consumible"], rarity: "B", cost: 1, series: 2,
         text: "Reacción. Úsala antes de recibir un ataque. El atacante pierde TODO su Furor instantáneamente.",
-        canPlayCard: function() { return false; },
-        onHandReactionToAttack: async function(handCard, attacker, defender, game) {
-            if (attacker.furor === 0) return { used: false };
-
-            const reactor = handCard.owner === 'p1' ? 'JUGADOR 1' : 'JUGADOR 2';
-            const wantUse = await new Promise(resolve => {
-                game.openChoiceModal(`REACCIÓN DE ${reactor}\n\n¿Usar Cortarrollos para vaciar el Furor de ${attacker.name}?`, [
-                    { label: 'SÍ (-TODO EL FUROR)', action: () => resolve(true) },
-                    { label: 'NO REACCIONAR', action: () => resolve(false) }
-                ], handCard.owner);
-            });
-
-            if (wantUse) {
-                game.logMsg(`¡Cortarrollos anula la inercia de ${attacker.name}! Pierde todo el Furor.`, 'ability');
-                game.modifyStat(attacker, 'furor', -attacker.furor);
-                return { used: true };
-            }
-            return { used: false };
-        }
+        abilities: [{
+            trigger: 'REACCION', sobre: 'ATAQUE',
+            si: { atacante: { campo: 'furor', op: '>', valor: 0 } },
+            prompt: '¿Usar Cortarrollos para vaciar el Furor de {atacante}?',
+            log: { msg: '¡Cortarrollos anula la inercia de {atacante}! Pierde todo el Furor.', tipo: 'ability' },
+            efectos: [
+                { op: 'MODIFICAR_STAT', quien: 'ATACANTE', stat: 'furor', vaciar: true },
+            ],
+        }],
     },
     {
         name: "Milkor MGL", type: "Ayuda", subtype: "Arma", tags: ["Equipable", "a distancia"], rarity: "B", cost: 1, series: 2,
@@ -7847,10 +7769,14 @@ const KARLOS_RULES = {
 //  Valores: número | {COUNT:{...}} | {REF:"objetivo.furorMax"} (campos computados)
 // ===================================================================
 const DSL = {
-    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE', 'AURA', 'ANTES_DE_JUGAR', 'PUEDE_ATACAR', 'SOBRECURACION'],
-    OPS_EFECTO: ['MODIFICAR_STAT', 'CURAR', 'DAÑO', 'APLICAR_ESTADO', 'MODIFICAR_CONTADORES', 'ATACAR', 'MONEDA', 'ROBAR', 'BUSCAR', 'MARCAR', 'VER_MANO', 'LIMPIAR_ESTADOS', 'ELEGIR', 'DESTRUIR_EVENTO', 'MARCAR_TEMPORAL', 'DESCARTAR', 'EQUIPAR', 'MARCAR_JUGADOR', 'FLOTANTE', 'FIJAR_STAT'],
+    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE', 'AURA', 'ANTES_DE_JUGAR', 'PUEDE_ATACAR', 'SOBRECURACION', 'REACCION'],
+    // Los 5 últimos ops solo tienen sentido dentro de una REACCION (los interpreta
+    // DSL._runReaccion, no _doEffect): controlan el resultado que la reacción
+    // devuelve al motor de combate (redirigir el ataque, cancelarlo, drenar Furor
+    // tras él, fijar el daño, autoataque del atacante).
+    OPS_EFECTO: ['MODIFICAR_STAT', 'CURAR', 'DAÑO', 'APLICAR_ESTADO', 'MODIFICAR_CONTADORES', 'ATACAR', 'MONEDA', 'ROBAR', 'BUSCAR', 'MARCAR', 'VER_MANO', 'LIMPIAR_ESTADOS', 'ELEGIR', 'DESTRUIR_EVENTO', 'MARCAR_TEMPORAL', 'DESCARTAR', 'EQUIPAR', 'MARCAR_JUGADOR', 'FLOTANTE', 'FIJAR_STAT', 'REDIRIGIR', 'CANCELAR_ATAQUE', 'MARCAR_DRENAJE', 'FIJAR_DAÑO', 'ATACANTE_SE_AUTOATACA'],
     OPS_CMP: ['==', '!=', '<=', '>=', '<', '>', 'includes', 'truthy', 'falsy'],
-    QUIEN: ['SELF', 'ALIADO', 'ENEMIGO', 'TODOS', 'ATACANTE', 'DEFENSOR'], // los dos últimos solo tienen sentido en GLOBAL_TRAS_ATAQUE
+    QUIEN: ['SELF', 'ALIADO', 'ENEMIGO', 'TODOS', 'ATACANTE', 'DEFENSOR'], // ATACANTE/DEFENSOR: solo en GLOBAL_TRAS_ATAQUE y REACCION
 
     _tmpl(id) { return (typeof getCardTemplate === 'function') ? getCardTemplate(id) : CARD_DB.find(c => c.id === id); },
     _field(c, campo) {
@@ -7990,6 +7916,7 @@ const DSL = {
         if (e.op === 'MODIFICAR_STAT') {
             let d = DSL._value(ownerId, game, e.delta, sourceCard, ctx);
             if (e.deltaCondicional) for (const dc of e.deltaCondicional) if (DSL._match(target, dc.filtro)) { d = dc.delta; break; }
+            if (e.vaciar) d = -(target[e.stat] || 0); // "vacía este stat a 0" (Cortarrollos: todo el Furor del atacante)
             const antes = target[e.stat];
             game.modifyStat(target, e.stat, d, e.offsetY || 0, e.fuente !== undefined ? e.fuente : sourceCard);
             if (e.floating && typeof showFloatingText === 'function') showFloatingText(target.instanceId, String(e.floating.texto).split('{delta}').join(Math.abs(d)), e.floating.estilo || 'ft-green', e.floating.offset !== undefined ? e.floating.offset : -20);
@@ -8406,6 +8333,99 @@ const DSL = {
         return { ok: true, anyApplied };
     },
 
+    // --- REACCIONES DESDE LA MANO (trigger REACCION) ---
+    // Intérprete de efectos EN CONTEXTO DE REACCIÓN. A diferencia de _runEffectList,
+    // resuelve `quien` contra {atacante, defensor} del combate en curso (como
+    // GLOBAL_TRAS_ATAQUE) y entiende los ops de protocolo que moldean el RESULTADO
+    // que la reacción devuelve al motor (result): redirigir el ataque, cancelarlo,
+    // drenar Furor tras él, fijar el daño, autoataque del atacante. Los ops
+    // genéricos (MODIFICAR_STAT, BUSCAR, APLICAR_ESTADO…) se delegan a _doEffect con
+    // el objetivo ya resuelto. `result` se muta in situ; result.abortar aborta la
+    // reacción sin consumir la carta (p. ej. cancelar la elección de Pequeña traición).
+    async _runReaccion(efectos, handCard, game, cx, result) {
+        const reactor = handCard.owner;
+        const RF = (txt, extra) => DSL._fill(txt, Object.assign({
+            carta: handCard.name,
+            atacante: DSL._nombre(game, cx.attacker), atacanteG: cx.attacker.gender,
+            defensor: DSL._nombre(game, cx.defensor), defensorG: cx.defensor.gender,
+            reactor: (typeof game.getDisplayName === 'function' ? game.getDisplayName(reactor) : reactor),
+        }, extra || {}));
+        for (const e of (efectos || [])) {
+            if (result.abortar) return;
+            if (e.if && !DSL._cond(handCard, game, e.if)) continue;
+            const objetivo = e.quien === 'ATACANTE' ? cx.attacker
+                           : e.quien === 'DEFENSOR' ? cx.defensor
+                           : e.quien === 'SELF' ? handCard
+                           : cx.defensor;
+            if (e.op === 'REDIRIGIR') {
+                const p = game.players[reactor];
+                const pool = [...p.vanguard, ...p.rearguard].filter(c => c.instanceId !== cx.defensor.instanceId);
+                if (!pool.length) continue; // sin objetivo al que redirigir (ya filtrado por el gate)
+                let sel = null;
+                if (typeof game.pickBoardTargets === 'function') {
+                    const r = await game.pickBoardTargets(pool, 1, RF(e.titulo || 'ELIGE A LA NUEVA VÍCTIMA'), handCard, reactor, e.cancelable !== false);
+                    sel = r && r[0];
+                } else {
+                    const r = await game.openVisualSearchModal(RF(e.titulo || 'ELIGE A LA NUEVA VÍCTIMA'), pool, 1, false, reactor);
+                    sel = r && r[0];
+                }
+                if (!sel) { result.abortar = true; return; } // elección cancelada: la carta NO se consume
+                result.newDefender = sel;
+                if (e.log) game.logMsg(RF(e.log.msg, { objetivo: DSL._nombre(game, sel), objetivoG: sel.gender }), e.log.tipo || 'ability');
+                if (e.floating && typeof showFloatingText === 'function') showFloatingText(sel.instanceId, e.floating.texto, e.floating.estilo || 'ft-purple', e.floating.offset !== undefined ? e.floating.offset : -30);
+                continue;
+            }
+            if (e.op === 'CANCELAR_ATAQUE') { result.cancelAttack = true; continue; }
+            if (e.op === 'MARCAR_DRENAJE') { result.drainFurorAfter = true; continue; }
+            if (e.op === 'FIJAR_DAÑO') { result.newDmg = (e.valor !== undefined ? e.valor : 0); continue; }
+            if (e.op === 'ATACANTE_SE_AUTOATACA') {
+                const a = cx.attacker;
+                let dmg = a.currentAtk - a.currentDef;
+                if (dmg <= 0) dmg = 1;
+                if (e.log) game.logMsg(RF(e.log.msg), e.log.tipo || 'combat');
+                await game.dealDamage(a, a, dmg, false);
+                continue;
+            }
+            if (e.op === 'MONEDA') {
+                const res = await game.triggerCoinFlips(e.cantidad || 1, reactor);
+                const cruz = res && res[0] === 'tails';
+                if (cruz) {
+                    if (e.logCruz) game.logMsg(RF(e.logCruz.msg), e.logCruz.tipo || 'combat');
+                    if (Array.isArray(e.cruz)) await DSL._runReaccion(e.cruz, handCard, game, cx, result);
+                } else {
+                    if (e.logCara) game.logMsg(RF(e.logCara.msg), e.logCara.tipo || 'combat');
+                    if (Array.isArray(e.cara)) await DSL._runReaccion(e.cara, handCard, game, cx, result);
+                }
+                continue;
+            }
+            // Op genérico: se delega al ejecutor normal con el objetivo ya resuelto.
+            const e2 = Object.assign({}, e); delete e2.quien;
+            await DSL._doEffect(e2, handCard, objetivo, game, reactor, null);
+        }
+    },
+
+    // Comprueba el gate `si` de una reacción (¿siquiera se ofrece el modal?).
+    _reaccionGate(si, handCard, game, cx) {
+        si = si || {};
+        if (si.soloAtaqueNormal) { const esNormal = !game.abilityContext || game.abilityContext.isNormalAttack; if (!esNormal) return false; }
+        if (si.soloDañoNormal && cx.isSpecial) return false;
+        if (si.defensorEsPropio && cx.defensor.owner !== handCard.owner) return false;
+        if (si.atacanteNoAvatar && (getCardTemplate(cx.attacker.id) || {}).isAvatar) return false;
+        if (si.atacante && !DSL._cmp(DSL._field(cx.attacker, si.atacante.campo), si.atacante.op, si.atacante.valor)) return false;
+        if (si.defensor && !DSL._cmp(DSL._field(cx.defensor, si.defensor.campo), si.defensor.op, si.defensor.valor)) return false;
+        return true;
+    },
+
+    // Pregunta SÍ/NO al reactor (modal de reacción) y devuelve la promesa booleana.
+    _reaccionPrompt(prompt, handCard, game) {
+        return new Promise(resolve => {
+            game.openChoiceModal(prompt, [
+                { label: 'SÍ', action: () => resolve(true) },
+                { label: 'NO REACCIONAR', action: () => resolve(false) },
+            ], handCard.owner);
+        });
+    },
+
     validate(tmpl) {
         const errs = [];
         (tmpl.abilities || []).forEach((ab, i) => {
@@ -8705,6 +8725,71 @@ const DSL = {
                 }
                 return amount;
             };
+        }
+
+        // REACCION -> onHandReactionToAttack / onHandReactionToDamage.
+        // Reacciones desde la mano (Cortarrollos, Inspiración, Pequeña traición,
+        // Jugada arriesgada, Escudo mágico). El motor de combate ya recorre la mano
+        // del defensor y llama a estos hooks (bucle de performAttack y de dealDamage);
+        // aquí solo producimos las funciones con el contrato de retorno correcto.
+        //  · sobre: 'ATAQUE'  -> onHandReactionToAttack(handCard, attacker, defender, game)
+        //       return { used, newDefender?, drainFurorAfter?, cancelAttack? }
+        //  · sobre: 'DAÑO'    -> onHandReactionToDamage(handCard, defender, attacker, dmg, isSpecial, game, p)
+        //       return { used, newDmg }
+        // El gate `si` decide si se ofrece el modal; el `prompt` es la pregunta SÍ/NO
+        // (interactiva, solo la ve el reactor: 2ª persona correcta). El `log` de uso
+        // y los efectos van en 3ª persona con {reactor}/{atacante}/{defensor} y género.
+        const reaccion = abs.find(a => a.trigger === 'REACCION');
+        if (reaccion) {
+            const correr = async function (handCard, game, cx, result) {
+                if (!DSL._reaccionGate(reaccion.si, handCard, game, cx)) return false;
+                // Pre-chequeo de REDIRIGIR: sin aliado distinto al defensor, la carta
+                // ni se ofrece (como la vieja: validTargets.length === 0 -> {used:false}).
+                if ((reaccion.efectos || []).some(e => e.op === 'REDIRIGIR')) {
+                    const p = game.players[handCard.owner];
+                    const hay = [...p.vanguard, ...p.rearguard].some(c => c.instanceId !== cx.defensor.instanceId);
+                    if (!hay) return false;
+                }
+                const quiere = await DSL._reaccionPrompt(
+                    DSL._fill(reaccion.prompt || '¿Reaccionar?', {
+                        carta: handCard.name,
+                        atacante: DSL._nombre(game, cx.attacker), atacanteG: cx.attacker.gender,
+                        defensor: DSL._nombre(game, cx.defensor), defensorG: cx.defensor.gender,
+                    }), handCard, game);
+                if (!quiere) return false;
+                if (reaccion.log) game.logMsg(DSL._fill(reaccion.log.msg, {
+                    carta: handCard.name,
+                    atacante: DSL._nombre(game, cx.attacker), atacanteG: cx.attacker.gender,
+                    defensor: DSL._nombre(game, cx.defensor), defensorG: cx.defensor.gender,
+                    reactor: (typeof game.getDisplayName === 'function' ? game.getDisplayName(handCard.owner) : handCard.owner),
+                }), reaccion.log.tipo || 'ability');
+                await DSL._runReaccion(reaccion.efectos, handCard, game, cx, result);
+                return !result.abortar;
+            };
+            if (reaccion.sobre === 'DAÑO' && typeof tmpl.onHandReactionToDamage !== 'function') {
+                tmpl.onHandReactionToDamage = async function (handCard, defender, attacker, dmg, isSpecial, game, p) {
+                    const cx = { attacker, defensor: defender, isSpecial };
+                    const result = { used: true, newDmg: dmg };
+                    const ok = await correr(handCard, game, cx, result);
+                    if (!ok) return { used: false, newDmg: dmg };
+                    return result;
+                };
+            } else if (typeof tmpl.onHandReactionToAttack !== 'function') {
+                tmpl.onHandReactionToAttack = async function (handCard, attacker, defender, game) {
+                    const cx = { attacker, defensor: defender };
+                    const result = { used: true };
+                    const ok = await correr(handCard, game, cx, result);
+                    if (!ok) return { used: false };
+                    return result;
+                };
+            }
+            // Las reacciones no se juegan como una Ayuda normal: se quedan en la mano.
+            if (typeof tmpl.canPlayCard !== 'function') {
+                tmpl.canPlayCard = function (card, game) {
+                    if (reaccion.avisoNoJugable) game.logMsg(DSL._fill(reaccion.avisoNoJugable, { carta: card.name }), 'system');
+                    return false;
+                };
+            }
         }
 
         // GLOBAL_TRAS_ATAQUE -> onGlobalAfterAttack (eventos activos): reacciona a CUALQUIER ataque resuelto.
