@@ -1823,12 +1823,12 @@ const CARD_DB = [
     },
     {
         id: 26, name: "Escudo mágico", type: "Ayuda", subtype: "Técnica", tags: ["Consumible"], rarity: "C",
-        text: "Reacción: Se activa automáticamente si un aliado con al menos 1 de Furor recibe un ataque. Gasta 1 de su Furor para evitar el daño (pero no los otros efectos).", cost: 0, series: 1,
+        text: "Reacción. Puedes usarla antes de recibir un ataque normal o especial. Gasta 1 de Furor del aliado atacado (que debe tener al menos 1) para evitar el daño, pero no los otros efectos.", cost: 0, series: 1,
         // Migrada a DSL (trigger REACCION sobre DAÑO, 21-jul-2026).
         abilities: [{
             trigger: 'REACCION', sobre: 'DAÑO',
             si: { defensorEsPropio: true, defensor: { campo: 'furor', op: '>=', valor: 1 } },
-            prompt: '¡{atacante} va a atacar a {defensor}! ¿Usar Escudo mágico (-1 FUROR)?',
+            prompt: '¿Usar Escudo mágico para proteger al aliado atacado (-1 FUROR)?',
             log: { msg: '¡{reactor} usa {carta} para proteger a {defensor}!', tipo: 'ability' },
             efectos: [
                 { op: 'MODIFICAR_STAT', quien: 'DEFENSOR', stat: 'furor', delta: -1 },
@@ -6581,10 +6581,11 @@ const CARD_DB = [
     },
     {
         name: "Pequeña traición", type: "Ayuda", subtype: "Técnica", tags: ["Consumible"], rarity: "C", cost: 1, series: 2,
-        text: "Reacción. Úsala justo antes de que un aliado reciba un ataque. Elige un aliado distinto para que reciba el ataque en su lugar, ignorando los demás efectos del ataque original.",
-        // Migrada a DSL (trigger REACCION, 21-jul-2026). REDIRIGIR ahora elige la
-        // nueva víctima con reborde verde en el tablero (norma de targeting), no con
-        // el modal de búsqueda visual que usaba la vieja.
+        text: "Reacción. Puedes usarla antes de recibir un ataque normal o especial. Elige un aliado distinto para que reciba el ataque en su lugar, ignorando los demás efectos del ataque original.",
+        // Migrada a DSL (trigger REACCION, 21-jul-2026). Sin gate soloAtaqueNormal: sirve
+        // para ataques normales Y especiales (caso raro, pedido por Toto). REDIRIGIR
+        // elige la nueva víctima con reborde verde en el tablero (norma de targeting),
+        // no con el modal de búsqueda visual que usaba la vieja.
         abilities: [{
             trigger: 'REACCION', sobre: 'ATAQUE',
             prompt: '¿Usar Pequeña traición para desviar el ataque hacia otro aliado?',
@@ -6597,7 +6598,7 @@ const CARD_DB = [
     },
     {
         name: "Inspiración", type: "Ayuda", subtype: "Técnica", tags: ["Consumible"], rarity: "C", cost: 1, series: 2,
-        text: "Reacción. Úsala antes de recibir un ataque normal. Busca hasta dos 'Ayuda - Técnica' en tu mazo, añádelas y baraja.",
+        text: "Reacción. Puedes usarla antes de recibir un ataque normal. Busca hasta dos 'Ayuda - Técnica' en tu mazo (al menos una), añádelas y baraja.",
         abilities: [{
             trigger: 'REACCION', sobre: 'ATAQUE',
             si: { soloAtaqueNormal: true },
@@ -6613,10 +6614,10 @@ const CARD_DB = [
     },
     {
         name: "Jugada arriesgada", type: "Ayuda", subtype: "Técnica", tags: ["Consumible"], rarity: "B", cost: 1, series: 2,
-        text: "Reacción. Moneda. Cara = el atacante se ataca a sí mismo. Cruz = el ataque ocurre y el atacante pierde 1 Furor.",
+        text: "Reacción. Puedes usarla antes de recibir un ataque normal o especial. Moneda. Cara = el atacante se ataca a sí mismo. Cruz = el ataque ocurre y el atacante pierde 1 Furor.",
         abilities: [{
             trigger: 'REACCION', sobre: 'ATAQUE',
-            prompt: '¿Lanzar Jugada arriesgada ante el ataque de {atacante}?',
+            prompt: '¿Lanzar Jugada arriesgada ante este ataque?',
             log: { msg: '¡{reactor} opta por una Jugada arriesgada!', tipo: 'ability' },
             efectos: [
                 { op: 'MONEDA',
@@ -6630,11 +6631,11 @@ const CARD_DB = [
     },
     {
         name: "Cortarrollos", type: "Ayuda", subtype: "Técnica", tags: ["Consumible"], rarity: "B", cost: 1, series: 2,
-        text: "Reacción. Úsala antes de recibir un ataque. El atacante pierde TODO su Furor instantáneamente.",
+        text: "Reacción. Puedes usarla antes de recibir un ataque normal o especial. El atacante pierde TODO su Furor instantáneamente.",
         abilities: [{
             trigger: 'REACCION', sobre: 'ATAQUE',
             si: { atacante: { campo: 'furor', op: '>', valor: 0 } },
-            prompt: '¿Usar Cortarrollos para vaciar el Furor de {atacante}?',
+            prompt: '¿Usar Cortarrollos para vaciar el Furor del atacante?',
             log: { msg: '¡Cortarrollos anula la inercia de {atacante}! Pierde todo el Furor.', tipo: 'ability' },
             efectos: [
                 { op: 'MODIFICAR_STAT', quien: 'ATACANTE', stat: 'furor', vaciar: true },
@@ -8065,7 +8066,7 @@ const DSL = {
                 // Las búsquedas CON ELECCIÓN sobre el MAZO usan el visor de mazo completo
                 // (pedido por Toto): se ve todo el mazo y solo las elegibles llevan el
                 // reborde verde. Las de otras zonas (o multi-elección) siguen con modal.
-                const esVisorMazo = e.en === 'MAZO' && (e.cantidad || 1) === 1 && typeof game.openDeckSearchViewer === 'function';
+                const esVisorMazo = e.en === 'MAZO' && typeof game.openDeckSearchViewer === 'function';
                 const visorVacio = async (barajara) => {
                     if (!esVisorMazo) return;
                     await game.openDeckSearchViewer(pid, [], F(e.titulo || 'ELIGE UNA CARTA'),
@@ -8101,8 +8102,10 @@ const DSL = {
                 }
                 let elegidas;
                 if (esVisorMazo) {
-                    const una = await game.openDeckSearchViewer(pid, lista, F(e.titulo || 'ELIGE UNA CARTA'));
-                    elegidas = una ? [una] : [];
+                    // maxCount = e.cantidad: single (1) devuelve una carta o null; multi (>1)
+                    // devuelve un array (Inspiración: hasta 2, mín. 1).
+                    const r = await game.openDeckSearchViewer(pid, lista, F(e.titulo || 'ELIGE UNA CARTA'), null, e.cantidad || 1);
+                    elegidas = Array.isArray(r) ? r : (r ? [r] : []);
                 } else {
                     elegidas = await game.openVisualSearchModal(F(e.titulo || 'ELIGE UNA CARTA'), lista, e.cantidad || 1, !!e.autoSeleccion, pid);
                 }
@@ -8417,12 +8420,14 @@ const DSL = {
     },
 
     // Pregunta SÍ/NO al reactor (modal de reacción) y devuelve la promesa booleana.
-    _reaccionPrompt(prompt, handCard, game) {
+    // Pasa el contexto de combate (atacante/defensor) para que el modal muestre ambas
+    // cartas bajo el prompt (atacante → "Atacando a" → objetivo), con hover = detalle.
+    _reaccionPrompt(prompt, handCard, game, cx) {
         return new Promise(resolve => {
             game.openChoiceModal(prompt, [
                 { label: 'SÍ', action: () => resolve(true) },
                 { label: 'NO REACCIONAR', action: () => resolve(false) },
-            ], handCard.owner);
+            ], handCard.owner, cx ? { reaccion: { atacante: cx.attacker, defensor: cx.defensor } } : null);
         });
     },
 
@@ -8755,7 +8760,7 @@ const DSL = {
                         carta: handCard.name,
                         atacante: DSL._nombre(game, cx.attacker), atacanteG: cx.attacker.gender,
                         defensor: DSL._nombre(game, cx.defensor), defensorG: cx.defensor.gender,
-                    }), handCard, game);
+                    }), handCard, game, cx);
                 if (!quiere) return false;
                 if (reaccion.log) game.logMsg(DSL._fill(reaccion.log.msg, {
                     carta: handCard.name,

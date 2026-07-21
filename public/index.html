@@ -3619,9 +3619,19 @@
             // Sin elegibles: aviso intermedio entre el título y el "(Haz clic...)".
             // Online: reutiliza el canal de las búsquedas visuales (currentVisualResolve
             // + replay de VISUAL_SEARCH_CONFIRM); al no-elector solo le sale el banner.
-            openDeckSearchViewer(playerId, elegibles, titulo = null, aviso = null) {
+            // maxCount: nº MÁXIMO de cartas a elegir (por defecto 1). Con maxCount === 1 el
+            // clic en una elegible resuelve al instante (modo de toda la vida) y la promesa
+            // devuelve UNA carta o null. Con maxCount > 1 (p. ej. Inspiración: hasta 2), el
+            // clic marca/desmarca (mín. 1 obligatoria), aparece un botón CONFIRMAR y la
+            // promesa devuelve un ARRAY de cartas.
+            openDeckSearchViewer(playerId, elegibles, titulo = null, aviso = null, maxCount = 1) {
+                const multi = maxCount > 1;
                 return new Promise(resolveRaw => {
-                    this.currentVisualResolve = (cards) => { this._deckSearchActivo = false; resolveRaw(cards && cards.length ? cards[0] : null); };
+                    this.currentVisualResolve = (cards) => {
+                        this._deckSearchActivo = false;
+                        if (multi) resolveRaw(cards || []);
+                        else resolveRaw(cards && cards.length ? cards[0] : null);
+                    };
 
                     if (this.gameMode === 'online' && this.activePlayerId !== 'setup' && this.myPlayerId !== playerId) {
                         const banner = document.getElementById('action-banner');
@@ -3647,6 +3657,47 @@
                     avisoEl.innerText = aviso || '';
                     avisoEl.style.display = aviso ? 'block' : 'none';
 
+                    // Botón CONFIRMAR: solo en modo multi. Se crea una vez y se reutiliza.
+                    let confirmEl = document.getElementById('deck-search-confirm');
+                    if (multi) {
+                        if (!confirmEl) {
+                            confirmEl = document.createElement('button');
+                            confirmEl.id = 'deck-search-confirm';
+                            confirmEl.style.cssText = 'margin-top: 10px; padding: 10px 22px; border:none; border-radius:6px; font-weight:bold; font-size:1.05rem; cursor:pointer;';
+                            content.parentNode.appendChild(confirmEl);
+                        }
+                        confirmEl.style.display = 'block';
+                    } else if (confirmEl) {
+                        confirmEl.style.display = 'none';
+                    }
+                    const seleccionadas = [];
+                    const refrescarConfirmar = () => {
+                        if (!multi || !confirmEl) return;
+                        const n = seleccionadas.length;
+                        confirmEl.innerText = `CONFIRMAR (${n}/${maxCount})`;
+                        const listo = n >= 1;
+                        confirmEl.disabled = !listo;
+                        confirmEl.style.background = listo ? '#10b981' : '#475569';
+                        confirmEl.style.color = 'white';
+                        confirmEl.style.opacity = listo ? '1' : '0.6';
+                        confirmEl.style.cursor = listo ? 'pointer' : 'not-allowed';
+                    };
+                    if (multi && confirmEl) {
+                        confirmEl.onclick = (ev) => {
+                            ev.stopPropagation();
+                            if (seleccionadas.length < 1) return; // mín. 1 obligatoria
+                            this._deckSearchActivo = false;
+                            document.getElementById('discard-viewer').style.display = 'none';
+                            avisoEl.style.display = 'none';
+                            confirmEl.style.display = 'none';
+                            const elegidas = seleccionadas.slice();
+                            if (this.gameMode === 'online') {
+                                this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'VISUAL_SEARCH_CONFIRM', ids: elegidas.map(c => c.instanceId) });
+                            }
+                            this.resolveVisualSearch(elegidas);
+                        };
+                    }
+
                     content.innerHTML = '';
                     const deckCopy = [...p.deck].reverse(); // como el visor de debug: la cima primero
                     if (deckCopy.length === 0) {
@@ -3659,16 +3710,29 @@
                             if (idsElegibles.has(carta.instanceId)) {
                                 el.classList.add('valid-target'); // el reborde verde de toda la vida
                                 el.style.cursor = 'pointer';
-                                el.onclick = (ev) => {
-                                    ev.stopPropagation();
-                                    this._deckSearchActivo = false;
-                                    document.getElementById('discard-viewer').style.display = 'none';
-                                    avisoEl.style.display = 'none';
-                                    if (this.gameMode === 'online') {
-                                        this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'VISUAL_SEARCH_CONFIRM', ids: [carta.instanceId] });
-                                    }
-                                    this.resolveVisualSearch([carta]);
-                                };
+                                if (multi) {
+                                    el.onclick = (ev) => {
+                                        ev.stopPropagation();
+                                        const idx = seleccionadas.findIndex(c => c.instanceId === carta.instanceId);
+                                        if (idx !== -1) { seleccionadas.splice(idx, 1); el.classList.remove('selected'); }
+                                        else {
+                                            if (seleccionadas.length >= maxCount) return; // ya en el tope
+                                            seleccionadas.push(carta); el.classList.add('selected');
+                                        }
+                                        refrescarConfirmar();
+                                    };
+                                } else {
+                                    el.onclick = (ev) => {
+                                        ev.stopPropagation();
+                                        this._deckSearchActivo = false;
+                                        document.getElementById('discard-viewer').style.display = 'none';
+                                        avisoEl.style.display = 'none';
+                                        if (this.gameMode === 'online') {
+                                            this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'VISUAL_SEARCH_CONFIRM', ids: [carta.instanceId] });
+                                        }
+                                        this.resolveVisualSearch([carta]);
+                                    };
+                                }
                             } else {
                                 el.onclick = null;
                                 el.style.cursor = 'default';
@@ -3676,6 +3740,7 @@
                             content.appendChild(el);
                         });
                     }
+                    refrescarConfirmar();
 
                     this._deckSearchActivo = true;
                     this._deckSearchElegiblesCount = idsElegibles.size;
@@ -5448,9 +5513,13 @@
                 }
             }
 
-            openChoiceModal(title, choices, chooserId = null) {
+            // opts.reaccion (opcional) = { atacante, defensor }: muestra ambas cartas
+            // bajo el prompt (atacante → flecha "Atacando a" → objetivo), con hover =
+            // detalle, para que el reactor sepa exactamente quién ataca a quién y pueda
+            // discernir los IDs. Pedido por Toto (betasteo 22-jul-2026).
+            openChoiceModal(title, choices, chooserId = null, opts = null) {
                 const intendedPlayer = chooserId || this.activePlayerId;
-                
+
                 // --- AUTO-RESPUESTA DE LA IA ---
                 if (this.isVsAI && intendedPlayer === this.ai.aiPlayerId) {
                     this.currentChoices = choices;
@@ -5458,8 +5527,43 @@
                     setTimeout(() => this.executeChoice(0), 800);
                     return; // Abortamos para que no dibuje el modal HTML
                 }
-                this.currentChoices = choices; 
+                this.currentChoices = choices;
                 document.getElementById('choice-title').innerText = title;
+
+                // Fila de cartas de reacción (si las hay). El modal baja a z-index 4500
+                // (bajo #card-preview, 5000) para que el panel de detalle se vea por
+                // encima al hacer hover, igual que en el visor de mazo (4000).
+                const modalEl = document.getElementById('choice-modal');
+                let cardsEl = document.getElementById('choice-cards');
+                if (!cardsEl) {
+                    cardsEl = document.createElement('div');
+                    cardsEl.id = 'choice-cards';
+                    cardsEl.style.cssText = 'display:none; align-items:center; justify-content:center; gap:26px; margin-bottom:28px;';
+                    const btns = document.getElementById('choice-buttons');
+                    btns.parentNode.insertBefore(cardsEl, btns);
+                }
+                cardsEl.innerHTML = '';
+                const rc = opts && opts.reaccion;
+                if (rc && rc.atacante && rc.defensor) {
+                    modalEl.style.zIndex = '4500';
+                    const mkCard = (card) => {
+                        const cel = this.createCardEl(card, false, true);
+                        cel.onmouseenter = () => this.startPreview(card);
+                        cel.onmouseleave = () => this.stopPreview();
+                        return cel;
+                    };
+                    const flecha = document.createElement('div');
+                    flecha.style.cssText = 'display:flex; flex-direction:column; align-items:center; color:#fbbf24; font-weight:bold; pointer-events:none;';
+                    flecha.innerHTML = '<div style="font-size:0.95rem; margin-bottom:2px; white-space:nowrap;">Atacando a</div><div style="font-size:2.6rem; line-height:1;">&#10230;</div>';
+                    cardsEl.appendChild(mkCard(rc.atacante));
+                    cardsEl.appendChild(flecha);
+                    cardsEl.appendChild(mkCard(rc.defensor));
+                    cardsEl.style.display = 'flex';
+                } else {
+                    modalEl.style.zIndex = '8500';
+                    cardsEl.style.display = 'none';
+                }
+
                 const container = document.getElementById('choice-buttons');
                 container.innerHTML = '';
                 choices.forEach((choice, index) => {
@@ -5491,7 +5595,13 @@
                     this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'CHOICE_SELECTED', index: index });
                 }
                 document.getElementById('choice-modal').style.display = 'none';
-                
+                // Limpieza de las cartas de reacción (si las hubo) y del detalle abierto
+                // por hover; el modal vuelve a su z-index normal.
+                const _cc = document.getElementById('choice-cards');
+                if (_cc) { _cc.innerHTML = ''; _cc.style.display = 'none'; }
+                document.getElementById('choice-modal').style.zIndex = '8500';
+                this.stopPreview();
+
                 // NO borrar el texto del cartelón si estamos en el proceso de Setup inicial
                 if (this.activePlayerId !== 'setup') {
                     document.getElementById('action-banner').style.display = 'none';

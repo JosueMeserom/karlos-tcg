@@ -273,10 +273,10 @@ function crearJuego(ctx) {
 
     // Visor de mazo completo (búsquedas con elección sobre el MAZO). Contrato:
     // resuelve UNA carta o null (cierre sin elegir / sin elegibles).
-    inst.openDeckSearchViewer = (playerId, elegibles, titulo = null, aviso = null) =>
+    inst.openDeckSearchViewer = (playerId, elegibles, titulo = null, aviso = null, maxCount = 1) =>
         new Promise(resolve => {
             ctx.pendientes.push({
-                tipo: 'visorMazo', jugador: playerId, titulo, aviso,
+                tipo: 'visorMazo', jugador: playerId, titulo, aviso, maxCount,
                 cartas: [...inst.players[playerId].deck], elegibles: elegibles || [], resolver: resolve,
             });
         });
@@ -465,10 +465,16 @@ async function aplicarRespuesta(ctx, inst, paso) {
         else if (pend.tipo === 'busqueda') paso = { busqueda: paso.elegir };
         else if (pend.tipo === 'opcion') paso = { opcion: paso.elegir[0] };
         else if (pend.tipo === 'visorMazo') {
-            const ref = paso.elegir[0];
-            const carta = pend.elegibles.find(c => c.instanceId === ref || c.name === ref);
-            if (!carta) throw new Error(`[${ctx.cual}] "${ref}" no está entre las elegibles del visor de mazo: ${pend.elegibles.map(c => c.name).join(', ') || '(ninguna)'}`);
-            pend.resolver(carta);
+            // Copia local para poder tomar instancias DISTINTAS cuando se repiten
+            // nombres (p. ej. Inspiración: dos "Atomización"), como en 'busqueda'.
+            const restantes = [...pend.elegibles];
+            const seleccion = paso.elegir.map(ref => {
+                const i = restantes.findIndex(c => c.instanceId === ref || c.name === ref);
+                if (i === -1) throw new Error(`[${ctx.cual}] "${ref}" no está entre las elegibles del visor de mazo: ${pend.elegibles.map(c => c.name).join(', ') || '(ninguna)'}`);
+                return restantes.splice(i, 1)[0];
+            });
+            // Contrato del visor: single (maxCount<=1) resuelve UNA carta; multi, el array.
+            pend.resolver((pend.maxCount && pend.maxCount > 1) ? seleccion : seleccion[0]);
             await asentar(ctx);
             return;
         }
