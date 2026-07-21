@@ -271,6 +271,16 @@ function crearJuego(ctx) {
             ctx.pendientes.push({ tipo: 'busqueda', titulo, cartas, exactCount, autoSelectMax, resolver: resolve });
         });
 
+    // Visor de mazo completo (búsquedas con elección sobre el MAZO). Contrato:
+    // resuelve UNA carta o null (cierre sin elegir / sin elegibles).
+    inst.openDeckSearchViewer = (playerId, elegibles, titulo = null, aviso = null) =>
+        new Promise(resolve => {
+            ctx.pendientes.push({
+                tipo: 'visorMazo', jugador: playerId, titulo, aviso,
+                cartas: [...inst.players[playerId].deck], elegibles: elegibles || [], resolver: resolve,
+            });
+        });
+
     inst.openConfirmModal = (mensaje, aviso = null) => {
         ctx.pendientes.push({ tipo: 'confirmar', mensaje, aviso });
     };
@@ -454,6 +464,14 @@ async function aplicarRespuesta(ctx, inst, paso) {
         if (pend.tipo === 'elegirTablero') paso = { elegirTablero: paso.elegir };
         else if (pend.tipo === 'busqueda') paso = { busqueda: paso.elegir };
         else if (pend.tipo === 'opcion') paso = { opcion: paso.elegir[0] };
+        else if (pend.tipo === 'visorMazo') {
+            const ref = paso.elegir[0];
+            const carta = pend.elegibles.find(c => c.instanceId === ref || c.name === ref);
+            if (!carta) throw new Error(`[${ctx.cual}] "${ref}" no está entre las elegibles del visor de mazo: ${pend.elegibles.map(c => c.name).join(', ') || '(ninguna)'}`);
+            pend.resolver(carta);
+            await asentar(ctx);
+            return;
+        }
         else throw new Error(`[${ctx.cual}] {elegir} no sabe responder a "${pend.tipo}"`);
     }
 
@@ -462,8 +480,10 @@ async function aplicarRespuesta(ctx, inst, paso) {
         lanzar(ctx, inst.confirmAction());
     } else if (paso.cancelar !== undefined) {
         // Sobre una búsqueda visual equivale al botón Cancelar del modal (resuelve
-        // con lista vacía); en el resto de estados, al clic de cancelación general.
+        // con lista vacía); sobre el visor de mazo, al clic en el fondo oscuro
+        // (resuelve null); en el resto de estados, al clic de cancelación general.
         if (pend.tipo === 'busqueda') pend.resolver([]);
+        else if (pend.tipo === 'visorMazo') pend.resolver(null);
         else inst.cancelAction();
     } else if (paso.opcion !== undefined) {
         if (pend.tipo !== 'opcion') throw new Error(`[${ctx.cual}] esperaba responder a "${pend.tipo}", el paso es {opcion}`);

@@ -63,6 +63,7 @@ const escenarios = [
         pasos: [
             { jugar: 'Rezo en grupo' },
             { elegir: ['Oso con armadura', 'Mini-tigre'] },
+            { soloEn: 'nueva', cancelar: true }, // cierra el visor de mazo vacío (solo la nueva lo abre)
         ],
         logsSoloNueva: [
             { linea: 'No quedan Dioses ni Diosas en el mazo de J1 (Jugador 1).',

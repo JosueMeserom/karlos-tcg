@@ -44,6 +44,7 @@ const escenarios = [
         pasos: [
             { jugar: 'Pago por adelantado' },
             { elegir: ['Oso con armadura'] },
+            { soloEn: 'nueva', cancelar: true }, // cierra el visor de mazo vacío (solo la nueva lo abre)
         ],
         logsIntencionados: [
             { de: 'Barajando el mazo...', a: 'Barajando el mazo de J1 (Jugador 1)...',

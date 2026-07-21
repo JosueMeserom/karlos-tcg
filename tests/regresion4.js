@@ -97,6 +97,7 @@ const escenarios = [
         pasos: [
             { jugar: 'Hexagrama' },
             { seleccionar: 'Mini-tigre' },
+            { soloEn: 'nueva', cancelar: true }, // cierra el visor de mazo vacío (solo la nueva lo abre)
         ],
         logsIntencionados: [
             { de: 'Barajando el mazo...', a: 'Barajando el mazo de J1 (Jugador 1)...',

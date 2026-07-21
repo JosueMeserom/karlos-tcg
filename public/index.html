@@ -3511,13 +3511,95 @@
                 if (this.gameMode === 'online' && !isRemote && this.myPlayerId !== 'spectator') {
                     this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'CLOSE_VIEWER' });
                 }
-                
+
                 document.getElementById('discard-viewer').style.display = 'none';
-                
+                const avisoVisor = document.getElementById('deck-search-notice');
+                if (avisoVisor) avisoVisor.style.display = 'none';
+
                 // Si el espectador cierra, tampoco debe borrar el cartel de los jugadores reales
                 if (this.myPlayerId !== 'spectator') {
                     document.getElementById('action-banner').style.display = 'none';
                 }
+
+                // Visor de búsqueda en mazo abierto: cerrarlo sin elegir resuelve "nada".
+                if (this._deckSearchActivo) {
+                    this._deckSearchActivo = false;
+                    if (this.gameMode === 'online' && !isRemote && this.myPlayerId !== 'spectator') {
+                        this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'VISUAL_SEARCH_CONFIRM', ids: [] });
+                    }
+                    this.resolveVisualSearch([]);
+                }
+            }
+
+            // --- VISOR DE BÚSQUEDA EN MAZO (pedido por Toto, 21-jul-2026) ---
+            // Muestra el MAZO COMPLETO (mismo visor que el debug); solo las cartas
+            // elegibles llevan el reborde verde y son clicables. Devuelve una promesa
+            // con la carta elegida, o null si se cierra clicando el fondo oscuro.
+            // Sin elegibles: aviso intermedio entre el título y el "(Haz clic...)".
+            // Online: reutiliza el canal de las búsquedas visuales (currentVisualResolve
+            // + replay de VISUAL_SEARCH_CONFIRM); al no-elector solo le sale el banner.
+            openDeckSearchViewer(playerId, elegibles, titulo = null, aviso = null) {
+                return new Promise(resolveRaw => {
+                    this.currentVisualResolve = (cards) => { this._deckSearchActivo = false; resolveRaw(cards && cards.length ? cards[0] : null); };
+
+                    if (this.gameMode === 'online' && this.activePlayerId !== 'setup' && this.myPlayerId !== playerId) {
+                        const banner = document.getElementById('action-banner');
+                        banner.innerText = `Esperando a que ${this.getDisplayName(playerId)} busque en su mazo...`;
+                        banner.style.display = 'block';
+                        return; // sin visor local: lo resuelve el replay remoto
+                    }
+
+                    const p = this.players[playerId];
+                    const viewer = document.getElementById('discard-viewer');
+                    const title = document.getElementById('discard-title');
+                    const content = document.getElementById('discard-content');
+                    const idsElegibles = new Set((elegibles || []).map(c => c.instanceId));
+
+                    title.innerText = titulo || `MAZO DE ${this.getDisplayName(playerId).toUpperCase()}`;
+                    let avisoEl = document.getElementById('deck-search-notice');
+                    if (!avisoEl) {
+                        avisoEl = document.createElement('div');
+                        avisoEl.id = 'deck-search-notice';
+                        avisoEl.style.cssText = 'color: #fbbf24; font-size: 1.05rem; margin-bottom: 6px; pointer-events: none; font-weight: bold;';
+                        title.parentNode.insertBefore(avisoEl, title.nextSibling);
+                    }
+                    avisoEl.innerText = aviso || '';
+                    avisoEl.style.display = aviso ? 'block' : 'none';
+
+                    content.innerHTML = '';
+                    const deckCopy = [...p.deck].reverse(); // como el visor de debug: la cima primero
+                    if (deckCopy.length === 0) {
+                        content.innerHTML = '<div style="color:white;">Vacío.</div>';
+                    } else {
+                        deckCopy.forEach(carta => {
+                            const el = this.createCardEl(carta, false, true);
+                            el.onmouseenter = () => this.startPreview(carta);
+                            el.onmouseleave = () => this.stopPreview();
+                            if (idsElegibles.has(carta.instanceId)) {
+                                el.classList.add('valid-target'); // el reborde verde de toda la vida
+                                el.style.cursor = 'pointer';
+                                el.onclick = (ev) => {
+                                    ev.stopPropagation();
+                                    this._deckSearchActivo = false;
+                                    document.getElementById('discard-viewer').style.display = 'none';
+                                    avisoEl.style.display = 'none';
+                                    if (this.gameMode === 'online') {
+                                        this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'VISUAL_SEARCH_CONFIRM', ids: [carta.instanceId] });
+                                    }
+                                    this.resolveVisualSearch([carta]);
+                                };
+                            } else {
+                                el.onclick = null;
+                                el.style.cursor = 'default';
+                            }
+                            content.appendChild(el);
+                        });
+                    }
+
+                    this._deckSearchActivo = true;
+                    viewer.style.display = 'flex';
+                    this.adjustCardHeaders();
+                });
             }
 
             async triggerCoinFlips(count = 1, playerId) {

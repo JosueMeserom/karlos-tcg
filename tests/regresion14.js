@@ -97,6 +97,7 @@ const escenarios = [
         pasos: [
             { finTurno: true },
             { soloEn: 'nueva', opcion: 'COMPRAR MERCHANDISING (BUSCAR OTAKU)' },
+            { soloEn: 'nueva', cancelar: true }, // cierra el visor de mazo vacío con su aviso de barajado
         ],
         logsIntencionados: [
             { de: 'Moneda: CARA - ¡Has encontrado algo genial en la Feria!', a: 'Moneda: CARA - ¡J1 (Jugador 1) ha encontrado algo genial en la Feria!', motivo: M3 },

@@ -1723,7 +1723,8 @@ const CARD_DB = [
                         if (!seen.has(c.id)) { seen.add(c.id); uniqueDeck.push(c); }
                     }
 
-                    const chosenCard = await game.openVisualSearchModal('BUSCAR EN EL MAZO', uniqueDeck, 1, false, card.owner);
+                    const _elegida = await game.openDeckSearchViewer(card.owner, p.deck, 'BUSCAR EN EL MAZO');
+                    const chosenCard = _elegida ? [_elegida] : [];
                     if (chosenCard && chosenCard.length > 0) {
                         const targetInfo = chosenCard[0];
                         const idx = p.deck.findIndex(c => c.id === targetInfo.id);
@@ -5055,7 +5056,8 @@ const CARD_DB = [
             const fusions = p.deck.filter(c => c.name === "Fusión de planos");
 
             if (fusions.length > 0) {
-                const chosen = await game.openVisualSearchModal('BUSCAR FUSIÓN DE PLANOS', fusions, 1, false, card.owner);
+                const _elegida = await game.openDeckSearchViewer(card.owner, fusions, 'BUSCAR FUSIÓN DE PLANOS');
+                const chosen = _elegida ? [_elegida] : [];
                 if (chosen && chosen.length > 0) {
                     const target = chosen[0];
                     const idx = p.deck.findIndex(c => c.instanceId === target.instanceId);
@@ -5488,7 +5490,8 @@ const CARD_DB = [
             if (wantSearch) {
                 const valid = p.deck.filter(c => c.type === 'Ayuda');
                 if (valid.length > 0) {
-                    const chosen = await game.openVisualSearchModal('BUSCAR AYUDA', valid, 1, false, card.owner);
+                    const _elegida = await game.openDeckSearchViewer(card.owner, valid, 'BUSCAR AYUDA');
+                    const chosen = _elegida ? [_elegida] : [];
                     if (chosen && chosen.length > 0) {
                         const target = chosen[0];
                         const idx = p.deck.findIndex(c => c.instanceId === target.instanceId);
@@ -5569,7 +5572,8 @@ const CARD_DB = [
             // 2. Si ha decidido (o no le queda otra) que buscar en mazo:
             if (searchedDeck) {
                 const validDeck = p.deck.filter(c => c.name === "Meca EBA");
-                const chosen = await game.openVisualSearchModal('BUSCAR MECA EBA EN MAZO', validDeck, 1, true, card.owner);
+                const _elegida = await game.openDeckSearchViewer(card.owner, validDeck, 'BUSCAR MECA EBA EN MAZO');
+                const chosen = _elegida ? [_elegida] : [];
                 
                 // Barajamos SIEMPRE tras abrir el modal del mazo
                 game.logMsg(`Barajando el mazo de ${game.getDisplayName(p.id)}...`, 'system');
@@ -8190,6 +8194,15 @@ const DSL = {
                         { label: e.confirmar.no || 'IGNORAR', action: () => resolve(false) }
                     ], pid);
                 });
+                // Las búsquedas CON ELECCIÓN sobre el MAZO usan el visor de mazo completo
+                // (pedido por Toto): se ve todo el mazo y solo las elegibles llevan el
+                // reborde verde. Las de otras zonas (o multi-elección) siguen con modal.
+                const esVisorMazo = e.en === 'MAZO' && (e.cantidad || 1) === 1 && typeof game.openDeckSearchViewer === 'function';
+                const visorVacio = async (barajara) => {
+                    if (!esVisorMazo) return;
+                    await game.openDeckSearchViewer(pid, [], F(e.titulo || 'ELIGE UNA CARTA'),
+                        barajara ? 'No hay cartas elegibles en este mazo. Se barajará al cerrar el visor.' : 'No hay cartas elegibles en este mazo.');
+                };
                 let confirmado = false;
                 if (e.preguntarSiempre && e.confirmar) {
                     // Flujo pedido por Toto (Feria del cómic): la pregunta va ANTES de
@@ -8198,12 +8211,18 @@ const DSL = {
                     if (!(await pregunta())) { if (e.confirmar.logNo) game.logMsg(F(e.confirmar.logNo), 'system'); continue; }
                     confirmado = true;
                     if (lista.length === 0) {
+                        await visorVacio(!!e.barajarDespues);
                         if (e.logNoValidas) game.logMsg(F(e.logNoValidas), 'system');
                         await baraja();
                         continue;
                     }
                 }
                 if (lista.length === 0) {
+                    // El visor vacío solo sale si el jugador INICIÓ la búsqueda (sin
+                    // confirmar: jugar la carta ya es iniciarla). Con confirmar, la
+                    // pregunta se salta al no haber válidas y no se abre nada (p. ej.
+                    // Llamada del deber no molesta en cada fin de turno sin Guardias).
+                    if (!e.confirmar) await visorVacio(!!(e.barajarDespues && e.barajarDespues.inclusoSinValidas));
                     if (e.logNoValidas) game.logMsg(F(e.logNoValidas), 'system');
                     if (e.barajarDespues && e.barajarDespues.inclusoSinValidas) await baraja();
                     continue;
@@ -8212,7 +8231,13 @@ const DSL = {
                 if (e.confirmar && !confirmado) {
                     if (!(await pregunta())) { if (e.confirmar.logNo) game.logMsg(F(e.confirmar.logNo), 'system'); continue; }
                 }
-                const elegidas = await game.openVisualSearchModal(F(e.titulo || 'ELIGE UNA CARTA'), lista, e.cantidad || 1, !!e.autoSeleccion, pid);
+                let elegidas;
+                if (esVisorMazo) {
+                    const una = await game.openDeckSearchViewer(pid, lista, F(e.titulo || 'ELIGE UNA CARTA'));
+                    elegidas = una ? [una] : [];
+                } else {
+                    elegidas = await game.openVisualSearchModal(F(e.titulo || 'ELIGE UNA CARTA'), lista, e.cantidad || 1, !!e.autoSeleccion, pid);
+                }
                 if (elegidas && elegidas.length > 0) { for (const t of elegidas) await aMano(t); algunExito = true; }
                 else if (e.abortaSiCancelas) return false; // p. ej. consumibles: cancelar el modal no consume la carta
                 else if (e.logSinEleccion) game.logMsg(F(e.logSinEleccion), 'system');
