@@ -1413,21 +1413,15 @@ const CARD_DB = [
     { 
         id: 14, name: "Incluso En El KG", hp: 2, def: 2, atk: 2, type: "Esbirro", subtype: "Ser vivo", tags: ["Animal salvaje"], gender: 'N', rarity: "C",
         text: "Retorno a mano al morir en vez de perder Retribución.", passiveName: "INCLUSO EN EL JUEGO DE CARTAS", series: 1,
-        // NUEVO HOOK: Maneja su propia muerte
-        onDeath: async function(card, game) {
-            game.logMsg(`¡Habilidad pasiva de ${game.getCardNameWithOwner(card)}: ${card.passiveName} tiene lugar! (Vuelve a la mano)`, 'ability');
-            showFloatingText(card.instanceId, card.passiveName, "ft-ability");
-            try { await animateSpinToHand(card.instanceId, card.owner); } catch (err) {}
-            
-            const p = game.players[card.owner];
-            p.vanguard = p.vanguard.filter(c => c.instanceId !== card.instanceId);
-            p.rearguard = p.rearguard.filter(c => c.instanceId !== card.instanceId);
-            
-            card.location = 'hand';
-            card.currentHp = getCardTemplate(card.id).hp;
-            p.hand.push(card);
-            return true; // Indica al motor que la muerte ha sido gestionada
-        }
+        // Migrada a DSL (trigger AL_MORIR, 21-jul-2026): gestiona su propia muerte
+        // devolviéndose a la mano (op VOLVER_A_MANO) y suprimiéndola (gestionada:true,
+        // que hace que onDeath devuelva true → el motor no la descarta, solo da Retribución).
+        abilities: [{
+            trigger: 'AL_MORIR', gestionada: true,
+            log: { msg: '¡Habilidad pasiva de {carta}: {pasiva} tiene lugar! (Vuelve a la mano)', tipo: 'ability' },
+            floating: { texto: '{pasiva}', estilo: 'ft-ability', offset: 0 },
+            efectos: [ { op: 'VOLVER_A_MANO' } ],
+        }],
     },
     { id: 15, name: "Mini-tigre", hp: 3, def: 3, atk: 2, type: "Esbirro", subtype: "Ser vivo", tags: ["Animal salvaje"], gender: 'N', rarity: "C", text: "-", series: 1 },
     {
@@ -7774,12 +7768,12 @@ const KARLOS_RULES = {
 //  Valores: número | {COUNT:{...}} | {REF:"objetivo.furorMax"} (campos computados)
 // ===================================================================
 const DSL = {
-    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE', 'AURA', 'ANTES_DE_JUGAR', 'PUEDE_ATACAR', 'SOBRECURACION', 'REACCION'],
+    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE', 'AURA', 'ANTES_DE_JUGAR', 'PUEDE_ATACAR', 'SOBRECURACION', 'REACCION', 'AL_MORIR'],
     // Los 5 últimos ops solo tienen sentido dentro de una REACCION (los interpreta
     // DSL._runReaccion, no _doEffect): controlan el resultado que la reacción
     // devuelve al motor de combate (redirigir el ataque, cancelarlo, drenar Furor
     // tras él, fijar el daño, autoataque del atacante).
-    OPS_EFECTO: ['MODIFICAR_STAT', 'CURAR', 'DAÑO', 'APLICAR_ESTADO', 'MODIFICAR_CONTADORES', 'ATACAR', 'MONEDA', 'ROBAR', 'BUSCAR', 'MARCAR', 'VER_MANO', 'LIMPIAR_ESTADOS', 'ELEGIR', 'DESTRUIR_EVENTO', 'MARCAR_TEMPORAL', 'DESCARTAR', 'EQUIPAR', 'MARCAR_JUGADOR', 'FLOTANTE', 'FIJAR_STAT', 'REDIRIGIR', 'CANCELAR_ATAQUE', 'MARCAR_DRENAJE', 'FIJAR_DAÑO', 'ATACANTE_SE_AUTOATACA'],
+    OPS_EFECTO: ['MODIFICAR_STAT', 'CURAR', 'DAÑO', 'APLICAR_ESTADO', 'MODIFICAR_CONTADORES', 'ATACAR', 'MONEDA', 'ROBAR', 'BUSCAR', 'MARCAR', 'VER_MANO', 'LIMPIAR_ESTADOS', 'ELEGIR', 'DESTRUIR_EVENTO', 'MARCAR_TEMPORAL', 'DESCARTAR', 'EQUIPAR', 'MARCAR_JUGADOR', 'FLOTANTE', 'FIJAR_STAT', 'REDIRIGIR', 'CANCELAR_ATAQUE', 'MARCAR_DRENAJE', 'FIJAR_DAÑO', 'ATACANTE_SE_AUTOATACA', 'VOLVER_A_MANO'],
     OPS_CMP: ['==', '!=', '<=', '>=', '<', '>', 'includes', 'truthy', 'falsy'],
     QUIEN: ['SELF', 'ALIADO', 'ENEMIGO', 'TODOS', 'ATACANTE', 'DEFENSOR'], // ATACANTE/DEFENSOR: solo en GLOBAL_TRAS_ATAQUE y REACCION
 
@@ -8155,6 +8149,20 @@ const DSL = {
         }
         if (e.op === 'FLOTANTE') {
             if (typeof showFloatingText === 'function') showFloatingText(target.instanceId, e.texto, e.estilo || 'ft-green', e.offset !== undefined ? e.offset : -20);
+            return true;
+        }
+        if (e.op === 'VOLVER_A_MANO') {
+            // Devuelve la carta del campo a la mano (Incluso En El KG al morir). Replica
+            // EXACTAMENTE la vieja: solo resetea currentHp; furor/estado no se tocan.
+            const owner = target.owner;
+            const pl = game.players[owner];
+            if (typeof animateSpinToHand === 'function') { try { await animateSpinToHand(target.instanceId, owner); } catch (err) {} }
+            pl.vanguard = pl.vanguard.filter(c => c.instanceId !== target.instanceId);
+            pl.rearguard = pl.rearguard.filter(c => c.instanceId !== target.instanceId);
+            target.location = 'hand';
+            target.currentHp = getCardTemplate(target.id).hp;
+            pl.hand.push(target);
+            if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
             return true;
         }
         if (e.op === 'EQUIPAR') {
@@ -8799,6 +8807,26 @@ const DSL = {
                     return false;
                 };
             }
+        }
+
+        // AL_MORIR -> onDeath(card, game). El motor lo llama en checkDeath con hp<=0. Si
+        // la habilidad declara `gestionada: true`, onDeath devuelve true y el motor SUPRIME
+        // la muerte normal (sin descarte/animación/log "ha sido destruido"), solo da la
+        // Retribución: así Incluso En El KG vuelve a la mano (op VOLVER_A_MANO). Sin
+        // gestionada, devuelve false y la muerte procede normal tras los efectos (Goodman
+        // busca en el mazo si le queda Furor y luego muere). `si` es el gate opcional.
+        const alMorir = abs.find(a => a.trigger === 'AL_MORIR');
+        if (alMorir && typeof tmpl.onDeath !== 'function') {
+            tmpl.onDeath = async function (card, game) {
+                if (alMorir.si && !DSL._cond(card, game, alMorir.si)) return false;
+                const relleno = { carta: DSL._nombre(game, card), nombre: card.name, pasiva: tmpl.passiveName || alMorir.nombre || '' };
+                if (alMorir.log) game.logMsg(DSL._fill(alMorir.log.msg, relleno), alMorir.log.tipo || 'ability');
+                if (alMorir.floating && typeof showFloatingText === 'function') {
+                    showFloatingText(card.instanceId, DSL._fill(alMorir.floating.texto || relleno.pasiva, relleno), alMorir.floating.estilo || 'ft-ability', alMorir.floating.offset !== undefined ? alMorir.floating.offset : -30);
+                }
+                await DSL._runEffectList(alMorir.efectos || [], card, game, card.owner, [card]);
+                return !!alMorir.gestionada;
+            };
         }
 
         // GLOBAL_TRAS_ATAQUE -> onGlobalAfterAttack (eventos activos): reacciona a CUALQUIER ataque resuelto.
