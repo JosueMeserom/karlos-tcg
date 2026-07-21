@@ -3066,69 +3066,38 @@ const CARD_DB = [
     {
         name: "Esfuerzo dividido", type: "Evento", rarity: "A", series: 1, cost: 1, duration: 4,
         text: "4 turnos. Requiere 3 aliados en vanguardia. Al colocarla, escoge 2: no pueden atacar ni usar Activas y ganan Oculto. Mientras esté en juego, si uno de ellos muere, esta carta se destruye. Al expirar, el rival roba 1 retribución.",
-        canPlayCard: function(card, game, p) {
-            if (p.vanguard.length < 3) { game.logMsg("Necesitas al menos 3 aliados en la vanguardia.", 'system'); return false; }
-            return true;
-        },
-        onPlay: async function(card, game) {
-            game.selectedCard = card;
-            game.inputState = 'SELECT_ABILITY_TARGETS';
-            game.abilityContext = { targets: [], maxTargets: 2, name: 'ESFUERZO DIVIDIDO', targetType: 'ally' };
-            game.isActionLocked = true; 
-            game.logError("Escoge los 2 aliados que dividirán su esfuerzo.");
-            game.render();
-        },
-        onValidateTarget: function(card, target, game, isSilent = false) {
-            if (target.location !== 'vanguard') return false; 
-            if (game.abilityContext.targets.some(t => t.instanceId === target.instanceId)) return false;
-            return true;
-        },
-        onTargetsReady: async function(card, game) {
-            const t1 = game.abilityContext.targets[0];
-            const t2 = game.abilityContext.targets[1];
-            card.chosenAllies = [t1.instanceId, t2.instanceId];
-            
-            game.logMsg(`¡${t1.name} y ${t2.name} se ocultan para dividir el esfuerzo!`, 'ability');
-            game.isActionLocked = false;
-            game.cancelAction(); 
-            game.updatePassives();
-            game.render();
-        },
-        onUpdatePassive: function(card, game, p) {
-            if (!card.chosenAllies) return;
-            card.chosenAllies.forEach(id => {
-                const ally = game.findCard(id);
-                if (ally && ally.location === 'vanguard') {
-                    ally.stealth = true;
-                    ally.exhausted = true; 
-                }
-            });
-        },
-        onAllyDeath: async function(card, deadCard, game) {
-            if (card.chosenAllies && card.chosenAllies.includes(deadCard.instanceId)) {
-                game.logMsg(`Uno de los eslabones ha caído. ${card.name} se destruye.`, 'ability');
-                await game.destroyEvent(card.owner); // Usa el nuevo sistema global
-            }
-        },
-        onDestroy: async function(card, game, playerId) { // Limpieza si Giro de Guion lo destruye
-            if (card.chosenAllies) {
-                card.chosenAllies.forEach(id => {
-                    const ally = game.findCard(id);
-                    if (ally) { ally.stealth = false; ally.exhausted = false; }
-                });
-            }
-        },
-        onExpire: async function(card, game, playerId) {
-            const enemyId = playerId === 'p1' ? 'p2' : 'p1';
-            if (card.chosenAllies) {
-                card.chosenAllies.forEach(id => {
-                    const ally = game.findCard(id);
-                    if (ally) { ally.stealth = false; ally.exhausted = false; }
-                });
-            }
-            game.logMsg(`Esfuerzo dividido expira naturalmente. ¡El rival coge 1 Retribución!`, 'ability');
-            await game.processRetribution(enemyId); 
-        }
+        // Migrada a DSL (tanda de eventos, 21-jul-2026). Piezas nuevas del intérprete
+        // que estrena: ELEGIR guardaIdsEnSelf (guarda los 2 elegidos como lista),
+        // AURA soloSelfLista + marcar-array (Oculto+agotado a los elegidos), triggers
+        // AL_MORIR_ALIADO (se destruye si muere un elegido) y AL_DESTRUIR (limpieza al
+        // destruirla), op RETRIBUCION y _pool selfLista (para la limpieza).
+        abilities: [
+            { trigger: "JUGAR", requisitos: [
+                { count: { zona: "VANGUARDIA" }, op: ">=", valor: 3, msg: "Necesitas al menos 3 aliados en la vanguardia." } ] },
+            { trigger: "AL_JUGAR", efectos: [
+                { op: "ELEGIR", de: "ALIADOS", zona: "VANGUARDIA", cantidad: 2,
+                  guardaIdsEnSelf: "chosenAllies",
+                  titulo: "Escoge los 2 aliados que dividirán su esfuerzo",
+                  logAntes: "¡{elegidos} se ocultan para dividir el esfuerzo!", logAntesTipo: "ability" } ] },
+            // Los 2 elegidos quedan Ocultos y agotados mientras el Evento siga en juego.
+            { trigger: "AURA", quien: "ALIADO", soloSelfLista: "chosenAllies",
+              filtros: [ { campo: "location", op: "==", valor: "vanguard" } ],
+              marcar: [ { campo: "stealth", valor: true }, { campo: "exhausted", valor: true } ] },
+            // Si uno de los elegidos muere, el Evento se destruye.
+            { trigger: "AL_MORIR_ALIADO", si: { deadCardEnSelfLista: "chosenAllies" },
+              log: { msg: "Uno de los eslabones ha caído. {carta} se destruye.", tipo: "ability" },
+              destruirseEvento: true },
+            // Destrucción prematura (Giro de guion): limpia Oculto/agotamiento.
+            { trigger: "AL_DESTRUIR", efectos: [
+                { op: "MARCAR", target: { selfLista: "chosenAllies" }, campo: "stealth", valor: false },
+                { op: "MARCAR", target: { selfLista: "chosenAllies" }, campo: "exhausted", valor: false } ] },
+            // Expira: misma limpieza + el rival coge 1 Retribución.
+            { trigger: "AL_CADUCAR", log: "Esfuerzo dividido expira naturalmente. ¡El rival coge 1 Retribución!", logTipo: "ability",
+              efectos: [
+                { op: "MARCAR", target: { selfLista: "chosenAllies" }, campo: "stealth", valor: false },
+                { op: "MARCAR", target: { selfLista: "chosenAllies" }, campo: "exhausted", valor: false },
+                { op: "RETRIBUCION", jugador: "RIVAL" } ] },
+        ]
     },
     {
         name: "Dobla la ropa", type: "Ayuda", subtype: "Técnica", tags: ["Consumible"], rarity: "C", series: 1, cost: 0,
@@ -7742,12 +7711,12 @@ const KARLOS_RULES = {
 //  Valores: número | {COUNT:{...}} | {REF:"objetivo.furorMax"} (campos computados)
 // ===================================================================
 const DSL = {
-    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE', 'AURA', 'ANTES_DE_JUGAR', 'PUEDE_ATACAR', 'SOBRECURACION', 'REACCION', 'AL_MORIR'],
+    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE', 'AURA', 'ANTES_DE_JUGAR', 'PUEDE_ATACAR', 'SOBRECURACION', 'REACCION', 'AL_MORIR', 'AL_MORIR_ALIADO', 'AL_DESTRUIR'],
     // Los 5 últimos ops solo tienen sentido dentro de una REACCION (los interpreta
     // DSL._runReaccion, no _doEffect): controlan el resultado que la reacción
     // devuelve al motor de combate (redirigir el ataque, cancelarlo, drenar Furor
     // tras él, fijar el daño, autoataque del atacante).
-    OPS_EFECTO: ['MODIFICAR_STAT', 'CURAR', 'DAÑO', 'APLICAR_ESTADO', 'MODIFICAR_CONTADORES', 'ATACAR', 'MONEDA', 'ROBAR', 'BUSCAR', 'MARCAR', 'VER_MANO', 'LIMPIAR_ESTADOS', 'ELEGIR', 'DESTRUIR_EVENTO', 'MARCAR_TEMPORAL', 'DESCARTAR', 'EQUIPAR', 'MARCAR_JUGADOR', 'FLOTANTE', 'FIJAR_STAT', 'REDIRIGIR', 'CANCELAR_ATAQUE', 'MARCAR_DRENAJE', 'FIJAR_DAÑO', 'ATACANTE_SE_AUTOATACA', 'VOLVER_A_MANO'],
+    OPS_EFECTO: ['MODIFICAR_STAT', 'CURAR', 'DAÑO', 'APLICAR_ESTADO', 'MODIFICAR_CONTADORES', 'ATACAR', 'MONEDA', 'ROBAR', 'BUSCAR', 'MARCAR', 'VER_MANO', 'LIMPIAR_ESTADOS', 'ELEGIR', 'DESTRUIR_EVENTO', 'MARCAR_TEMPORAL', 'DESCARTAR', 'EQUIPAR', 'MARCAR_JUGADOR', 'FLOTANTE', 'FIJAR_STAT', 'REDIRIGIR', 'CANCELAR_ATAQUE', 'MARCAR_DRENAJE', 'FIJAR_DAÑO', 'ATACANTE_SE_AUTOATACA', 'VOLVER_A_MANO', 'RETRIBUCION'],
     OPS_CMP: ['==', '!=', '<=', '>=', '<', '>', 'includes', 'truthy', 'falsy'],
     QUIEN: ['SELF', 'ALIADO', 'ENEMIGO', 'TODOS', 'ATACANTE', 'DEFENSOR'], // ATACANTE/DEFENSOR: solo en GLOBAL_TRAS_ATAQUE y REACCION
 
@@ -7797,6 +7766,12 @@ const DSL = {
     },
     _pool(ownerId, game, spec, selfCard) {
         if (spec.quien === 'SELF') return selfCard ? [selfCard] : [];
+        // selfLista: cartas en mesa cuyo instanceId está en la lista guardada en la
+        // propia carta (p. ej. Esfuerzo dividido con chosenAllies). Ignora bandos.
+        if (spec.selfLista) {
+            const ids = (selfCard && Array.isArray(selfCard[spec.selfLista])) ? selfCard[spec.selfLista] : [];
+            return [...DSL._zone(game, 'p1', spec.zona), ...DSL._zone(game, 'p2', spec.zona)].filter(c => ids.includes(c.instanceId));
+        }
         const en = ownerId === 'p1' ? 'p2' : 'p1';
         let pool = spec.quien === 'ENEMIGO' ? DSL._zone(game, en, spec.zona)
                  : spec.quien === 'TODOS' ? [...DSL._zone(game, 'p1', spec.zona), ...DSL._zone(game, 'p2', spec.zona)]
@@ -7980,6 +7955,12 @@ const DSL = {
                 if (e.soloSiHayMazo && game.players[pid].deck.length === 0) continue; // sin rebarajar el descarte
                 await game.drawCard(pid, e.sinAnimacion || false, e.velocidad);
             }
+            return true;
+        }
+        if (e.op === 'RETRIBUCION') {
+            // El jugador coge 1 retribución (Esfuerzo dividido: el rival, al expirar).
+            const pid = e.jugador === 'RIVAL' ? (ownerId === 'p1' ? 'p2' : 'p1') : ownerId;
+            if (typeof game.processRetribution === 'function') await game.processRetribution(pid);
             return true;
         }
         if (e.op === 'BUSCAR') {
@@ -8197,6 +8178,9 @@ const DSL = {
                 // (viaja con exportGameState; lo leen AURA soloSelfId, las reglas de
                 // Furor con objetivoSelfId y el PREVIEW_GLOBAL campoSelfId).
                 if (e.guardaIdEnSelf && lista[0]) sourceCard[e.guardaIdEnSelf] = lista[0].instanceId;
+                // guardaIdsEnSelf: como el anterior pero con TODOS los elegidos, como
+                // array (Esfuerzo dividido: chosenAllies; lo leen AURA/_pool soloSelfLista).
+                if (e.guardaIdsEnSelf) sourceCard[e.guardaIdsEnSelf] = lista.map(x => x.instanceId);
             };
             const dn = typeof game.getDisplayName === 'function' ? game.getDisplayName(ownerId) : ownerId;
             const F = (t) => DSL._fill(t, { carta: sourceCard.name, jugador: dn });
@@ -8309,7 +8293,7 @@ const DSL = {
         let anyApplied = false;
         for (const e of (efectos || [])) {
             if (e.if && !DSL._cond(sourceCard, game, e.if)) continue; // condición evaluada sobre la carta fuente
-            if (e.op === 'ROBAR') { // afecta al jugador, no a cartas: una sola ejecución
+            if (e.op === 'ROBAR' || e.op === 'RETRIBUCION') { // afectan al jugador, no a cartas: una sola ejecución
                 const r = await DSL._doEffect(e, sourceCard, null, game, ownerId, habilidad);
                 if (r === true) anyApplied = true;
                 continue;
@@ -8429,7 +8413,7 @@ const DSL = {
             effs.forEach((e, j) => {
                 if (e.if) return;
                 if (!DSL.OPS_EFECTO.includes(e.op)) errs.push(`abilities[${i}] efecto[${j}]: op desconocida '${e.op}'`);
-                if (e.target && typeof e.target === 'object' && !DSL.QUIEN.includes(e.target.quien)) errs.push(`abilities[${i}] efecto[${j}]: target.quien inválido`);
+                if (e.target && typeof e.target === 'object' && e.target.quien !== undefined && !DSL.QUIEN.includes(e.target.quien)) errs.push(`abilities[${i}] efecto[${j}]: target.quien inválido`);
             });
             effs.forEach((e, j) => {
                 [...(e.siExito || []), ...(e.cara || []), ...(e.cruz || [])].forEach((s, k) => { if (!s.if && !DSL.OPS_EFECTO.includes(s.op)) errs.push(`abilities[${i}] efecto[${j}] rama[${k}]: op desconocida '${s.op}'`); });
@@ -8807,6 +8791,36 @@ const DSL = {
             };
         }
 
+        // AL_MORIR_ALIADO -> onAllyDeath(card, deadCard, game). El motor lo llama (en
+        // checkDeath) para el Evento activo de AMBOS jugadores cada vez que muere una
+        // carta; la habilidad decide con `si` si le concierne. Uso típico: un Evento
+        // que se autodestruye si muere una carta clave (Esfuerzo dividido: un elegido).
+        const alMorirAliado = abs.find(a => a.trigger === 'AL_MORIR_ALIADO');
+        if (alMorirAliado && typeof tmpl.onAllyDeath !== 'function') {
+            tmpl.onAllyDeath = async function (card, deadCard, game) {
+                const si = alMorirAliado.si || {};
+                if (si.deadCardEnSelfLista && !(Array.isArray(card[si.deadCardEnSelfLista]) && card[si.deadCardEnSelfLista].includes(deadCard.instanceId))) return;
+                if (si.deadCardNombre && deadCard.name !== si.deadCardNombre) return;
+                if (si.deadCardDe === 'PROPIO' && deadCard.owner !== card.owner) return;
+                if (si.deadCardDe === 'RIVAL' && deadCard.owner === card.owner) return;
+                if (alMorirAliado.log) game.logMsg(DSL._fill(alMorirAliado.log.msg, { carta: card.name, muerto: DSL._nombre(game, deadCard) }), alMorirAliado.log.tipo || 'ability');
+                await DSL._runEffectList(alMorirAliado.efectos || [], card, game, card.owner, null);
+                if (alMorirAliado.destruirseEvento) await game.destroyEvent(card.owner);
+            };
+        }
+
+        // AL_DESTRUIR -> onDestroy(card, game, playerId). El motor lo llama en
+        // destroyEvent (destrucción PREMATURA de un Evento, p. ej. por Giro de guion),
+        // ANTES de mandarlo al descarte: sirve para deshacer efectos persistentes que
+        // no se auto-limpian (Esfuerzo dividido quita Oculto/agotamiento a sus elegidos).
+        const alDestruir = abs.find(a => a.trigger === 'AL_DESTRUIR');
+        if (alDestruir && typeof tmpl.onDestroy !== 'function') {
+            tmpl.onDestroy = async function (card, game, playerId) {
+                if (alDestruir.log) game.logMsg(DSL._fill(alDestruir.log.msg, { carta: card.name, jugador: (typeof game.getDisplayName === 'function' ? game.getDisplayName(playerId) : playerId) }), alDestruir.log.tipo || 'system');
+                await DSL._runEffectList(alDestruir.efectos || [], card, game, playerId, null);
+            };
+        }
+
         // GLOBAL_TRAS_ATAQUE -> onGlobalAfterAttack (eventos activos): reacciona a CUALQUIER ataque resuelto.
         const trasAtaque = abs.find(a => a.trigger === 'GLOBAL_TRAS_ATAQUE');
         if (trasAtaque && typeof tmpl.onGlobalAfterAttack !== 'function') {
@@ -9050,10 +9064,13 @@ const DSL = {
                     for (const lado of lados) {
                         [...lado.vanguard, ...lado.rearguard].forEach(c => {
                             if (a.soloSelfId && c.instanceId !== ev[a.soloSelfId]) return;
+                            // soloSelfLista: solo las cartas cuyo instanceId está en la lista
+                            // guardada en el Evento (Esfuerzo dividido: chosenAllies).
+                            if (a.soloSelfLista && !(Array.isArray(ev[a.soloSelfLista]) && ev[a.soloSelfLista].includes(c.instanceId))) return;
                             if (a.algunaEtiqueta && !(c.tags && a.algunaEtiqueta.some(t => c.tags.includes(t)))) return;
                             if (a.sinAlgunaEtiqueta && c.tags && a.sinAlgunaEtiqueta.some(t => c.tags.includes(t))) return;
                             if (a.filtros && !a.filtros.every(f => DSL._match(c, f))) return;
-                            if (a.marcar) c[a.marcar.campo] = a.marcar.valor !== undefined ? a.marcar.valor : true;
+                            (Array.isArray(a.marcar) ? a.marcar : (a.marcar ? [a.marcar] : [])).forEach(m => { c[m.campo] = m.valor !== undefined ? m.valor : true; });
                         });
                     }
                 }
