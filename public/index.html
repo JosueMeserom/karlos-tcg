@@ -3396,21 +3396,37 @@
             // Si sí, cancelar la elección desperdiciaría ese compromiso sin poder
             // deshacerlo, así que no se ofrece la opción (ACERTIJO tras la moneda;
             // el 2º ELEGIR de PEM tras pagar el Furor del 1º).
+            // BUG SÚPER importante detectado por Toto en betasteo (21-jul-2026): jugar
+            // Deuda con la mafia online dejaba el cliente rival pillado para siempre en
+            // "Esperando a que X elija...", eligiera o cancelara el jugador activo. Causa
+            // raíz: esta función creaba un dslPick/Promise REAL también en el cliente NO
+            // elector, y su resolución dependía del replay en cola de SELECT_CARD/
+            // CANCEL_ACTION — pero esa cola es FIFO y bloqueante (processActionQueue
+            // espera a que termine PLAY_CARD, que a su vez está suspendido esperando
+            // ESTA MISMA Promise, antes de poder procesar el SELECT_CARD/CANCEL_ACTION
+            // que la resolvería): un deadlock estructural. openDeckSearchViewer ya evita
+            // esto con un canal fuera de cola (currentVisualResolve + replay de
+            // VISUAL_SEARCH_CONFIRM, gestionado aparte en el listener de socket); se
+            // adopta el mismo patrón aquí.
             pickBoardTargets(cards, n, prompt) {
                 const sourceCard = arguments.length > 3 ? arguments[3] : null;
                 const chooserId = arguments.length > 4 ? arguments[4] : this.activePlayerId;
                 const cancelable = arguments.length > 5 ? arguments[5] !== false : true;
                 return new Promise(resolve => {
-                    this.dslPick = { pool: new Set(cards.map(c => c.instanceId)), n: n, targets: [], resolve, byId: {}, chooserId, cancelable };
-                    this.selectedCard = sourceCard; // la Ayuda origen: el render la necesita
-                    cards.forEach(c => this.dslPick.byId[c.instanceId] = c);
-                    this.inputState = 'SELECT_DSL_TARGETS';
-                    if (prompt && (this.gameMode === 'local' || this.myPlayerId === chooserId)) this.logError(prompt);
+                    this.currentVisualResolve = (sel) => { resolve(sel && sel.length ? sel : null); };
+
                     if (this.gameMode === 'online' && this.myPlayerId !== 'spectator' && this.myPlayerId !== chooserId) {
                         const banner = document.getElementById('action-banner');
                         banner.innerText = `Esperando a que ${this.getDisplayName(chooserId)} elija...`;
                         banner.style.display = 'block';
+                        return; // sin picker local: lo resuelve el replay remoto (VISUAL_SEARCH_CONFIRM)
                     }
+
+                    this.dslPick = { pool: new Set(cards.map(c => c.instanceId)), n: n, targets: [], byId: {}, chooserId, cancelable };
+                    this.selectedCard = sourceCard; // la Ayuda origen: el render la necesita
+                    cards.forEach(c => this.dslPick.byId[c.instanceId] = c);
+                    this.inputState = 'SELECT_DSL_TARGETS';
+                    if (prompt) this.logError(prompt);
                     this.render();
                 });
             }
@@ -3482,10 +3498,13 @@
                     this.dslPick = null;
                     this.selectedCard = null;
                     this.inputState = 'IDLE';
-                    const _banner = document.getElementById('action-banner');
-                    if (_banner) _banner.style.display = 'none';
                     this.render();
-                    ctx.resolve(sel);
+                    // Resolución fuera de cola (ver comentario en pickBoardTargets): el
+                    // rival no espera un SELECT_CARD encolado, sino este replay directo.
+                    if (this.gameMode === 'online') {
+                        this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'VISUAL_SEARCH_CONFIRM', ids: sel.map(c => c.instanceId) });
+                    }
+                    this.resolveVisualSearch(sel);
                 } else {
                     if (_soyElChooser) this.logError(`Objetivo ${ctx.targets.length}/${ctx.n} fijado. Elige el siguiente.`);
                     this.render();
@@ -4854,12 +4873,16 @@
                 }
 
                 if (this.inputState === 'SELECT_DSL_TARGETS') {
-                    const _dp = this.dslPick;
                     // Gate por chooser (norma de targeting en tablero): si esta elección
                     // le toca al RIVAL del jugador activo (p. ej. ACERTIJO en cruz), un
                     // clic del jugador activo no debe hacer nada — ni localmente ni por red.
+                    // Nota (fix del bug de "Esperando a que X elija..." colgado, 21-jul-2026):
+                    // este clic es SIEMPRE local; el rival ya no tiene dslPick propio (ver
+                    // pickBoardTargets) así que nunca llega aquí por replay ni necesita
+                    // sincronizarse clic a clic — solo la elección FINAL se emite, dentro
+                    // de _dslPickClick, por el canal fuera de cola (VISUAL_SEARCH_CONFIRM).
+                    const _dp = this.dslPick;
                     if (this.gameMode === 'online' && !isRemote && _dp && this.myPlayerId !== (_dp.chooserId || this.activePlayerId)) return;
-                    if (_dp && _dp.pool.has(card.instanceId) && !_dp.targets.some(t => t.instanceId === card.instanceId)) syncAction(); // JUGADA LEGAL: EMITIMOS (el replay remoto la necesita)
                     this._dslPickClick(card);
                     return;
                 }
@@ -5593,7 +5616,18 @@
 
                     const searchInput = modal.querySelector('#modal-search-input');
                     const cancelBtnV = modal.querySelector('#modal-cancel-btn');
-                    if (cancelBtnV) cancelBtnV.onclick = () => { this.resolveVisualSearch([]); }; // salir sin elegir: como si no hubiera pasado nada
+                    // Mismo bug de fondo que pickBoardTargets (Toto, 21-jul-2026): cancelar
+                    // aquí no emitía nada por red, así que el rival se quedaba pillado en
+                    // "Esperando a que X busque cartas..." para siempre. Se emite ids:[]
+                    // por el mismo canal que Confirmar, con el mismo gate de intendedPlayer.
+                    if (cancelBtnV) cancelBtnV.onclick = () => {
+                        const _intended = chooserId || this.activePlayerId;
+                        if (this.gameMode === 'online' && this.activePlayerId !== 'setup' && this.myPlayerId !== _intended) return;
+                        if (this.gameMode === 'online' && this.activePlayerId !== 'setup') {
+                            this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'VISUAL_SEARCH_CONFIRM', ids: [] });
+                        }
+                        this.resolveVisualSearch([]);
+                    }; // salir sin elegir: como si no hubiera pasado nada
                     const confirmBtn = modal.querySelector('#modal-confirm-btn');
 
                     renderGrid();
@@ -6109,15 +6143,18 @@
                         if (!isRemote && this.myPlayerId === _chooser) this.logMsg('Ya te has comprometido: no puedes cancelar esta elección.', 'system');
                         return;
                     }
-                    if (this.gameMode === 'online' && !isRemote) {
-                        this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'CANCEL_ACTION' });
-                    }
-                    const r = this.dslPick.resolve;
+                    // Fix del bug de "Esperando a que X elija..." colgado para siempre
+                    // (Toto, 21-jul-2026): se cancela por el mismo canal fuera de cola que
+                    // la elección completa (VISUAL_SEARCH_CONFIRM con ids:[]), no por
+                    // CANCEL_ACTION en cola — ver comentario en pickBoardTargets.
                     this.dslPick = null;
                     this.selectedCard = null;
                     this.inputState = 'IDLE';
                     this.render();
-                    r(null);
+                    if (this.gameMode === 'online' && !isRemote) {
+                        this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'VISUAL_SEARCH_CONFIRM', ids: [] });
+                    }
+                    this.resolveVisualSearch([]);
                     return;
                 }
 
