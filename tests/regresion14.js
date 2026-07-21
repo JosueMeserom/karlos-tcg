@@ -79,7 +79,35 @@ const escenarios = [
         ],
     },
     {
-        nombre: 'Cara sin Otakus en el mazo: solo el aviso, sin barajar',
+        // CAMBIO DE DISEÑO pedido por Toto (21-jul-2026): la pregunta de compra va
+        // ANTES de mirar si hay Otakus (preguntarSiempre); si aceptas y no hay, se
+        // avisa y se baraja igualmente. La vieja ni preguntaba ni barajaba.
+        nombre: 'Cara sin Otakus en el mazo: la nueva pregunta igualmente y baraja al aceptar',
+        semilla: 3, // elegida para que el barajado REORDENE el mazo de 3 (con 19 quedaba igual y el contrato estricto lo detectó)
+        monedas: ['cara'],
+        turnoDe: 'p1',
+        p1: {
+            vanguardia: ['Oso con armadura'],
+            evento: { carta: 'Feria del cómic', duracion: 2 },
+            mazo: ['Mini-tigre', 'Robot de seguridad SP', 'Droide antidisturbios'],
+        },
+        p2: { vanguardia: ['Mini-tigre'], mazo: ['Longaniza'] },
+        pasos: [
+            { finTurno: true },
+            { soloEn: 'nueva', opcion: 'COMPRAR MERCHANDISING (BUSCAR OTAKU)' },
+        ],
+        logsIntencionados: [
+            { de: 'Moneda: CARA - ¡Has encontrado algo genial en la Feria!', a: 'Moneda: CARA - ¡J1 (Jugador 1) ha encontrado algo genial en la Feria!', motivo: M3 },
+            { de: 'Has mirado en todos los puestos, pero no quedan cartas Otaku en tu mazo.', a: 'J1 (Jugador 1) ha mirado en todos los puestos, pero no quedan cartas Otaku en su mazo.', motivo: M3 },
+        ],
+        diferenciasEsperadas: [
+            { contiene: 'log[', motivo: 'la nueva añade el log del barajado tras aceptar la compra sin válidas; la vieja no barajaba' },
+            { contiene: 'estado.p1.deck', motivo: 'la nueva baraja el mazo al aceptar sin válidas; la vieja lo dejaba intacto' },
+        ],
+    },
+    {
+        nombre: 'Cara sin Otakus, declinando la compra: sin barajado (nuevo flujo, la vieja ni pregunta)',
+        semilla: 19,
         monedas: ['cara'],
         turnoDe: 'p1',
         p1: {
@@ -90,10 +118,13 @@ const escenarios = [
         p2: { vanguardia: ['Mini-tigre'], mazo: ['Longaniza'] },
         pasos: [
             { finTurno: true },
+            { soloEn: 'nueva', opcion: 'NO COMPRAR' },
         ],
         logsIntencionados: [
             { de: 'Moneda: CARA - ¡Has encontrado algo genial en la Feria!', a: 'Moneda: CARA - ¡J1 (Jugador 1) ha encontrado algo genial en la Feria!', motivo: M3 },
-            { de: 'Has mirado en todos los puestos, pero no quedan cartas Otaku en tu mazo.', a: 'J1 (Jugador 1) ha mirado en todos los puestos, pero no quedan cartas Otaku en su mazo.', motivo: M3 },
+        ],
+        diferenciasEsperadas: [
+            { contiene: 'log[', motivo: 'la vieja emite su aviso de "no quedan Otakus" sin preguntar; la nueva pregunta y, al declinar, no avisa de nada' },
         ],
     },
     {

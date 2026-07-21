@@ -4615,14 +4615,23 @@
                     }
 
                     if (enemyP.vanguard.length === 0 && enemyP.rearguard.length > 0) {
-                        if (!isRemote) this.logError("El rival no tiene Vanguardia para ser atacada."); return; 
+                        if (!isRemote) this.logError("El rival no tiene Vanguardia para ser atacada."); return;
+                    }
+
+                    // Veto temprano (§11b): el aviso sale AL CLICAR la carta, no justo
+                    // antes del golpe. Si aún puede retirarse, se permite seleccionarla
+                    // (la retirada sigue disponible) y el veto se reimpone al elegir enemigo.
+                    const vetoAtq = this.getAttackStartVeto(card);
+                    if (vetoAtq) {
+                        if (!isRemote) this.logError(vetoAtq);
+                        if (!canRetreat) return;
                     }
 
                     syncAction(); // <--- JUGADA LEGAL: EMITIMOS
                     this.selectedCard = card;
                     this.inputState = 'SELECT_TARGET';
                     this.render();
-                    return; 
+                    return;
                 }
 
                 if (this.inputState === 'SELECT_TARGET' && card.owner === this.activePlayerId && card.location === 'rearguard') {
@@ -4663,7 +4672,15 @@
                     if (getCardTemplate(card.id).isAvatar) {
                         if (!isRemote) this.logError(`${card.name} es un AVATAR y no puede ser objetivo de nada.`); return;
                     }
-                    
+
+                    // Reimposición del veto de inicio (§11b): la carta pudo seleccionarse
+                    // por su opción de retirada; atacar sigue vetado.
+                    const vetoObj = this.getAttackStartVeto(this.selectedCard);
+                    if (vetoObj) {
+                        if (!isRemote) this.logError(vetoObj);
+                        return;
+                    }
+
                     syncAction(); // <--- JUGADA LEGAL: EMITIMOS
                     this.performAttack(this.selectedCard, card);
                     return;
@@ -5044,9 +5061,16 @@
                     return;
                 }
                 
+                // Veto temprano (§11b) para Habilidades que involucran ataques
+                // (abilityUsesAttack lo marca el compile de las Activas con ataqueNormal).
+                if (template.abilityUsesAttack) {
+                    const vetoAb = this.getAttackStartVeto(card);
+                    if (vetoAb) { if (!isRemote) this.logError(vetoAb); return; }
+                }
+
                 if (typeof template.canActivateAbility === 'function') {
-                    if (!template.canActivateAbility(card, this)) return; 
-                } 
+                    if (!template.canActivateAbility(card, this)) return;
+                }
 
                 // 2. ¡TODO LEGAL! AHORA SÍ, ENVIAMOS LA ORDEN POR RED
                 if (this.gameMode === 'online' && !isRemote) {
@@ -5463,6 +5487,30 @@
                     [...p.vanguard, ...p.rearguard].forEach(c => anota(c, 300));
                 }
                 return cola.sort((a, b) => a.prioridad - b.prioridad);
+            }
+
+            // Consulta previa (§11b): ¿hay algún interceptor que VETE que esta carta
+            // inicie un ataque? Sin efectos ni monedas: solo el mensaje de veto (o null).
+            // Mismo orden de capas que la cola de intercepción: eventos → equipos → pasivas.
+            getAttackStartVeto(attacker) {
+                const capas = [];
+                for (const pid of ['p1', 'p2']) {
+                    const ev = this.players[pid].activeEvent;
+                    if (ev) capas.push(ev);
+                }
+                if (attacker && attacker.equippedCards) capas.push(...attacker.equippedCards);
+                for (const pid of ['p1', 'p2']) {
+                    const p = this.players[pid];
+                    capas.push(...p.vanguard, ...p.rearguard);
+                }
+                for (const carta of capas) {
+                    const t = getCardTemplate(carta.id);
+                    if (typeof t.onVetoAttackStart === 'function') {
+                        const veto = t.onVetoAttackStart(carta, attacker, this);
+                        if (veto) return veto;
+                    }
+                }
+                return null;
             }
 
             async checkAttackStatus(attacker, defender) {

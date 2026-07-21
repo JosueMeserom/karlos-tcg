@@ -6549,7 +6549,8 @@ const CARD_DB = [
               filtros: [ { no: true, campo: "tags", op: "includes", valor: "Otaku" }, { no: true, campo: "tags", op: "includes", valor: "otaku" } ],
               marcar: { campo: "isSilenced", valor: true } },
             { trigger: "PREVIEW_GLOBAL", lineas: [
-                { quien: "CUALQUIERA", filtros: [ { no: true, campo: "tags", op: "includes", valor: "Otaku" }, { no: true, campo: "tags", op: "includes", valor: "otaku" } ],
+                { quien: "CUALQUIERA", soloTipos: ["Personaje", "Esbirro"],
+                  filtros: [ { no: true, campo: "tags", op: "includes", valor: "Otaku" }, { no: true, campo: "tags", op: "includes", valor: "otaku" } ],
                   texto: "Silenciado" } ] },
             { trigger: "FIN_TURNO", soloTurnoPropio: true, log: "Feria del cómic: Buscando merchandising exclusivo...", logTipo: "system",
               efectos: [
@@ -6558,6 +6559,7 @@ const CARD_DB = [
                   cara: [
                     { op: "BUSCAR", en: "MAZO", cantidad: 1, destino: "MANO",
                       algunFiltro: [ { campo: "tags", op: "includes", valor: "Otaku" }, { campo: "tags", op: "includes", valor: "otaku" } ],
+                      preguntarSiempre: true,
                       confirmar: { titulo: "FERIA DEL CÓMIC", si: "COMPRAR MERCHANDISING (BUSCAR OTAKU)", no: "NO COMPRAR" },
                       titulo: "COMPRAR CARTA OTAKU",
                       log: "{jugador} añade {objetivo} a su mano.",
@@ -8182,20 +8184,33 @@ const DSL = {
                     await baraja();
                     continue;
                 }
+                const pregunta = () => new Promise(resolve => {
+                    game.openChoiceModal(F(e.confirmar.titulo), [
+                        { label: e.confirmar.si, action: () => resolve(true) },
+                        { label: e.confirmar.no || 'IGNORAR', action: () => resolve(false) }
+                    ], pid);
+                });
+                let confirmado = false;
+                if (e.preguntarSiempre && e.confirmar) {
+                    // Flujo pedido por Toto (Feria del cómic): la pregunta va ANTES de
+                    // mirar si hay cartas válidas; si aceptas y no hay, se avisa y se
+                    // baraja igualmente (la búsqueda ya revolvió el mazo).
+                    if (!(await pregunta())) { if (e.confirmar.logNo) game.logMsg(F(e.confirmar.logNo), 'system'); continue; }
+                    confirmado = true;
+                    if (lista.length === 0) {
+                        if (e.logNoValidas) game.logMsg(F(e.logNoValidas), 'system');
+                        await baraja();
+                        continue;
+                    }
+                }
                 if (lista.length === 0) {
                     if (e.logNoValidas) game.logMsg(F(e.logNoValidas), 'system');
                     if (e.barajarDespues && e.barajarDespues.inclusoSinValidas) await baraja();
                     continue;
                 }
                 if (e.logIntro) game.logMsg(F(e.logIntro), e.logIntroTipo || 'ability');
-                if (e.confirmar) {
-                    const quiere = await new Promise(resolve => {
-                        game.openChoiceModal(F(e.confirmar.titulo), [
-                            { label: e.confirmar.si, action: () => resolve(true) },
-                            { label: e.confirmar.no || 'IGNORAR', action: () => resolve(false) }
-                        ], pid);
-                    });
-                    if (!quiere) { if (e.confirmar.logNo) game.logMsg(F(e.confirmar.logNo), 'system'); continue; }
+                if (e.confirmar && !confirmado) {
+                    if (!(await pregunta())) { if (e.confirmar.logNo) game.logMsg(F(e.confirmar.logNo), 'system'); continue; }
                 }
                 const elegidas = await game.openVisualSearchModal(F(e.titulo || 'ELIGE UNA CARTA'), lista, e.cantidad || 1, !!e.autoSeleccion, pid);
                 if (elegidas && elegidas.length > 0) { for (const t of elegidas) await aMano(t); algunExito = true; }
@@ -8600,6 +8615,7 @@ const DSL = {
                     return true;
                 };
             }
+            if (activa.ataqueNormal) tmpl.abilityUsesAttack = true; // el motor veta la activación temprano si un interceptor lo pide
             tmpl.onExecuteAbility = function (card, game) {
                 game.selectedCard = card;
                 game.inputState = 'SELECT_ABILITY_TARGETS';
@@ -8759,6 +8775,23 @@ const DSL = {
                 }
                 return m.sinResultado === 'PERMITIR'; // moneda cancelada
             };
+            // Consulta SIN efectos (§11b), separada de la ejecución: ¿está vetado
+            // INICIAR un ataque? El motor la usa al clicar la carta atacante o al
+            // activar una Habilidad con ataque, ANTES de elegir objetivo. El marcado
+            // del candado y los efectos siguen viviendo en onGlobalBeforeAttack.
+            if (antesAtaque.unaVez && typeof tmpl.onVetoAttackStart !== 'function') {
+                tmpl.onVetoAttackStart = function (ev, attacker, game) {
+                    if (antesAtaque.soloAtacante === 'PROPIO' && attacker.owner !== ev.owner) return null;
+                    if (antesAtaque.soloAtacante === 'RIVAL' && attacker.owner === ev.owner) return null;
+                    if ((getCardTemplate(attacker.id) || {}).isAvatar) return null;
+                    if (antesAtaque.exentoPlantilla) {
+                        const at = DSL._tmpl(attacker.id);
+                        if (at && at[antesAtaque.exentoPlantilla]) return null;
+                    }
+                    if (ev[antesAtaque.unaVez.campoSelf]) return antesAtaque.unaVez.logRepite || 'No puedes iniciar otro ataque.';
+                    return null;
+                };
+            }
         }
 
         const caducar = abs.find(a => a.trigger === 'AL_CADUCAR');

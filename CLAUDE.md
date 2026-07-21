@@ -59,6 +59,9 @@ Solo con la batería completa en verde se retoma la siguiente tarea de motor: **
 - Fable 5 para diseñar el harness, casos delicados y depuración difícil; cambiar a Sonnet (`/model`) para el trabajo mecánico de replicar el patrón suite tras suite.
 - Trabajar por tandas que terminen en punto commiteado, para poder parar sin perder nada si se agota la ventana de uso.
 
+## Vocabulario de Toto
+- **"Detalle"**: el rectángulo azul que aparece en la zona izquierda del cliente al hacer hover sobre una carta, con Efectos actuales, "Afectado por:", duración, habilidades, etc.
+
 ## Preferencias de Toto
 - Español siempre. Honestidad ante todo: si algo no se puede verificar, decirlo en vez de improvisar.
 - Toto valida visualmente en el navegador tras los cambios de cliente; darle instrucciones de prueba concretas cuando toque.

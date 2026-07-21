@@ -73,7 +73,10 @@ const escenarios = [
             { jugar: 'Plan de equipo' },
             { atacar: 'Mini-tigre', objetivo: 'Robot de seguridad SP' },
             { elegir: ['Oso con armadura', 'Droide antidisturbios'] }, // dmg 7-6=1: sobrevive
-            // Bloqueado: logError privado, el atacante gasta la acción igualmente
+            // CAMBIO pedido por Toto (21-jul-2026): el veto ahora salta AL CLICAR al
+            // atacante (onVetoAttackStart, §11b), no justo antes del golpe. La vieja
+            // dejaba llegar a performAttack y AGOTABA al atacante vetado; la nueva
+            // le conserva la acción.
             { atacar: 'Droide antidisturbios', objetivo: 'Gallina del infinito' },
         ],
         logsIntencionados: [
@@ -81,7 +84,13 @@ const escenarios = [
               a: '¡Oso con armadura (J1 (Jugador 1)) y Droide antidisturbios (J1 (Jugador 1)) unen fuerzas! El ATQ de Mini-tigre (J1 (Jugador 1)) sube a 7.',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba chosen[n].name y attacker.name a secas; la nueva rellena {duo}/{objetivo} con DSL._nombre' },
         ],
-        diferenciasEsperadas: [PLAN_USADO],
+        diferenciasEsperadas: [
+            PLAN_USADO,
+            { contiene: 'estado.p1.vanguard.2.exhausted',
+              motivo: 'veto temprano pedido por Toto: la vieja bloqueaba en performAttack y AGOTABA al atacante vetado; la nueva veta al clic y le conserva la acción' },
+            { contiene: 'estado.p1.vanguard.2.hasAttackedThisTurn',
+              motivo: 'ídem: en la nueva el atacante vetado ni siquiera llega a contar como que atacó' },
+        ],
     },
     {
         nombre: 'Elección cancelada: el ataque procede sin boost y el candado queda marcado',

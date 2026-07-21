@@ -495,6 +495,11 @@ async function aplicarRespuesta(ctx, inst, paso) {
 }
 
 async function ejecutarPaso(ctx, inst, paso) {
+    // soloEn: paso que solo aplica a una base, para divergencias de FLUJO
+    // intencionadas (p. ej. la nueva pregunta donde la vieja callaba). Úsese
+    // siempre junto a diferenciasEsperadas que documenten la divergencia.
+    if (paso.soloEn && paso.soloEn !== ctx.cual) return;
+
     if (esPasoRespuesta(paso)) return aplicarRespuesta(ctx, inst, paso);
 
     if (paso.elegir !== undefined && ctx.pendientes.length) return aplicarRespuesta(ctx, inst, paso);
