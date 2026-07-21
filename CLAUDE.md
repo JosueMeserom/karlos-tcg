@@ -62,6 +62,9 @@ Solo con la batería completa en verde se retoma la siguiente tarea de motor: **
 ## Vocabulario de Toto
 - **"Detalle"**: el rectángulo azul que aparece en la zona izquierda del cliente al hacer hover sobre una carta, con Efectos actuales, "Afectado por:", duración, habilidades, etc.
 
+## Normas de UX del cliente (INNEGOCIABLES)
+- **Elegir una carta que ya está EN EL CAMPO** (vanguardia/retaguardia, propia o rival) para un efecto de Habilidad/Ayuda/Evento: SIEMPRE reborde verde en el propio tablero (como atacar, o como Manzanahoria/Longaniza), NUNCA el modal genérico de búsqueda visual. El modal queda solo para mano, mazo (el mazo además usa el visor de mazo completo, no el modal simple) o descartes. En el DSL: `ELEGIR` con `de: "ALIADOS"|"ENEMIGOS"|"TODOS"` usa `pickBoardTargets` por defecto; `forzarModal: true` debe justificarse caso a caso, auditar cada vez que se use en una carta nueva.
+
 ## Preferencias de Toto
 - Español siempre. Honestidad ante todo: si algo no se puede verificar, decirlo en vez de improvisar.
 - Toto valida visualmente en el navegador tras los cambios de cliente; darle instrucciones de prueba concretas cuando toque.

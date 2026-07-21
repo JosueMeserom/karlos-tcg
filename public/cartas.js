@@ -3198,7 +3198,7 @@ const CARD_DB = [
                 { count: { de: "ENEMIGOS", filtros: [ { campo: "subtype", op: "==", valor: "Máquina" } ] }, op: ">=", valor: 1, msg: "El rival no tiene 'Máquinas'." } ] },
             { trigger: "AL_CONSUMIR",
               efectos: [
-                { op: "ELEGIR", de: "ALIADOS", filtros: [ { campo: "furor", op: ">=", valor: 1 } ], cantidad: 1, forzarModal: true,
+                { op: "ELEGIR", de: "ALIADOS", filtros: [ { campo: "furor", op: ">=", valor: 1 } ], cantidad: 1,
                   titulo: "¿QUIÉN DISPARA EL PEM? (-1 FUROR)",
                   efectos: [ { op: "MODIFICAR_STAT", stat: "furor", delta: -1 } ] },
                 { op: "ELEGIR", de: "ENEMIGOS", filtros: [ { campo: "subtype", op: "==", valor: "Máquina" } ], cantidad: 1,
@@ -3850,6 +3850,7 @@ const CARD_DB = [
         activeName: "RECIEDAD", activeCost: 1,
         abilities: [
             { trigger: "ACTIVA", nombre: "RECIEDAD", coste: { furor: 1 }, sinObjetivo: true,
+              requisitos: [ { count: { algunEstado: ["dot", "confusion", "ceguera", "sueno"] }, op: ">=", valor: 1, msg: "Ninguno de tus aliados sufre estados alterados." } ],
               log: "¡El {carta} emite una luz purificadora que limpia a tus aliados!", logTipo: "ability",
               efectos: [
                 { op: "LIMPIAR_ESTADOS", estados: ["dot", "confusion", "ceguera", "sueno"], floating: "LIMPIO", floatingStyle: "ft-green", offsetFloating: -20 } ] }
@@ -4366,7 +4367,7 @@ const CARD_DB = [
               soloAtacante: "PROPIO",
               unaVez: { campoSelf: "planUsado", logRepite: "Con 'Plan de equipo' sólo puedes atacar una vez este turno." },
               efectos: [
-                { op: "ELEGIR", de: "ALIADOS", cantidad: 2, forzarModal: true, opcional: true,
+                { op: "ELEGIR", de: "ALIADOS", cantidad: 2, opcional: true,
                   titulo: "PLAN DE EQUIPO: ELIGE 2 ALIADOS PARA SUMAR SU ATQ",
                   guardaSuma: { campo: "currentAtk", en: "sumaAtq" }, guardaNombres: "duo" },
                 { op: "FIJAR_STAT", stat: "currentAtk", valor: { REF: "vars.sumaAtq" },
@@ -6234,11 +6235,11 @@ const CARD_DB = [
                 { op: "MONEDA",
                   logCara: { msg: "Moneda: CARA - Tú eliges a quién vaciarle la mente.", tipo: "ability" },
                   cara: [
-                    { op: "ELEGIR", de: "ENEMIGOS", cantidad: 1, forzarModal: true, titulo: "ACERTIJO (CARA): TÚ ELIGES (-2 FUR)",
+                    { op: "ELEGIR", de: "ENEMIGOS", cantidad: 1, titulo: "ACERTIJO (CARA): TÚ ELIGES (-2 FUR)",
                       efectos: [ { op: "MODIFICAR_STAT", stat: "furor", delta: -2, log: "¡{objetivo} no sabe la respuesta y pierde 2 de Furor!" } ] } ],
                   logCruz: { msg: "Moneda: CRUZ - El rival decide quién de sus tropas sufrirá la jaqueca.", tipo: "ability" },
                   cruz: [
-                    { op: "ELEGIR", de: "ENEMIGOS", elegidoPor: "RIVAL", cantidad: 1, forzarModal: true, titulo: "ACERTIJO (CRUZ): ELIGE UN ALIADO PARA PERDER 1 FUR",
+                    { op: "ELEGIR", de: "ENEMIGOS", elegidoPor: "RIVAL", cantidad: 1, titulo: "ACERTIJO (CRUZ): ELIGE UN ALIADO PARA PERDER 1 FUR",
                       efectos: [ { op: "MODIFICAR_STAT", stat: "furor", delta: -1, log: "El rival decide sacrificar 1 Furor de {objetivo}." } ] } ] } ] }
         ],
     },
@@ -6521,7 +6522,7 @@ const CARD_DB = [
                 { count: {}, op: ">=", valor: 1, msg: "Necesitas al menos 1 aliado en el campo para contraer la deuda." } ] },
             { trigger: "ANTES_DE_JUGAR",
               efectos: [
-                { op: "ELEGIR", de: "ALIADOS", cantidad: 1, forzarModal: true,
+                { op: "ELEGIR", de: "ALIADOS", cantidad: 1,
                   titulo: "¿QUIÉN CONTRAE LA DEUDA?",
                   guardaIdEnSelf: "mafiaTargetId", guardaEn: "deudor" } ] },
             { trigger: "AL_JUGAR", log: "¡{deudor} se ha endeudado con la mafia! Queda silenciado y sin cobrar Furor." },
@@ -7903,6 +7904,7 @@ const DSL = {
                  : DSL._zone(game, ownerId, spec.zona);
         if (spec.excludeSelf && selfCard) pool = pool.filter(c => c.instanceId !== selfCard.instanceId);
         if (!spec.permitirAvatar) pool = pool.filter(c => !((getCardTemplate(c.id) || {}).isAvatar)); // Kami: intocable por defecto
+        if (spec.algunEstado) pool = pool.filter(c => c.status && spec.algunEstado.some(k => c.status[k])); // mismo criterio que canPlayCard (JUGAR)
         (spec.filtros || []).forEach(f => { pool = pool.filter(c => DSL._match(c, f)); });
         return pool;
     },
@@ -8292,11 +8294,13 @@ const DSL = {
                 return true;
             }
             // Selección-en-tablero (estilo Bi-choque/Manzanahoria) para mesa; la MANO
-            // sigue usando el modal visual, y elegidoPor SIEMPRE fuerza el modal
-            // (pickBoardTargets no sabe abrir el prompt de "esperando a X" para un
-            // clic que no es del jugador activo).
-            if (e.de !== 'MANO' && !e.forzarModal && !e.elegidoPor && typeof game.pickBoardTargets === 'function') {
-                const sel = await game.pickBoardTargets(pool, n, DSL._fill(e.titulo || 'Elige objetivo', { carta: sourceCard.name }) + ' (clic en el tablero; X para cancelar)', sourceCard);
+            // sigue usando el modal visual. Norma de targeting en tablero (Toto,
+            // 21-jul-2026): elegir una carta YA COLOCADA EN EL CAMPO siempre es
+            // reborde verde en tablero, nunca el modal genérico — forzarModal debe
+            // justificarse caso a caso. pickBoardTargets ya soporta un chooser
+            // explícito (chooserId), así que elegidoPor:"RIVAL" también usa tablero.
+            if (e.de !== 'MANO' && !e.forzarModal && typeof game.pickBoardTargets === 'function') {
+                const sel = await game.pickBoardTargets(pool, n, DSL._fill(e.titulo || 'Elige objetivo', { carta: sourceCard.name }) + ' (clic en el tablero; X para cancelar)', sourceCard, chooserId);
                 if (!sel) { if (e.logCancela && !e.opcional) game.logError(F(e.logCancela)); return e.opcional ? 'skip' : false; }
                 if (e.guardaEn && sel[0]) { DSL._vars = DSL._vars || {}; (DSL._vars[sourceCard.instanceId] = DSL._vars[sourceCard.instanceId] || {})[e.guardaEn] = DSL._nombre(game, sel[0]); }
                 _guarda(sel);
@@ -8544,8 +8548,18 @@ const DSL = {
                 }
                 for (const e of (usar.efectos || [])) {
                     if (e.op === 'CURAR' && e.conBeforeHealed !== false && target.currentHp >= target.maxHp) {
-                        if (!isSilent) game.logError(DSL._fill(e.msgLleno || '{objetivo} ya tiene la Vida completa.', { objetivo: DSL._nombre(game, target) }));
-                        return false;
+                        // Bug de motor (betasteo de Toto, compartido por ambas bases): esta
+                        // heurística de "ya está lleno" no contaba con cartas que pueden
+                        // REBASAR su Vida máxima al curarse (SOBRECURACION/onBeforeHealed,
+                        // p. ej. Limo primario), así que las rechazaba como objetivo aunque
+                        // el runtime de CURAR sí sabe expandir el máximo. Se deja pasar aquí
+                        // y que decida CURAR (que llama a onBeforeHealed antes de su propio
+                        // chequeo, ya con el máximo actualizado).
+                        const _puedeSobrecurar = typeof (getCardTemplate(target.id) || {}).onBeforeHealed === 'function';
+                        if (!_puedeSobrecurar) {
+                            if (!isSilent) game.logError(DSL._fill(e.msgLleno || '{objetivo} ya tiene la Vida completa.', { objetivo: DSL._nombre(game, target) }));
+                            return false;
+                        }
                     }
                 }
                 return true;

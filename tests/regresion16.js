@@ -11,10 +11,29 @@
 //   - ACTIVA.sinObjetivo: salta la fase de clic-en-objetivo (autobuffs, fichas,
 //     monedas con elección interna).
 //   - ELEGIR.elegidoPor: "RIVAL" — el pool sigue siendo relativo al DUEÑO de la
-//     carta, pero decide/clica el rival (fuerza modal: el tablero no soporta
-//     "espera a que decida el otro jugador").
+//     carta, pero decide/clica el rival: pickBoardTargets gana un "chooser"
+//     explícito (norma de targeting en tablero — nunca modal para elegir del
+//     campo, ver CLAUDE.md), con render/clic gateados por chooser y no por
+//     activePlayerId.
 //   - Triggers PUEDE_ATACAR (-> canAttackNormally) y SOBRECURACION (->
 //     onBeforeHealed) para consultas de una sola carta.
+//
+// BUGS DE MOTOR descubiertos y corregidos al preparar esta tanda (betasteo de
+// Toto sobre la propia tanda):
+//   1. cancelAction() nunca resolvía un dslPick activo (ni pasaba por el
+//      candado de isActionLocked ni limpiaba this.dslPick): con el modal, la
+//      vieja tenía su propio botón "Cancelar" independiente del candado; con
+//      el tablero generalizado, cualquier ELEGIR opcional a mitad de una
+//      acción bloqueada (Plan de equipo, disparado dentro de performAttack)
+//      se habría quedado sin forma de declinar. Corregido: SELECT_DSL_TARGETS
+//      resuelve el pick con null ANTES de mirar isActionLocked.
+//   2. La heurística de "objetivo ya lleno" de AL_USAR_AYUDA (onValidateTarget)
+//      no contaba con onBeforeHealed/SOBRECURACION: Limo primario a Vida
+//      máxima quedaba inelegible para curar aunque pudiera rebasarla. Ahora se
+//      omite esa heurística cuando la plantilla tiene onBeforeHealed.
+//   3. RECIEDAD no comprobaba que hubiera algún estado alterado que limpiar
+//      (requisito nuevo con el filtro algunEstado, ya existente para JUGAR
+//      pero ausente del _pool genérico que usan los requisitos de ACTIVA).
 //
 // Cambio de comportamiento deliberado en Alumno con VP: la comprobación de
 // "hay enemigos" pasa a requisitos (como Contendiente/Sra. Kumicho) y se
@@ -52,6 +71,25 @@ const escenarios = [
         p2: { vanguardia: ['Mini-tigre'] },
         pasos: [
             { habilidad: 'Elemental sanador' },
+        ],
+    },
+    {
+        // Cubre el bug #3 de la cabecera: antes se podía activar RECIEDAD sin
+        // ningún estado que limpiar (gastando Furor para nada). La vieja no tenía
+        // este requisito (solo miraba el Furor), así que SÍ abre el modal de
+        // confirmar; la nueva bloquea antes en canActivateAbility.
+        nombre: 'Elemental sanador rechazado sin ningún estado alterado que limpiar',
+        p1: { vanguardia: [{ carta: 'Elemental sanador', furor: 1 }, 'Oso con armadura'] },
+        p2: { vanguardia: ['Mini-tigre'] },
+        pasos: [
+            { habilidad: 'Elemental sanador' },
+            { soloEn: 'vieja', confirmar: true },
+        ],
+        diferenciasEsperadas: [
+            { contiene: 'estado.p1.vanguard.0.furor', motivo: 'la vieja gastaba 1 Furor igualmente sin nada que limpiar; la nueva bloquea antes de pagar el coste (requisito nuevo)' },
+            { contiene: 'flotante[', motivo: 'la vieja llega a mostrar los flotantes de activación (RECIEDAD) y el log de intro antes de no encontrar nada que limpiar; la nueva no llega a ejecutar nada' },
+            { contiene: 'log[', motivo: 'idem: la vieja loguea el intento (intro + "nada que limpiar" implícito, sin log explícito de fracaso); la nueva no genera ningún log' },
+            { contiene: 'estado.p1.vanguard.0.exhausted', motivo: 'la vieja agota la carta tras el intento; la nueva ni siquiera la activa' },
         ],
     },
     {
@@ -136,6 +174,33 @@ const escenarios = [
         pasos: [
             { jugar: 'Manzanahoria' },
             { seleccionar: 'Limo primario' },
+        ],
+    },
+    {
+        // Cubre el bug #2 de la cabecera: Limo primario EXACTAMENTE a su Vida
+        // máxima (4/4, sin rebasar todavía) debe seguir siendo objetivo válido
+        // para curar, porque puede expandir su propio máximo al hacerlo. Antes
+        // del fix, onValidateTarget lo rechazaba como "ya tiene la Vida completa".
+        nombre: 'Limo primario a Vida máxima sigue siendo objetivo válido (puede rebasarla)',
+        p1: { vanguardia: [{ carta: 'Limo primario', vida: 4 }], mano: ['Manzanahoria'] },
+        p2: { vanguardia: ['Mini-tigre'] },
+        pasos: [
+            { jugar: 'Manzanahoria' },
+            { seleccionar: 'Limo primario' },
+        ],
+        // El fix del bug #2 vive en public/cartas.js (onValidateTarget del compile
+        // AL_USAR_AYUDA); cartas_antes_de_dsl.js NUNCA se edita, así que la vieja
+        // sigue rechazando a Limo primario como objetivo ("ya tiene la Vida
+        // completa") y Manzanahoria se queda sin usar en su mano. La nueva sí lo
+        // acepta y expande su máximo a 6. Divergencia real y deliberada.
+        diferenciasEsperadas: [
+            { contiene: 'log[', motivo: 'la vieja rechaza el objetivo en silencio (logError privado) y no llega a ejecutar nada; la nueva cura y expande' },
+            { contiene: 'flotante[', motivo: 'ídem: la vieja no genera ningún flotante' },
+            { contiene: 'estado.p1.hand.0', motivo: 'la vieja no consume Manzanahoria (objetivo rechazado); la nueva sí' },
+            { contiene: 'estado.p1.vanguard.0.currentHp', motivo: 'la vieja deja a Limo primario en 4; la nueva lo cura a 6' },
+            { contiene: 'estado.p1.vanguard.0.maxHp', motivo: 'la vieja no expande el máximo (rechazó el objetivo); la nueva lo expande a 6' },
+            { contiene: 'estado.p1.discard', motivo: 'la vieja no descarta Manzanahoria (no llegó a usarse); la nueva sí' },
+            { contiene: 'estado.p1.cardCounts', motivo: 'consecuencia del mismo desajuste: la nueva asigna copyId al descartar, la vieja no llega a esa rama' },
         ],
     },
 ];

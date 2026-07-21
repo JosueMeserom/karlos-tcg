@@ -3378,13 +3378,24 @@
             }
 
             // Selección-en-tablero genérica para el DSL (reutilizable): resuelve con las cartas elegidas o null si se cancela
+            // chooserId (5º arg, por defecto el jugador activo): quién debe clicar.
+            // Habilidades con elección ajena (ACERTIJO en cruz: decide el rival) lo
+            // fijan explícito; el render y el clic en el tablero se gatean contra
+            // ESTE jugador, no contra activePlayerId (norma de targeting en tablero).
             pickBoardTargets(cards, n, prompt) {
+                const sourceCard = arguments.length > 3 ? arguments[3] : null;
+                const chooserId = arguments.length > 4 ? arguments[4] : this.activePlayerId;
                 return new Promise(resolve => {
-                    this.dslPick = { pool: new Set(cards.map(c => c.instanceId)), n: n, targets: [], resolve, byId: {} };
-                    this.selectedCard = arguments.length > 3 ? arguments[3] : null; // la Ayuda origen: el render la necesita
+                    this.dslPick = { pool: new Set(cards.map(c => c.instanceId)), n: n, targets: [], resolve, byId: {}, chooserId };
+                    this.selectedCard = sourceCard; // la Ayuda origen: el render la necesita
                     cards.forEach(c => this.dslPick.byId[c.instanceId] = c);
                     this.inputState = 'SELECT_DSL_TARGETS';
-                    if (prompt && this.myPlayerId === this.activePlayerId) this.logError(prompt);
+                    if (prompt && (this.gameMode === 'local' || this.myPlayerId === chooserId)) this.logError(prompt);
+                    if (this.gameMode === 'online' && this.myPlayerId !== 'spectator' && this.myPlayerId !== chooserId) {
+                        const banner = document.getElementById('action-banner');
+                        banner.innerText = `Esperando a que ${this.getDisplayName(chooserId)} elija...`;
+                        banner.style.display = 'block';
+                    }
                     this.render();
                 });
             }
@@ -3443,9 +3454,10 @@
             _dslPickClick(card) {
                 const ctx = this.dslPick;
                 if (!ctx) return;
+                const _soyElChooser = this.gameMode === 'local' || this.myPlayerId === (ctx.chooserId || this.activePlayerId);
                 if (!ctx.pool.has(card.instanceId)) {
                     const _t = getCardTemplate(card.id) || {};
-                    if (_t.isAvatar && this.myPlayerId === this.activePlayerId) this.logError(`${card.name} es un AVATAR y no puede ser objetivo de nada.`);
+                    if (_t.isAvatar && _soyElChooser) this.logError(`${card.name} es un AVATAR y no puede ser objetivo de nada.`);
                     return;
                 }
                 if (ctx.targets.some(t => t.instanceId === card.instanceId)) return;
@@ -3455,10 +3467,12 @@
                     this.dslPick = null;
                     this.selectedCard = null;
                     this.inputState = 'IDLE';
+                    const _banner = document.getElementById('action-banner');
+                    if (_banner) _banner.style.display = 'none';
                     this.render();
                     ctx.resolve(sel);
                 } else {
-                    if (this.myPlayerId === this.activePlayerId) this.logError(`Objetivo ${ctx.targets.length}/${ctx.n} fijado. Elige el siguiente.`);
+                    if (_soyElChooser) this.logError(`Objetivo ${ctx.targets.length}/${ctx.n} fijado. Elige el siguiente.`);
                     this.render();
                 }
             }
@@ -3532,6 +3546,14 @@
             }
 
             closeDiscardViewer(isRemote = false) {
+                // Elección obligatoria (pedido por Toto, 21-jul-2026): si el visor de
+                // búsqueda en mazo tiene alguna carta elegible, NO se puede cerrar sin
+                // elegir (clic fuera / fondo oscuro no hace nada). Solo se permite cerrar
+                // sin elegir cuando el visor está vacío de elegibles (nada que escoger).
+                if (this._deckSearchActivo && this._deckSearchElegiblesCount > 0 && !isRemote) {
+                    return;
+                }
+
                 // SEGURO ANTI-BUGS: El espectador no molesta a los jugadores enviando órdenes por red
                 if (this.gameMode === 'online' && !isRemote && this.myPlayerId !== 'spectator') {
                     this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'CLOSE_VIEWER' });
@@ -3622,6 +3644,7 @@
                     }
 
                     this._deckSearchActivo = true;
+                    this._deckSearchElegiblesCount = idsElegibles.size;
                     viewer.style.display = 'flex';
                     this.adjustCardHeaders();
                 });
@@ -4817,6 +4840,10 @@
 
                 if (this.inputState === 'SELECT_DSL_TARGETS') {
                     const _dp = this.dslPick;
+                    // Gate por chooser (norma de targeting en tablero): si esta elección
+                    // le toca al RIVAL del jugador activo (p. ej. ACERTIJO en cruz), un
+                    // clic del jugador activo no debe hacer nada — ni localmente ni por red.
+                    if (this.gameMode === 'online' && !isRemote && _dp && this.myPlayerId !== (_dp.chooserId || this.activePlayerId)) return;
                     if (_dp && _dp.pool.has(card.instanceId) && !_dp.targets.some(t => t.instanceId === card.instanceId)) syncAction(); // JUGADA LEGAL: EMITIMOS (el replay remoto la necesita)
                     this._dslPickClick(card);
                     return;
@@ -6043,8 +6070,36 @@
             }
 
             cancelAction(isRemote = false) {
+                // Selección-en-tablero del DSL (SELECT_DSL_TARGETS): resuelve el pick
+                // en curso con null; el propio ELEGIR decide si eso aborta la carta o,
+                // con opcional:true, lo salta sin más. Bug de motor descubierto al
+                // generalizar el targeting en tablero (Toto, 21-jul-2026): esta rama NO
+                // pasaba por el candado de isActionLocked ni limpiaba this.dslPick, así
+                // que cancelar aquí dejaba la Promise colgada para siempre. La vieja
+                // nunca lo sufrió porque su modal tenía su propio botón "Cancelar"
+                // independiente del candado; con el tablero generalizado, cualquier
+                // ELEGIR opcional a mitad de una acción bloqueada (p. ej. Plan de
+                // equipo, disparado dentro de performAttack) se habría quedado sin
+                // forma de declinar. Se resuelve ANTES de mirar isActionLocked: es un
+                // sub-paso dentro de una acción ya comprometida, no "cancelar la
+                // acción" que el candado protege.
+                if (this.inputState === 'SELECT_DSL_TARGETS' && this.dslPick) {
+                    const _chooser = this.dslPick.chooserId || this.activePlayerId;
+                    if (this.gameMode === 'online' && !isRemote && this.myPlayerId !== _chooser) return;
+                    if (this.gameMode === 'online' && !isRemote) {
+                        this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'CANCEL_ACTION' });
+                    }
+                    const r = this.dslPick.resolve;
+                    this.dslPick = null;
+                    this.selectedCard = null;
+                    this.inputState = 'IDLE';
+                    this.render();
+                    r(null);
+                    return;
+                }
+
                 // --- CANDADO DE SEGURIDAD PARA HABILIDADES ---
-                if (this.abilityContext && this.abilityContext.cannotCancel && 
+                if (this.abilityContext && this.abilityContext.cannotCancel &&
                    (this.inputState === 'SELECT_ABILITY_TARGETS' || this.inputState === 'SELECT_TARGET')) {
                     if (!isRemote) this.logError("Ya no puedes cancelar esta habilidad.");
                     return;
@@ -6365,7 +6420,16 @@
                     uiHtml += `<button class="game-btn" id="btn-end-turn" onclick="event.stopPropagation(); game.confirmEndTurn()" ${disabled}>Pasar</button>`;
                 }
 
-                const cancelDisabled = (!isMyTurn || this.inputState === 'IDLE' || this.inputState === 'WAITING_OPPONENT_DISCARD' || this.inputState === 'CONFIRM_ABILITY' || this.inputState === 'CONFIRM_RETREAT' || this.isActionLocked) ? 'disabled' : '';
+                // SELECT_DSL_TARGETS es un caso especial en ambos sentidos: (a) a quién
+                // le toca puede ser el CHOOSER de la elección, no el jugador activo
+                // (ACERTIJO en cruz); (b) cancelAction() ya sabe resolver el pick sin
+                // pasar por isActionLocked (ver cancelAction), así que el candado no
+                // debe deshabilitar el botón aquí.
+                const _esDslPick = this.inputState === 'SELECT_DSL_TARGETS' && this.dslPick;
+                const _puedeCancelarDsl = _esDslPick && (this.gameMode === 'local' || this.myPlayerId === (this.dslPick.chooserId || this.activePlayerId));
+                const cancelDisabled = _esDslPick
+                    ? (_puedeCancelarDsl ? '' : 'disabled')
+                    : (!isMyTurn || this.inputState === 'IDLE' || this.inputState === 'WAITING_OPPONENT_DISCARD' || this.inputState === 'CONFIRM_ABILITY' || this.inputState === 'CONFIRM_RETREAT' || this.isActionLocked) ? 'disabled' : '';
                 uiHtml += `<button class="game-btn" style="background:#eab308;" id="btn-cancel" onclick="event.stopPropagation(); game.cancelAction()" ${cancelDisabled}>X</button>`;
 
                 if (this.inputState === 'SELECT_ABILITY_TARGETS' && this.abilityContext && this.abilityContext.canStopEarly && this.abilityContext.targets.length > 0) {
@@ -6866,8 +6930,12 @@
 
                 if (card.exhausted) el.classList.add('exhausted');
 
-                // Selección-en-tablero del DSL: el reborde vive fuera de las cadenas de ataque (el pool ya decide dueño/zona)
-                if (isMyTurn && this.inputState === 'SELECT_DSL_TARGETS' && this.dslPick && this.dslPick.pool.has(card.instanceId) && !this.dslPick.targets.some(t => t.instanceId === card.instanceId)) {
+                // Selección-en-tablero del DSL: el reborde vive fuera de las cadenas de ataque (el pool ya decide dueño/zona).
+                // Gateado por chooser (no por isMyTurn/activePlayerId): quien elige puede
+                // ser el RIVAL del jugador activo (ACERTIJO en cruz), y es a ÉL a quien
+                // debe salirle el reborde verde, no al jugador activo.
+                const _dslSoyChooser = this.gameMode === 'local' || this.myPlayerId === ((this.dslPick && this.dslPick.chooserId) || this.activePlayerId);
+                if (_dslSoyChooser && this.inputState === 'SELECT_DSL_TARGETS' && this.dslPick && this.dslPick.pool.has(card.instanceId) && !this.dslPick.targets.some(t => t.instanceId === card.instanceId)) {
                     el.classList.add('valid-target');
                 }
 
