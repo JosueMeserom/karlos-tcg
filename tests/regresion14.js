@@ -130,6 +130,23 @@ const escenarios = [
         ],
     },
     {
+        // Cubre el fix del motor (21-jul-2026): el reseteo de updatePassives iba
+        // intercalado por jugador y borraba las marcas de auras cruzadas sobre el
+        // segundo jugador; además activateAbility no comprobaba el silencio (solo
+        // se ocultaba el botón en el render). Ambas bases comparten el fix.
+        nombre: 'El silencio de la Feria alcanza al campo ENEMIGO y bloquea su habilidad',
+        turnoDe: 'p2',
+        p1: {
+            vanguardia: ['Frikazo', 'Oso con armadura'],
+            evento: { carta: 'Feria del cómic', duracion: 2 },
+            mazo: ['Longaniza'],
+        },
+        p2: { vanguardia: [{ carta: 'Alumno con VP', furor: 2 }], mazo: ['Longaniza'] },
+        pasos: [
+            { habilidad: 'Alumno con VP', jugador: 'p2' }, // vetada por silencio: sin logs públicos, furor intacto
+        ],
+    },
+    {
         nombre: 'La Feria caduca y cierra sus puertas (los silenciados se liberan)',
         turnoDe: 'p2',
         p1: {

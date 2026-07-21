@@ -6538,7 +6538,7 @@ const CARD_DB = [
     },
     {
         name: "Feria del cómic", type: "Evento", rarity: "A", cost: 1, duration: 2, series: 2,
-        text: "2 turnos. Mientras esté en juego, todos los que NO tengan la etiqueta 'Otaku' están Silenciados (no pueden usar Habilidades), y al final de tu turno echas una moneda: con cara, buscas una carta 'Otaku' en tu mazo, la añades a tu mano y barajas.",
+        text: "2 turnos. Mientras esté en juego, TODOS los aliados y enemigos en el campo que NO tengan la etiqueta 'Otaku' están Silenciados (no pueden usar Habilidades), y al final de tu turno echas una moneda: con cara, buscas una carta 'Otaku' en tu mazo, la añades a tu mano y barajas.",
         // Migrada al DSL (fase interceptores). Fidelidad: el AURA no exime a los
         // Avatares (la imperativa silenciaba también a Kami); se baraja aunque la
         // compra se cancele (la búsqueda ya revolvió el mazo); silencio si no hay

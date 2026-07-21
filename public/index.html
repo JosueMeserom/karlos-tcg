@@ -4189,15 +4189,26 @@
                     });
                 };
 
+                // PRE-PASADA: el reseteo de AMBOS jugadores va ANTES de procesar a
+                // cualquiera. Antes iba intercalado en el bucle por jugador y el
+                // reseteo de p2 BORRABA las marcas que las auras de campo cruzado de
+                // p1 (p. ej. el silencio de Feria del cómic sobre los enemigos)
+                // acababan de poner. Bug general de auras cruzadas, betasteo de Toto.
+                ['p1', 'p2'].forEach(pid => {
+                    [...this.players[pid].vanguard, ...this.players[pid].rearguard].forEach(card => {
+                        const template = getCardTemplate(card.id);
+                        card.currentAtk = template.atk;
+                        card.currentDef = template.def;
+                        card.isSilenced = false; // se resetea aquí; las Auras lo reimponen después
+                        delete this._statMods[card.instanceId]; // su pizarra empieza limpia con el reseteo
+                    });
+                });
+
                 ['p1', 'p2'].forEach(pid => {
                     const p = this.players[pid];
 
                     [...p.vanguard, ...p.rearguard].forEach(card => {
                         const template = getCardTemplate(card.id);
-                        card.currentAtk = template.atk;
-                        card.currentDef = template.def;
-                        card.isSilenced = false; // Reseteamos el silencio antes de leer las Auras
-                        delete this._statMods[card.instanceId]; // su pizarra empieza limpia con el reseteo
 
                         if (typeof template.onUpdatePassive === 'function') {
                             const antes = _foto();
@@ -5053,6 +5064,14 @@
                 const template = getCardTemplate(card.id);
                 
                 if (card.exhausted && !template.abilityWhileExhausted) return;
+
+                // El silencio es una REGLA, no solo un botón oculto en el render:
+                // sin este gate, un replay remoto o un efecto podían activar la
+                // habilidad de una carta silenciada (p. ej. bajo Feria del cómic).
+                if (card.isSilenced || (card.status && card.status.silencio && card.status.silencio.duration > 0)) {
+                    if (!isRemote) this.logError(`${this.getCardNameWithOwner(card)} está Silenciada y no puede usar Habilidades.`);
+                    return;
+                }
 
                 if (card.location !== 'vanguard' && !template.canUseAbilityFromRearguard) {
                     if (!isRemote) this.logError("Solo las cartas en la Vanguardia pueden usar habilidades.");
