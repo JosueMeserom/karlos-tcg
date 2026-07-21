@@ -27,8 +27,8 @@ Visión a largo plazo — esto es un juego completo, no solo un motor: quedan mu
 ## Base de regresión — VERIFICADA (20-jul-2026)
 `public/cartas_antes_de_dsl.js` (494.857 bytes) coincide exactamente en tamaño con la base canónica usada en todas las sesiones de chat: se da por buena. Matiz documentado y esperado: contiene un esqueleto DSL temprano (`const DSL`, `_runEffectList` ×9, `_match` ×3) — la foto se tomó con el primer andamio del DSL ya presente. No es un error; no "corregirlo".
 
-## Tarea en curso: RECONSTRUIR la batería de regresión desde cero
-Las 24 suites históricas (r1–r23 + humo) vivían en los transcripts de las sesiones de chat y se perdieron; NO existen en ninguna parte y NO deben "recuperarse de memoria" ni inventarse. Se reescribe la batería completa en `tests/` ANTES de tocar nada del motor:
+## Estado: batería de regresión reconstruida + migración al DSL por tandas
+La batería histórica (r1–r23 + humo) se perdió con los transcripts de chat y se reconstruyó desde cero (NO se "recupera de memoria" ni se inventa nada). **A 21-jul-2026: 19 suites / 121 escenarios, todo en verde.** Hitos cerrados: interceptores de ataque (tag `v0.2-interceptores`), tanda 1 de migración (cartas simples) y tanda 2 (trigger `REACCION`, §12 del doc de diseño). Cómo está montada la batería y cómo se añaden suites nuevas:
 
 1. **Harness común** (`tests/harness.js`): carga `public/cartas_antes_de_dsl.js` (VIEJA) y `public/cartas.js` (NUEVA) en contextos aislados, ejecuta el mismo escenario contra ambas y compara salidas (logs, flotantes, estado final de la partida). Se diseña una sola vez y bien; las suites lo importan.
 2. **Cobertura por enumeración**: extraer del propio `cartas.js` la lista completa de cartas migradas al DSL (~37). Esa lista ES la cobertura; ninguna carta migrada se queda sin escenarios.
@@ -36,7 +36,7 @@ Las 24 suites históricas (r1–r23 + humo) vivían en los transcripts de las se
 4. **Diferencias intencionadas** (p. ej. logs pasados a 3ª persona — norma del proyecto: todo log visible por ambos jugadores va en 3ª persona con el nombre del jugador) se normalizan con mapas documentados DENTRO de la suite, con comentario que explique el porqué. Nunca se ignoran en silencio.
 5. Cada suite imprime un mensaje de éxito explícito ("… IDÉNTICAS") o el recuento de FALLOS.
 
-Solo con la batería completa en verde se retoma la siguiente tarea de motor: **interceptores de ataque** (§10-11 de `docs/DSL_cartas_diseno.md`; punto único de intercepción en `performAttack` con cola ordenada evento → equipos → pasivas; migrar Plan de equipo primero, luego Feria del cómic y Deuda con la mafia, con suite propia viejo-vs-nuevo). [Nombres corregidos por Toto: antes decía "Feria y Deuda de sangre", cartas que no existen.]
+**Migración al DSL, en curso por tandas** (ver la memoria `estado-migracion-dsl` para el detalle vivo): cada tanda = migrar cartas en `public/cartas.js` + suite viejo-vs-nuevo nueva + pasada estricta + commit + push. Tandas hechas: interceptores (Plan de equipo, Feria del cómic, Deuda con la mafia), tanda 1 (simples), tanda 2 (REACCION). Candidatas siguientes: `AL_MORIR` (onDeath/onAllyDeath), clones/tokens (más arquitectura), y las irreducibles de §6 que se quedan como código. El recuento de hooks de una carta NO es buen proxy de complejidad.
 
 ## Metodología (INNEGOCIABLE)
 1. Tras CUALQUIER cambio en `cartas.js` o el intérprete: pasada estricta de TODAS las suites (`for f in tests/regresion*.js tests/humo.js; do node "$f"; done`), exigiendo el mensaje de éxito explícito de cada una. No vale "parece que pasa".

@@ -18,6 +18,8 @@ Analicé las **142 cartas** de `cartas.js` (**348 funciones-hook** repartidas en
 
 La complejidad **no está repartida**: se concentra en unos pocos patrones recurrentes (objetivos/flujo, 295 llamadas; búsqueda de cartas, 75; modificar stats, 133). Si esos patrones se vuelven **primitivas** del DSL, el grueso de la colección se declara. El ~17 % restante (evoluciones/tokens, menús de acción propios, reacciones desde la mano, mecánicas especiales como Atomización) se queda como código, y no pasa nada: es la puerta de escape prevista.
 
+> **Actualización 21-jul-2026:** las **reacciones desde la mano** salieron de la puerta de escape. Al reanudar la migración (tanda 2) se decidió con Opus construir el trigger `REACCION` (ver §12 más abajo) en lugar de dejarlas como código: 5 de las 6 cartas de reacción (Cortarrollos, Inspiración, Pequeña traición, Jugada arriesgada, Escudo mágico) son ya declarativas. Solo Frasco maldito sigue imperativa. Fue una decisión de futuro-declarativo de Toto, asumiendo que el botín por carta era fino (cada una necesita result-shaping propio) pero que compensa para las reacciones que vengan.
+
 **Veredicto:** el editor tal como lo imaginaste es viable **si** migramos a un motor híbrido (declarativo + escape de código) de forma **incremental**. No hace falta reescribir el motor de golpe.
 
 ---
@@ -53,7 +55,7 @@ Agrupando los ~53 hooks por momento del turno. Los 10 primeros cubren la gran ma
 - **Turno:** `onStartTurn` (7), `onEndTurn` (11), y variantes temporales (`onStartTurnTempEffect` 11, `onEndTurnTempEffect` 3, `onUpdateTempEffect` 6)
 - **Eventos/Ayudas persistentes:** `onExpire` (18), `onExecuteAyuda` (11), `onEquipUpdate` (9)
 - **Reactivos:** `onDoTTick` (3, veneno), `onBeforeGainFuror`/`onGlobalBeforeGainFuror` (9), `onDestroy`/`onDeath`/`onAllyDeath` (6)
-- **Cola larga (1-2 cartas c/u):** `onInterceptAttack`, `onLethalDamageIntercept`, `onGlobalBeforeStatChange`, `onBeforeAffectedByEnemyEffect`, `onHandReaction*`, etc. → normalmente **escape de código**.
+- **Cola larga (1-2 cartas c/u):** `onInterceptAttack`, `onLethalDamageIntercept`, `onGlobalBeforeStatChange`, `onBeforeAffectedByEnemyEffect`, etc. → normalmente **escape de código**. (`onHandReaction*` ya NO: lo cubre el trigger `REACCION` desde 21-jul-2026.)
 
 ---
 
@@ -148,13 +150,13 @@ Esto reproduce: +2 Atq si Vida≤3 (pasiva), y el ataque a 2 enemigos con Atq-1 
 ```json
 { "id": 27, "name": "Atomización", "type": "Ayuda", "custom": "atomizacion_v1" }
 ```
-`custom` apunta a una función registrada a mano en `index.html`. El intérprete ve `custom != null` y delega. Igual para evoluciones, tokens (Clon de Unmei, Megalimo…), menús propios (`getCustomActions`) y reacciones desde la mano.
+`custom` apunta a una función registrada a mano en `index.html`. El intérprete ve `custom != null` y delega. Igual para evoluciones, tokens (Clon de Unmei, Megalimo…) y menús propios (`getCustomActions`). (Las reacciones desde la mano ya NO delegan: son declarativas vía el trigger `REACCION` desde 21-jul-2026.)
 
 ---
 
 ## 6. Las 24 cartas irreducibles (la puerta de escape)
 
-Motivos (con solape): búsqueda/visor con lógica propia, hooks raros de 1-2 cartas, reacciones desde la mano (7), evoluciones/tokens (6), mecánicas especiales tipo swap/atomizar/crear token (5), menús de acción propios `getCustomActions` (4).
+Motivos (con solape): búsqueda/visor con lógica propia, hooks raros de 1-2 cartas, ~~reacciones desde la mano (7)~~ (ya migradas al trigger `REACCION`, 21-jul-2026; solo Frasco maldito sigue como código), evoluciones/tokens (6), mecánicas especiales tipo swap/atomizar/crear token (5), menús de acción propios `getCustomActions` (4).
 
 Ejemplos: Águila, Mill, Escudo mágico, Atomización, Lupa, Erasmo, Xanadu, Unmei y su Clon, Némesis, Meca EBA, Arthas, Clon de NoName, Megalimo, Limo crecido…
 
@@ -222,3 +224,42 @@ Mismo principio que §10 aplicado a comportamientos: **nada de flags sueltos, co
 - Pasiva de Diego Antonio: interceptor de prioridad superior que anula el de Aniceto para su caso concreto.
 
 **c) Consecuencia para el DSL.** La primitiva `ATACAR` llevará `tipoAtaque` (por defecto `'normal'`) y los **requisitos se expresan contra las consultas**, no contra el estado crudo. El requisito real del Bi-Choque no es "no hay enemigos con Provocar", sino "existen ≥2 objetivos legales *para este descriptor de ataque*": con ataques normales, Provocar restringe la legalidad; si algo los vuelve especiales, la misma consulta devuelve más objetivos y la habilidad se habilita sola. La legalidad de objetivos se centraliza en un helper (`getLegalAttackTargets(descriptor)`) que usan por igual el motor, el DSL y (futuro) la IA.
+
+## 12. Trigger `REACCION`: reacciones desde la mano (implementado 21-jul-2026)
+
+Cartas que el defensor puede jugar desde la mano **en respuesta a un ataque**, antes de que se resuelva. El motor de combate (`index.html`) ya recorría la mano del defensor llamando a dos hooks; el DSL solo los **produce** desde una declaración, sin tocar ningún call-site:
+
+- `sobre: 'ATAQUE'` → `onHandReactionToAttack(handCard, attacker, defender, game)`, disparado en el bucle de `performAttack`. Devuelve `{ used, newDefender?, drainFurorAfter?, cancelAttack? }`.
+- `sobre: 'DAÑO'` → `onHandReactionToDamage(handCard, defender, attacker, dmg, isSpecial, game, p)`, disparado en `dealDamage`. Devuelve `{ used, newDmg }`.
+
+**Forma declarativa:**
+
+```js
+abilities: [{
+  trigger: 'REACCION',
+  sobre: 'ATAQUE',                       // o 'DAÑO'
+  si: { atacante: {campo,op,valor}, defensor: {...},
+        soloAtaqueNormal: true, defensorEsPropio: true,
+        atacanteNoAvatar: true, soloDañoNormal: true },   // gate (todo opcional)
+  prompt: '¿Usar X?',                    // modal SÍ/NO al reactor (2ª persona; sin nombres:
+                                         //   atacante y objetivo se muestran como cartas bajo el prompt)
+  log: { msg: '... {reactor}/{atacante}/{defensor} ...', tipo: 'ability' },
+  efectos: [ ... ],                      // se ejecutan con DSL._runReaccion
+}]
+```
+
+**Ejecución (`DSL._runReaccion`).** Como `GLOBAL_TRAS_ATAQUE`, resuelve `quien: ATACANTE | DEFENSOR | SELF` contra el combate en curso. Los ops **genéricos** (MODIFICAR_STAT, BUSCAR, APLICAR_ESTADO, FLOTANTE…) se delegan a `_doEffect` con el objetivo ya resuelto. Además hay **ops de protocolo** que solo tienen sentido dentro de una REACCION y moldean el objeto `result` de retorno:
+
+| op | efecto en `result` | carta ejemplo |
+|---|---|---|
+| `REDIRIGIR` | `newDefender` (elige aliado ≠ defensor con reborde verde en tablero) | Pequeña traición |
+| `CANCELAR_ATAQUE` | `cancelAttack = true` | Jugada arriesgada (cara) |
+| `MARCAR_DRENAJE` | `drainFurorAfter = true` | Jugada arriesgada (cruz) |
+| `FIJAR_DAÑO` | `newDmg = valor` | Escudo mágico |
+| `ATACANTE_SE_AUTOATACA` | el atacante se golpea a sí mismo | Jugada arriesgada (cara) |
+
+`MONEDA` funciona igual que en efectos normales pero sus ramas `cara`/`cruz` recursan por `_runReaccion` (para poder llevar ops de protocolo). `MODIFICAR_STAT` admite `vaciar: true` (pone el stat a 0 — Cortarrollos vacía todo el Furor del atacante).
+
+**Consumo de la carta y cancelación** los gestiona el motor: si la reacción devuelve `{used:true}`, el bucle la descarta; si el reactor declina el prompt o cancela una elección (p. ej. la víctima de Pequeña traición), devuelve `{used:false}` y la carta se queda en la mano (`result.abortar`).
+
+**Cobertura DSL:** Cortarrollos, Inspiración, Pequeña traición, Jugada arriesgada (ATAQUE) y Escudo mágico (DAÑO). Frasco maldito sigue imperativa. Suite `regresion18`.
