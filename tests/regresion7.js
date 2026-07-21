@@ -26,6 +26,8 @@ const escenarios = [
             { elegir: ['Karlos'] },           // mercenario buscado
         ],
         logsIntencionados: [
+            { de: 'Barajando el mazo...', a: 'Barajando el mazo de J1 (Jugador 1)...',
+              motivo: 'atribución de jugador pedida por Toto (21-jul-2026): los logs de zonas ocultas dicen de quién son; la vieja decía "Barajando el mazo..." a secas' },
             { de: 'Contratas a Karlos desde tu mazo.', a: 'J1 (Jugador 1) contrata a Karlos (J1 (Jugador 1)) desde su mazo.',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño/jugador): la vieja usaba nombres a secas o 2ª persona; la nueva usa DSL._nombre / {jugador}' },
         ],
@@ -44,6 +46,8 @@ const escenarios = [
             { elegir: ['Oso con armadura'] },
         ],
         logsIntencionados: [
+            { de: 'Barajando el mazo...', a: 'Barajando el mazo de J1 (Jugador 1)...',
+              motivo: 'atribución de jugador pedida por Toto (21-jul-2026): los logs de zonas ocultas dicen de quién son; la vieja decía "Barajando el mazo..." a secas' },
             { de: 'No quedan Mercenarios en tu mazo.', a: 'No quedan Mercenarios en el mazo de J1 (Jugador 1).',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño/jugador): la vieja usaba nombres a secas o 2ª persona; la nueva usa DSL._nombre / {jugador}' },
         ],

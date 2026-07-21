@@ -1251,7 +1251,7 @@ const CARD_DB = [
                             game.logMsg(`No se encontró ningún Escudo mágico en el mazo.`, 'system');
                         }
                         
-                        game.logMsg("Barajando el mazo...", 'system');
+                        game.logMsg(`Barajando el mazo de ${game.getDisplayName(p.id)}...`, 'system');
                         await animateShuffle(p.id);
                         game.shuffle(p.deck);
                         game.render();
@@ -1737,7 +1737,7 @@ const CARD_DB = [
                         }
                     }
                     
-                    game.logMsg("Barajando el mazo...", 'system');
+                    game.logMsg(`Barajando el mazo de ${game.getDisplayName(p.id)}...`, 'system');
                     if (typeof animateShuffle === 'function') await animateShuffle(p.id);
                     game.shuffle(p.deck);
                     game.render();
@@ -3085,7 +3085,7 @@ const CARD_DB = [
                   titulo: "BUSCAR MERCENARIO EN EL MAZO",
                   log: "{jugador} contrata a {objetivo} desde su mazo.",
                   logNoValidas: "No quedan Mercenarios en el mazo de {jugador}. ¡El pago se ha perdido!",
-                  barajarDespues: { log: "Barajando el mazo...", inclusoSinValidas: true } } ] }
+                  barajarDespues: { log: "Barajando el mazo de {jugador}...", inclusoSinValidas: true } } ] }
         ],
     },
     {
@@ -3116,7 +3116,7 @@ const CARD_DB = [
                   algunFiltro: [ { campo: "subtype", op: "==", valor: "Ingerible" }, { campo: "subtype", op: "==", valor: "Arma" }, { campo: "subtype", op: "==", valor: "Vestimenta" } ],
                   log: "{jugador} ha comprado: {objetivo}.",
                   logNoEncontrada: "{jugador} ha mirado toda la tienda y no quedaba nada de eso.",
-                  barajarDespues: { log: "Barajando el mazo..." } } ] },
+                  barajarDespues: { log: "Barajando el mazo de {jugador}..." } } ] },
             { trigger: "AL_CADUCAR", log: "Termina el día De compras de {jugador}.", logTipo: "system" }
         ],
     },
@@ -3542,7 +3542,7 @@ const CARD_DB = [
                   log: "{jugador} ha encontrado un tesoro y lo añade a su mano.", logTipo: "system",
                   logSinEleccion: "{jugador} no cogió nada.",
                   logNoValidas: "{jugador} no tiene equipamiento en su mazo.",
-                  barajarDespues: { log: "Barajando el mazo..." } } ] }
+                  barajarDespues: { log: "Barajando el mazo de {jugador}..." } } ] }
         ],
     },
     {
@@ -3852,7 +3852,7 @@ const CARD_DB = [
                   titulo: "HEXAGRAMA: Busca 1 Invocación",
                   log: "{jugador} añade {objetivo} a su mano.",
                   logNoValidas: "¡El Hexagrama fracasa! No quedan cartas de 'Invocación' en el mazo de {jugador}.",
-                  barajarDespues: { log: "Barajando el mazo...", inclusoSinValidas: true } } ] }
+                  barajarDespues: { log: "Barajando el mazo de {jugador}...", inclusoSinValidas: true } } ] }
         ],
     },
     {
@@ -4552,7 +4552,7 @@ const CARD_DB = [
                                 game.logMsg(`Añades ${target.name} a tu mano.`, 'ability');
                             }
                             
-                            game.logMsg("Barajando el mazo...", 'system');
+                            game.logMsg(`Barajando el mazo de ${game.getDisplayName(p.id)}...`, 'system');
                             if (typeof animateShuffle === 'function') await animateShuffle(p.id);
                             game.shuffle(p.deck);
                             game.render();
@@ -4975,7 +4975,7 @@ const CARD_DB = [
                   titulo: "BUSCAR DIOS/A EN EL MAZO",
                   log: "¡La deidad {objetivo} acude a la mano de {jugador}!",
                   logNoValidas: "No quedan Dioses ni Diosas en el mazo de {jugador}.",
-                  barajarDespues: { log: "Barajando el mazo...", inclusoSinValidas: true } } ] }
+                  barajarDespues: { log: "Barajando el mazo de {jugador}...", inclusoSinValidas: true } } ] }
         ],
     },
     {
@@ -5505,7 +5505,7 @@ const CARD_DB = [
                 }
 
                 // REGLA TCG: Como ha mirado el mazo, ahora sí barajamos SIEMPRE
-                game.logMsg("Barajando el mazo...", 'system');
+                game.logMsg(`Barajando el mazo de ${game.getDisplayName(p.id)}...`, 'system');
                 if (typeof animateShuffle === 'function') await animateShuffle(p.id);
                 game.shuffle(p.deck);
             }
@@ -5572,7 +5572,7 @@ const CARD_DB = [
                 const chosen = await game.openVisualSearchModal('BUSCAR MECA EBA EN MAZO', validDeck, 1, true, card.owner);
                 
                 // Barajamos SIEMPRE tras abrir el modal del mazo
-                game.logMsg("Barajando el mazo...", 'system');
+                game.logMsg(`Barajando el mazo de ${game.getDisplayName(p.id)}...`, 'system');
                 if (typeof animateShuffle === 'function') await animateShuffle(p.id);
                 game.shuffle(p.deck);
 
@@ -6196,7 +6196,7 @@ const CARD_DB = [
                   confirmar: { titulo: "LLAMADA DEL DEBER", si: "BUSCAR GUARDIA REAL EN MAZO", no: "NO BUSCAR" },
                   titulo: "RECLUTAR GUARDIA REAL",
                   log: "{jugador} recluta a {objetivo} desde su cuartel.",
-                  barajarDespues: { log: "Barajando el mazo..." } } ] },
+                  barajarDespues: { log: "Barajando el mazo de {jugador}..." } } ] },
             { trigger: "AL_CADUCAR", log: "La Llamada del deber se extingue.", logTipo: "system" }
         ],
     },
@@ -6564,7 +6564,7 @@ const CARD_DB = [
                       titulo: "COMPRAR CARTA OTAKU",
                       log: "{jugador} añade {objetivo} a su mano.",
                       logNoValidas: "{jugador} ha mirado en todos los puestos, pero no quedan cartas Otaku en su mazo.",
-                      barajarDespues: { log: "Barajando el mazo..." } } ],
+                      barajarDespues: { log: "Barajando el mazo de {jugador}..." } } ],
                   logCruz: { msg: "Moneda: CRUZ - Había demasiada cola y {jugador} se fue con las manos vacías.", tipo: "neutral" } } ] },
             { trigger: "AL_CADUCAR", log: "La Feria del cómic cierra sus puertas.", logTipo: "system" }
         ],
@@ -6598,7 +6598,7 @@ const CARD_DB = [
                   confirmar: { titulo: "{jugador}: COBRAR FAVOR A LA MAFIA", si: "BUSCAR MAFIA EN EL MAZO", no: "NO BUSCAR" },
                   titulo: "{jugador}: Llama a un contacto",
                   log: "{jugador} recibe a {objetivo} desde el submundo.", logTipo: "system",
-                  barajarDespues: { log: "Barajando el mazo..." } } ] }
+                  barajarDespues: { log: "Barajando el mazo de {jugador}..." } } ] }
         ],
     },
     {

@@ -47,7 +47,7 @@ const escenarios = [
               motivo: 'norma del proyecto (logs en 3ª persona con dueño/jugador): la vieja usaba nombres a secas o 2ª persona; la nueva usa DSL._nombre / {jugador}' },
         ],
         logsSoloNueva: [
-            { linea: 'Barajando el mazo...',
+            { linea: 'Barajando el mazo de J1 (Jugador 1)...',
               motivo: 'la vieja logueaba el barajado con game.logError (privado, fuera del historial); la nueva usa logMsg público. Visibilidad ampliada por la migración, contenido idéntico.' },
         ],
     },
@@ -67,7 +67,7 @@ const escenarios = [
         logsSoloNueva: [
             { linea: 'No quedan Dioses ni Diosas en el mazo de J1 (Jugador 1).',
               motivo: 'la vieja logueaba este aviso con game.logError (privado, fuera del historial); la nueva usa logMsg público. Visibilidad ampliada por la migración, contenido idéntico.' },
-            { linea: 'Barajando el mazo...',
+            { linea: 'Barajando el mazo de J1 (Jugador 1)...',
               motivo: 'la vieja logueaba el barajado con game.logError (privado, fuera del historial); la nueva usa logMsg público. Visibilidad ampliada por la migración, contenido idéntico.' },
         ],
     },

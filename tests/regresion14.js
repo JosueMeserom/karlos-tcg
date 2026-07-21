@@ -38,6 +38,8 @@ const escenarios = [
             { elegir: ['Lolita'] },
         ],
         logsIntencionados: [
+            { de: 'Barajando el mazo...', a: 'Barajando el mazo de J1 (Jugador 1)...',
+              motivo: 'atribución de jugador pedida por Toto (21-jul-2026): los logs de zonas ocultas dicen de quién son; la vieja decía "Barajando el mazo..." a secas' },
             { de: 'Moneda: CARA - ¡Has encontrado algo genial en la Feria!', a: 'Moneda: CARA - ¡J1 (Jugador 1) ha encontrado algo genial en la Feria!', motivo: M3 },
             { de: 'Añades Lolita a tu mano.', a: 'J1 (Jugador 1) añade Lolita (J1 (Jugador 1)) a su mano.', motivo: M3 },
         ],

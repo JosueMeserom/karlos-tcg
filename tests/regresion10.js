@@ -110,6 +110,8 @@ const escenarios = [
             { finTurno: true }, // p2→p1: duración 1→0, caduca
         ],
         logsIntencionados: [
+            { de: 'Barajando el mazo...', a: 'Barajando el mazo de J1 (Jugador 1)...',
+              motivo: 'atribución de jugador pedida por Toto (21-jul-2026): los logs de zonas ocultas dicen de quién son; la vieja decía "Barajando el mazo..." a secas' },
             { de: '¡Llamada del deber inspira a Capitán Guardia Real!', a: '¡Llamada del deber inspira a Capitán Guardia Real [1] (J1 (Jugador 1))!',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba c.name a secas; la nueva rellena {objetivo} con DSL._nombre (incluye el [n] de copia, ya asignado al salir de la mano)' },
             { de: 'Reclutas a Águila desde tu cuartel.', a: 'J1 (Jugador 1) recluta a Águila (J1 (Jugador 1)) desde su cuartel.',

@@ -77,6 +77,8 @@ const escenarios = [
             { elegir: ['Gólem multielemental'] },
         ],
         logsIntencionados: [
+            { de: 'Barajando el mazo...', a: 'Barajando el mazo de J1 (Jugador 1)...',
+              motivo: 'atribución de jugador pedida por Toto (21-jul-2026): los logs de zonas ocultas dicen de quién son; la vieja decía "Barajando el mazo..." a secas' },
             { de: 'El Hexagrama brilla y te permite buscar en tu mazo...', a: 'El Hexagrama brilla y permite a J1 (Jugador 1) buscar en su mazo...',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño/jugador): la vieja usaba nombres a secas o 2ª persona; la nueva usa DSL._nombre / {jugador}' },
             { de: 'Añades Gólem multielemental a tu mano.', a: 'J1 (Jugador 1) añade Gólem multielemental (J1 (Jugador 1)) a su mano.',
@@ -97,6 +99,8 @@ const escenarios = [
             { seleccionar: 'Mini-tigre' },
         ],
         logsIntencionados: [
+            { de: 'Barajando el mazo...', a: 'Barajando el mazo de J1 (Jugador 1)...',
+              motivo: 'atribución de jugador pedida por Toto (21-jul-2026): los logs de zonas ocultas dicen de quién son; la vieja decía "Barajando el mazo..." a secas' },
             { de: "No quedan cartas de 'Invocación' en tu mazo.", a: "No quedan cartas de 'Invocación' en el mazo de J1 (Jugador 1).",
               motivo: 'norma del proyecto (logs en 3ª persona con dueño/jugador): la vieja usaba nombres a secas o 2ª persona; la nueva usa DSL._nombre / {jugador}' },
         ],
