@@ -3189,6 +3189,7 @@
                         const porFuente = new Map();
                         mods.forEach(m => {
                             if (m.stat === 'OCULTO') { effects.push(`Oculto, fuente: ${(m.srcId === card.instanceId) ? String(m.fuente).replace(`(${this.nCarta(card)})`, '(esta carta)') : m.fuente}`); return; }
+                            if (m.stat === 'SILENCIO') { effects.push(`Silenciado, fuente: ${(m.srcId === card.instanceId) ? String(m.fuente).replace(`(${this.nCarta(card)})`, '(esta carta)') : m.fuente}`); return; }
                             const _fm = (m.srcId === card.instanceId) ? 'esta carta' : m.fuente;
                             const clave = (m.srcId || '') + '|' + _fm;
                             if (!porFuente.has(clave)) porFuente.set(clave, { partes: [], fuente: _fm });
@@ -3251,7 +3252,7 @@
                         }
                         ((this._statMods && this._statMods[otra.instanceId]) || []).forEach(m => {
                             if (m.srcId === card.instanceId || m.srcAltId === card.instanceId) {
-                                _salientes.push(m.stat === 'OCULTO' ? `Oculto, objetivo: ${this.getCardNameWithOwner(otra)}` : `${m.delta > 0 ? '+' : ''}${m.delta} ${m.stat}, objetivo: ${this.getCardNameWithOwner(otra)}`);
+                                _salientes.push(m.stat === 'OCULTO' ? `Oculto, objetivo: ${this.getCardNameWithOwner(otra)}` : m.stat === 'SILENCIO' ? `Silenciado, objetivo: ${this.getCardNameWithOwner(otra)}` : `${m.delta > 0 ? '+' : ''}${m.delta} ${m.stat}, objetivo: ${this.getCardNameWithOwner(otra)}`);
                             }
                         });
                         [...(otra.tempEffects || []), ...(otra.activeEffects || [])].forEach(eff => {
@@ -4257,17 +4258,18 @@
                 // evento, efecto temporal, límites) deja constancia de qué cambió, cuánto y desde dónde.
                 this._statMods = {}; // instanceId -> [{stat, delta, fuente, srcId, srcAltId, srcZone}]
                 const _mesa = () => [...this.players.p1.vanguard, ...this.players.p1.rearguard, ...this.players.p2.vanguard, ...this.players.p2.rearguard];
-                const _foto = () => { const m = {}; _mesa().forEach(c => m[c.instanceId] = [c.currentAtk, c.currentDef, !!c.stealth]); return m; };
+                const _foto = () => { const m = {}; _mesa().forEach(c => m[c.instanceId] = [c.currentAtk, c.currentDef, !!c.stealth, !!c.isSilenced]); return m; };
                 const _anota = (antes, fuente, srcId, srcAltId, srcZone) => {
                     _mesa().forEach(c => {
                         const b = antes[c.instanceId];
                         if (!b) return;
                         const dA = c.currentAtk - b[0], dD = c.currentDef - b[1];
-                        if (!dA && !dD && !(!b[2] && c.stealth)) return;
+                        if (!dA && !dD && !(!b[2] && c.stealth) && !(!b[3] && c.isSilenced)) return;
                         const arr = this._statMods[c.instanceId] = this._statMods[c.instanceId] || [];
                         if (dA) arr.push({ stat: 'ATQ', delta: dA, fuente, srcId, srcAltId, srcZone });
                         if (dD) arr.push({ stat: 'DEF', delta: dD, fuente, srcId, srcAltId, srcZone });
                         if (!b[2] && c.stealth) arr.push({ stat: 'OCULTO', delta: 1, fuente, srcId, srcAltId, srcZone, badgeKey: 'oculto' });
+                        if (!b[3] && c.isSilenced) arr.push({ stat: 'SILENCIO', delta: 1, fuente, srcId, srcAltId, srcZone, badgeKey: 'silencio' });
                     });
                 };
 
@@ -6584,7 +6586,12 @@
                         const ev = this.players[pid].activeEvent;
                         if (ev && typeof getCardTemplate(ev.id).onGlobalGetPreviewEffects === 'function') {
                             const extras = getCardTemplate(ev.id).onGlobalGetPreviewEffects(ev, c, this);
-                            if (extras && extras.length > 0) out.push({ srcZone: `${pid}-event-slot`, srcEvName: ev.name });
+                            if (extras && extras.length > 0) {
+                                let claves = [];
+                                if (typeof getCardTemplate(ev.id).onGlobalGetPreviewBadges === 'function') claves = getCardTemplate(ev.id).onGlobalGetPreviewBadges(ev, c, this) || [];
+                                if (claves.length) claves.forEach(k => out.push({ srcZone: `${pid}-event-slot`, srcEvName: ev.name, badgeKey: k }));
+                                else out.push({ srcZone: `${pid}-event-slot`, srcEvName: ev.name });
+                            }
                         }
                     }
                     return out;
@@ -6627,12 +6634,15 @@
                             const bc = centro(b);
                             let col = GRIS;
                             try { const c2 = getComputedStyle(b).backgroundColor; if (c2 && c2 !== 'rgba(0, 0, 0, 0)' && c2 !== 'transparent') col = c2; } catch (e) {}
-                            return { x: bc.x, y: bc.y, color: col };
+                            return { x: bc.x, y: bc.y, color: col, esBadge: true };
                         }
                     }
                     const cc = centro(targetEl);
-                    return { x: cc.x, y: cc.y, color: GRIS };
+                    return { x: cc.x, y: cc.y, color: GRIS, esBadge: false };
                 };
+                // Si una fuente ya apunta a alguna badge, su punto-centro genérico sobra
+                // (evita horquillas badge+centro desde el mismo origen).
+                const soloBadges = (pts) => { const b = pts.filter(p => p.esBadge); return b.length ? b : pts; };
                 // Dibuja de srcEl a los puntos de targetEl (con horquilla si hay varios)
                 const dibujaGrupo = (srcEl, targetEl, pts) => {
                     const s = centro(srcEl);
@@ -6671,7 +6681,7 @@
                         if (!grupos.has(srcEl)) grupos.set(srcEl, []);
                         grupos.get(srcEl).push(punto(destEl, f));
                     });
-                    grupos.forEach((pts, srcEl) => { dibujaGrupo(srcEl, destEl, pts); entrantes++; });
+                    grupos.forEach((pts, srcEl) => { dibujaGrupo(srcEl, destEl, soloBadges(pts)); entrantes++; });
                 }
                 // === SALIENTES: a quién afecta la carta inspeccionada ===
                 if (destEl) {
@@ -6684,7 +6694,7 @@
                             const mio = (f.srcId === card.instanceId) || (f.srcAltId === card.instanceId) || (f.srcName && f.srcName === card.name) || (f.srcEvName && f.srcEvName === card.name);
                             if (mio) pts.push(punto(oEl, f));
                         });
-                        if (pts.length) { dibujaGrupo(destEl, oEl, pts); salientes++; }
+                        if (pts.length) { dibujaGrupo(destEl, oEl, soloBadges(pts)); salientes++; }
                     });
                 }
                 console.log('[Flechas]', card.name, '· entrantes:', entrantes, '· salientes:', salientes);
@@ -6981,12 +6991,12 @@
                         if (isBankrupt) {
                             // Muestra el Furor original que guardamos en el bolsillo (o 0 si entró al campo durante la Bancarrota)
                             const shownFuror = card.bankruptStoredFuror !== undefined ? card.bankruptStoredFuror : card.furor;
-                            html += `<div class="furor-container" style="background: #450a0a; border-color: #dc2626; display: flex; justify-content: center; align-items: center;">
+                            html += `<div class="furor-container" data-badge="furor" style="background: #450a0a; border-color: #dc2626; display: flex; justify-content: center; align-items: center;">
                                         <span style="position: absolute; color: #ef4444; font-size: 1.5rem; font-weight: 900; opacity: 0.5;">X</span>
                                         <span style="color: #cbd5e1; font-weight: bold; z-index: 1; text-shadow: 1px 1px 3px black; opacity: 0.5;">${shownFuror}</span>
                                      </div>`;
                         } else {
-                            html += `<div class="furor-container">${card.furor}</div>`;
+                            html += `<div class="furor-container" data-badge="furor">${card.furor}</div>`;
                         }
                     }
                 }
@@ -7142,6 +7152,7 @@
                             if (card.status[key] && card.status[key].duration > 0) hasStatus = true;
                         }
                     }
+                    if (card.isSilenced) hasStatus = true; // badge de silencio por aura (∞): también sobresale a la izquierda
                     if (hasStatus) marginLeft = Math.max(marginLeft, getCssOffset('.status-dot', 'left') + 4); 
                     if (card.stealth) marginLeft = Math.max(marginLeft, getCssOffset('.stealth-badge', 'left') + 4); 
 

@@ -8734,6 +8734,30 @@ const DSL = {
                     return out;
                 };
             }
+            // Ancla visual: las flechas del detalle apuntan a la píldora de Furor
+            // cuando alguna regla de Furor de este evento aplica a la carta (el
+            // motor consulta este hook al recolectar influencias; con AURA de
+            // silencio a la vez, la flecha se desdobla a ambas badges).
+            if (typeof tmpl.onGlobalGetPreviewBadges !== 'function') {
+                tmpl.onGlobalGetPreviewBadges = function (ev, targetCard, game) {
+                    const _tt = getCardTemplate(targetCard.id) || {};
+                    if (targetCard.owner !== ev.owner && _tt.immuneToEnemyEvents) return [];
+                    for (const r of (modFuror.reglas || [])) {
+                        // Sin exigir r.preview: reglas solo-de-acción (como el corte de
+                        // Furor de Deuda con la mafia) también anclan su flecha. si.origen
+                        // no se evalúa aquí (es condición de runtime, no estática).
+                        const si = r.si || {};
+                        if (si.objetivoSelfId && targetCard.instanceId !== ev[si.objetivoSelfId]) continue;
+                        if (si.objetivoDe === 'PROPIO' && targetCard.owner !== ev.owner) continue;
+                        if (si.objetivoDe === 'RIVAL' && targetCard.owner === ev.owner) continue;
+                        if (si.algunaEtiqueta && !(targetCard.tags && si.algunaEtiqueta.some(t => targetCard.tags.includes(t)))) continue;
+                        if (si.campoObjetivo && !DSL._cmp(DSL._field(targetCard, si.campoObjetivo.campo), si.campoObjetivo.op, si.campoObjetivo.valor)) continue;
+                        if (si.campoSelf && !DSL._cmp(DSL._field(ev, si.campoSelf.campo), si.campoSelf.op, si.campoSelf.valor)) continue;
+                        return ['furor'];
+                    }
+                    return [];
+                };
+            }
         }
 
         // GLOBAL_INICIO_TURNO -> onGlobalStartTurn (eventos): al empezar un turno, ANTES de la fase de Furor.
