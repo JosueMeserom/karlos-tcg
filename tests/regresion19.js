@@ -37,6 +37,46 @@ const escenarios = [
         // solo toca currentHp, como la vieja); el Furor 2 se conserva en ambas.
         logsIntencionados: [],
     },
+    {
+        nombre: 'Goodman: muere con Furor y busca una carta en el mazo (acepta y elige)',
+        p1: { vanguardia: ['Droide antidisturbios'] },
+        p2: { vanguardia: [{ carta: 'Goodman', furor: 2 }], mazo: ['Mini-tigre', 'Oso con armadura'] },
+        pasos: [
+            { atacar: 'Droide antidisturbios', objetivo: 'Goodman' },
+            { opcion: 0 },                 // SÍ, buscar (preguntarSiempre)
+            { elegir: ['Mini-tigre'] },    // visor de mazo (vieja) / visor de mazo (nueva): mismo tipo
+        ],
+        logsIntencionados: [
+            { de: 'Añades Mini-tigre a la mano desde el mazo.',
+              a: 'J2 (Jugador 2) añade Mini-tigre (J2 (Jugador 2)) a su mano desde el mazo.',
+              motivo: 'norma del proyecto (3ª persona con jugador/dueño): la vieja usaba "Añades {name}" (2ª persona); la nueva rellena {jugador}/{objetivo} con getDisplayName/DSL._nombre' },
+            { de: 'Barajando el mazo...', a: 'Barajando el mazo de J2 (Jugador 2)...',
+              motivo: 'normalización estándar de barajarDespues (como el resto de cartas migradas): la vieja decía el genérico "Barajando el mazo..."; la nueva incluye el jugador con {jugador}' },
+        ],
+    },
+    {
+        nombre: 'Goodman: muere con Furor pero declina buscar',
+        p1: { vanguardia: ['Droide antidisturbios'] },
+        p2: { vanguardia: [{ carta: 'Goodman', furor: 1 }], mazo: ['Mini-tigre'] },
+        pasos: [
+            { atacar: 'Droide antidisturbios', objetivo: 'Goodman' },
+            { opcion: 1 },                 // NO buscar
+        ],
+        // Sin logsIntencionados: "{carta} muere, pero decides no buscar información."
+        // se rellena con sourceCard.name ("Goodman", sin dueño), idéntico a la vieja.
+        logsIntencionados: [],
+    },
+    {
+        nombre: 'Goodman: muere sin Furor — INFORMACIÓN VALIOSA no se dispara',
+        p1: { vanguardia: ['Droide antidisturbios'] },
+        p2: { vanguardia: [{ carta: 'Goodman', furor: 0 }], mazo: ['Mini-tigre'] },
+        pasos: [
+            { atacar: 'Droide antidisturbios', objetivo: 'Goodman' },
+        ],
+        // El gate `si: furor>=1` falla (como el `if (card.furor >= 1)` viejo): muerte normal
+        // sin modales ni logs de búsqueda. Idéntico en ambas.
+        logsIntencionados: [],
+    },
 ];
 
 correrSuite('regresion19', escenarios);

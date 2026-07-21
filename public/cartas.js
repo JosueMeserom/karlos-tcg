@@ -1695,53 +1695,27 @@ const CARD_DB = [
         id: 24, name: "Goodman", hp: 2, def: 2, atk: 1, type: "Personaje", subtype: "Ser vivo", tags: ["Científico"], gender: 'M', rarity: "B",
         text: "P: INFORMACIÓN VALIOSA: Sólo si tiene al menos 1 de Furor; cuando muere, busca carta en el mazo.",
         passiveName: "INFORMACIÓN VALIOSA", series: 1,
-        onDeath: async function(card, game) {
-            if (card.furor >= 1) {
-                const p = game.players[card.owner];
-                const wantSearch = await new Promise(resolve => {
-                    game.openChoiceModal('INFORMACIÓN VALIOSA', [
-                        { label: 'BUSCAR CARTA EN EL MAZO', action: () => resolve(true) },
-                        { label: 'NO BUSCAR', action: () => resolve(false) }
-                    ], card.owner);
-                });
-
-                if (wantSearch) {
-                    game.logMsg(`¡${card.passiveName} se activa! ${card.name} busca una carta.`, 'ability');
-                    showFloatingText(card.instanceId, "INFORMACIÓN VALIOSA", "ft-ability", -30);
-
-                    if (p.deck.length === 0) return false;
-
-                    const uniqueDeck = [];
-                    const seen = new Set();
-                    for (let c of p.deck) {
-                        if (!seen.has(c.id)) { seen.add(c.id); uniqueDeck.push(c); }
-                    }
-
-                    const _elegida = await game.openDeckSearchViewer(card.owner, p.deck, 'BUSCAR EN EL MAZO');
-                    const chosenCard = _elegida ? [_elegida] : [];
-                    if (chosenCard && chosenCard.length > 0) {
-                        const targetInfo = chosenCard[0];
-                        const idx = p.deck.findIndex(c => c.id === targetInfo.id);
-                        if (idx !== -1) {
-                            const target = p.deck[idx];
-                            await animateStackToHand(`${p.id}-deck-stack`, p.id, target.id);
-                            p.deck.splice(idx, 1);
-                            target.location = 'hand';
-                            p.hand.push(target);
-                            game.logMsg(`Añades ${target.name} a la mano desde el mazo.`, 'ability');
-                        }
-                    }
-                    
-                    game.logMsg(`Barajando el mazo de ${game.getDisplayName(p.id)}...`, 'system');
-                    if (typeof animateShuffle === 'function') await animateShuffle(p.id);
-                    game.shuffle(p.deck);
-                    game.render();
-                } else {
-                    game.logMsg(`${card.name} muere, pero decides no buscar información.`, 'system');
-                }
-            }
-            return false;
-        }
+        // Migrada a DSL (trigger AL_MORIR, 21-jul-2026). NO gestionada: busca (si le
+        // queda Furor) y luego muere normal. La búsqueda es un BUSCAR en MAZO sin
+        // filtros (cualquier carta elegible) con preguntarSiempre. Borde documentado:
+        // si aceptas con el mazo VACÍO, la vieja emitía el logIntro+flotante y luego
+        // nada; la nueva no emite nada (sinVacioTrasConfirmar corta antes) — arguably
+        // más correcto (no dice "busca una carta" sin mazo). No se testea ese borde.
+        abilities: [{
+            trigger: 'AL_MORIR',
+            si: { campo: 'furor', op: '>=', valor: 1 },
+            efectos: [
+                { op: 'BUSCAR', en: 'MAZO', cantidad: 1,
+                  preguntarSiempre: true, sinVacioTrasConfirmar: true,
+                  confirmar: { titulo: 'INFORMACIÓN VALIOSA', si: 'BUSCAR CARTA EN EL MAZO', no: 'NO BUSCAR',
+                               logNo: '{carta} muere, pero decides no buscar información.' },
+                  logIntro: '¡INFORMACIÓN VALIOSA se activa! {carta} busca una carta.',
+                  floatingIntro: { texto: 'INFORMACIÓN VALIOSA', estilo: 'ft-ability', offset: -30 },
+                  titulo: 'BUSCAR EN EL MAZO',
+                  log: '{jugador} añade {objetivo} a su mano desde el mazo.',
+                  barajarDespues: { log: 'Barajando el mazo de {jugador}...' } },
+            ],
+        }],
     },
     {
         id: 25, name: "Agah", hp: 6, def: 7, atk: 7, type: "Personaje", subtype: "Ser vivo", tags: ["Mercenario", "Usuario de magia"], gender: 'M', rarity: "B",
@@ -8078,6 +8052,9 @@ const DSL = {
                     if (!(await pregunta())) { if (e.confirmar.logNo) game.logMsg(F(e.confirmar.logNo), 'system'); continue; }
                     confirmado = true;
                     if (lista.length === 0) {
+                        // sinVacioTrasConfirmar: si aceptas pero no hay nada, no se abre
+                        // visor ni se baraja (Goodman al morir con el mazo vacío: no hace nada).
+                        if (e.sinVacioTrasConfirmar) continue;
                         await visorVacio(!!e.barajarDespues);
                         if (e.logNoValidas) game.logMsg(F(e.logNoValidas), 'system');
                         await baraja();
@@ -8095,6 +8072,7 @@ const DSL = {
                     continue;
                 }
                 if (e.logIntro) game.logMsg(F(e.logIntro), e.logIntroTipo || 'ability');
+                if (e.floatingIntro && typeof showFloatingText === 'function') showFloatingText(sourceCard.instanceId, F(e.floatingIntro.texto), e.floatingIntro.estilo || 'ft-ability', e.floatingIntro.offset !== undefined ? e.floatingIntro.offset : -30);
                 if (e.confirmar && !confirmado) {
                     if (!(await pregunta())) { if (e.confirmar.logNo) game.logMsg(F(e.confirmar.logNo), 'system'); continue; }
                 }
