@@ -6582,7 +6582,7 @@ const CARD_DB = [
         // regla GLOBAL_MODIFICAR_FUROR con objetivoSelfId. La elección previa a
         // la colocación (cancelable) vive en ANTES_DE_JUGAR.
         abilities: [
-            { trigger: "PREVIEW_GLOBAL", lineas: [ { campoSelfId: "mafiaTargetId", texto: "Silenciado y sin ganar Furor por su deuda" } ] },
+            { trigger: "PREVIEW_GLOBAL", lineas: [ { campoSelfId: "mafiaTargetId", texto: "Silenciado y sin ganar Furor al inicio de cada turno por su deuda" } ] },
             { trigger: "JUGAR", requisitos: [
                 { count: {}, op: ">=", valor: 1, msg: "Necesitas al menos 1 aliado en el campo para contraer la deuda." } ] },
             { trigger: "ANTES_DE_JUGAR",

@@ -3159,11 +3159,22 @@
                     effects = [...new Set(effects)];
 
                     // --- Eventos Globales inyectando texto a las cartas ---
+                    // curadoOculto/curadoSilencio: si un texto curado ya cubre el concepto
+                    // ("Silenciado y sin ganar Furor..."), la línea genérica automática de
+                    // más abajo (basada en el registro de stats) se omite para no repetirlo.
+                    let curadoOculto = false, curadoSilencio = false;
                     for (let pid of ['p1', 'p2']) {
                         let ev = this.players[pid].activeEvent;
                         if (ev && typeof getCardTemplate(ev.id).onGlobalGetPreviewEffects === 'function') {
                             const extras = getCardTemplate(ev.id).onGlobalGetPreviewEffects(ev, card, this);
-                            if (extras && extras.length > 0) effects.push(...extras);
+                            if (extras && extras.length > 0) {
+                                effects.push(...extras);
+                                extras.forEach(t => {
+                                    const tl = String(t).toLowerCase();
+                                    if (tl.includes('oculto')) curadoOculto = true;
+                                    if (tl.includes('silenciad')) curadoSilencio = true;
+                                });
+                            }
                         }
                     }
 
@@ -3188,8 +3199,8 @@
                         // ("+2 ATQ y +2 DEF, fuente: Overclock" en vez de una entrada por stat)
                         const porFuente = new Map();
                         mods.forEach(m => {
-                            if (m.stat === 'OCULTO') { effects.push(`Oculto, fuente: ${(m.srcId === card.instanceId) ? String(m.fuente).replace(`(${this.nCarta(card)})`, '(esta carta)') : m.fuente}`); return; }
-                            if (m.stat === 'SILENCIO') { effects.push(`Silenciado, fuente: ${(m.srcId === card.instanceId) ? String(m.fuente).replace(`(${this.nCarta(card)})`, '(esta carta)') : m.fuente}`); return; }
+                            if (m.stat === 'OCULTO') { if (!curadoOculto) effects.push(`Oculto, fuente: ${(m.srcId === card.instanceId) ? String(m.fuente).replace(`(${this.nCarta(card)})`, '(esta carta)') : m.fuente}`); return; }
+                            if (m.stat === 'SILENCIO') { if (!curadoSilencio) effects.push(`Silenciado, fuente: ${(m.srcId === card.instanceId) ? String(m.fuente).replace(`(${this.nCarta(card)})`, '(esta carta)') : m.fuente}`); return; }
                             const _fm = (m.srcId === card.instanceId) ? 'esta carta' : m.fuente;
                             const clave = (m.srcId || '') + '|' + _fm;
                             if (!porFuente.has(clave)) porFuente.set(clave, { partes: [], fuente: _fm });
@@ -3225,6 +3236,11 @@
                     // === EFECTOS ACTUALES: a quién está afectando ESTA carta ===
                     const _salientes = [];
                     const _mesaAll = [...this.players.p1.vanguard, ...this.players.p1.rearguard, ...this.players.p2.vanguard, ...this.players.p2.rearguard];
+                    // curadoPorObjetivo: igual que en "Afectado por", evita que la línea
+                    // genérica automática (más abajo) repita un concepto que el texto
+                    // curado ya cubrió para ese mismo objetivo (p. ej. Feria del cómic
+                    // listando "Silenciado" dos veces por carta).
+                    const curadoPorObjetivo = new Map();
                     // Si la carta inspeccionada ES un Evento activo, sus influencias de preview cuentan como salientes
                     for (const _pid of ['p1', 'p2']) {
                         const _ev = this.players[_pid].activeEvent;
@@ -3234,6 +3250,11 @@
                                 _mesaAll.forEach(otra => {
                                     (_tpl.onGlobalGetPreviewEffects(_ev, otra, this) || []).forEach(lin => {
                                         _salientes.push(`${String(lin).replace(/,\s*fuente:.*$/, '')}, objetivo: ${this.getCardNameWithOwner(otra)}`);
+                                        const tl = String(lin).toLowerCase();
+                                        if (!curadoPorObjetivo.has(otra.instanceId)) curadoPorObjetivo.set(otra.instanceId, new Set());
+                                        const _cs = curadoPorObjetivo.get(otra.instanceId);
+                                        if (tl.includes('oculto')) _cs.add('oculto');
+                                        if (tl.includes('silenciad')) _cs.add('silencio');
                                     });
                                 });
                             }
@@ -3252,7 +3273,10 @@
                         }
                         ((this._statMods && this._statMods[otra.instanceId]) || []).forEach(m => {
                             if (m.srcId === card.instanceId || m.srcAltId === card.instanceId) {
-                                _salientes.push(m.stat === 'OCULTO' ? `Oculto, objetivo: ${this.getCardNameWithOwner(otra)}` : m.stat === 'SILENCIO' ? `Silenciado, objetivo: ${this.getCardNameWithOwner(otra)}` : `${m.delta > 0 ? '+' : ''}${m.delta} ${m.stat}, objetivo: ${this.getCardNameWithOwner(otra)}`);
+                                const _cs = curadoPorObjetivo.get(otra.instanceId);
+                                if (m.stat === 'OCULTO') { if (!_cs || !_cs.has('oculto')) _salientes.push(`Oculto, objetivo: ${this.getCardNameWithOwner(otra)}`); return; }
+                                if (m.stat === 'SILENCIO') { if (!_cs || !_cs.has('silencio')) _salientes.push(`Silenciado, objetivo: ${this.getCardNameWithOwner(otra)}`); return; }
+                                _salientes.push(`${m.delta > 0 ? '+' : ''}${m.delta} ${m.stat}, objetivo: ${this.getCardNameWithOwner(otra)}`);
                             }
                         });
                         [...(otra.tempEffects || []), ...(otra.activeEffects || [])].forEach(eff => {
