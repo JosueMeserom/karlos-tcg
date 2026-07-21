@@ -2402,23 +2402,11 @@ const CARD_DB = [
     },
     {
         name: "Limo primario", hp: 4, def: 4, atk: 3, type: "Esbirro", subtype: "Ser vivo", tags: ["Animal salvaje"], rarity: "A",
-        text: "P: CRECIMIENTO IMPARABLE: Puede rebasar su Vida máxima al curarse (hasta 9).", 
+        text: "P: CRECIMIENTO IMPARABLE: Puede rebasar su Vida máxima al curarse (hasta 9).",
         passiveName: "CRECIMIENTO IMPARABLE", series: 1,
-        
-        onBeforeHealed: function(card, amount, source, game) {
-            const newTotal = card.currentHp + amount;
-            if (newTotal > card.maxHp) {
-                const newMax = Math.min(9, newTotal);
-                if (newMax > card.maxHp) {
-                    const diff = newMax - card.maxHp;
-                    card.maxHp = newMax;
-                    game.logMsg(`¡${card.passiveName}! El Limo primario expande su Vida a ${newMax}.`, 'ability');
-                    showFloatingText(card.instanceId, card.passiveName, "ft-ability", -40);
-                    showFloatingText(card.instanceId, `+${diff} VIDA MÁX.`, "ft-green", -20);
-                }
-            }
-            return amount;
-        }
+        abilities: [
+            { trigger: "SOBRECURACION", max: 9, log: "¡{pasiva}! El {carta} expande su Vida a {max}." }
+        ],
     },
     {
         name: "Sadame (retornada)", hp: 4, def: 4, atk: 7, type: "Personaje", subtype: "No-muerto", tags: ["Usuaria de magia"], gender: "F", rarity: "S",
@@ -3860,35 +3848,12 @@ const CARD_DB = [
         name: "Elemental sanador", hp: 3, def: 2, atk: 1, type: "Esbirro", subtype: "Ser mágico", rarity: "C", cost: 1, series: 1,
         text: "A: RECIEDAD (1F): Elimina todos los estados alterados que sufran tus aliados.",
         activeName: "RECIEDAD", activeCost: 1,
-        canActivateAbility: function(card, game) {
-            if (card.furor < 1) { game.logError("Falta Furor (1)."); return false; }
-            return true;
-        },
-        onExecuteAbility: async function(card, game) {
-            game.modifyStat(card, 'furor', -1);
-            showFloatingText(card.instanceId, "RECIEDAD", "ft-ability", -30);
-            game.logMsg(`¡El ${card.name} emite una luz purificadora que limpia a tus aliados!`, 'ability');
-            
-            const p = game.players[card.owner];
-            [...p.vanguard, ...p.rearguard].forEach(ally => {
-                if (ally.status) {
-                    let cleaned = false;
-                    if (ally.status.dot) { delete ally.status.dot; cleaned = true; }
-                    if (ally.status.confusion) { delete ally.status.confusion; cleaned = true; }
-                    if (ally.status.ceguera) { delete ally.status.ceguera; cleaned = true; }
-                    if (ally.status.sueno) { delete ally.status.sueno; cleaned = true; }
-                    if (cleaned) {
-                        showFloatingText(ally.instanceId, "LIMPIO", "ft-green", -20);
-                    }
-                }
-            });
-            
-            card.exhausted = true;
-            game.isActionLocked = false;
-            game.cancelAction();
-            game.updatePassives();
-            game.render();
-        }
+        abilities: [
+            { trigger: "ACTIVA", nombre: "RECIEDAD", coste: { furor: 1 }, sinObjetivo: true,
+              log: "¡El {carta} emite una luz purificadora que limpia a tus aliados!", logTipo: "ability",
+              efectos: [
+                { op: "LIMPIAR_ESTADOS", estados: ["dot", "confusion", "ceguera", "sueno"], floating: "LIMPIO", floatingStyle: "ft-green", offsetFloating: -20 } ] }
+        ],
     },
     {
         name: "Valafar", hp: 4, def: 5, atk: 8, type: "Personaje", subtype: "Ser vivo", tags: ["Belfegor"], gender: "M", rarity: "S", cost: 1, series: 1,
@@ -4471,13 +4436,10 @@ const CARD_DB = [
         name: "Muro parlante", hp: 5, def: 7, atk: 0, type: "Esbirro", subtype: "Ser mágico", tags: ["Cosa"], rarity: "C", cost: 1, series: 1,
         text: "P: INAMOVIBLE: Mientras tenga 0 de Atq, no puede realizar ataques normales.",
         passiveName: "INAMOVIBLE",
-        canAttackNormally: function(card, game) {
-            if (card.currentAtk <= 0) {
-                game.logError("INAMOVIBLE: Muro parlante no puede atacar mientras su ATQ sea 0 o menor.");
-                return false;
-            }
-            return true;
-        }
+        abilities: [
+            { trigger: "PUEDE_ATACAR", si: { campo: "currentAtk", op: ">", valor: 0 },
+              msg: "INAMOVIBLE: {carta} no puede atacar mientras su ATQ sea 0 o menor." }
+        ],
     },
     {
         name: "Canceladora", tempEffectText: "Cancelado: perderá su próximo turno", type: "Ayuda", subtype: "Arma", tags: ["Consumible", "a distancia"], rarity: "B", cost: 1, series: 1,
@@ -6261,52 +6223,24 @@ const CARD_DB = [
         name: "Alumno con VP", hp: 2, def: 1, atk: 3, type: "Esbirro", subtype: "Ser vivo", tags: ["Usuario de VP", "Estudioso"], rarity: "C", cost: 1, series: 2,
         text: "A: ACERTIJO (1F): Moneda. Cara: Elige enemigo y le quita 2 Furor. Cruz: Rival elige enemigo y le quita 1 Furor.",
         activeName: "ACERTIJO", activeCost: 1,
-        canActivateAbility: function(card, game) {
-            if (card.furor < 1) { game.logError("Falta Furor (1)."); return false; }
-            return true;
-        },
-        onExecuteAbility: async function(card, game) {
-            game.modifyStat(card, 'furor', -1);
-            showFloatingText(card.instanceId, "ACERTIJO", "ft-ability", -30);
-            game.isActionLocked = true;
-            
-            const results = await game.triggerCoinFlips(1, card.owner);
-            if (!results) { game.cancelAction(); return; }
-
-            const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
-            const enemyP = game.players[enemyId];
-            const validEnemies = [...enemyP.vanguard, ...enemyP.rearguard].filter(c => !getCardTemplate(c.id).isAvatar);
-
-            if (validEnemies.length === 0) {
-                game.logError("No hay enemigos para escuchar el acertijo.");
-                card.exhausted = true;
-                game.isActionLocked = false;
-                game.cancelAction();
-                game.render();
-                return;
-            }
-
-            if (results[0] === 'heads') {
-                game.logMsg("Moneda: CARA - Tú eliges a quién vaciarle la mente.", 'ability');
-                const chosen = await game.openVisualSearchModal('ACERTIJO (CARA): TÚ ELIGES (-2 FUR)', validEnemies, 1, true, card.owner);
-                if (chosen && chosen.length > 0) {
-                    game.modifyStat(chosen[0], 'furor', -2);
-                    game.logMsg(`¡${chosen[0].name} no sabe la respuesta y pierde 2 de Furor!`, 'ability');
-                }
-            } else {
-                game.logMsg("Moneda: CRUZ - El rival decide quién de sus tropas sufrirá la jaqueca.", 'ability');
-                const chosen = await game.openVisualSearchModal('ACERTIJO (CRUZ): ELIGE UN ALIADO PARA PERDER 1 FUR', validEnemies, 1, true, enemyId);
-                if (chosen && chosen.length > 0) {
-                    game.modifyStat(chosen[0], 'furor', -1);
-                    game.logMsg(`El rival decide sacrificar 1 Furor de ${chosen[0].name}.`, 'ability');
-                }
-            }
-            
-            card.exhausted = true;
-            game.isActionLocked = false;
-            game.cancelAction();
-            game.render();
-        }
+        // Migrada al DSL. Cambio de comportamiento deliberado: la comprobación de
+        // "hay enemigos" pasa a requisitos (como Contendiente/Sra. Kumicho), así que
+        // se evalúa ANTES de pagar el Furor y lanzar la moneda. La imperativa
+        // gastaba ambos igualmente cuando no había objetivos válidos.
+        abilities: [
+            { trigger: "ACTIVA", nombre: "ACERTIJO", coste: { furor: 1 }, sinObjetivo: true,
+              requisitos: [ { count: { quien: "ENEMIGO" }, op: ">=", valor: 1, msg: "No hay enemigos para escuchar el acertijo." } ],
+              efectos: [
+                { op: "MONEDA",
+                  logCara: { msg: "Moneda: CARA - Tú eliges a quién vaciarle la mente.", tipo: "ability" },
+                  cara: [
+                    { op: "ELEGIR", de: "ENEMIGOS", cantidad: 1, forzarModal: true, titulo: "ACERTIJO (CARA): TÚ ELIGES (-2 FUR)",
+                      efectos: [ { op: "MODIFICAR_STAT", stat: "furor", delta: -2, log: "¡{objetivo} no sabe la respuesta y pierde 2 de Furor!" } ] } ],
+                  logCruz: { msg: "Moneda: CRUZ - El rival decide quién de sus tropas sufrirá la jaqueca.", tipo: "ability" },
+                  cruz: [
+                    { op: "ELEGIR", de: "ENEMIGOS", elegidoPor: "RIVAL", cantidad: 1, forzarModal: true, titulo: "ACERTIJO (CRUZ): ELIGE UN ALIADO PARA PERDER 1 FUR",
+                      efectos: [ { op: "MODIFICAR_STAT", stat: "furor", delta: -1, log: "El rival decide sacrificar 1 Furor de {objetivo}." } ] } ] } ] }
+        ],
     },
     {
         name: "Frikazo", hp: 3, def: 2, atk: 2, type: "Esbirro", subtype: "Ser vivo", tags: ["Estudioso", "Otaku"], rarity: "C", cost: 1, series: 2,
@@ -7912,7 +7846,7 @@ const KARLOS_RULES = {
 //  Valores: número | {COUNT:{...}} | {REF:"objetivo.furorMax"} (campos computados)
 // ===================================================================
 const DSL = {
-    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE', 'AURA', 'ANTES_DE_JUGAR'],
+    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE', 'AURA', 'ANTES_DE_JUGAR', 'PUEDE_ATACAR', 'SOBRECURACION'],
     OPS_EFECTO: ['MODIFICAR_STAT', 'CURAR', 'DAÑO', 'APLICAR_ESTADO', 'MODIFICAR_CONTADORES', 'ATACAR', 'MONEDA', 'ROBAR', 'BUSCAR', 'MARCAR', 'VER_MANO', 'LIMPIAR_ESTADOS', 'ELEGIR', 'DESTRUIR_EVENTO', 'MARCAR_TEMPORAL', 'DESCARTAR', 'EQUIPAR', 'MARCAR_JUGADOR', 'FLOTANTE', 'FIJAR_STAT'],
     OPS_CMP: ['==', '!=', '<=', '>=', '<', '>', 'includes', 'truthy', 'falsy'],
     QUIEN: ['SELF', 'ALIADO', 'ENEMIGO', 'TODOS', 'ATACANTE', 'DEFENSOR'], // los dos últimos solo tienen sentido en GLOBAL_TRAS_ATAQUE
@@ -8339,6 +8273,11 @@ const DSL = {
             };
             const dn = typeof game.getDisplayName === 'function' ? game.getDisplayName(ownerId) : ownerId;
             const F = (t) => DSL._fill(t, { carta: sourceCard.name, jugador: dn });
+            // elegidoPor: "RIVAL" -> quien clica/decide es el rival del dueño de la
+            // carta (p. ej. ACERTIJO en cruz). El pool sigue siendo relativo al
+            // DUEÑO (de:"ENEMIGOS" = el rival, elija quien elija); solo cambia el
+            // destinatario del modal/banner de "esperando a...".
+            const chooserId = e.elegidoPor === 'RIVAL' ? (ownerId === 'p1' ? 'p2' : 'p1') : ownerId;
             if (pool.length < n) return e.opcional ? 'skip' : false;
             if (e.autoSiUnica && pool.length === n) {
                 // Única opción posible: se toma sola, sin preguntar (como el pagador único del Té)
@@ -8352,8 +8291,11 @@ const DSL = {
                 if (e.logDespues) game.logMsg(F(e.logDespues), e.logDespuesTipo || 'ability');
                 return true;
             }
-            // Selección-en-tablero (estilo Bi-choque/Manzanahoria) para mesa; la MANO sigue usando el modal visual
-            if (e.de !== 'MANO' && !e.forzarModal && typeof game.pickBoardTargets === 'function') {
+            // Selección-en-tablero (estilo Bi-choque/Manzanahoria) para mesa; la MANO
+            // sigue usando el modal visual, y elegidoPor SIEMPRE fuerza el modal
+            // (pickBoardTargets no sabe abrir el prompt de "esperando a X" para un
+            // clic que no es del jugador activo).
+            if (e.de !== 'MANO' && !e.forzarModal && !e.elegidoPor && typeof game.pickBoardTargets === 'function') {
                 const sel = await game.pickBoardTargets(pool, n, DSL._fill(e.titulo || 'Elige objetivo', { carta: sourceCard.name }) + ' (clic en el tablero; X para cancelar)', sourceCard);
                 if (!sel) { if (e.logCancela && !e.opcional) game.logError(F(e.logCancela)); return e.opcional ? 'skip' : false; }
                 if (e.guardaEn && sel[0]) { DSL._vars = DSL._vars || {}; (DSL._vars[sourceCard.instanceId] = DSL._vars[sourceCard.instanceId] || {})[e.guardaEn] = DSL._nombre(game, sel[0]); }
@@ -8371,11 +8313,11 @@ const DSL = {
                     game.openChoiceModal(F(e.confirmar.titulo), [
                         { label: e.confirmar.si, action: () => resolve(true) },
                         { label: e.confirmar.no || 'CANCELAR', action: () => resolve(false) }
-                    ], ownerId);
+                    ], chooserId);
                 });
                 if (!quiere) return e.opcional ? 'skip' : false;
             }
-            const sel = await game.openVisualSearchModal(F(e.titulo || 'ELIGE'), pool, n, e.autoSeleccion !== false, ownerId);
+            const sel = await game.openVisualSearchModal(F(e.titulo || 'ELIGE'), pool, n, e.autoSeleccion !== false, chooserId);
             if (!sel || sel.length < n) { if (e.logCancela && !e.opcional) game.logError(F(e.logCancela)); return e.opcional ? 'skip' : false; }
             if (e.guardaEn && sel[0]) { DSL._vars = DSL._vars || {}; (DSL._vars[sourceCard.instanceId] = DSL._vars[sourceCard.instanceId] || {})[e.guardaEn] = DSL._nombre(game, sel[0]); }
             _guarda(sel);
@@ -8641,7 +8583,44 @@ const DSL = {
                 };
             }
             if (activa.ataqueNormal) tmpl.abilityUsesAttack = true; // el motor veta la activación temprano si un interceptor lo pide
+
+            // Cuerpo compartido por ambos caminos (con y sin selección de objetivo):
+            // paga coste, floating del nombre, corre los efectos y CIERRA LA ACCIÓN.
+            // Fix (betasteo previo al catch): las dos únicas Activas DSL que existían
+            // (BOMBAZO, PUÑALADA) usan ATACAR, que se cierra a sí misma vía
+            // performAttack (agota, renderiza, sincroniza) — enmascaraba que ESTE
+            // cierre genérico nunca se ejecutaba. Cualquier Activa sin ATACAR se
+            // habría quedado sin agotar la carta ni soltar el candado de acción.
+            // El guard `!card.exhausted` evita duplicar el cierre cuando sí atacó.
+            const _ejecutarActiva = async (card, game, targets) => {
+                if (costeFuror > 0) game.modifyStat(card, 'furor', -costeFuror);
+                if (typeof showFloatingText === 'function') {
+                    showFloatingText(card.instanceId, card.activeName, 'ft-ability', -30);
+                    (activa.floatingExtra || []).forEach(fe => showFloatingText(card.instanceId, fe.texto, fe.estilo || 'ft-green', fe.offset !== undefined ? fe.offset : -10));
+                }
+                if (activa.log) game.logMsg(DSL._fill(activa.log, { carta: card.name }), activa.logTipo || 'ability');
+                await DSL._runEffectList(activa.efectos, card, game, card.owner, targets, activa.nombre || tmpl.activeName || null);
+                if (!card.exhausted) {
+                    card.exhausted = true;
+                    game.isActionLocked = false;
+                    game.cancelAction();
+                    game.updatePassives();
+                    if (typeof game.render === 'function') game.render();
+                    game.forceSync();
+                }
+            };
+
             tmpl.onExecuteAbility = function (card, game) {
+                if (activa.sinObjetivo) {
+                    // Sin fase de selección: la propia carta es el "objetivo" implícito
+                    // (autobuffs, monedas con elección interna vía ELEGIR, fichas...).
+                    game.selectedCard = card;
+                    game.isActionLocked = true;
+                    game.inputState = 'EXECUTING';
+                    game.render();
+                    _ejecutarActiva(card, game, [card]).then(() => game.forceSync());
+                    return;
+                }
                 game.selectedCard = card;
                 game.inputState = 'SELECT_ABILITY_TARGETS';
                 const cx = { targets: [], maxTargets: cant, name: activa.nombre || tmpl.activeName, targetType: tt };
@@ -8662,15 +8641,46 @@ const DSL = {
             }
             if (typeof tmpl.onTargetsReady !== 'function') {
                 tmpl.onTargetsReady = async function (card, game) {
-                    const targets = game.abilityContext.targets;
-                    if (costeFuror > 0) game.modifyStat(card, 'furor', -costeFuror);
-                    if (typeof showFloatingText === 'function') {
-                        showFloatingText(card.instanceId, card.activeName, 'ft-ability', -30);
-                        (activa.floatingExtra || []).forEach(fe => showFloatingText(card.instanceId, fe.texto, fe.estilo || 'ft-green', fe.offset !== undefined ? fe.offset : -10));
-                    }
-                    await DSL._runEffectList(activa.efectos, card, game, card.owner, targets, activa.nombre || tmpl.activeName || null);
+                    await _ejecutarActiva(card, game, game.abilityContext.targets);
                 };
             }
+        }
+
+        // PUEDE_ATACAR -> canAttackNormally: consulta de veto de ataque normal por
+        // condición (p. ej. Muro parlante: solo puede atacar con Atq > 0).
+        const puedeAtacar = abs.find(a => a.trigger === 'PUEDE_ATACAR');
+        if (puedeAtacar && typeof tmpl.canAttackNormally !== 'function') {
+            tmpl.canAttackNormally = function (card, game) {
+                if (puedeAtacar.si && !DSL._cond(card, game, puedeAtacar.si)) {
+                    if (puedeAtacar.msg) game.logError(DSL._fill(puedeAtacar.msg, { carta: card.name }));
+                    return false;
+                }
+                return true;
+            };
+        }
+
+        // SOBRECURACION -> onBeforeHealed: permite rebasar la Vida máxima al curarse,
+        // hasta un tope. El hook ya vive en la primitiva CURAR ("variante estándar");
+        // esto solo lo declara para pasivas de expansión de Vida (Limo primario).
+        const sobrecuracion = abs.find(a => a.trigger === 'SOBRECURACION');
+        if (sobrecuracion && typeof tmpl.onBeforeHealed !== 'function') {
+            tmpl.onBeforeHealed = function (card, amount, source, game) {
+                const newTotal = card.currentHp + amount;
+                if (newTotal > card.maxHp) {
+                    const newMax = Math.min(sobrecuracion.max || 9, newTotal);
+                    if (newMax > card.maxHp) {
+                        const diff = newMax - card.maxHp;
+                        card.maxHp = newMax;
+                        const relleno = { carta: card.name, pasiva: tmpl.passiveName || sobrecuracion.nombre || 'SOBRECURACIÓN', max: newMax };
+                        game.logMsg(DSL._fill(sobrecuracion.log || '¡{pasiva}! {carta} expande su Vida a {max}.', relleno), 'ability');
+                        if (typeof showFloatingText === 'function') {
+                            showFloatingText(card.instanceId, relleno.pasiva, 'ft-ability', -40);
+                            showFloatingText(card.instanceId, `+${diff} VIDA MÁX.`, 'ft-green', -20);
+                        }
+                    }
+                }
+                return amount;
+            };
         }
 
         // GLOBAL_TRAS_ATAQUE -> onGlobalAfterAttack (eventos activos): reacciona a CUALQUIER ataque resuelto.

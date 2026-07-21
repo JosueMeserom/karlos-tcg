@@ -580,7 +580,11 @@ async function ejecutarPaso(ctx, inst, paso) {
 async function ejecutarEscenario(cual, esc) {
     const ctx = crearContexto(cual);
     ctx.semilla = esc.semilla !== undefined ? esc.semilla : 1;
-    ctx.monedas = (esc.monedas || []).map(m => m === 'cara' ? 'heads' : m === 'cruz' ? 'tails' : m);
+    // esc.monedas admite array (simétrico, de siempre) u objeto {vieja:[...], nueva:[...]}
+    // para flujos que divergen en CUÁNTAS monedas se piden (p. ej. un requisito
+    // nuevo que corta el camino antes de llegar a la moneda en una sola base).
+    const _monedasCrudas = Array.isArray(esc.monedas) ? esc.monedas : (esc.monedas ? esc.monedas[cual] || [] : []);
+    ctx.monedas = _monedasCrudas.map(m => m === 'cara' ? 'heads' : m === 'cruz' ? 'tails' : m);
 
     const inst = crearJuego(ctx);
     await asentar(ctx); // timers del constructor (chat de fin de partida, etc.)
