@@ -3000,6 +3000,7 @@ const CARD_DB = [
             { trigger: "JUGAR", requisitos: [
                 { count: { filtros: [ { o: [ [ { campo: "tags", op: "includes", valor: "Draconiana" } ], [ { campo: "tags", op: "includes", valor: "Draconiano" } ] ] }, { campo: "furor", op: ">=", valor: 2 } ] }, op: ">=", valor: 1, msg: "Necesitas un aliado Draconiano/a con al menos 2 de Furor." } ] },
             { trigger: "AL_EQUIPAR",
+              mientrasEquipado: { atk: 3 },
               efectos: [
                 { op: "ELEGIR", de: "ALIADOS", filtros: [ { o: [ [ { campo: "tags", op: "includes", valor: "Draconiana" } ], [ { campo: "tags", op: "includes", valor: "Draconiano" } ] ] }, { campo: "furor", op: ">=", valor: 2 } ], cantidad: 1,
                   titulo: "¿QUIÉN ENTRA EN FURIA? (-2 FUROR)",
@@ -3009,11 +3010,6 @@ const CARD_DB = [
                       floats: [ { texto: "FURIA BERSERKER", estilo: "ft-ability", offset: -40 }, { texto: "+3 ATQ (EQUIPADO)", estilo: "ft-green", offset: -20 } ],
                       log: "{objetivo} se equipa con Furia berserker (+3 ATQ)." } ] } ] }
         ],
-        
-        // Hook llamado por el motor automáticamente desde updatePassives
-        onEquipUpdate: function(equipCard, target, game) {
-            target.currentAtk += 3;
-        },
     },
     {
         name: "Pago por adelantado", type: "Ayuda", subtype: "Técnica", tags: ["Consumible"], rarity: "C", series: 1, cost: 0,
@@ -3203,6 +3199,7 @@ const CARD_DB = [
                 { de: "JUGADOR", campo: "hasUsedShichishito", op: "falsy", msg: "Ya has usado Shichishito en esta partida." },
                 { count: { zona: "VANGUARDIA", filtros: [ { campo: "type", op: "==", valor: "Personaje" }, { campo: "name", op: "contieneTexto", valor: "Karlos" } ] }, op: ">=", valor: 1, msg: "Necesitas a Karlos en la vanguardia." } ] },
             { trigger: "AL_EQUIPAR",
+              mientrasEquipado: { atk: 2, def: 2 },
               efectos: [
                 { op: "ELEGIR", de: "ALIADOS", zona: "VANGUARDIA", filtros: [ { campo: "type", op: "==", valor: "Personaje" }, { campo: "name", op: "contieneTexto", valor: "Karlos" } ], cantidad: 1,
                   titulo: "¿QUIÉN EMPUÑA LA SHICHISHITO?",
@@ -3212,10 +3209,6 @@ const CARD_DB = [
                       floats: [ { texto: "SHICHISHITO", estilo: "ft-ability", offset: -40 }, { texto: "+2 ATQ / +2 DEF", estilo: "ft-green", offset: -20 } ],
                       log: "{objetivo} empuña la legendaria arma Shichishito." } ] } ] }
         ],
-        onEquipUpdate: function(equipCard, target, game) {
-            target.currentAtk += 2;
-            target.currentDef += 2;
-        },
     },
     {
         name: "Kami", hp: 3, def: 9, atk: 9, type: "Personaje", subtype: "Ser vivo", tags: ["Usuaria de VP"], gender: "F", rarity: "S", cost: 0, series: 1,
@@ -3462,44 +3455,27 @@ const CARD_DB = [
     {
         name: "Espada V", type: "Ayuda", subtype: "Arma", cost: 1, rarity: "B", series: 1,
         text: "Equipable, melé. Anexa a un Personaje aliado llamado 'Karlos' o 'Agah'. +2 Atq. Sólo puedes usar esta carta una vez por partida.",
-        canPlayCard: function(card, game, player) {
-            // El flag espadaV_Used impide jugar OTRA Espada V en la misma partida
-            if (player.espadaV_Used) {
-                game.logError("Ya has empuñado la Espada V en esta partida.");
-                return false;
-            }
-            const valid = [...player.vanguard, ...player.rearguard].some(c => (c.name.includes("Karlos") || c.name.includes("Agah")) && !getCardTemplate(c.id).isAvatar);
-            if (!valid) game.logError("No hay ningún Karlos ni Agah aliado en el campo.");
-            return valid;
-        },
-        onPlay: function(card, game) {
-            game.selectedCard = card;
-            game.inputState = 'SELECT_AYUDA_TARGET';
-            game.logError("Elige a Karlos o Agah para empuñar la Espada V.");
-            game.render();
-        },
-        onValidateTarget: function(card, target, game, isSilent) {
-            if (target.owner !== card.owner) return false;
-            if (!target.name.includes("Karlos") && !target.name.includes("Agah")) {
-                if (!isSilent) game.logMsg("Solo puede equiparse a Karlos o Agah.");
-                return false;
-            }
-            return true;
-        },
-        onExecuteAyuda: async function(card, target, game) {
-            const p = game.players[card.owner];
-            p.espadaV_Used = true; // Candado para toda la partida
-            
-            game.logMsg(`¡${target.name} empuña la mítica ${card.name}!`, 'ability');
-            
-            if (!target.equippedCards) target.equippedCards = [];
-            target.equippedCards.push(card);
-            card.equippedTo = target.instanceId;
-            return true;
-        },
-        onEquipUpdate: function(equipCard, hostCard, game) {
-            hostCard.currentAtk += 2;
-        }
+        abilities: [
+            { trigger: "JUGAR", requisitos: [
+                { de: "JUGADOR", campo: "espadaV_Used", op: "falsy", msg: "Ya has empuñado la Espada V en esta partida." },
+                { count: { filtros: [ { o: [ [ { campo: "name", op: "contieneTexto", valor: "Karlos" } ], [ { campo: "name", op: "contieneTexto", valor: "Agah" } ] ] } ] }, op: ">=", valor: 1, msg: "No hay ningún Karlos ni Agah aliado en el campo." } ] },
+            // AL_USAR_AYUDA (no AL_EQUIPAR): la vieja usaba onValidateTarget/onExecuteAyuda
+            // -selección-en-tablero directa sobre la carta, sin ELEGIR-, y ese pipeline
+            // (executeAyuda en index.html) es quien mueve la carta jugada de la mano a
+            // descartes SIEMPRE que onExecuteAyuda devuelva true — el propio EQUIPAR (con
+            // soloAnexar) no toca la mano. Mismo patrón exacto que Infusión de maná (arriba):
+            // el equipo queda a la vez anexado (equippedCards, con su buff) y físicamente en
+            // descartes (location:'discard'). Es una rareza del motor, no un bug de esta
+            // carta en concreto: se replica fielmente en vez de "limpiarla" en la migración.
+            { trigger: "AL_USAR_AYUDA",
+              mientrasEquipado: { atk: 2 },
+              requisitosObjetivo: [
+                { o: [ [ { campo: "name", op: "contieneTexto", valor: "Karlos" } ], [ { campo: "name", op: "contieneTexto", valor: "Agah" } ] ], msg: "Solo puede equiparse a Karlos o Agah." } ],
+              efectos: [
+                { op: "MARCAR_JUGADOR", campo: "espadaV_Used", valor: true },
+                { op: "EQUIPAR", soloAnexar: true,
+                  log: "{objetivo} empuña la mítica Espada V." } ] }
+        ],
     },
     {
         name: "Kazuo", hp: 3, def: 5, atk: 5, type: "Personaje", subtype: "Ser vivo", tags: ["Samurái"], gender: "M", rarity: "A", cost: 4, series: 1,
@@ -4319,6 +4295,7 @@ const CARD_DB = [
             { trigger: "JUGAR", requisitos: [
                 { count: { filtros: [ { no: true, campo: "tags", op: "includes", valor: "Cosa" } ] }, op: ">=", valor: 1, msg: "No tienes aliados válidos (sin etiqueta 'Cosa')." } ] },
             { trigger: "AL_EQUIPAR",
+              mientrasEquipado: { def: 3, atk: -3 },
               efectos: [
                 { op: "ELEGIR", de: "ALIADOS", filtros: [ { no: true, campo: "tags", op: "includes", valor: "Cosa" } ], cantidad: 1,
                   titulo: "¿QUIÉN SE PONE LA CHAQUETA METÁLICA?",
@@ -4327,10 +4304,6 @@ const CARD_DB = [
                       floats: [ { texto: "CHAQUETA METÁLICA", estilo: "ft-ability", offset: -40 }, { texto: "+3 DEF / -3 ATQ", estilo: "ft-green", offset: -20 } ],
                       log: "{objetivo} se pone la Chaqueta (+3 Def, -3 Atq)." } ] } ] }
         ],
-        onEquipUpdate: function(equipCard, target, game) {
-            target.currentDef += 3;
-            target.currentAtk -= 3;
-        },
     },
     {
         name: "Muro parlante", hp: 5, def: 7, atk: 0, type: "Esbirro", subtype: "Ser mágico", tags: ["Cosa"], rarity: "C", cost: 1, series: 1,
@@ -8516,6 +8489,23 @@ const DSL = {
         }
 
         const usar = abs.find(a => a.trigger === 'AL_USAR_AYUDA');
+
+        // mientrasEquipado (campo hermano de efectos, declarable en AL_EQUIPAR -equipos con
+        // flujo onPlay directo, p. ej. Furia berserker- o en AL_USAR_AYUDA -equipos con flujo
+        // de selección de objetivo, p. ej. Espada V, que no necesita AL_EQUIPAR en absoluto-)
+        // -> onEquipUpdate: buff continuo y SILENCIOSO (sin floating/log — el aviso visual ya
+        // salió UNA VEZ en el EQUIPAR) mientras la carta siga anexada. El motor resetea
+        // currentAtk/currentDef a la plantilla en cada updatePassives y llama a este hook para
+        // reaplicar el delta; de ahí que sea pura suma, no un efecto de una vez.
+        const _fuenteBuff = (equipar && equipar.mientrasEquipado) ? equipar : (usar && usar.mientrasEquipado) ? usar : null;
+        if (_fuenteBuff && typeof tmpl.onEquipUpdate !== 'function') {
+            tmpl.onEquipUpdate = function (equipCard, hostCard, game) {
+                const m = _fuenteBuff.mientrasEquipado;
+                if (m.atk) hostCard.currentAtk += m.atk;
+                if (m.def) hostCard.currentDef += m.def;
+            };
+        }
+
         if (usar && typeof tmpl.onValidateTarget !== 'function') {
             // El motor usa este hook (en silencio) para decidir qué cartas llevan reborde de objetivo válido,
             // y (con voz) para explicar el rechazo al clicar. Se deriva de los requisitos + viabilidad de efectos.
