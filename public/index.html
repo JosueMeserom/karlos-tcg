@@ -3206,24 +3206,28 @@
                     let _txtBase = card.text;
                     let resultHtml = "";
                     const _obien = (v) => v.split(/\s+o bien\s+/i).map(s => s.trim()).join('<span class="coste-obien">o bien</span>');
+                    // Fila REQUISITO/COSTE: label SIEMPRE pegado a la izquierda (space-between), valor a la derecha.
                     const _fila = (label, valor) => `<span class="ev-dur-label">${label}</span><span class="ev-dur-value" style="font-size:0.78rem; text-align:right; max-width:72%; line-height:1.35;">${_obien(valor)}</span>`;
                     // 1) HÍBRIDA "Requisito: X o bien Coste: Y." -> UNA caja apilada: el Requisito
-                    //    arriba, "o bien" centrado, el Coste debajo. El requisito va primero porque
-                    //    se prefiere/verifica antes que pagar el coste (norma de Toto, 23-jul-2026).
+                    //    arriba, "o bien" centrado (con padding vertical simétrico propio, sin
+                    //    depender del gap ni del transform del .coste-obien, que descentraban), el
+                    //    Coste debajo. El requisito va primero porque se prefiere/verifica antes que
+                    //    pagar el coste (norma de Toto, 23-jul-2026).
                     let _mH;
                     while ((_mH = _txtBase.match(/^Requisito:\s*(.+?)\s+o bien\s+Coste:\s*(.+?)\.\s*/i))) {
-                        resultHtml += `<div class="ev-dur-box" style="flex-direction:column; align-items:stretch; gap:5px;">`
-                            + `<div style="display:flex; justify-content:space-around; align-items:center;">${_fila('REQUISITO', _mH[1])}</div>`
-                            + `<span class="coste-obien" style="margin:0; align-self:center;">o bien</span>`
-                            + `<div style="display:flex; justify-content:space-around; align-items:center;">${_fila('COSTE', _mH[2])}</div>`
+                        resultHtml += `<div class="ev-dur-box" style="flex-direction:column; align-items:stretch; gap:0;">`
+                            + `<div style="display:flex; justify-content:space-between; align-items:center;">${_fila('REQUISITO', _mH[1])}</div>`
+                            + `<div style="text-align:center; padding:5px 0; line-height:1;"><span class="coste-obien" style="margin:0; transform:none; vertical-align:baseline;">o bien</span></div>`
+                            + `<div style="display:flex; justify-content:space-between; align-items:center;">${_fila('COSTE', _mH[2])}</div>`
                             + `</div>`;
                         _txtBase = _txtBase.slice(_mH[0].length);
                     }
-                    // 2) SIMPLES "Coste: X." / "Requisito: Y." sueltos (cada uno su propia caja; el
-                    //    "o bien" dentro de un mismo valor se formatea inline).
+                    // 2) SIMPLES "Coste: X." / "Requisito: Y." sueltos (cada uno su propia caja, con
+                    //    el label también pegado a la izquierda; el "o bien" dentro de un mismo valor
+                    //    se formatea inline).
                     let _mCab;
                     while ((_mCab = _txtBase.match(/^(Coste|Requisito):\s*(.+?)\.\s*/))) {
-                        resultHtml += `<div class="ev-dur-box">${_fila(_mCab[1].toUpperCase(), _mCab[2])}</div>`;
+                        resultHtml += `<div class="ev-dur-box" style="justify-content:space-between;">${_fila(_mCab[1].toUpperCase(), _mCab[2])}</div>`;
                         _txtBase = _txtBase.slice(_mCab[0].length);
                     }
                     let currentMode = "text"; 

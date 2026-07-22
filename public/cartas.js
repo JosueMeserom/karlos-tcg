@@ -3031,7 +3031,7 @@ const CARD_DB = [
     },
     {
         name: "Cápsula de bio-regeneración", type: "Ayuda", subtype: "Tecnología", tags: ["Consumible"], rarity: "B", series: 2, cost: 0,
-        text: "Coste: Tu vanguardia llena. Elige de tu descarte un 'Ser vivo' sin condiciones de colocación y colócalo en retaguardia.",
+        text: "Requisito: Tu vanguardia llena. Elige de tu descarte un 'Ser vivo' sin condiciones de colocación y colócalo en retaguardia.",
         abilities: [
             { trigger: "JUGAR", requisitos: [
                 { count: { zona: "VANGUARDIA" }, op: ">=", valor: 4, msg: "Tu vanguardia debe estar llena (4 cartas)." },
@@ -4654,7 +4654,7 @@ const CARD_DB = [
     },
     {
         name: "Berry", hp: 2, def: 1, atk: 1, type: "Personaje", subtype: "Ser vivo", tags: ["Usuaria de VP"], gender: "F", rarity: "S", cost: 1, series: 1,
-        text: "Coste: Tu vanguardia llena; se coloca en retaguardia. P: IDOL A DISTANCIA: Siempre Oculta. Desde la retaguardia: Gana 1 Furor en la Fase de Furor y puede usar su Activa. A: INTERFAZ (1F): Busca 'Rebobinar', 'Cambio de canal' o 'Publicidad mental' en mazo o descarte. Baraja si buscas en mazo.",
+        text: "Requisito: Tu vanguardia llena; se coloca en retaguardia. P: IDOL A DISTANCIA: Siempre Oculta. Desde la retaguardia: Gana 1 Furor en la Fase de Furor y puede usar su Activa. A: INTERFAZ (1F): Busca 'Rebobinar', 'Cambio de canal' o 'Publicidad mental' en mazo o descarte. Baraja si buscas en mazo.",
         passiveName: "IDOL A DISTANCIA", activeName: "INTERFAZ", activeCost: 1,
         
         canUseAbilityFromRearguard: true, // Permite usar Habilidad activa
