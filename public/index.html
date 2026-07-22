@@ -8217,7 +8217,16 @@
                         this._dbgRx('poller ASENTADO -> vuelco estado final');
                         this._syncAutoritativo();
                     } else {
-                        setTimeout(poll, 250); // sigue esperando a que la corrutina (y sus animaciones) terminen
+                        // Snapshot INTERMEDIO: la corrutina sigue trabajando pero el rival NO tiene
+                        // un prompt abierto (esperandoOtraInteraccion=false → estamos en fase de
+                        // animación/proceso entre prompts, o rematando el ataque). Le mando el
+                        // estado ACTUAL para que vea los cambios (mano robándose, vida bajando,
+                        // cartas a descartes) avanzar "a saltos" (~4/seg) en vez de todo de golpe
+                        // al final. NUNCA durante un prompt (pisaría su UI): por eso el guard.
+                        // No hay animación fluida en el reconectado —su corrutina murió— pero sí
+                        // progresión de estado visible.
+                        if (!esperandoOtraInteraccion) { this._dbgRx('snapshot intermedio (espejo)'); this._syncAutoritativo(); }
+                        setTimeout(poll, 250);
                     }
                 };
                 setTimeout(poll, 250);
