@@ -3688,25 +3688,10 @@ const CARD_DB = [
         isToken: true, // Etiqueta clave para el motor
         reverseArrow: true, // <--- Hace que la flecha vaya del Clon hacia Unmei
         text: "Este clon copia el ATQ y DEF de Unmei en todo momento. Tiene su propia Vida, pero no puede ganar Furor ni usar habilidades. Si el Unmei original muere o abandona el campo, este clon se desvanece instantáneamente.",
-        onUpdatePassive: function(card, game) {
-            // El clon tiene el Furor capado a 0 siempre
-            card.maxFuror = 0; 
-            card.furor = 0;
-            
-            if (card.parentId) {
-                const parent = game.findCard(card.parentId);
-                // Si el padre sigue vivo y coleando en el campo de batalla
-                if (parent && (parent.location === 'vanguard' || parent.location === 'rearguard')) {
-                    // Copiamos sus stats de combate en tiempo real
-                    card.currentAtk = parent.currentAtk;
-                    card.currentDef = parent.currentDef;
-                } else {
-                    // Si el padre muere o vuelve a la mano, el clon sufre muerte súbita
-                    card.currentHp = 0;
-                    game.checkDeath(card, false); // Muerte sin retribución
-                }
-            }
-        }
+        // Migrado a DSL (trigger ESPEJO, 21-jul-2026). Unmei sigue creando el clon de
+        // forma imperativa (MULTIPLICACIÓN DE CUERPO) y le fija parentId; el clon en sí
+        // ya es declarativo.
+        abilities: [{ trigger: "ESPEJO", de: "parentId", copiar: ["currentAtk", "currentDef"], furorCero: true, muerteSiSinPadre: true }]
     },
     {
         name: "Flash de maná", type: "Ayuda", subtype: "Mágico", rarity: "B", cost: 1, series: 1,
@@ -6003,22 +5988,8 @@ const CARD_DB = [
         isToken: true, // Etiqueta clave para ocultarlo
         reverseArrow: true, 
         text: "Este clon copia el ATQ y DEF de NoName en todo momento. Tiene su propia Vida, pero no puede ganar Furor ni usar habilidades. Si el NoName original muere o abandona el campo, este clon se desvanece instantáneamente.",
-        onUpdatePassive: function(card, game) {
-            // El clon tiene el Furor capado a 0 siempre
-            card.maxFuror = 0; 
-            card.furor = 0;
-            
-            if (card.parentId) {
-                const parent = game.findCard(card.parentId);
-                if (parent && (parent.location === 'vanguard' || parent.location === 'rearguard')) {
-                    card.currentAtk = parent.currentAtk;
-                    card.currentDef = parent.currentDef;
-                } else {
-                    card.currentHp = 0;
-                    game.checkDeath(card, false); 
-                }
-            }
-        }
+        // Migrado a DSL (trigger ESPEJO, 21-jul-2026). Idéntico al Clon de Unmei.
+        abilities: [{ trigger: "ESPEJO", de: "parentId", copiar: ["currentAtk", "currentDef"], furorCero: true, muerteSiSinPadre: true }]
     },
     {
         name: "Capitán Guardia Real", hp: 3, def: 4, atk: 5, type: "Esbirro", subtype: "Ser vivo", tags: ["Guardia Real", "Traje protector"], rarity: "A", cost: 1, series: 2,
@@ -7711,7 +7682,7 @@ const KARLOS_RULES = {
 //  Valores: número | {COUNT:{...}} | {REF:"objetivo.furorMax"} (campos computados)
 // ===================================================================
 const DSL = {
-    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE', 'AURA', 'ANTES_DE_JUGAR', 'PUEDE_ATACAR', 'SOBRECURACION', 'REACCION', 'AL_MORIR', 'AL_MORIR_ALIADO', 'AL_DESTRUIR'],
+    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE', 'AURA', 'ANTES_DE_JUGAR', 'PUEDE_ATACAR', 'SOBRECURACION', 'REACCION', 'AL_MORIR', 'AL_MORIR_ALIADO', 'AL_DESTRUIR', 'ESPEJO'],
     // Los 5 últimos ops solo tienen sentido dentro de una REACCION (los interpreta
     // DSL._runReaccion, no _doEffect): controlan el resultado que la reacción
     // devuelve al motor de combate (redirigir el ataque, cancelarlo, drenar Furor
@@ -9054,6 +9025,25 @@ const DSL = {
         // CONTINUA en las cartas que cumplan los filtros (updatePassives limpia y
         // reaplica en cada pasada). Fiel a las auras imperativas que sustituye:
         // sin exención de Avatar (la Feria imperativa silenciaba también a Kami).
+        // ESPEJO -> onUpdatePassive: la carta "clon" copia en vivo stats de otra carta
+        // (la referenciada por un campo propio, p. ej. parentId) y se desvanece si esa
+        // carta ya no está en el campo. Reutilizable por cualquier ficha-clon.
+        const espejo = abs.find(a => a.trigger === 'ESPEJO');
+        if (espejo && typeof tmpl.onUpdatePassive !== 'function') {
+            tmpl.onUpdatePassive = function (card, game) {
+                if (espejo.furorCero) { card.maxFuror = 0; card.furor = 0; }
+                const pid = card[espejo.de];
+                if (!pid) return;
+                const parent = game.findCard(pid);
+                if (parent && (parent.location === 'vanguard' || parent.location === 'rearguard')) {
+                    (espejo.copiar || []).forEach(s => { card[s] = parent[s]; });
+                } else if (espejo.muerteSiSinPadre) {
+                    card.currentHp = 0;
+                    game.checkDeath(card, false); // muerte súbita, sin retribución (fire-and-forget, como la vieja)
+                }
+            };
+        }
+
         const auras = abs.filter(a => a.trigger === 'AURA');
         if (auras.length && typeof tmpl.onUpdatePassive !== 'function') {
             tmpl.onUpdatePassive = function (ev, game, p) {

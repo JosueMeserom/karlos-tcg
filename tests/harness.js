@@ -370,6 +370,10 @@ function crearCartaEn(ctx, inst, pid, spec, location) {
         if (spec.agotada !== undefined) carta.exhausted = spec.agotada;
         if (spec.duracion !== undefined) carta.duration = spec.duracion;
         if (spec.estado) carta.status = JSON.parse(JSON.stringify(spec.estado));
+        // padre: enlaza este token/clon con otra carta por NOMBRE; construirEstado
+        // resuelve el parentId tras colocarlo todo (el padre puede estar en cualquier zona).
+        if (spec.padre) carta._padreRef = spec.padre;
+        if (spec.campos) Object.assign(carta, spec.campos); // campos arbitrarios (estado propio de la carta)
     }
     return carta;
 }
@@ -395,6 +399,21 @@ function construirEstado(ctx, inst, esc) {
         (cfg.descartes || []).forEach(s => p.discard.push(crearCartaEn(ctx, inst, pid, s, 'discard')));
         (cfg.retribucion || []).forEach(s => p.retribution.push(crearCartaEn(ctx, inst, pid, s, 'retribution')));
         if (cfg.evento) p.activeEvent = crearCartaEn(ctx, inst, pid, cfg.evento, 'event');
+    }
+
+    // Resolución de `padre`: enlaza cada carta con _padreRef al parentId de la carta
+    // homónima del MISMO jugador (busca en todas sus zonas: el padre puede estar en el
+    // descarte, p. ej. para probar la muerte súbita del clon cuando el padre ya no está).
+    for (const pid of ['p1', 'p2']) {
+        const p = inst.players[pid];
+        const todas = [...p.vanguard, ...p.rearguard, ...p.hand, ...p.deck, ...p.discard, ...(p.activeEvent ? [p.activeEvent] : [])];
+        todas.forEach(c => {
+            if (!c._padreRef) return;
+            const padre = todas.find(x => x.name === c._padreRef && x.instanceId !== c.instanceId);
+            if (!padre) throw new Error(`[${ctx.cual}] padre "${c._padreRef}" no encontrado para ${c.name}`);
+            c.parentId = padre.instanceId;
+            delete c._padreRef;
+        });
     }
 
     inst.updatePassives();
