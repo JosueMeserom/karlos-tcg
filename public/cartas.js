@@ -2209,7 +2209,7 @@ const CARD_DB = [
     },
     {
         name: "Wolfgang", hp: 5, def: 3, atk: 3, type: "Personaje", subtype: "Ser mágico", tags: ["Invocación", "Bestia animal"], gender: "F", rarity: "B",
-        text: "Requisito: Aniceto en tu campo o bien Coste: descartar Manzanahoria de tu mano. P: Al colocar: +1 Def y Atq a vanguardia aliada. A: TENTAR A LA SUERTE (1F): 3 monedas. Ataca 1 vez por cada Cara.",
+        text: "Requisito: Aniceto en tu campo o bien Coste: Manzanahoria de tu mano. P: Al colocar: +1 Def y Atq a vanguardia aliada. A: TENTAR A LA SUERTE (1F): 3 monedas. Ataca 1 vez por cada Cara.",
         passiveName: "SABIDURÍA", activeName: "TENTAR A LA SUERTE", activeCost: 1, series: 1,
         
         canPlayCard: function(card, game, p) {

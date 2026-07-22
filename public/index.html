@@ -3206,28 +3206,36 @@
                     let _txtBase = card.text;
                     let resultHtml = "";
                     const _obien = (v) => v.split(/\s+o bien\s+/i).map(s => s.trim()).join('<span class="coste-obien">o bien</span>');
-                    // Fila REQUISITO/COSTE: label SIEMPRE pegado a la izquierda (space-between), valor a la derecha.
-                    const _fila = (label, valor) => `<span class="ev-dur-label">${label}</span><span class="ev-dur-value" style="font-size:0.78rem; text-align:right; max-width:72%; line-height:1.35;">${_obien(valor)}</span>`;
-                    // 1) HÍBRIDA "Requisito: X o bien Coste: Y." -> UNA caja apilada: el Requisito
-                    //    arriba, "o bien" centrado (con padding vertical simétrico propio, sin
-                    //    depender del gap ni del transform del .coste-obien, que descentraban), el
-                    //    Coste debajo. El requisito va primero porque se prefiere/verifica antes que
-                    //    pagar el coste (norma de Toto, 23-jul-2026).
+                    // Cajas tipo stats de cabecera (COSTE / REQUISITO / DURACIÓN): el label va en una
+                    // COLUMNA de ancho FIJO con el texto centrado, de modo que los centros de COSTE,
+                    // REQUISITO y DURACIÓN queden alineados en el mismo eje (Toto, 23-jul-2026), con
+                    // el mismo padding a la izquierda para todas. El valor va a la derecha
+                    // (margin-left:auto). valStyle: estilo extra del valor — DURACIÓN lo deja grande
+                    // (CSS ev-dur-value); Coste/Requisito lo achican (_VS) por ser textos largos.
+                    const _filaStat = (label, valorHtml, valStyle) =>
+                        `<span class="ev-dur-label" style="width:6em; text-align:center; flex-shrink:0;">${label}</span>`
+                        + `<span class="ev-dur-value" style="margin-left:auto; text-align:right; ${valStyle || ''}">${valorHtml}</span>`;
+                    const _VS = 'font-size:0.78rem; max-width:62%; line-height:1.35;';
+                    const _cajaStat = (label, valorHtml, valStyle) =>
+                        `<div class="ev-dur-box" style="justify-content:flex-start; padding-left:10px;">${_filaStat(label, valorHtml, valStyle)}</div>`;
+                    // 1) HÍBRIDA "Requisito: X o bien Coste: Y." -> UNA caja apilada: Requisito arriba,
+                    //    "o bien" centrado (padding vertical simétrico propio; sin el gap ni el
+                    //    transform del .coste-obien, que lo descentraban), Coste debajo. El requisito
+                    //    primero porque se prefiere/verifica antes que pagar el coste.
                     let _mH;
                     while ((_mH = _txtBase.match(/^Requisito:\s*(.+?)\s+o bien\s+Coste:\s*(.+?)\.\s*/i))) {
                         resultHtml += `<div class="ev-dur-box" style="flex-direction:column; align-items:stretch; gap:0;">`
-                            + `<div style="display:flex; justify-content:space-between; align-items:center;">${_fila('REQUISITO', _mH[1])}</div>`
+                            + `<div style="display:flex; align-items:center; padding-left:10px;">${_filaStat('REQUISITO', _obien(_mH[1]), _VS)}</div>`
                             + `<div style="text-align:center; padding:5px 0; line-height:1;"><span class="coste-obien" style="margin:0; transform:none; vertical-align:baseline;">o bien</span></div>`
-                            + `<div style="display:flex; justify-content:space-between; align-items:center;">${_fila('COSTE', _mH[2])}</div>`
+                            + `<div style="display:flex; align-items:center; padding-left:10px;">${_filaStat('COSTE', _obien(_mH[2]), _VS)}</div>`
                             + `</div>`;
                         _txtBase = _txtBase.slice(_mH[0].length);
                     }
-                    // 2) SIMPLES "Coste: X." / "Requisito: Y." sueltos (cada uno su propia caja, con
-                    //    el label también pegado a la izquierda; el "o bien" dentro de un mismo valor
-                    //    se formatea inline).
+                    // 2) SIMPLES "Coste: X." / "Requisito: Y." sueltos (cada uno su propia caja; el
+                    //    "o bien" dentro de un mismo valor se formatea inline).
                     let _mCab;
                     while ((_mCab = _txtBase.match(/^(Coste|Requisito):\s*(.+?)\.\s*/))) {
-                        resultHtml += `<div class="ev-dur-box" style="justify-content:space-between;">${_fila(_mCab[1].toUpperCase(), _mCab[2])}</div>`;
+                        resultHtml += _cajaStat(_mCab[1].toUpperCase(), _obien(_mCab[2]), _VS);
                         _txtBase = _txtBase.slice(_mCab[0].length);
                     }
                     let currentMode = "text"; 
@@ -3238,15 +3246,20 @@
                         const durM = txt.match(/^\s*(\d+)\s*turnos?\.\s*/);
                         const durVal = durM ? parseInt(durM[1]) : (card.duration !== undefined ? card.duration : null);
                         if (durM) txt = txt.slice(durM[0].length);
-                        if (durVal !== null) resultHtml += `<div class="ev-dur-box"><span class="ev-dur-label">DURACIÓN</span><span class="ev-dur-value">${durVal} turno${durVal === 1 ? '' : 's'}</span></div>`;
+                        if (durVal !== null) resultHtml += _cajaStat('DURACIÓN', `${durVal} turno${durVal === 1 ? '' : 's'}`);
+                        // Requisito del Evento ("Requiere X.") -> su propia caja REQUISITO tipo stats,
+                        // JUSTO debajo de DURACIÓN y con el mismo formato que las Ayudas (Toto,
+                        // 23-jul-2026), en vez de una sección de color en el cuerpo. La duración es la
+                        // seña de todo Evento, así que el requisito va pegado a ella.
+                        const reqM = txt.match(/^Requiere\s+(.+?)\.\s*/);
+                        if (reqM) { resultHtml += _cajaStat('REQUISITO', _obien(reqM[1]), _VS); txt = txt.slice(reqM[0].length); }
                         const marcas = [
-                            ['Requiere ', 'Requisito', 'ev-req', true],
                             ['Antes de colocarla, ', 'Antes de colocarla', 'ev-antes', false],
                             ['Al colocarla, ', 'Al colocarla', 'ev-al', false],
                             ['Mientras esté en juego, ', 'Mientras esté en juego', 'ev-mientras', false],
                             ['Al expirar, ', 'Al expirar', 'ev-exp', false]
                         ];
-                        txt.split(/(?=Requiere |Antes de colocarla, |Al colocarla, |Mientras esté en juego, |Al expirar, )/).forEach(seg => {
+                        txt.split(/(?=Antes de colocarla, |Al colocarla, |Mientras esté en juego, |Al expirar, )/).forEach(seg => {
                             seg = seg.trim();
                             if (!seg) return;
                             const m = marcas.find(x => seg.startsWith(x[0]));
