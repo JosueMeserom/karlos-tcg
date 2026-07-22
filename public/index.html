@@ -8009,6 +8009,9 @@
             // termine, y luego se reenvía el estado autoritativo. Devuelve si abortó algo.
             _abortPendingInteraction() {
                 let abortado = false;
+                // Quita el cartel "Esperando a que X elija..." (lo puse yo al empezar a
+                // esperar la elección del rival; al abortar ya no espero nada).
+                const _ab = document.getElementById('action-banner'); if (_ab) _ab.style.display = 'none';
                 if (this.currentVisualResolve) {
                     const r = this.currentVisualResolve;
                     this.currentVisualResolve = null; this.dslPick = null;
