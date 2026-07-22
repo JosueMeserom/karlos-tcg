@@ -251,29 +251,34 @@
                     </div>
                 </div>
 
-                <div class="dbg-box" style="margin-bottom:0;">
-                    <span class="dbg-title" style="text-align: center;">Forzar fin (coger retribución)</span>
-                    <div style="display:flex; gap:8px;">
-                        <button class="dbg-btn dbg-btn-red" style="flex:1; font-size:0.7rem;" onclick="game.debugTakeRetribution('p1')">💀 J1 coge retr.</button>
-                        <button class="dbg-btn dbg-btn-red" style="flex:1; font-size:0.7rem;" onclick="game.debugTakeRetribution('p2')">💀 J2 coge retr.</button>
+            </div>
+
+            <div style="display:flex; gap:8px; align-items:stretch; margin-top:8px;">
+                <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:8px;">
+                    <div class="dbg-box" style="margin-bottom:0;">
+                        <span class="dbg-title" style="text-align: center;">Forzar fin (coger retribución)</span>
+                        <div style="display:flex; gap:8px;">
+                            <button class="dbg-btn dbg-btn-red" style="flex:1; font-size:0.7rem;" onclick="game.debugTakeRetribution('p1')">💀 J1 coge retr.</button>
+                            <button class="dbg-btn dbg-btn-red" style="flex:1; font-size:0.7rem;" onclick="game.debugTakeRetribution('p2')">💀 J2 coge retr.</button>
+                        </div>
+                    </div>
+                    <div class="dbg-box" style="margin-bottom:0;">
+                        <span class="dbg-title" style="text-align: center;">Save-states <span id="dbg-ss-slot" style="color:#a78bfa;">(slot 1)</span></span>
+                        <div class="dbg-grid-4" style="gap:6px;">
+                            <button class="dbg-btn dbg-btn-green" style="font-size:0.65rem;" onclick="game.debugSaveState()">💾 Guardar</button>
+                            <button class="dbg-btn" style="font-size:0.65rem;" onclick="game.debugLoadState()">📂 Cargar</button>
+                            <button class="dbg-btn dbg-btn-green" style="font-size:0.65rem;" onclick="game.debugSaveStateAs()">💾 En otro slot…</button>
+                            <button class="dbg-btn" style="font-size:0.65rem;" onclick="game.debugLoadStateFrom()">📂 De otro slot…</button>
+                            <button class="dbg-btn dbg-btn-red" style="font-size:0.65rem; grid-column: 1 / -1;" onclick="game.debugRestartDialog()">♻️ Reiniciar partida…</button>
+                        </div>
                     </div>
                 </div>
-
-                <div class="dbg-box" style="margin-bottom:0;">
-                    <span class="dbg-title" style="text-align: center;">Save-states <span id="dbg-ss-slot" style="color:#a78bfa;">(slot 1)</span></span>
-                    <div class="dbg-grid-4" style="gap:6px;">
-                        <button class="dbg-btn dbg-btn-green" style="font-size:0.65rem;" onclick="game.debugSaveState()">💾 Guardar</button>
-                        <button class="dbg-btn" style="font-size:0.65rem;" onclick="game.debugLoadState()">📂 Cargar</button>
-                        <button class="dbg-btn dbg-btn-green" style="font-size:0.65rem;" onclick="game.debugSaveStateAs()">💾 En otro slot…</button>
-                        <button class="dbg-btn" style="font-size:0.65rem;" onclick="game.debugLoadStateFrom()">📂 De otro slot…</button>
-                        <button class="dbg-btn dbg-btn-red" style="font-size:0.65rem; grid-column: 1 / -1;" onclick="game.debugRestartDialog()">♻️ Reiniciar partida…</button>
+                <div style="flex:1; min-width:0; display:flex;">
+                    <div class="dbg-box" style="margin-bottom:0; flex:1; display:flex; flex-direction:column;">
+                        <span class="dbg-title" style="text-align: center;">Cargar escenario de tablero</span>
+                        <textarea id="dbg-scenario-input" spellcheck="false" style="width:100%; box-sizing:border-box; flex:1; min-height:70px; font-family:monospace; font-size:0.62rem; resize:none; background:#0f172a; color:#e2e8f0; border:1px solid #475569; border-radius:6px; padding:6px; margin-top:4px;" placeholder='{ "turnoDe":"p1", "p1":{ "vanguardia":["Karlos"], "mano":["Cortarrollos"] }, "p2":{ "vanguardia":["Mini-tigre"] } }'></textarea>
+                        <button class="dbg-btn dbg-btn-green" style="width:100%; margin-top:6px;" onclick="game.debugLoadScenario()">▶️ Cargar escenario (sincroniza online)</button>
                     </div>
-                </div>
-
-                <div class="dbg-box" style="margin-bottom:0; margin-top:8px; border-color:#38bdf8; background: rgba(56,189,248,0.05);">
-                    <span class="dbg-title" style="color:#38bdf8;">Cargar escenario de tablero</span>
-                    <textarea id="dbg-scenario-input" spellcheck="false" style="width:100%; box-sizing:border-box; height:110px; font-family:monospace; font-size:0.62rem; resize:vertical; background:#0f172a; color:#e2e8f0; border:1px solid #475569; border-radius:6px; padding:6px;" placeholder='{ "turnoDe":"p1", "p1":{ "vanguardia":["Karlos"], "mano":["Cortarrollos"] }, "p2":{ "vanguardia":["Mini-tigre"] } }'></textarea>
-                    <button class="dbg-btn dbg-btn-green" style="width:100%; margin-top:6px;" onclick="game.debugLoadScenario()">▶️ Cargar escenario (sincroniza online)</button>
                 </div>
             </div>
 
@@ -2871,7 +2876,11 @@
                         delete c._padreRef;
                     });
                 }
-                if (spec.turno !== undefined) this.turn = spec.turno;
+                // Por defecto turno 2 (como el harness): así el jugador activo puede
+                // atacar/usar Activas nada más cargar, sin el veto del primer turno
+                // (turn===1 && activo===quien empieza). Para un contador de turno realista,
+                // pon `turno` explícito (p. ej. 3 si es turno de quien empezó).
+                this.turn = spec.turno !== undefined ? spec.turno : 2;
                 if (spec.turnoDe) this.activePlayerId = spec.turnoDe;
                 if (spec.empieza) this.startingPlayerId = spec.empieza;
                 this.phase = 'PRINCIPAL';
