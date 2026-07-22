@@ -1655,6 +1655,15 @@
                         if (data.pr && data.pr.chooserId === this.myPlayerId && !this.currentChoices) this._reMostrarReaccionPendiente(data.pr);
                         return;
                     }
+                    // Reanudar perfecto (interacción visual encadenada tras una reacción, p. ej.
+                    // Inspiración->mazo, Jugada->moneda, Pequeña traición->tablero): el rival
+                    // estable me empuja la interacción para que la re-muestre tras reconectar.
+                    if (data.action === 'PENDING_INTERACTION') {
+                        const pi = data.pi;
+                        const yaTengoUI = this.currentChoices || this.dslPick || this._deckSearchActivo;
+                        if (pi && pi.chooserId === this.myPlayerId && !yaTengoUI) this._reMostrarInteraccionPendiente(pi);
+                        return;
+                    }
                     // --- SINCRONIZACIÓN DE MONEDAS EN TIEMPO REAL ---
                     if (data.action === 'COIN_FLIP_REMOTE' || data.action === 'COIN_ADVANCE_REMOTE') {
                         window.dispatchEvent(new CustomEvent('game-sync', { detail: data }));
@@ -1746,19 +1755,19 @@
                         // —y las que encadenen, con auto-declinar—, dejo que la acción reanude y
                         // TERMINE, y solo entonces le mando el estado FINAL (el de ahora aún es
                         // pre-acción). El rival reconectado solo recibe ese estado ya resuelto.
-                        const tengoInteraccion = this.currentChoices || this.currentVisualResolve || this.dslPick;
+                        const tengoInteraccion = this.currentChoices || this.currentVisualResolve || this.dslPick || this.pendingInteraction;
                         const esperandoRival = tengoInteraccion && this._interaccionChooser && this._interaccionChooser !== this.myPlayerId;
-                        if (esperandoRival && this.currentChoices && this.pendingReaction) {
-                            // REACCIÓN: reanudar perfecto. Entro en modo espejo y le mando el estado
-                            // TAL CUAL (incluye pendingReaction): J2 re-mostrará el prompt y sus clics
-                            // dirigirán MI corrutina viva, que aplica la reacción y, al terminar la
-                            // cadena, le vuelca el estado final.
+                        if (esperandoRival && ((this.currentChoices && this.pendingReaction) || this.pendingInteraction)) {
+                            // REACCIÓN o interacción visual (tablero/mazo/moneda) del rival: reanudar
+                            // perfecto. Entro en modo espejo y le mando el estado TAL CUAL (incluye
+                            // pendingReaction/pendingInteraction): el reconectado re-mostrará su UI y
+                            // sus clics dirigirán MI corrutina viva, que hace el trabajo y, al terminar
+                            // (con lo que encadene), le vuelca el estado final.
                             this._espejandoReaccion = true;
                             this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'HARD_SYNC', state: this.exportGameState(), targetId: target });
                         } else if (esperandoRival) {
-                            // Elección EN TABLERO por el rival (ACERTIJO en cruz…): re-mostrar el picker
-                            // es otra maquinaria; de momento auto-declinamos (el reconectado pierde esa
-                            // elección) y le volcamos el estado final tras completar.
+                            // Interacción del rival no cubierta por el reanudar-perfecto: auto-declinamos
+                            // (el reconectado pierde esa elección) y le volcamos el estado final tras completar.
                             this._abortPendingInteraction();
                             setTimeout(() => {
                                 this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'HARD_SYNC', state: this.exportGameState(), targetId: target });
@@ -3604,8 +3613,13 @@
                 return new Promise(resolve => {
                     this.currentVisualResolve = (sel) => { resolve(sel && sel.length ? sel : null); };
                     this._interaccionChooser = chooserId; // quién debe elegir (para la recuperación por reconexión)
+                    // Descriptor serializable (reanudar-perfecto): si el elector reconecta, se re-monta este picker.
+                    this.pendingInteraction = { tipo: 'boardPick', chooserId, cardsIds: cards.map(c => c.instanceId), n, prompt: prompt || null, sourceId: sourceCard ? sourceCard.instanceId : null, cancelable };
 
                     if (this.gameMode === 'online' && this.myPlayerId !== 'spectator' && this.myPlayerId !== chooserId) {
+                        // No-elector: si estoy en modo espejo (el elector reconectó y mi corrutina
+                        // dirige), le empujo la interacción para que re-monte el picker en su tablero.
+                        if (this._espejandoReaccion) this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'PENDING_INTERACTION', pi: this.pendingInteraction });
                         const banner = document.getElementById('action-banner');
                         banner.innerText = `Esperando a que ${this.getDisplayName(chooserId)} elija...`;
                         banner.style.display = 'block';
@@ -3827,7 +3841,14 @@
                         else resolveRaw(cards && cards.length ? cards[0] : null);
                     };
 
+                    this._interaccionChooser = playerId; // quién busca (para la recuperación por reconexión)
+                    // Descriptor serializable (reanudar-perfecto): si el buscador reconecta, se re-monta el visor.
+                    this.pendingInteraction = { tipo: 'deckViewer', chooserId: playerId, playerId, elegiblesIds: (elegibles || []).map(c => c.instanceId), titulo: titulo || null, aviso: aviso || null, maxCount };
+
                     if (this.gameMode === 'online' && this.activePlayerId !== 'setup' && this.myPlayerId !== playerId) {
+                        // No-elector en modo espejo (el buscador reconectó y mi corrutina dirige): le
+                        // empujo la interacción para que re-monte el visor de su mazo.
+                        if (this._espejandoReaccion) this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'PENDING_INTERACTION', pi: this.pendingInteraction });
                         const banner = document.getElementById('action-banner');
                         banner.innerText = `Esperando a que ${this.getDisplayName(playerId)} busque en su mazo...`;
                         banner.style.display = 'block';
@@ -3978,6 +3999,17 @@
                 overlay.style.display = 'flex';
 
                 const isMyCoin = this.gameMode === 'local' || this.myPlayerId === playerId;
+
+                // Reanudar-perfecto: descriptor serializable de la moneda. Si el que lanza reconecta,
+                // se re-lanza en su cliente (ver _reMostrarInteraccionPendiente). En modo espejo (el
+                // que lanza reconectó y mi corrutina dirige) se lo empujo para que re-monte el overlay.
+                if (this.gameMode === 'online' && playerId !== 'setup') {
+                    this._interaccionChooser = playerId;
+                    this.pendingInteraction = { tipo: 'coin', chooserId: playerId, playerId, count };
+                    if (!isMyCoin && this._espejandoReaccion) {
+                        this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'PENDING_INTERACTION', pi: this.pendingInteraction });
+                    }
+                }
 
                 // --- SISTEMA DE COLA PARA EVENTOS DE RED (Bandeja de entrada local) ---
                 const remoteQueue = [];
@@ -4218,7 +4250,8 @@
                 if (hitbox) hitbox.onclick = null;
                 overlay.style.display = 'none';
                 if (!isMyCoin) window.removeEventListener('game-sync', remoteHandler);
-                
+                if (this.pendingInteraction && this.pendingInteraction.tipo === 'coin') this.pendingInteraction = null; // moneda resuelta (reanudar-perfecto)
+
                 return results;
             }
             
@@ -6093,6 +6126,7 @@
                     finalCards = selectedCardsOrIds.map(id => this.findCard(id));
                 }
                 
+                this.pendingInteraction = null; // interacción visual resuelta (reanudar-perfecto)
                 if (this.currentVisualResolve) {
                     this.currentVisualResolve(finalCards);
                     this.currentVisualResolve = null;
@@ -7909,7 +7943,11 @@
                     logHistory: this.logHistory || [],
                     // Prompt de reacción pendiente (si lo hay): permite RE-MOSTRARLo al que
                     // reconecte a mitad de la cadena de reacciones (ver openChoiceModal/importGameState).
-                    pendingReaction: this.pendingReaction || null
+                    pendingReaction: this.pendingReaction || null,
+                    // Interacción visual pendiente del rival (elección en tablero, búsqueda en
+                    // mazo o moneda): mismo reanudar-perfecto que la reacción, pero para esos
+                    // tipos (ver pickBoardTargets/openDeckSearchViewer/triggerCoinFlips).
+                    pendingInteraction: this.pendingInteraction || null
                 };
             }
 
@@ -8035,6 +8073,7 @@
                     this.currentChoices = null;
                     this._interaccionChooser = null;
                     this.pendingReaction = null;
+                    this.pendingInteraction = null;
                 }
 
                 // Reanudar perfecto: si el estado trae un prompt de reacción pendiente del que
@@ -8050,6 +8089,21 @@
                     banner.innerText = `Esperando a que ${this.getDisplayName(state.pendingReaction.chooserId)} elija...`;
                     banner.style.display = 'block';
                 }
+
+                // Reanudar perfecto (interacciones visuales: elección en tablero, búsqueda en
+                // mazo, moneda): si el estado trae una interacción pendiente de la que YO soy el
+                // elector y no tengo ya UI viva, la RE-MUESTRO. Sus clics dirigen la corrutina
+                // viva del rival (VISUAL_SEARCH_CONFIRM / COIN_FLIP_REMOTE). Excluyo el caso
+                // reacción (ya lo cubre pendingReaction arriba, que puede llevar además esto).
+                const pi = state.pendingInteraction;
+                const yaTengoUI = this.currentChoices || this.dslPick || this._deckSearchActivo;
+                if (pi && pi.chooserId === this.myPlayerId && !yaTengoUI) {
+                    this._reMostrarInteraccionPendiente(pi);
+                } else if (pi && pi.chooserId !== this.myPlayerId && !state.pendingReaction && this.myPlayerId !== 'spectator' && this.activePlayerId !== 'setup') {
+                    const banner = document.getElementById('action-banner');
+                    banner.innerText = `Esperando a que ${this.getDisplayName(pi.chooserId)} elija...`;
+                    banner.style.display = 'block';
+                }
             }
 
             _reMostrarReaccionPendiente(pr) {
@@ -8063,6 +8117,39 @@
                 this.openChoiceModal(pr.prompt, choices, pr.chooserId, { reaccion: { atacante, defensor, mano } });
             }
 
+            // Reanudar perfecto para interacciones visuales dirigidas al rival (yo, el
+            // reconectado, soy el elector). RE-CONSTRUYE la UI real; la corrutina viva del
+            // rival estable NO existe aquí, así que la respuesta viaja por sus canales de
+            // siempre (VISUAL_SEARCH_CONFIRM para tablero/mazo, COIN_FLIP_REMOTE para moneda),
+            // que el rival estable —con la corrutina válida— sí recibe y resuelve.
+            _reMostrarInteraccionPendiente(pi) {
+                if (!pi) return;
+                if (pi.tipo === 'boardPick') {
+                    const cards = (pi.cardsIds || []).map(id => this.findCard(id)).filter(Boolean);
+                    if (!cards.length) return;
+                    const source = pi.sourceId ? this.findCard(pi.sourceId) : null;
+                    this.dslPick = { pool: new Set(cards.map(c => c.instanceId)), n: pi.n, targets: [], byId: {}, chooserId: pi.chooserId, cancelable: pi.cancelable };
+                    cards.forEach(c => this.dslPick.byId[c.instanceId] = c);
+                    this.selectedCard = source;      // la Ayuda/origen: el render la resalta
+                    this.inputState = 'SELECT_DSL_TARGETS';
+                    if (pi.prompt) this.logError(pi.prompt);
+                    this.render();
+                    // Sin currentVisualResolve local (no hay Promise aquí): _dslPickClick emite
+                    // VISUAL_SEARCH_CONFIRM al completar y resolveVisualSearch limpia sin más.
+                } else if (pi.tipo === 'deckViewer') {
+                    const elegibles = (pi.elegiblesIds || []).map(id => this.findCard(id)).filter(Boolean);
+                    // openDeckSearchViewer, con playerId === yo, monta el visor real; sus clics
+                    // ya emiten VISUAL_SEARCH_CONFIRM. La Promise que crea queda huérfana (inocua).
+                    this.openDeckSearchViewer(pi.playerId, elegibles, pi.titulo, pi.aviso, pi.maxCount || 1);
+                } else if (pi.tipo === 'coin') {
+                    // Re-lanzo la moneda "huérfana" (isMyCoin, porque soy quien lanza): el clic
+                    // emite COIN_FLIP_REMOTE que consume la corrutina viva del rival. La moneda
+                    // aún no se había lanzado al desconectar, así que generar ahora el resultado
+                    // es correcto. La Promise que devuelve queda huérfana (inocua).
+                    this.triggerCoinFlips(pi.count || 1, pi.playerId);
+                }
+            }
+
             // Aborta la interacción pendiente de ESTE cliente (una reacción/elección donde
             // el rival, que acaba de reconectar, era quien debía responder): declina/cancela
             // por el resolver directamente (sin re-emitir) para que la acción reanude y
@@ -8073,6 +8160,7 @@
                 // esperar la elección del rival; al abortar ya no espero nada).
                 const _ab = document.getElementById('action-banner'); if (_ab) _ab.style.display = 'none';
                 this.pendingReaction = null;
+                this.pendingInteraction = null;
                 if (this.currentVisualResolve) {
                     const r = this.currentVisualResolve;
                     this.currentVisualResolve = null; this.dslPick = null;
@@ -8106,6 +8194,7 @@
                     if (!this._espejandoReaccion) { this._esperandoSettleEspejo = false; return; }
                     const esperandoOtraInteraccion =
                         this.pendingReaction ||          // otra reacción de la cadena (ya empujada por PENDING_REACTION)
+                        this.pendingInteraction ||       // interacción visual encadenada (tablero/mazo/moneda)
                         this.currentChoices ||           // modal de elección abierto
                         this.currentVisualResolve ||     // búsqueda visual / elección en tablero
                         this.dslPick ||                  // pick DSL en tablero
