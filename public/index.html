@@ -1728,7 +1728,7 @@
                         // Un HARD_SYNC dirigido (con targetId) o pedido por nosotros (reconexión/espectador/hueco)
                         // SIEMPRE se importa: es una sincronización autoritativa que necesitamos.
                         // Solo ignoramos un sync "ambiental" si llegara a mitad de una acción en curso.
-                        const dirigido = !!data.targetId || this.awaitingHardSync;
+                        const dirigido = !!data.targetId || this.awaitingHardSync || data.admin;
                         const accionEnCurso = this.inputState !== 'IDLE' || this.isActionLocked;
                         if (!dirigido && accionEnCurso) {
                             console.warn('[SYNC] Sync ambiental ignorado: hay una acción en curso.');
@@ -2701,7 +2701,25 @@
             }
 
             toggleDebugMenu() {
-                this.isDebugOpen = !this.isDebugOpen;
+                const abriendo = !this.isDebugOpen;
+                // Al ABRIR el debug con una carta seleccionada esperando otro clic (objetivo
+                // de ataque, de Manzanahoria, elección en tablero…) Y SOLO si esa selección
+                // es cancelable: se cancela (se propaga al rival por su vía normal) y esa
+                // misma carta pasa a estar seleccionada por el debug (reborde morado + panel).
+                // cancelAction respeta lo no-cancelable: si no limpia, no auto-seleccionamos.
+                if (abriendo && this.selectedCard &&
+                    ['SELECT_TARGET', 'SELECT_DSL_TARGETS', 'SELECT_ABILITY_TARGETS', 'SELECT_ESBIRRO_TO_SWAP', 'CONFIRM_RETREAT'].includes(this.inputState)) {
+                    const cardSel = this.selectedCard;
+                    this.cancelAction();
+                    if (this.inputState === 'IDLE') {
+                        this.isDebugOpen = true;
+                        document.getElementById('debug-modal').style.display = 'flex';
+                        if (cardSel && this.findCard(cardSel.instanceId)) this.onDebugCardClick(cardSel);
+                        else this.render();
+                        return;
+                    }
+                }
+                this.isDebugOpen = abriendo;
                 document.getElementById('debug-modal').style.display = this.isDebugOpen ? 'flex' : 'none';
                 this.debugSelectedCard = null;
                 document.getElementById('dbg-edit-panel').style.display = 'none';
@@ -2818,7 +2836,11 @@
 
             syncDebugState() {
                 if (this.gameMode === 'online') {
-                    this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'HARD_SYNC', state: this.exportGameState() });
+                    // admin:true -> HARD_SYNC AUTORITATIVO: el rival lo importa aunque él
+                    // tenga una acción en curso (p. ej. una selección de objetivo replicada).
+                    // Sin esto, editar stats desde el debug con una carta preseleccionada no
+                    // se propagaba (el rival lo descartaba por "acción en curso").
+                    this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'HARD_SYNC', admin: true, state: this.exportGameState() });
                     this.logMsg("[ADMIN] La mesa ha sido modificada. Sincronizando con los demás jugadores...", "system");
                 }
             }
@@ -4690,6 +4712,16 @@
                     if (typeof template.onPlay === 'function') {
                         template.onPlay(card, this); // sin await: la tubería de acciones en red no debe bloquearse
                     } else {
+                        // Pre-chequeo de objetivos: si NINGÚN objetivo en mesa es válido
+                        // (p. ej. Manzanahoria con todos los aliados a Vida llena), no se
+                        // entra en targeting — antes se podía "usar" sin poder elegir a nadie.
+                        if (typeof template.onValidateTarget === 'function') {
+                            const _mesa = [...this.players.p1.vanguard, ...this.players.p1.rearguard, ...this.players.p2.vanguard, ...this.players.p2.rearguard];
+                            if (!_mesa.some(c => template.onValidateTarget(card, c, this, true))) {
+                                if (!isRemote) this.logError(`No hay ningún objetivo válido para ${card.name}.`);
+                                return;
+                            }
+                        }
                         this.selectedCard = card;
                         this.inputState = 'SELECT_AYUDA_TARGET';
                         if (!isRemote) this.logError(`Selecciona objetivo para ${card.name}.`);
@@ -5673,6 +5705,13 @@
                     modalEl.style.zIndex = '4500';
                     const mkCard = (card) => {
                         const cel = this.createCardEl(card, false, true);
+                        // Estas cartas del modal son SOLO visuales: se les quita el data-id
+                        // para que no colisionen con las del tablero en los querySelector
+                        // por data-id (drawConnections, animaciones…). Si no, la flecha de
+                        // anexo de un clon apuntaba a la carta del modal (y en el cliente
+                        // que tiene el modal oculto, a las coordenadas 0,0). El hover del
+                        // detalle sigue funcionando (va por onmouseenter, no por data-id).
+                        cel.removeAttribute('data-id');
                         cel.onmouseenter = () => this.startPreview(card);
                         cel.onmouseleave = () => this.stopPreview();
                         return cel;
@@ -6250,7 +6289,7 @@
                         if (card.attachments) {
                             card.attachments.forEach(tid => {
                                 const target = this.findCard(tid);
-                                if (target) target.attachedTo = null;
+                                if (target) { target.attachedTo = null; delete target.esZombi; } // el ex-anexo deja de ser zombi (vuelve a poder curarse)
                             });
                         }
 

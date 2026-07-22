@@ -135,6 +135,20 @@ const escenarios = [
               motivo: 'norma del proyecto (3ª persona): la vieja hardcodeaba "JUGADOR 2"; la nueva rellena {reactor} con getDisplayName' },
         ],
     },
+    {
+        nombre: 'Frasco maldito: reacciona al daño normal, baja 2 el ATQ del atacante y el golpe',
+        p1: { vanguardia: ['Droide antidisturbios'] }, // atk 5
+        p2: { vanguardia: ['Robot de seguridad SP'], mano: ['Frasco maldito'] }, // def 1, hp 4
+        pasos: [
+            { atacar: 'Droide antidisturbios', objetivo: 'Robot de seguridad SP' },
+            { opcion: 0 },
+        ],
+        logsIntencionados: [
+            { de: '¡JUGADOR 2 lanza un Frasco maldito a Droide antidisturbios!',
+              a: '¡J2 (Jugador 2) lanza un Frasco maldito a Droide antidisturbios [1] (J1 (Jugador 1))!',
+              motivo: 'norma del proyecto (3ª persona con dueño): la vieja hardcodeaba "JUGADOR 2" y attacker.name a secas; la nueva rellena {reactor}/{atacante} con getDisplayName/DSL._nombre' },
+        ],
+    },
 ];
 
 correrSuite('regresion18', escenarios);

@@ -700,6 +700,7 @@ const CARD_DB = [
                     if (ally) {
                         ally.attachedTo = null;
                         delete ally.reverseArrow; // <--- LIMPIEZA: Le quitamos la marca al soltarlo
+                        delete ally.esZombi; // deja de ser zombi (vuelve a poder curarse)
                     }
                 });
                 card.attachments = [];
@@ -738,6 +739,7 @@ const CARD_DB = [
             game.modifyStat(card, 'furor', -1);
             target.attachedTo = card.instanceId;
             target.reverseArrow = true; // <--- INYECCIÓN: Solo este zombi invierte su propia flecha
+            target.esZombi = true; // marca de zombi de Sadame (rechaza Ayudas de curación); un anexo NO-zombi (p. ej. un clon) no la lleva
             card.attachments.push(target.instanceId);
             
             showFloatingText(card.instanceId, "ZOMBIFICAR", "ft-ability", -30);
@@ -1397,7 +1399,7 @@ const CARD_DB = [
         abilities: [
             { trigger: "JUGAR", requisitos: [ { count: { quien: "ALIADO" }, op: ">=", valor: 1, msg: "No tienes aliados en mesa para usar {carta}." } ] },
             { trigger: "AL_USAR_AYUDA",
-              requisitosObjetivo: [ { campo: "attachedTo", op: "falsy", msg: "{objetivo} está Zombificado y rechaza la Ayuda." } ],
+              requisitosObjetivo: [ { campo: "esZombi", op: "falsy", msg: "{objetivo} está Zombificado y rechaza la Ayuda." } ],
               efectos: [ { op: "CURAR", valor: 2, floating: "MANZANAHORIA", log: "{carta} cura 2 de Vida a {objetivo} ({antes} -> {despues})." } ] }
         ]
     },
@@ -1669,7 +1671,7 @@ const CARD_DB = [
                 { count: { filtros: [ { campo: "furor", op: ">=", valor: 1 } ] }, op: ">=", valor: 1, msg: "Necesitas un aliado con al menos 1 de Furor para pagar Té helado." } ] },
             { trigger: "AL_USAR_AYUDA",
               requisitosObjetivo: [
-                { campo: "attachedTo", op: "falsy", msg: "{objetivo} está Zombificado y rechaza la Ayuda." },
+                { campo: "esZombi", op: "falsy", msg: "{objetivo} está Zombificado y rechaza la Ayuda." },
                 { campo: "currentHp", op: "<", valorCampo: "maxHp", msg: "{objetivo} ya tiene la Vida completa." } ],
               efectos: [
                 { op: "ELEGIR", de: "ALIADOS", filtros: [ { campo: "furor", op: ">=", valor: 1 } ], cantidad: 1, autoSiUnica: true, guardaEn: "pagador",
@@ -4152,35 +4154,24 @@ const CARD_DB = [
     },
     {
         name: "Frasco maldito", type: "Ayuda", subtype: "Mágico", tags: ["Consumible"], rarity: "C", cost: 1, series: 1,
-        text: "Reacción. Usa justo antes de que un aliado reciba un ataque normal. Baja en 2 el Atq del atacante hasta el inicio de tu próximo turno.",
-        canPlayCard: function() { return false; }, // Es pura reacción
-        onHandReactionToDamage: async function(handCard, defender, attacker, dmg, isSpecial, game, p) {
-            // Solo salta si el ataque es normal y va contra el dueño del frasco
-            if (!isSpecial && defender.owner === handCard.owner && !getCardTemplate(attacker.id).isAvatar) {
-                const reactor = handCard.owner === 'p1' ? 'JUGADOR 1' : 'JUGADOR 2';
-                const used = await new Promise(resolve => {
-                    game.openChoiceModal(`REACCIÓN DE ${reactor}\n\n¿Usar Frasco maldito contra ${attacker.name}?`, [
-                        { label: 'SÍ (Baja 2 ATQ temporalmente)', action: () => resolve(true) },
-                        { label: 'NO REACCIONAR', action: () => resolve(false) }
-                    ], handCard.owner);
-                });
-                
-                if (used) {
-                    game.logMsg(`¡${reactor} lanza un Frasco maldito a ${attacker.name}!`, 'ability');
-                    showFloatingText(attacker.instanceId, "-2 ATQ (Frasco)", "ft-red-stat", -20);
-                    
-                    if (!attacker.tempEffects) attacker.tempEffects = [];
-                    attacker.tempEffects.push({ sourceId: handCard.id, ownerId: handCard.owner });
-                    
-                    // Simulamos la reducción matemática para este golpe actual
-                    let newDmg = dmg - 2;
-                    if (newDmg <= 0) newDmg = (attacker.type === 'Esbirro' && defender.type === 'Personaje') ? 0.5 : 1;
-                    
-                    return { used: true, newDmg: newDmg };
-                }
-            }
-            return { used: false, newDmg: dmg };
-        },
+        text: "Reacción. Puedes usarla antes de recibir un ataque normal. Baja en 2 el Atq del atacante hasta el inicio de tu próximo turno.",
+        // Migrada a DSL (trigger REACCION sobre DAÑO, 22-jul-2026). La reacción es
+        // declarativa (y así estrena el prompt con las cartas atacante→objetivo); el
+        // efecto persistente -2 ATQ y su caducidad siguen en onUpdateTempEffect /
+        // onStartTurnTempEffect imperativos (híbrido). El tempEffect lo empuja
+        // MARCAR_TEMPORAL con conOwner (mismo {sourceId, ownerId} que la vieja + un
+        // sourceInstanceId inerte).
+        abilities: [{
+            trigger: 'REACCION', sobre: 'DAÑO',
+            si: { soloDañoNormal: true, defensorEsPropio: true, atacanteNoAvatar: true },
+            prompt: '¿Usar Frasco maldito contra el atacante (-2 ATQ temporal)?',
+            log: { msg: '¡{reactor} lanza un Frasco maldito a {atacante}!', tipo: 'ability' },
+            efectos: [
+                { op: 'MARCAR_TEMPORAL', quien: 'ATACANTE', conOwner: true,
+                  floating: { texto: '-2 ATQ (Frasco)', estilo: 'ft-red-stat', offset: -20 } },
+                { op: 'FIJAR_DAÑO', reducir: 2 },
+            ],
+        }],
         onUpdateTempEffect: function(target, effect, game) {
             target.currentAtk -= 2;
         },
@@ -8325,7 +8316,18 @@ const DSL = {
             }
             if (e.op === 'CANCELAR_ATAQUE') { result.cancelAttack = true; continue; }
             if (e.op === 'MARCAR_DRENAJE') { result.drainFurorAfter = true; continue; }
-            if (e.op === 'FIJAR_DAÑO') { result.newDmg = (e.valor !== undefined ? e.valor : 0); continue; }
+            if (e.op === 'FIJAR_DAÑO') {
+                if (e.reducir !== undefined) {
+                    // Baja el daño de este golpe en N, con el mínimo de siempre (0.5 si
+                    // Esbirro ataca a Personaje, si no 1). Frasco maldito: -2.
+                    let nd = (result.newDmg !== undefined ? result.newDmg : 0) - e.reducir;
+                    if (nd <= 0) nd = (cx.attacker.type === 'Esbirro' && cx.defensor.type === 'Personaje') ? 0.5 : 1;
+                    result.newDmg = nd;
+                } else {
+                    result.newDmg = (e.valor !== undefined ? e.valor : 0);
+                }
+                continue;
+            }
             if (e.op === 'ATACANTE_SE_AUTOATACA') {
                 const a = cx.attacker;
                 let dmg = a.currentAtk - a.currentDef;
