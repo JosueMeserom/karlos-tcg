@@ -269,6 +269,12 @@
                         <button class="dbg-btn dbg-btn-red" style="font-size:0.65rem; grid-column: 1 / -1;" onclick="game.debugRestartDialog()">♻️ Reiniciar partida…</button>
                     </div>
                 </div>
+
+                <div class="dbg-box" style="margin-bottom:0; margin-top:8px; border-color:#38bdf8; background: rgba(56,189,248,0.05);">
+                    <span class="dbg-title" style="color:#38bdf8;">Cargar escenario de tablero</span>
+                    <textarea id="dbg-scenario-input" spellcheck="false" style="width:100%; box-sizing:border-box; height:110px; font-family:monospace; font-size:0.62rem; resize:vertical; background:#0f172a; color:#e2e8f0; border:1px solid #475569; border-radius:6px; padding:6px;" placeholder='{ "turnoDe":"p1", "p1":{ "vanguardia":["Karlos"], "mano":["Cortarrollos"] }, "p2":{ "vanguardia":["Mini-tigre"] } }'></textarea>
+                    <button class="dbg-btn dbg-btn-green" style="width:100%; margin-top:6px;" onclick="game.debugLoadScenario()">▶️ Cargar escenario (sincroniza online)</button>
+                </div>
             </div>
 
             <div id="dbg-edit-panel" style="display:none; margin-top: 12px;">
@@ -2810,6 +2816,106 @@
                     this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'HARD_SYNC', state: this.exportGameState() });
                     this.logMsg("[ADMIN] La mesa ha sido modificada. Sincronizando con los demás jugadores...", "system");
                 }
+            }
+
+            // ─── CARGADOR DE ESCENARIOS DE TABLERO (debug) ───
+            // Monta el estado de la mesa desde un spec declarativo simple (mismo formato
+            // que los escenarios del harness de tests) y lo sincroniza online por la MISMA
+            // vía que los save-states (syncDebugState -> HARD_SYNC). Pensado para betatestear
+            // tandas: pegas un escenario, pulsas Cargar y a jugar en ambos clientes.
+            debugLoadScenario() {
+                const el = document.getElementById('dbg-scenario-input');
+                const txt = el ? el.value.trim() : '';
+                if (!txt) { this.logError('Pega un escenario en el cuadro de texto.'); return; }
+                let spec;
+                try { spec = JSON.parse(txt); }
+                catch (e) { this.logError('El escenario no es JSON válido: ' + e.message); return; }
+                try { this.loadBoardScenario(spec); }
+                catch (e) { console.error(e); this.logError('No se pudo cargar el escenario: ' + e.message); }
+            }
+
+            // Formato del spec:
+            //   { turno?, turnoDe?, empieza?,
+            //     p1: { hp?, vanguardia:[], retaguardia:[], mano:[], mazo:[], descartes:[],
+            //           retribucion:[], evento? }, p2: {...} }
+            //   Cada carta: "Nombre"  o  { carta:"Nombre", furor?, vida?, atk?, def?,
+            //     agotada?, duracion?, estado?, padre?, campos? }
+            //   `padre`: enlaza un token/clon (parentId) con la carta homónima. `campos`:
+            //   asigna campos arbitrarios a la carta (estado interno). `mazo` va de arriba
+            //   (cima) a abajo. Los alias en inglés (vanguard/hand/deck…) también valen.
+            loadBoardScenario(spec) {
+                spec = spec || {};
+                for (const pid of ['p1', 'p2']) {
+                    const p = this.players[pid];
+                    p.hand = []; p.vanguard = []; p.rearguard = []; p.deck = []; p.discard = []; p.retribution = []; p.activeEvent = null;
+                    p.cardCounts = {};
+                    const cfg = spec[pid] || {};
+                    if (cfg.hp !== undefined) p.hp = cfg.hp;
+                    const add = (arr, loc, target) => (arr || []).forEach(s => target.push(this._scenarioCard(s, pid, loc)));
+                    add(cfg.vanguardia || cfg.vanguard, 'vanguard', p.vanguard);
+                    add(cfg.retaguardia || cfg.rearguard, 'rearguard', p.rearguard);
+                    add(cfg.mano || cfg.hand, 'hand', p.hand);
+                    [...(cfg.mazo || cfg.deck || [])].reverse().forEach(s => p.deck.push(this._scenarioCard(s, pid, 'deck')));
+                    add(cfg.descartes || cfg.discard, 'discard', p.discard);
+                    add(cfg.retribucion || cfg.retribution, 'retribution', p.retribution);
+                    if (cfg.evento || cfg.event) p.activeEvent = this._scenarioCard(cfg.evento || cfg.event, pid, 'event');
+                }
+                // Resolver refs `padre` (parentId por nombre; el padre puede estar en cualquier zona).
+                for (const pid of ['p1', 'p2']) {
+                    const p = this.players[pid];
+                    const todas = [...p.vanguard, ...p.rearguard, ...p.hand, ...p.deck, ...p.discard, ...p.retribution, ...(p.activeEvent ? [p.activeEvent] : [])];
+                    todas.forEach(c => {
+                        if (!c._padreRef) return;
+                        const padre = todas.find(x => x.name === c._padreRef && x.instanceId !== c.instanceId);
+                        if (padre) c.parentId = padre.instanceId;
+                        delete c._padreRef;
+                    });
+                }
+                if (spec.turno !== undefined) this.turn = spec.turno;
+                if (spec.turnoDe) this.activePlayerId = spec.turnoDe;
+                if (spec.empieza) this.startingPlayerId = spec.empieza;
+                this.phase = 'PRINCIPAL';
+                this.inputState = 'IDLE';
+                this.selectedCard = null;
+                this.abilityContext = null;
+                this.isActionLocked = false;
+                this.placedUnitThisTurn = false;
+                this.directAttackUsedThisTurn = false;
+                this.updatePassives();
+                this.render();
+                const ov = document.getElementById('turn-overlay'); if (ov) ov.style.display = 'none';
+                this.logMsg('[ADMIN] Escenario de tablero cargado.', 'system');
+                this.syncDebugState(); // online: el rival recibe el estado (misma vía que los save-states)
+            }
+
+            _scenarioCard(spec, pid, location) {
+                const ref = (spec && typeof spec === 'object') ? spec.carta : spec;
+                const id = this._resolveScenarioCardId(ref);
+                const card = this.createCardInstance(id, pid);
+                card.location = location;
+                if (spec && typeof spec === 'object') {
+                    if (spec.furor !== undefined) card.furor = spec.furor;
+                    if (spec.vida !== undefined) card.currentHp = spec.vida;
+                    if (spec.atk !== undefined) card.currentAtk = spec.atk;
+                    if (spec.def !== undefined) card.currentDef = spec.def;
+                    if (spec.agotada !== undefined) card.exhausted = spec.agotada;
+                    if (spec.duracion !== undefined) card.duration = spec.duracion;
+                    if (spec.estado) card.status = JSON.parse(JSON.stringify(spec.estado));
+                    if (spec.padre) card._padreRef = spec.padre;
+                    if (spec.campos) Object.assign(card, spec.campos);
+                }
+                return card;
+            }
+
+            _resolveScenarioCardId(ref) {
+                if (typeof ref === 'number') {
+                    if (!CARD_DB.some(c => c.id === ref)) throw new Error('id de carta desconocido: ' + ref);
+                    return ref;
+                }
+                const found = CARD_DB.filter(c => c.name === ref);
+                if (found.length === 0) throw new Error('carta no encontrada: "' + ref + '"');
+                if (found.length > 1) throw new Error('nombre ambiguo: "' + ref + '" (usa el id numérico)');
+                return found[0].id;
             }
 
             // --- EL MARTILLO SINCRONIZADOR ---
