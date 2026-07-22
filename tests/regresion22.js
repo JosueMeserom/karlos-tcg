@@ -5,18 +5,15 @@
 // verde en la vieja, no un modal): la migración no cambia el mecanismo de elegir,
 // solo quién genera el hook.
 //
-// Detalle de motor descubierto al migrar (documentado, no "arreglado" en
-// silencio): el pipeline de onValidateTarget+onExecuteAyuda (executeAyuda en
-// index.html) mueve SIEMPRE la carta jugada de la mano a descartes cuando
-// onExecuteAyuda devuelve true — EQUIPAR con soloAnexar no toca la mano, deja que
-// ese cierre genérico lo haga. Resultado: un equipo jugado por este pipeline queda
-// A LA VEZ anexado (equippedCards, con su buff activo) Y físicamente en la pila de
-// descartes (location:'discard'). Es una rareza del MOTOR compartido por ambas
-// bases (no algo introducido por el DSL) y ya la reproduce fielmente Infusión de
-// maná (declarativa desde antes, con el mismo soloAnexar). Espada V se migra
-// replicándola igual — NO se "limpia" a mitad de una migración de comportamiento,
-// eso sería un cambio de conducta encubierto. Sin flotantes al equipar tampoco
-// (la vieja onExecuteAyuda de Espada V nunca llamaba a showFloatingText).
+// Nota de motor (23-jul-2026): el pipeline onValidateTarget+onExecuteAyuda
+// (executeAyuda en index.html) movía SIEMPRE la carta jugada a descartes cuando
+// onExecuteAyuda devolvía true, incluso si el efecto la había anexado — así que un
+// equipo jugado por este pipeline (Espada V, Infusión de maná) quedaba a la vez
+// equipado Y físicamente en descartes (carta fantasma). Toto pidió arreglarlo: ahora
+// executeAyuda, si la carta quedó con equippedTo, la deja en location:'equipped' y NO
+// la descarta. Como es motor COMPARTIDO por ambas bases, la comparación viejo-vs-nuevo
+// sigue en verde (ambas cambian igual). Sin flotantes al equipar (la vieja
+// onExecuteAyuda de Espada V nunca llamaba a showFloatingText).
 //
 // De paso, esta suite es la prueba de fuego del nuevo campo `mientrasEquipado`
 // (declarable en AL_EQUIPAR o en AL_USAR_AYUDA, compilado a onEquipUpdate):

@@ -2366,7 +2366,7 @@ const CARD_DB = [
     },
     {
         name: "Sadame (retornada)", hp: 4, def: 4, atk: 7, type: "Personaje", subtype: "No-muerto", tags: ["Usuaria de magia"], gender: "F", rarity: "S",
-        text: "Coste: Sadame en tu campo y Erasmo en cualquier campo. P: ÚLTIMA MISIÓN: Sustituye a Sadame. Stats no bajan de base. Restablece Vida al inicio. A: VUELVE A LA VIDA (3F): Revive 2 Personajes/Esbirros, dando igual sus condiciones o costes.",
+        text: "Requisito: Sadame en tu campo y Erasmo en cualquier campo. P: ÚLTIMA MISIÓN: Sustituye a Sadame. Stats no bajan de base. Restablece Vida al inicio. A: VUELVE A LA VIDA (3F): Revive 2 Personajes/Esbirros, dando igual sus condiciones o costes.",
         passiveName: "ÚLTIMA MISIÓN", activeName: "VUELVE A LA VIDA", activeCost: 3, series: 1,
         isEvolution: true,
         
@@ -2617,7 +2617,7 @@ const CARD_DB = [
     },
     {
         name: "Xanadu", hp: 6, def: 4, atk: 7, type: "Personaje", subtype: "Ser vivo", tags: ["Poder heredado"], gender: "M", rarity: "S", series: 1,
-        text: "Coste: 'Una buena razón' activa en cualquier campo. P: REPULSIÓN ABSOLUTA: Al recibir ataque normal, usa 1 Furor para esquivar el ataque y sus efectos. A: ESTORNUDO DEVASTADOR (2F): Intercambia un enemigo de vanguardia por uno de retaguardia (si respeta reglas). Si no hay retaguardia enemiga, lo devuelve a su mano.",
+        text: "Requisito: 'Una buena razón' activa en cualquier campo. P: REPULSIÓN ABSOLUTA: Al recibir ataque normal, usa 1 Furor para esquivar el ataque y sus efectos. A: ESTORNUDO DEVASTADOR (2F): Intercambia un enemigo de vanguardia por uno de retaguardia (si respeta reglas). Si no hay retaguardia enemiga, lo devuelve a su mano.",
         passiveName: "REPULSIÓN ABSOLUTA", activeName: "ESTORNUDO DEVASTADOR", activeCost: 2,
 
         onBeforePlayAsync: async function(card, game, p) {
@@ -2785,7 +2785,7 @@ const CARD_DB = [
     },
     {
         name: "Diego Antonio", hp: 7, def: 9, atk: 9, type: "Personaje", subtype: "Ser vivo", tags: ["Usuario de VP", "mafia"], gender: "M", rarity: "S", series: 1,
-        text: "Coste: 'Una buena razón' activa. P: CÓLERA INFINITA: Al colocar: +1 Furor y 3 Contadores (pierde 1/turno en Van; a 0 muere). No puede retirarse normal. Al recibir ataque normal, invierte el cálculo: Diego no recibe daño y daña al atacante. A: PACIFISMO (3F): Este turno no baja su contador.",
+        text: "Requisito: 'Una buena razón' activa. P: CÓLERA INFINITA: Al colocar: +1 Furor y 3 Contadores (pierde 1/turno en Van; a 0 muere). No puede retirarse normal. Al recibir ataque normal, invierte el cálculo: Diego no recibe daño y daña al atacante. A: PACIFISMO (3F): Este turno no baja su contador.",
         passiveName: "CÓLERA INFINITA", activeName: "PACIFISMO", activeCost: 3,
         uncopyable: true, // Requiere los contadores exclusivos de Diego
         
@@ -2856,7 +2856,7 @@ const CARD_DB = [
     },
     {
         name: "Silhouette", hp: 7, def: 1, atk: 1, type: "Personaje", subtype: "Ser vivo", tags: ["Draconiana", "otaku", "usuaria de VP"], gender: "F", rarity: "S", series: 1,
-        text: "Coste: 'Una buena razón' activa. P: REINA DEL COSPLAY: Al inicio de tu turno, cura 2 Vida. A: PONTE TRAJE (1F): Elige cualquier aliado o enemigo en el campo. Copias sus stats base (Atq y Def).",
+        text: "Requisito: 'Una buena razón' activa. P: REINA DEL COSPLAY: Al inicio de tu turno, cura 2 Vida. A: PONTE TRAJE (1F): Elige cualquier aliado o enemigo en el campo. Copias sus stats base (Atq y Def).",
         passiveName: "REINA DEL COSPLAY", activeName: "PONTE TRAJE", activeCost: 1,
         
         onBeforePlayAsync: async function(card, game, p) {
@@ -2945,7 +2945,7 @@ const CARD_DB = [
     },
     {
         name: "Cañón de positrones", type: "Ayuda", subtype: "Técnica", tags: ["Consumible"], rarity: "A", series: 2, cost: 0,
-        text: "Debes tener en tu campo a un Personaje cuyo nombre contenga 'Karlos' y consumir 2 de su Furor. Destruye a un enemigo de la vanguardia o retaguardia rival.",
+        text: "Coste: 2 de Furor de un Personaje 'Karlos'. Destruye a un enemigo de la vanguardia o retaguardia rival.",
         canPlayCard: function(card, game, p) {
             const hasKarlos = [...p.vanguard, ...p.rearguard].some(c => c.name.includes("Karlos") && c.furor >= 2);
             if (!hasKarlos) { game.logError("Necesitas un 'Karlos' con al menos 2 de Furor."); return false; }
@@ -2995,7 +2995,7 @@ const CARD_DB = [
     },
     {
         name: "Furia berserker", type: "Ayuda", subtype: "Técnica", tags: ["Equipable"], rarity: "B", series: 1, cost: 0,
-        text: "Debes tener a un aliado 'Draconiano/a' y consumir 2 de su Furor. Anéxala a dicho aliado: +3 Atq mientras esté equipada.",
+        text: "Coste: 2 de Furor de un aliado 'Draconiano/a'. Anéxala al aliado que tributó el coste: +3 Atq mientras esté equipada.",
         abilities: [
             { trigger: "JUGAR", requisitos: [
                 { count: { filtros: [ { o: [ [ { campo: "tags", op: "includes", valor: "Draconiana" } ], [ { campo: "tags", op: "includes", valor: "Draconiano" } ] ] }, { campo: "furor", op: ">=", valor: 2 } ] }, op: ">=", valor: 1, msg: "Necesitas un aliado Draconiano/a con al menos 2 de Furor." } ] },
@@ -3193,7 +3193,7 @@ const CARD_DB = [
     },
     {
         name: "Shichishito", type: "Ayuda", subtype: "Arma legendaria", tags: ["Equipable", "melé"], rarity: "A", cost: 0, series: 1,
-        text: "Anéxala a un Personaje en tu vanguardia cuyo nombre contenga 'Karlos'. +2 Def y +2 Atq. No puedes volver a usar esta carta en la partida.",
+        text: "Requisito: un Personaje 'Karlos' en tu vanguardia. Anéxala a dicho Personaje: +2 Atq y +2 Def mientras esté equipada. Sólo puedes usar esta carta una vez por partida.",
         abilities: [
             { trigger: "JUGAR", requisitos: [
                 { de: "JUGADOR", campo: "hasUsedShichishito", op: "falsy", msg: "Ya has usado Shichishito en esta partida." },
@@ -3454,7 +3454,7 @@ const CARD_DB = [
     },
     {
         name: "Espada V", type: "Ayuda", subtype: "Arma", cost: 1, rarity: "B", series: 1,
-        text: "Equipable, melé. Anexa a un Personaje aliado llamado 'Karlos' o 'Agah'. +2 Atq. Sólo puedes usar esta carta una vez por partida.",
+        text: "Requisito: un Personaje aliado 'Karlos' o 'Agah'. Anéxala a dicho Personaje: +2 Atq mientras esté equipada. Sólo puedes usar esta carta una vez por partida.",
         abilities: [
             { trigger: "JUGAR", requisitos: [
                 { de: "JUGADOR", campo: "espadaV_Used", op: "falsy", msg: "Ya has empuñado la Espada V en esta partida." },
@@ -4290,7 +4290,7 @@ const CARD_DB = [
     },
     {
         name: "Chaqueta metálica defensiva de la muerte", type: "Ayuda", subtype: "Vestimenta", tags: ["Equipable"], rarity: "C", cost: 1, series: 1,
-        text: "Anexa a un aliado que NO tenga la etiqueta 'Cosa'. +3 Def y -3 Atq.",
+        text: "Requisito: un aliado sin la etiqueta 'Cosa'. Anéxala a dicho aliado: +3 Def y -3 Atq mientras esté equipada.",
         abilities: [
             { trigger: "JUGAR", requisitos: [
                 { count: { filtros: [ { no: true, campo: "tags", op: "includes", valor: "Cosa" } ] }, op: ">=", valor: 1, msg: "No tienes aliados válidos (sin etiqueta 'Cosa')." } ] },

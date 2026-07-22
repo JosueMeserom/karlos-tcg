@@ -3198,14 +3198,21 @@
                     document.getElementById('cp-type').innerText = typeText;
                     
                    let parts;
-                    // COSTE: si el texto empieza por "Coste: ...", va a su propia caja tipo stats, antes que todo
+                    // COSTE / REQUISITO: si el texto empieza por "Coste: ..." o "Requisito: ...",
+                    // van a su propia caja tipo stats (misma apariencia), antes que todo. La norma
+                    // (Toto, 23-jul-2026): COSTE = hay que PAGAR/TRIBUTAR algo para usarla (Furor,
+                    // sacrificar un aliado…); REQUISITO = solo una CONDICIÓN para poder jugarla, sin
+                    // perder nada. Se consumen en bucle por si una carta llevara ambos.
                     let _txtBase = card.text;
                     let resultHtml = "";
-                    const _mCoste = _txtBase.match(/^Coste:\s*(.+?)\.\s*/);
-                    if (_mCoste) {
-                        _txtBase = _txtBase.slice(_mCoste[0].length);
-                        const _cv = _mCoste[1].split(/\s+o bien\s+/i).map(s => s.trim()).join('<span class="coste-obien">o bien</span>');
-                        resultHtml += `<div class="ev-dur-box"><span class="ev-dur-label">COSTE</span><span class="ev-dur-value" style="font-size:0.78rem; text-align:right; max-width:72%; line-height:1.35;">${_cv}</span></div>`;
+                    const _cajaCabecera = (label, valor) => {
+                        const _v = valor.split(/\s+o bien\s+/i).map(s => s.trim()).join('<span class="coste-obien">o bien</span>');
+                        resultHtml += `<div class="ev-dur-box"><span class="ev-dur-label">${label}</span><span class="ev-dur-value" style="font-size:0.78rem; text-align:right; max-width:72%; line-height:1.35;">${_v}</span></div>`;
+                    };
+                    let _mCab;
+                    while ((_mCab = _txtBase.match(/^(Coste|Requisito):\s*(.+?)\.\s*/))) {
+                        _cajaCabecera(_mCab[1].toUpperCase(), _mCab[2]);
+                        _txtBase = _txtBase.slice(_mCab[0].length);
                     }
                     let currentMode = "text"; 
                     if (card.type === 'Evento') {
@@ -4920,9 +4927,17 @@
                     if (idx !== -1) {
                         p.hand.splice(idx, 1);
                         this.assignCopyId(card); // el [n] nace al salir de la mano
-                        if (!p.discard) p.discard = [];
-                        p.discard.push(card);
-                        card.location = 'discard';
+                        if (card.equippedTo) {
+                            // Ayuda EQUIPABLE: quedó anexada a una carta (Espada V, Infusión de
+                            // maná…). Se queda en el campo como equipo, NO va a descartes. Antes
+                            // caía a la vez en equippedCards Y en la pila de descartes (carta
+                            // fantasma sin sentido); ahora solo queda equipada.
+                            card.location = 'equipped';
+                        } else {
+                            if (!p.discard) p.discard = [];
+                            p.discard.push(card);
+                            card.location = 'discard';
+                        }
                     }
                 }
                 
@@ -7841,9 +7856,9 @@
                         
                         if (eqTemp && eqTemp.isDual) {
                             eqEl.classList.add('dual-type'); // La carta entera de fondo también se vuelve Dual
-                            eqEl.innerHTML = `<div class="card-header" style="background: linear-gradient(135deg, #fcd34d 0%, #b45309 45%, #be185d 55%, #f9a8d4 100%) !important; border-bottom: 1px solid #78350f !important; color: black !important; font-size: 0.55rem; text-align: center; padding: 2px; line-height: 1.2;">EQUIPADO:<br>${eq.name}</div>`;
+                            eqEl.innerHTML = `<div class="card-header" style="background: linear-gradient(135deg, #fcd34d 0%, #b45309 45%, #be185d 55%, #f9a8d4 100%) !important; border-bottom: 1px solid #78350f !important; color: black !important; font-size: 0.55rem; text-align: center; padding: 2px; height: auto; min-height: 18px; line-height: 1.2;">EQUIPADO:<br>${eq.name}</div>`;
                         } else {
-                            eqEl.innerHTML = `<div class="card-header" style="background: linear-gradient(135deg, #fbcfe8 0%, #be185d 100%) !important; border-bottom: 1px solid #f9a8d4 !important; color: white !important; font-size: 0.55rem; text-align: center; padding: 2px; line-height: 1.2;">EQUIPADO:<br>${eq.name}</div>`;
+                            eqEl.innerHTML = `<div class="card-header" style="background: linear-gradient(135deg, #fbcfe8 0%, #be185d 100%) !important; border-bottom: 1px solid #f9a8d4 !important; color: white !important; font-size: 0.55rem; text-align: center; padding: 2px; height: auto; min-height: 18px; line-height: 1.2;">EQUIPADO:<br>${eq.name}</div>`;
                         }
                         
                         wrapper.appendChild(eqEl);
