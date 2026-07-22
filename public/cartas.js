@@ -8374,7 +8374,7 @@ const DSL = {
             game.openChoiceModal(prompt, [
                 { label: 'SÍ', action: () => resolve(true) },
                 { label: 'NO REACCIONAR', action: () => resolve(false) },
-            ], handCard.owner, cx ? { reaccion: { atacante: cx.attacker, defensor: cx.defensor } } : null);
+            ], handCard.owner, cx ? { reaccion: { atacante: cx.attacker, defensor: cx.defensor, mano: handCard } } : null);
         });
     },
 

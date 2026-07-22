@@ -1330,6 +1330,14 @@
                 this.isDebugOpen = false;
                 this.debugSelectedCard = null;
                 this.debugCoinMode = 'none';
+                // Persistencia del debug (como el override de admin): último slot de
+                // save-state activo y último escenario cargado con éxito.
+                this._ssSlot = parseInt(localStorage.getItem('karlos_dbg_ss_slot'), 10) || 1;
+                try {
+                    const _sc = localStorage.getItem('karlos_dbg_scenario');
+                    const _scEl = document.getElementById('dbg-scenario-input');
+                    if (_sc && _scEl) _scEl.value = _sc;
+                } catch (e) {}
                 this.atomizationAlly = null;
 
                 this.pendingAbilityCard = null;
@@ -2791,7 +2799,10 @@
             // con archivos cambiados, la partida se reconstruye con el código nuevo.
             _ssActive() { return this._ssSlot || 1; }
             _ssKey(n) { return `karlosSave_${n}`; }
-            _ssRefresh() { const el = document.getElementById('dbg-ss-slot'); if (el) el.textContent = `(slot ${this._ssActive()})`; }
+            _ssRefresh() {
+                try { localStorage.setItem('karlos_dbg_ss_slot', String(this._ssActive())); } catch (e) {} // se recuerda entre sesiones
+                const el = document.getElementById('dbg-ss-slot'); if (el) el.textContent = `(slot ${this._ssActive()})`;
+            }
             _ssStore(key, aviso) {
                 try { localStorage.setItem(key, JSON.stringify({ cuando: Date.now(), estado: this.exportGameState() })); }
                 catch (e) { console.warn('[save-state] no se pudo guardar', e); return; }
@@ -2857,7 +2868,10 @@
                 let spec;
                 try { spec = JSON.parse(txt); }
                 catch (e) { this.logError('El escenario no es JSON válido: ' + e.message); return; }
-                try { this.loadBoardScenario(spec); }
+                try {
+                    this.loadBoardScenario(spec);
+                    try { localStorage.setItem('karlos_dbg_scenario', txt); } catch (e) {} // se recuerda el último cargado con éxito
+                }
                 catch (e) { console.error(e); this.logError('No se pudo cargar el escenario: ' + e.message); }
             }
 
@@ -5752,6 +5766,32 @@
                         document.getElementById('action-banner').style.display = 'none';
                     }
                 }
+
+                // Resalta la carta de la MANO que provoca la reacción: la sube por encima
+                // del overlay (no oscurecida) con reborde verde, para dejar claro cuál es
+                // (y de paso el hover muestra su detalle, como las cartas atacante/objetivo).
+                // Solo en el cliente que ve el modal (el reactor). Pedido por Toto.
+                this._limpiarResalteReaccion();
+                const _muestraModal = this.gameMode !== 'online' || this.activePlayerId === 'setup' || this.myPlayerId === intendedPlayer;
+                if (rc && rc.mano && _muestraModal) {
+                    const manoEl = document.querySelector(`.card[data-id="${rc.mano.instanceId}"]`);
+                    if (manoEl) {
+                        this._reaccionManoEl = manoEl;
+                        this._reaccionManoZ = manoEl.style.zIndex;
+                        manoEl.style.zIndex = '4600'; // sobre el overlay (4500), bajo el detalle (5000)
+                        manoEl.style.pointerEvents = 'auto';
+                        manoEl.classList.add('valid-target');
+                    }
+                }
+            }
+
+            _limpiarResalteReaccion() {
+                const el = this._reaccionManoEl;
+                if (el) {
+                    el.classList.remove('valid-target');
+                    el.style.zIndex = this._reaccionManoZ || '';
+                    this._reaccionManoEl = null;
+                }
             }
 
             executeChoice(index, isRemote = false) {
@@ -5764,6 +5804,7 @@
                 const _cc = document.getElementById('choice-cards');
                 if (_cc) { _cc.innerHTML = ''; _cc.style.display = 'none'; }
                 document.getElementById('choice-modal').style.zIndex = '8500';
+                this._limpiarResalteReaccion();
                 this.stopPreview();
 
                 // NO borrar el texto del cartelón si estamos en el proceso de Setup inicial
@@ -7751,6 +7792,13 @@
                     startingPlayerId: this.startingPlayerId,
                     phase: this.phase,
                     prngSeed: this.prngSeed,
+                    // Contador de instanceId: DEBE viajar en el sync. Si no, tras cualquier
+                    // HARD_SYNC (setup, reconexión, cargador de escenarios…) los contadores
+                    // de los clientes divergen y la SIGUIENTE ficha creada por una habilidad
+                    // (Clon de Unmei/NoName con createCardInstance) nace con instanceId
+                    // distinto en cada cliente -> al atacar con ella, el rival no la encuentra
+                    // y se queda pillado. Sincronizándolo, ambos crean el mismo id en el replay.
+                    instanceCounter: this.instanceCounter || 0,
                     p1Name: this.p1Name,
                     p2Name: this.p2Name,
                     placedUnitThisTurn: this.placedUnitThisTurn || false,
@@ -7769,6 +7817,9 @@
                 this.startingPlayerId = state.startingPlayerId;
                 this.phase = state.phase;
                 this.prngSeed = state.prngSeed;
+                // Alinea el contador de instanceId con el del emisor: sin esto, las fichas
+                // creadas después (Clon de Unmei/NoName) tendrían id distinto en cada cliente.
+                if (state.instanceCounter !== undefined) this.instanceCounter = state.instanceCounter;
                 if (state.p1Name) this.p1Name = state.p1Name;
                 if (state.p2Name) this.p2Name = state.p2Name;
                 this.placedUnitThisTurn = state.placedUnitThisTurn || false;
