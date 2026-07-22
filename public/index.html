@@ -3209,13 +3209,15 @@
                     // Cajas tipo stats de cabecera (COSTE / REQUISITO / DURACIÓN): el label va en una
                     // COLUMNA de ancho FIJO con el texto centrado, de modo que los centros de COSTE,
                     // REQUISITO y DURACIÓN queden alineados en el mismo eje (Toto, 23-jul-2026), con
-                    // el mismo padding a la izquierda para todas. El valor va a la derecha
-                    // (margin-left:auto). valStyle: estilo extra del valor — DURACIÓN lo deja grande
-                    // (CSS ev-dur-value); Coste/Requisito lo achican (_VS) por ser textos largos.
+                    // el mismo padding a la izquierda para todas. El posicionamiento del valor lo fija
+                    // valStyle: Coste/Requisito (_VS) llevan texto largo -> a la derecha del recuadro;
+                    // DURACIÓN (_VSD) lleva texto corto ("X turnos") -> pegado al label con un pequeño
+                    // gap, para no dejar un hueco muerto en el centro del recuadro.
                     const _filaStat = (label, valorHtml, valStyle) =>
                         `<span class="ev-dur-label" style="width:6em; text-align:center; flex-shrink:0;">${label}</span>`
-                        + `<span class="ev-dur-value" style="margin-left:auto; text-align:right; ${valStyle || ''}">${valorHtml}</span>`;
-                    const _VS = 'font-size:0.78rem; max-width:62%; line-height:1.35;';
+                        + `<span class="ev-dur-value" style="${valStyle || ''}">${valorHtml}</span>`;
+                    const _VS = 'margin-left:auto; text-align:right; font-size:0.78rem; max-width:62%; line-height:1.35;';
+                    const _VSD = 'margin-left:16px;';
                     const _cajaStat = (label, valorHtml, valStyle) =>
                         `<div class="ev-dur-box" style="justify-content:flex-start; padding-left:10px;">${_filaStat(label, valorHtml, valStyle)}</div>`;
                     // 1) HÍBRIDA "Requisito: X o bien Coste: Y." -> UNA caja apilada: Requisito arriba,
@@ -3246,7 +3248,7 @@
                         const durM = txt.match(/^\s*(\d+)\s*turnos?\.\s*/);
                         const durVal = durM ? parseInt(durM[1]) : (card.duration !== undefined ? card.duration : null);
                         if (durM) txt = txt.slice(durM[0].length);
-                        if (durVal !== null) resultHtml += _cajaStat('DURACIÓN', `${durVal} turno${durVal === 1 ? '' : 's'}`);
+                        if (durVal !== null) resultHtml += _cajaStat('DURACIÓN', `${durVal} turno${durVal === 1 ? '' : 's'}`, _VSD);
                         // Requisito del Evento ("Requiere X.") -> su propia caja REQUISITO tipo stats,
                         // JUSTO debajo de DURACIÓN y con el mismo formato que las Ayudas (Toto,
                         // 23-jul-2026), en vez de una sección de color en el cuerpo. La duración es la
