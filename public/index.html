@@ -8200,6 +8200,8 @@
                 if (!this._espejandoReaccion) return;
                 if (this._esperandoSettleEspejo) return; // ya hay un poller en marcha
                 this._esperandoSettleEspejo = true;
+                this._ultimoSnapEspejo = null; // firma del último estado intermedio enviado (dedup)
+                const CADENCIA = 60; // ms entre sondeos; con dedup, solo emite/renderiza si el estado cambió
                 const poll = () => {
                     if (!this._espejandoReaccion) { this._esperandoSettleEspejo = false; return; }
                     const esperandoOtraInteraccion =
@@ -8218,18 +8220,28 @@
                         this._syncAutoritativo();
                     } else {
                         // Snapshot INTERMEDIO: la corrutina sigue trabajando pero el rival NO tiene
-                        // un prompt abierto (esperandoOtraInteraccion=false → estamos en fase de
-                        // animación/proceso entre prompts, o rematando el ataque). Le mando el
-                        // estado ACTUAL para que vea los cambios (mano robándose, vida bajando,
-                        // cartas a descartes) avanzar "a saltos" (~4/seg) en vez de todo de golpe
-                        // al final. NUNCA durante un prompt (pisaría su UI): por eso el guard.
-                        // No hay animación fluida en el reconectado —su corrutina murió— pero sí
-                        // progresión de estado visible.
-                        if (!esperandoOtraInteraccion) { this._dbgRx('snapshot intermedio (espejo)'); this._syncAutoritativo(); }
-                        setTimeout(poll, 250);
+                        // un prompt abierto (esperandoOtraInteraccion=false → fase de animación/
+                        // proceso entre prompts, o rematando el ataque). Le mando el estado ACTUAL
+                        // para que vea los cambios (mano robándose, vida bajando, cartas a descartes)
+                        // en cuanto ocurren, en vez de todo de golpe al final. NUNCA durante un
+                        // prompt (pisaría su UI): por eso el guard. Ojo: transmite ESTADO (datos),
+                        // que cambia de golpe; NO fotogramas de animación (esa la generaba la
+                        // corrutina del reconectado, que murió y no es serializable). Cadencia alta
+                        // + dedup: solo se emite/renderiza cuando el estado cambia de verdad, para
+                        // minimizar el desfase con J1 sin spam ni parpadeo por renders idénticos.
+                        if (!esperandoOtraInteraccion && this.gameMode === 'online' && this.myPlayerId !== 'spectator') {
+                            const snap = this.exportGameState();
+                            const firma = JSON.stringify(snap, (k, v) => k === 'logHistory' ? undefined : v);
+                            if (firma !== this._ultimoSnapEspejo) {
+                                this._ultimoSnapEspejo = firma;
+                                this._dbgRx('snapshot intermedio (espejo)');
+                                this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'HARD_SYNC', admin: true, state: snap });
+                            }
+                        }
+                        setTimeout(poll, CADENCIA);
                     }
                 };
-                setTimeout(poll, 250);
+                setTimeout(poll, CADENCIA);
             }
 
             // Traza de reconexión (apagada por defecto). Para diagnosticar un fallo de
