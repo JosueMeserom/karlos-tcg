@@ -1649,18 +1649,6 @@
                     //    y la Promise espera que la cola las procese.
                     if (data.action === 'CHOICE_SELECTED') { this.executeChoice(data.index, true); return; }
                     if (data.action === 'VISUAL_SEARCH_CONFIRM') { this.resolveVisualSearch(data.ids, true); return; }
-                    // El rival reconectó y perdió su overlay: si YO estaba esperando una elección
-                    // suya (reacción, ACERTIJO en cruz, redirección de Pequeña traición…), la
-                    // aborto (declina/cancela), dejo que la acción reanude y termine, y le reenvío
-                    // el estado final. Inmediata (fuera de cola) para no bloquear. Ignoro mi eco.
-                    if (data.action === 'PEER_ABORT_INTERACTION') {
-                        if (!data._from || data._from !== this.myPlayerId) {
-                            if (this._abortPendingInteraction()) {
-                                setTimeout(() => this._syncAutoritativo(), 1200); // deja completar la acción reanudada (animaciones incl.) y reenvía el estado
-                            }
-                        }
-                        return;
-                    }
                     // --- SINCRONIZACIÓN DE MONEDAS EN TIEMPO REAL ---
                     if (data.action === 'COIN_FLIP_REMOTE' || data.action === 'COIN_ADVANCE_REMOTE') {
                         window.dispatchEvent(new CustomEvent('game-sync', { detail: data }));
@@ -1742,14 +1730,32 @@
                     else if (data.action === 'REQUEST_SYNC') {
                         if (data.requesterId && data.requesterId === this.socket.id) continue;
                         if (this.myPlayerId === 'spectator') continue;
-                        
+
                         const target = data.targetId || data.requesterId;
-                        this.socket.emit('gameAction', { 
-                            roomCode: this.roomCode, 
-                            action: 'HARD_SYNC', 
-                            state: this.exportGameState(), 
-                            targetId: target 
-                        }); 
+                        // ¿Estoy esperando una elección DEL RIVAL (una reacción, un ACERTIJO en
+                        // cruz, la redirección de Pequeña traición…)? Si el rival acaba de
+                        // reconectar, ha perdido ese overlay y no responderá jamás, y yo me
+                        // quedaría en "Esperando a que X elija..." para siempre. Recupero YO
+                        // (soy el cliente estable, con la corrutina válida): declino la elección
+                        // —y las que encadenen, con auto-declinar—, dejo que la acción reanude y
+                        // TERMINE, y solo entonces le mando el estado FINAL (el de ahora aún es
+                        // pre-acción). El rival reconectado solo recibe ese estado ya resuelto.
+                        const tengoInteraccion = this.currentChoices || this.currentVisualResolve || this.dslPick;
+                        const esperandoRival = tengoInteraccion && this._interaccionChooser && this._interaccionChooser !== this.myPlayerId;
+                        if (esperandoRival) {
+                            this._autoDeclinarReacciones = true;
+                            this._abortPendingInteraction();
+                            setTimeout(() => {
+                                this._autoDeclinarReacciones = false;
+                                this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'HARD_SYNC', state: this.exportGameState(), targetId: target });
+                            }, 1500); // deja completar la acción reanudada (incl. animaciones) antes de volcar
+                        } else {
+                            // Caso espejo: soy YO quien está eligiendo (mi overlay sigue vivo) y el
+                            // rival reconectó. Le mando el estado actual y, tras completar mi elección,
+                            // le reenvío el estado final (si no, se quedaría en el estado pre-acción).
+                            if (tengoInteraccion && this._interaccionChooser === this.myPlayerId) this._reSyncTrasEleccion = true;
+                            this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'HARD_SYNC', state: this.exportGameState(), targetId: target });
+                        }
                     } else if (data.action === 'HARD_SYNC') {
                         // Un HARD_SYNC dirigido (con targetId) o pedido por nosotros (reconexión/espectador/hueco)
                         // SIEMPRE se importa: es una sincronización autoritativa que necesitamos.
@@ -3583,6 +3589,7 @@
                 const cancelable = arguments.length > 5 ? arguments[5] !== false : true;
                 return new Promise(resolve => {
                     this.currentVisualResolve = (sel) => { resolve(sel && sel.length ? sel : null); };
+                    this._interaccionChooser = chooserId; // quién debe elegir (para la recuperación por reconexión)
 
                     if (this.gameMode === 'online' && this.myPlayerId !== 'spectator' && this.myPlayerId !== chooserId) {
                         const banner = document.getElementById('action-banner');
@@ -5717,6 +5724,16 @@
                     return; // Abortamos para que no dibuje el modal HTML
                 }
                 this.currentChoices = choices;
+                this._interaccionChooser = intendedPlayer; // quién debe responder (para la recuperación por reconexión)
+
+                // Recuperación por reconexión del rival: declino esta reacción (y las que
+                // encadenen, con varias cartas de reacción en mano) SIN mostrar el modal, para
+                // que el ataque termine solo y el cliente estable pueda volcar el estado final.
+                if (this._autoDeclinarReacciones && opts && opts.reaccion) {
+                    const idx = choices.length - 1; // última opción = NO REACCIONAR
+                    Promise.resolve().then(() => { if (choices[idx] && typeof choices[idx].action === 'function') choices[idx].action(); });
+                    return;
+                }
                 document.getElementById('choice-title').innerText = title;
 
                 // Fila de cartas de reacción (si las hay). El modal baja a z-index 4500
@@ -5794,33 +5811,46 @@
                 if (rc && rc.mano && _muestraModal) {
                     const manoEl = document.querySelector(`.card[data-id="${rc.mano.instanceId}"]`);
                     if (manoEl) {
-                        // La carta de la mano vive en .hand-zone (position:relative; z-index:10),
-                        // que crea contexto de apilamiento y la atraparía bajo el overlay (4500)
-                        // por más z-index que le pongamos. La sacamos con position:fixed sobre su
-                        // posición actual para llevarla al contexto raíz, por encima del overlay.
+                        // La carta original está (a) oscurecida por el filtro del tablero
+                        // (#game-board.waiting-interaction .card:not(.interactive)) y (b) por debajo
+                        // del overlay (4500). En vez de pelear con su contexto de apilamiento (que
+                        // la atrapa) y con el reflow de la mano, CLONAMOS la carta en una capa
+                        // propia por encima del overlay, colocada EXACTAMENTE sobre su hueco, y
+                        // ocultamos la original con visibility:hidden (mantiene el hueco, sin reflow).
                         const r = manoEl.getBoundingClientRect();
-                        this._reaccionManoEl = manoEl;
-                        this._reaccionManoStyle = manoEl.getAttribute('style') || '';
-                        manoEl.style.position = 'fixed';
-                        manoEl.style.left = r.left + 'px';
-                        manoEl.style.top = r.top + 'px';
-                        manoEl.style.width = r.width + 'px';
-                        manoEl.style.height = r.height + 'px';
-                        manoEl.style.margin = '0';
-                        manoEl.style.zIndex = '4600'; // sobre el overlay (4500), bajo el detalle (5000)
-                        manoEl.style.pointerEvents = 'auto';
-                        manoEl.classList.add('valid-target');
+                        if (r.width) {
+                            let layer = document.getElementById('reaccion-lift');
+                            if (!layer) {
+                                layer = document.createElement('div');
+                                layer.id = 'reaccion-lift';
+                                layer.style.cssText = 'position:fixed; inset:0; pointer-events:none; z-index:4600;'; // sobre el overlay (4500), bajo el detalle (5000)
+                                document.body.appendChild(layer);
+                            }
+                            layer.innerHTML = '';
+                            const clon = this.createCardEl(rc.mano, false, true);
+                            clon.removeAttribute('data-id'); // solo visual: que no colisione en querySelector
+                            clon.style.position = 'absolute';
+                            clon.style.left = r.left + 'px';
+                            clon.style.top = r.top + 'px';
+                            clon.style.width = r.width + 'px';
+                            clon.style.height = r.height + 'px';
+                            clon.style.margin = '0';
+                            clon.style.pointerEvents = 'auto';
+                            clon.classList.add('valid-target'); // reborde verde
+                            clon.onmouseenter = () => this.startPreview(rc.mano);
+                            clon.onmouseleave = () => this.stopPreview();
+                            layer.appendChild(clon);
+                            manoEl.style.visibility = 'hidden';
+                            this._reaccionManoOrig = manoEl;
+                        }
                     }
                 }
             }
 
             _limpiarResalteReaccion() {
-                const el = this._reaccionManoEl;
-                if (el) {
-                    el.classList.remove('valid-target');
-                    el.setAttribute('style', this._reaccionManoStyle || ''); // restaura el estilo que puso render
-                    this._reaccionManoEl = null;
-                }
+                const layer = document.getElementById('reaccion-lift');
+                if (layer) layer.remove();
+                if (this._reaccionManoOrig) { this._reaccionManoOrig.style.visibility = ''; this._reaccionManoOrig = null; }
             }
 
             executeChoice(index, isRemote = false) {
@@ -5843,6 +5873,16 @@
 
                 if (this.currentChoices && this.currentChoices[index]) {
                     this.currentChoices[index].action();
+                }
+                this._reSyncTrasEleccionSiHaceFalta();
+            }
+
+            // Tras completar MI elección, si un rival reconectó durante ella (caso espejo),
+            // le reenvío el estado FINAL una vez la acción reanudada ha terminado.
+            _reSyncTrasEleccionSiHaceFalta() {
+                if (this._reSyncTrasEleccion) {
+                    this._reSyncTrasEleccion = false;
+                    setTimeout(() => this._syncAutoritativo(), 1500);
                 }
             }
 
@@ -6026,6 +6066,7 @@
                     this.currentVisualResolve(finalCards);
                     this.currentVisualResolve = null;
                 }
+                this._reSyncTrasEleccionSiHaceFalta();
             }
 
             // --- PUNTO ÚNICO DE INTERCEPCIÓN DE ATAQUE (docs/DSL_cartas_diseno.md §11) ---
@@ -7867,6 +7908,7 @@
                 document.getElementById('choice-modal').style.display = 'none';
                 document.getElementById('action-banner').style.display = 'none';
                 document.getElementById('coin-overlay').style.display = 'none';
+                if (this._limpiarResalteReaccion) this._limpiarResalteReaccion(); // por si había un modal de reacción con su carta resaltada
                 const coinHitbox = document.getElementById('coin-hitbox');
                 if (coinHitbox) coinHitbox.onclick = null;
                 const searchModal = document.querySelector('.search-modal');
@@ -7947,19 +7989,17 @@
                     audio.play().catch(e => console.log("Navegador bloqueó el autoplay del audio.", e));
                 }
 
-                // Recuperación de interacciones cross-cliente tras RECONECTAR: hemos perdido
-                // cualquier overlay/elección propia (el import los ocultó y reseteó a IDLE).
-                // Anulamos nuestros resolvers colgados (la corrutina suspendida quedará inerte,
-                // sin reanudarse sobre objetos viejos) y avisamos al rival de que, si él estaba
-                // esperando una elección NUESTRA, la aborte y nos reenvíe el estado final.
+                // Tras RECONECTAR (o cualquier reconexión por blip sin recargar): anulamos
+                // nuestros resolvers colgados para que una corrutina suspendida (p. ej. una
+                // reacción a medias) NO se reanude sobre objetos viejos. La recuperación de la
+                // elección la conduce el RIVAL estable al recibir el REQUEST_SYNC (aborta su
+                // espera, deja terminar la acción y nos manda el estado final ya resuelto).
                 if (this._reconnectRecovery) {
                     this._reconnectRecovery = false;
                     this.currentVisualResolve = null;
                     this.dslPick = null;
                     this.currentChoices = null;
-                    if (this.gameMode === 'online' && this.myPlayerId !== 'spectator') {
-                        this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'PEER_ABORT_INTERACTION' });
-                    }
+                    this._interaccionChooser = null;
                 }
             }
 
