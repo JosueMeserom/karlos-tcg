@@ -5897,21 +5897,14 @@
                 }
 
                 this.pendingReaction = null; // este prompt ya se resolvió (si en cadena hay otro, se re-fijará al mostrarlo)
-                if (this.currentChoices && this.currentChoices[index]) {
-                    this.currentChoices[index].action();
+                const _ch = this.currentChoices; this.currentChoices = null; // IMPRESCINDIBLE: si no, bloquea el re-mostrado del siguiente prompt de la cadena
+                if (_ch && _ch[index]) {
+                    _ch[index].action();
                 }
-                // Modo espejo: acabo de aplicar (en mi corrutina viva) la respuesta que me mandó
-                // el reconectado. Si tras reanudar NO aparece otro prompt de la cadena (la acción
-                // terminó), le vuelco el estado FINAL. Si aparece otro, ya se lo empujó su
-                // openChoiceModal (PENDING_REACTION), así que no volcamos aún.
-                if (this._espejandoReaccion && isRemote) {
-                    setTimeout(() => {
-                        if (!this.pendingReaction) {
-                            this._espejandoReaccion = false;
-                            this._syncAutoritativo();
-                        }
-                    }, 700); // deja reanudar la corrutina (y sus animaciones) para ver si encadena otra reacción
-                }
+                // Modo espejo: acabo de aplicar (en mi corrutina viva) la respuesta del
+                // reconectado. Cuando la acción termine DEL TODO (sin más prompts pendientes ni
+                // animaciones), le vuelco el estado final.
+                if (this._espejandoReaccion && isRemote) this._syncTrasCompletarEspejo();
                 this._reSyncTrasEleccionSiHaceFalta();
             }
 
@@ -8098,6 +8091,36 @@
                     abortado = true;
                 }
                 return abortado;
+            }
+
+            // Modo espejo (el rival reconectó y estoy re-conduciendo su reacción con mi corrutina
+            // viva): espera a que la corrutina termine DEL TODO — sin ningún prompt/elección
+            // pendiente, sin animaciones, IDLE — y solo entonces vuelca el estado final. Sustituye
+            // al antiguo setTimeout(700ms) a ojo, que mandaba el estado a medias si la animación
+            // tardaba (p. ej. Escudo: carta ya descartada pero atacante aún sin agotar).
+            _syncTrasCompletarEspejo() {
+                if (!this._espejandoReaccion) return;
+                if (this._esperandoSettleEspejo) return; // ya hay un poller en marcha
+                this._esperandoSettleEspejo = true;
+                const poll = () => {
+                    if (!this._espejandoReaccion) { this._esperandoSettleEspejo = false; return; }
+                    const esperandoOtraInteraccion =
+                        this.pendingReaction ||          // otra reacción de la cadena (ya empujada por PENDING_REACTION)
+                        this.currentChoices ||           // modal de elección abierto
+                        this.currentVisualResolve ||     // búsqueda visual / elección en tablero
+                        this.dslPick ||                  // pick DSL en tablero
+                        this.coinFlipResolve;            // moneda en vuelo
+                    const asentado = !esperandoOtraInteraccion &&
+                        this.inputState === 'IDLE' && !this.isActionLocked && !this.isFlipping;
+                    if (asentado) {
+                        this._esperandoSettleEspejo = false;
+                        this._espejandoReaccion = false;
+                        this._syncAutoritativo();
+                    } else {
+                        setTimeout(poll, 250); // sigue esperando a que la corrutina (y sus animaciones) terminen
+                    }
+                };
+                setTimeout(poll, 250);
             }
 
             // HARD_SYNC autoritativo silencioso (para recuperaciones automáticas, sin log de admin).
