@@ -1648,10 +1648,11 @@
                     //    Meterlas en la cola causaría un deadlock: la cola espera la Promise,
                     //    y la Promise espera que la cola las procese.
                     if (data.action === 'CHOICE_SELECTED') { this.executeChoice(data.index, true); return; }
-                    if (data.action === 'VISUAL_SEARCH_CONFIRM') { this.resolveVisualSearch(data.ids, true); return; }
+                    if (data.action === 'VISUAL_SEARCH_CONFIRM') { this._dbgRx('recibido VISUAL_SEARCH_CONFIRM', { ids: (data.ids||[]).length, espejando: !!this._espejandoReaccion }); this.resolveVisualSearch(data.ids, true); return; }
                     // Reanudar perfecto (cadena de reacciones): el rival estable me empuja el
                     // SIGUIENTE prompt de reacción para que lo re-muestre tras haber reconectado.
                     if (data.action === 'PENDING_REACTION') {
+                        this._dbgRx('recibido PENDING_REACTION', { chooser: data.pr && data.pr.chooserId, tengoModal: !!this.currentChoices });
                         if (data.pr && data.pr.chooserId === this.myPlayerId && !this.currentChoices) this._reMostrarReaccionPendiente(data.pr);
                         return;
                     }
@@ -1661,11 +1662,24 @@
                     if (data.action === 'PENDING_INTERACTION') {
                         const pi = data.pi;
                         const yaTengoUI = this.currentChoices || this.dslPick || this._deckSearchActivo;
+                        this._dbgRx('recibido PENDING_INTERACTION', { tipo: pi && pi.tipo, chooser: pi && pi.chooserId, yaTengoUI: !!yaTengoUI });
                         if (pi && pi.chooserId === this.myPlayerId && !yaTengoUI) this._reMostrarInteraccionPendiente(pi);
                         return;
                     }
+                    // REQUEST_SYNC con una interacción MÍA en curso: la cola (processActionQueue)
+                    // se bloquea mientras inputState==='EXECUTING', y estoy justo en EXECUTING
+                    // suspendido en el await de esa elección. Si lo encolara, no se procesaría
+                    // hasta el timeout de 8s: de ahí la tardanza al reconectar en mitad de un
+                    // prompt, y que yo nunca entrara en modo espejo (el reconectado se quedaba sin
+                    // el estado final). Lo atiendo AQUÍ, fuera de cola. Sin interacción, sigue a la
+                    // cola como antes (para capturar estados estables).
+                    if (data.action === 'REQUEST_SYNC') {
+                        const hayInteraccion = this.currentChoices || this.currentVisualResolve || this.dslPick || this.pendingInteraction;
+                        if (hayInteraccion) { this._dbgRx('REQUEST_SYNC atendido FUERA DE COLA (hay interacción)'); this._atenderRequestSync(data); return; }
+                    }
                     // --- SINCRONIZACIÓN DE MONEDAS EN TIEMPO REAL ---
                     if (data.action === 'COIN_FLIP_REMOTE' || data.action === 'COIN_ADVANCE_REMOTE') {
+                        this._dbgRx('recibido', data.action, { espejando: !!this._espejandoReaccion });
                         window.dispatchEvent(new CustomEvent('game-sync', { detail: data }));
                         return;
                     }
@@ -1742,43 +1756,11 @@
                     else if (data.action === 'DEBUG_RETRIBUTION') await this.debugTakeRetribution(data.playerId, true);
                     
                     // --- SYNC AHORA ESTÁ ENCOLADO PARA QUE CAPTURE ESTADOS ESTABLES ---
+                    // (Salvo cuando hay una interacción en curso: entonces se atiende FUERA de
+                    // cola en el listener de socket, porque la cola está bloqueada por el propio
+                    // EXECUTING de esa interacción — ver comentario allí.)
                     else if (data.action === 'REQUEST_SYNC') {
-                        if (data.requesterId && data.requesterId === this.socket.id) continue;
-                        if (this.myPlayerId === 'spectator') continue;
-
-                        const target = data.targetId || data.requesterId;
-                        // ¿Estoy esperando una elección DEL RIVAL (una reacción, un ACERTIJO en
-                        // cruz, la redirección de Pequeña traición…)? Si el rival acaba de
-                        // reconectar, ha perdido ese overlay y no responderá jamás, y yo me
-                        // quedaría en "Esperando a que X elija..." para siempre. Recupero YO
-                        // (soy el cliente estable, con la corrutina válida): declino la elección
-                        // —y las que encadenen, con auto-declinar—, dejo que la acción reanude y
-                        // TERMINE, y solo entonces le mando el estado FINAL (el de ahora aún es
-                        // pre-acción). El rival reconectado solo recibe ese estado ya resuelto.
-                        const tengoInteraccion = this.currentChoices || this.currentVisualResolve || this.dslPick || this.pendingInteraction;
-                        const esperandoRival = tengoInteraccion && this._interaccionChooser && this._interaccionChooser !== this.myPlayerId;
-                        if (esperandoRival && ((this.currentChoices && this.pendingReaction) || this.pendingInteraction)) {
-                            // REACCIÓN o interacción visual (tablero/mazo/moneda) del rival: reanudar
-                            // perfecto. Entro en modo espejo y le mando el estado TAL CUAL (incluye
-                            // pendingReaction/pendingInteraction): el reconectado re-mostrará su UI y
-                            // sus clics dirigirán MI corrutina viva, que hace el trabajo y, al terminar
-                            // (con lo que encadene), le vuelca el estado final.
-                            this._espejandoReaccion = true;
-                            this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'HARD_SYNC', state: this.exportGameState(), targetId: target });
-                        } else if (esperandoRival) {
-                            // Interacción del rival no cubierta por el reanudar-perfecto: auto-declinamos
-                            // (el reconectado pierde esa elección) y le volcamos el estado final tras completar.
-                            this._abortPendingInteraction();
-                            setTimeout(() => {
-                                this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'HARD_SYNC', state: this.exportGameState(), targetId: target });
-                            }, 1500);
-                        } else {
-                            // Caso espejo: soy YO quien está eligiendo (mi overlay sigue vivo) y el
-                            // rival reconectó. Le mando el estado actual y, tras completar mi elección,
-                            // le reenvío el estado final (si no, se quedaría en el estado pre-acción).
-                            if (tengoInteraccion && this._interaccionChooser === this.myPlayerId) this._reSyncTrasEleccion = true;
-                            this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'HARD_SYNC', state: this.exportGameState(), targetId: target });
-                        }
+                        this._atenderRequestSync(data);
                     } else if (data.action === 'HARD_SYNC') {
                         // Un HARD_SYNC dirigido (con targetId) o pedido por nosotros (reconexión/espectador/hueco)
                         // SIEMPRE se importa: es una sincronización autoritativa que necesitamos.
@@ -5900,6 +5882,8 @@
                             layer.appendChild(clon);
                             manoEl.style.visibility = 'hidden';
                             this._reaccionManoOrig = manoEl;
+                            this._reaccionLiftClon = clon;
+                            this._reaccionLiftTick(); // sigue el hueco de la carta si la mano se reajusta (resize/reflow)
                         }
                     }
                 }
@@ -5909,6 +5893,30 @@
                 const layer = document.getElementById('reaccion-lift');
                 if (layer) layer.remove();
                 if (this._reaccionManoOrig) { this._reaccionManoOrig.style.visibility = ''; this._reaccionManoOrig = null; }
+                this._reaccionLiftClon = null; // detiene el rAF de seguimiento (ver _reaccionLiftTick)
+            }
+
+            // Mantiene el clon resaltado de la carta que reacciona pegado al hueco de su carta
+            // original en la mano (visibility:hidden pero presente en el layout), de modo que si
+            // la mano se reajusta —resize de la ventana, reflow— el resalte se mueve con ella,
+            // igual que hace la mano de siempre. Se detiene solo al limpiar el resalte.
+            _reaccionLiftTick() {
+                if (this._reaccionLiftLoop) return;
+                this._reaccionLiftLoop = true;
+                const paso = () => {
+                    const clon = this._reaccionLiftClon;
+                    const orig = this._reaccionManoOrig;
+                    if (!clon || !orig || !document.contains(clon) || !document.contains(orig)) { this._reaccionLiftLoop = false; return; }
+                    const r = orig.getBoundingClientRect();
+                    if (r.width) {
+                        clon.style.left = r.left + 'px';
+                        clon.style.top = r.top + 'px';
+                        clon.style.width = r.width + 'px';
+                        clon.style.height = r.height + 'px';
+                    }
+                    requestAnimationFrame(paso);
+                };
+                requestAnimationFrame(paso);
             }
 
             executeChoice(index, isRemote = false) {
@@ -5937,6 +5945,7 @@
                 // Modo espejo: acabo de aplicar (en mi corrutina viva) la respuesta del
                 // reconectado. Cuando la acción termine DEL TODO (sin más prompts pendientes ni
                 // animaciones), le vuelco el estado final.
+                this._dbgRx('executeChoice', { index, isRemote, espejando: !!this._espejandoReaccion });
                 if (this._espejandoReaccion && isRemote) this._syncTrasCompletarEspejo();
                 this._reSyncTrasEleccionSiHaceFalta();
             }
@@ -8080,6 +8089,7 @@
                 // YO soy el elector y no tengo ya uno vivo (reconecté a mitad de la reacción),
                 // lo RE-MUESTRO. Sus botones solo mandan mi respuesta a la corrutina VIVA del
                 // rival, que hace el trabajo y me devuelve el estado final.
+                this._dbgRx('importGameState', { pendingReaction: state.pendingReaction && state.pendingReaction.chooserId, pendingInteraction: state.pendingInteraction && state.pendingInteraction.tipo, soyChooserR: state.pendingReaction && state.pendingReaction.chooserId === this.myPlayerId });
                 if (state.pendingReaction && state.pendingReaction.chooserId === this.myPlayerId && !this.currentChoices) {
                     this._reMostrarReaccionPendiente(state.pendingReaction);
                 } else if (state.pendingReaction && state.pendingReaction.chooserId !== this.myPlayerId && this.myPlayerId !== 'spectator' && this.activePlayerId !== 'setup') {
@@ -8204,12 +8214,59 @@
                     if (asentado) {
                         this._esperandoSettleEspejo = false;
                         this._espejandoReaccion = false;
+                        this._dbgRx('poller ASENTADO -> vuelco estado final');
                         this._syncAutoritativo();
                     } else {
                         setTimeout(poll, 250); // sigue esperando a que la corrutina (y sus animaciones) terminen
                     }
                 };
                 setTimeout(poll, 250);
+            }
+
+            // Traza de reconexión (apagada por defecto). Para diagnosticar un fallo de
+            // reconexión-a-mitad-de-prompt: abrir la consola (F12) en AMBOS clientes, ejecutar
+            // `game._debugReconexion = true`, reproducir, y pasar lo que salga con prefijo [RX].
+            _dbgRx(...args) { if (this._debugReconexion) console.log('[RX]', this.myPlayerId, ...args); }
+
+            // Atiende un REQUEST_SYNC de un cliente que (re)entra. Se llama por dos vías: desde
+            // la cola (estados estables, sin interacción) y fuera de cola (cuando hay una
+            // interacción en curso que bloquearía la cola). Decide entre reanudar-perfecto
+            // (modo espejo), auto-declinar (fallback) o simple reenvío del estado.
+            _atenderRequestSync(data) {
+                if (data.requesterId && data.requesterId === this.socket.id) return;
+                if (this.myPlayerId === 'spectator') return;
+
+                const target = data.targetId || data.requesterId;
+                // ¿Estoy esperando una elección DEL RIVAL (una reacción, un ACERTIJO en cruz, la
+                // redirección de Pequeña traición…)? Si el rival acaba de reconectar, ha perdido
+                // ese overlay. Con reanudar-perfecto entro en modo espejo: mi corrutina viva
+                // dirige y, al terminar, le vuelco el estado final. Lo no cubierto se auto-declina.
+                const tengoInteraccion = this.currentChoices || this.currentVisualResolve || this.dslPick || this.pendingInteraction;
+                const esperandoRival = tengoInteraccion && this._interaccionChooser && this._interaccionChooser !== this.myPlayerId;
+                this._dbgRx('atenderRequestSync', { esperandoRival, chooser: this._interaccionChooser, currentChoices: !!this.currentChoices, pendingReaction: !!this.pendingReaction, pendingInteraction: this.pendingInteraction && this.pendingInteraction.tipo, inputState: this.inputState });
+                if (esperandoRival && ((this.currentChoices && this.pendingReaction) || this.pendingInteraction)) {
+                    // REACCIÓN o interacción visual (tablero/mazo/moneda) del rival: reanudar
+                    // perfecto. Entro en modo espejo y le mando el estado TAL CUAL (incluye
+                    // pendingReaction/pendingInteraction): el reconectado re-mostrará su UI y
+                    // sus clics dirigirán MI corrutina viva, que hace el trabajo y, al terminar
+                    // (con lo que encadene), le vuelca el estado final.
+                    this._espejandoReaccion = true;
+                    this._dbgRx('-> MODO ESPEJO activado, envío estado a', target);
+                    this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'HARD_SYNC', state: this.exportGameState(), targetId: target });
+                } else if (esperandoRival) {
+                    // Interacción del rival no cubierta por el reanudar-perfecto: auto-declinamos
+                    // (el reconectado pierde esa elección) y le volcamos el estado final tras completar.
+                    this._abortPendingInteraction();
+                    setTimeout(() => {
+                        this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'HARD_SYNC', state: this.exportGameState(), targetId: target });
+                    }, 1500);
+                } else {
+                    // Caso espejo: soy YO quien está eligiendo (mi overlay sigue vivo) y el rival
+                    // reconectó. Le mando el estado actual y, tras completar mi elección, le reenvío
+                    // el estado final (si no, se quedaría en el estado pre-acción).
+                    if (tengoInteraccion && this._interaccionChooser === this.myPlayerId) this._reSyncTrasEleccion = true;
+                    this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'HARD_SYNC', state: this.exportGameState(), targetId: target });
+                }
             }
 
             // HARD_SYNC autoritativo silencioso (para recuperaciones automáticas, sin log de admin).
