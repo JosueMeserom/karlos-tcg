@@ -2209,7 +2209,7 @@ const CARD_DB = [
     },
     {
         name: "Wolfgang", hp: 5, def: 3, atk: 3, type: "Personaje", subtype: "Ser mágico", tags: ["Invocación", "Bestia animal"], gender: "F", rarity: "B",
-        text: "Coste: Aniceto en tu campo o bien descartar Manzanahoria de tu mano. P: Al colocar: +1 Def y Atq a vanguardia aliada. A: TENTAR A LA SUERTE (1F): 3 monedas. Ataca 1 vez por cada Cara.",
+        text: "Requisito: Aniceto en tu campo o bien Coste: descartar Manzanahoria de tu mano. P: Al colocar: +1 Def y Atq a vanguardia aliada. A: TENTAR A LA SUERTE (1F): 3 monedas. Ataca 1 vez por cada Cara.",
         passiveName: "SABIDURÍA", activeName: "TENTAR A LA SUERTE", activeCost: 1, series: 1,
         
         canPlayCard: function(card, game, p) {
@@ -2617,7 +2617,7 @@ const CARD_DB = [
     },
     {
         name: "Xanadu", hp: 6, def: 4, atk: 7, type: "Personaje", subtype: "Ser vivo", tags: ["Poder heredado"], gender: "M", rarity: "S", series: 1,
-        text: "Requisito: 'Una buena razón' activa en cualquier campo. P: REPULSIÓN ABSOLUTA: Al recibir ataque normal, usa 1 Furor para esquivar el ataque y sus efectos. A: ESTORNUDO DEVASTADOR (2F): Intercambia un enemigo de vanguardia por uno de retaguardia (si respeta reglas). Si no hay retaguardia enemiga, lo devuelve a su mano.",
+        text: "Requisito: 'Una buena razón' activo en cualquier campo. P: REPULSIÓN ABSOLUTA: Al recibir ataque normal, usa 1 Furor para esquivar el ataque y sus efectos. A: ESTORNUDO DEVASTADOR (2F): Intercambia un enemigo de vanguardia por uno de retaguardia (si respeta reglas). Si no hay retaguardia enemiga, lo devuelve a su mano.",
         passiveName: "REPULSIÓN ABSOLUTA", activeName: "ESTORNUDO DEVASTADOR", activeCost: 2,
 
         onBeforePlayAsync: async function(card, game, p) {
@@ -2785,7 +2785,7 @@ const CARD_DB = [
     },
     {
         name: "Diego Antonio", hp: 7, def: 9, atk: 9, type: "Personaje", subtype: "Ser vivo", tags: ["Usuario de VP", "mafia"], gender: "M", rarity: "S", series: 1,
-        text: "Requisito: 'Una buena razón' activa. P: CÓLERA INFINITA: Al colocar: +1 Furor y 3 Contadores (pierde 1/turno en Van; a 0 muere). No puede retirarse normal. Al recibir ataque normal, invierte el cálculo: Diego no recibe daño y daña al atacante. A: PACIFISMO (3F): Este turno no baja su contador.",
+        text: "Requisito: 'Una buena razón' activo en cualquier campo. P: CÓLERA INFINITA: Al colocar: +1 Furor y 3 Contadores (pierde 1/turno en Van; a 0 muere). No puede retirarse normal. Al recibir ataque normal, invierte el cálculo: Diego no recibe daño y daña al atacante. A: PACIFISMO (3F): Este turno no baja su contador.",
         passiveName: "CÓLERA INFINITA", activeName: "PACIFISMO", activeCost: 3,
         uncopyable: true, // Requiere los contadores exclusivos de Diego
         
@@ -2856,7 +2856,7 @@ const CARD_DB = [
     },
     {
         name: "Silhouette", hp: 7, def: 1, atk: 1, type: "Personaje", subtype: "Ser vivo", tags: ["Draconiana", "otaku", "usuaria de VP"], gender: "F", rarity: "S", series: 1,
-        text: "Requisito: 'Una buena razón' activa. P: REINA DEL COSPLAY: Al inicio de tu turno, cura 2 Vida. A: PONTE TRAJE (1F): Elige cualquier aliado o enemigo en el campo. Copias sus stats base (Atq y Def).",
+        text: "Requisito: 'Una buena razón' activo en cualquier campo. P: REINA DEL COSPLAY: Al inicio de tu turno, cura 2 Vida. A: PONTE TRAJE (1F): Elige cualquier aliado o enemigo en el campo. Copias sus stats base (Atq y Def).",
         passiveName: "REINA DEL COSPLAY", activeName: "PONTE TRAJE", activeCost: 1,
         
         onBeforePlayAsync: async function(card, game, p) {
@@ -5157,7 +5157,7 @@ const CARD_DB = [
     },
     {
         name: "Karlos (KL)", hp: 6, def: 7, atk: 6, type: "Personaje", subtype: "Ser vivo", tags: ["Mercenario", "Usuario de VP"], gender: "M", rarity: "A", cost: 4, series: 2,
-        text: "Coste: 2 de Furor o bien Karolina, Karlitos o Igniz en tu campo. P: DAME TRABAJOS: Si su Vida <= 3, +2 Atq. A: ULTRA-CHOQUE (2F): Dos ataques normales a vanguardia rival.",
+        text: "Requisito: Karolina, Karlitos o Igniz en tu campo o bien Coste: 2 de Furor. P: DAME TRABAJOS: Si su Vida <= 3, +2 Atq. A: ULTRA-CHOQUE (2F): Dos ataques normales a vanguardia rival.",
         passiveName: "DAME TRABAJOS", activeName: "ULTRA-CHOQUE", activeCost: 2,
         onBeforePlayAsync: async function(card, game, p) {
             const hasFriend = [...p.vanguard, ...p.rearguard].some(c => c.name === 'Karolina' || c.name === 'Karlitos' || c.name === 'Igniz');
