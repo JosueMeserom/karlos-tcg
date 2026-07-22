@@ -1649,6 +1649,12 @@
                     //    y la Promise espera que la cola las procese.
                     if (data.action === 'CHOICE_SELECTED') { this.executeChoice(data.index, true); return; }
                     if (data.action === 'VISUAL_SEARCH_CONFIRM') { this.resolveVisualSearch(data.ids, true); return; }
+                    // Reanudar perfecto (cadena de reacciones): el rival estable me empuja el
+                    // SIGUIENTE prompt de reacción para que lo re-muestre tras haber reconectado.
+                    if (data.action === 'PENDING_REACTION') {
+                        if (data.pr && data.pr.chooserId === this.myPlayerId && !this.currentChoices) this._reMostrarReaccionPendiente(data.pr);
+                        return;
+                    }
                     // --- SINCRONIZACIÓN DE MONEDAS EN TIEMPO REAL ---
                     if (data.action === 'COIN_FLIP_REMOTE' || data.action === 'COIN_ADVANCE_REMOTE') {
                         window.dispatchEvent(new CustomEvent('game-sync', { detail: data }));
@@ -1742,13 +1748,21 @@
                         // pre-acción). El rival reconectado solo recibe ese estado ya resuelto.
                         const tengoInteraccion = this.currentChoices || this.currentVisualResolve || this.dslPick;
                         const esperandoRival = tengoInteraccion && this._interaccionChooser && this._interaccionChooser !== this.myPlayerId;
-                        if (esperandoRival) {
-                            this._autoDeclinarReacciones = true;
+                        if (esperandoRival && this.currentChoices && this.pendingReaction) {
+                            // REACCIÓN: reanudar perfecto. Entro en modo espejo y le mando el estado
+                            // TAL CUAL (incluye pendingReaction): J2 re-mostrará el prompt y sus clics
+                            // dirigirán MI corrutina viva, que aplica la reacción y, al terminar la
+                            // cadena, le vuelca el estado final.
+                            this._espejandoReaccion = true;
+                            this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'HARD_SYNC', state: this.exportGameState(), targetId: target });
+                        } else if (esperandoRival) {
+                            // Elección EN TABLERO por el rival (ACERTIJO en cruz…): re-mostrar el picker
+                            // es otra maquinaria; de momento auto-declinamos (el reconectado pierde esa
+                            // elección) y le volcamos el estado final tras completar.
                             this._abortPendingInteraction();
                             setTimeout(() => {
-                                this._autoDeclinarReacciones = false;
                                 this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'HARD_SYNC', state: this.exportGameState(), targetId: target });
-                            }, 1500); // deja completar la acción reanudada (incl. animaciones) antes de volcar
+                            }, 1500);
                         } else {
                             // Caso espejo: soy YO quien está eligiendo (mi overlay sigue vivo) y el
                             // rival reconectó. Le mando el estado actual y, tras completar mi elección,
@@ -5726,13 +5740,24 @@
                 this.currentChoices = choices;
                 this._interaccionChooser = intendedPlayer; // quién debe responder (para la recuperación por reconexión)
 
-                // Recuperación por reconexión del rival: declino esta reacción (y las que
-                // encadenen, con varias cartas de reacción en mano) SIN mostrar el modal, para
-                // que el ataque termine solo y el cliente estable pueda volcar el estado final.
-                if (this._autoDeclinarReacciones && opts && opts.reaccion) {
-                    const idx = choices.length - 1; // última opción = NO REACCIONAR
-                    Promise.resolve().then(() => { if (choices[idx] && typeof choices[idx].action === 'function') choices[idx].action(); });
-                    return;
+                // Descriptor SERIALIZABLE del prompt de reacción, para poder RE-MOSTRARLO si el
+                // elector reconecta (la corrutina viva del rival estable dirige el resto). Se
+                // guarda en ambos clientes; se limpia al resolver (executeChoice).
+                const _rc0 = opts && opts.reaccion;
+                if (_rc0 && _rc0.atacante && _rc0.defensor) {
+                    this.pendingReaction = {
+                        prompt: title, chooserId: intendedPlayer,
+                        atacanteId: _rc0.atacante.instanceId, defensorId: _rc0.defensor.instanceId,
+                        manoId: _rc0.mano ? _rc0.mano.instanceId : null,
+                        opciones: choices.map(c => c.label),
+                    };
+                    // Modo espejo: soy el NO-elector (mi corrutina dirige) y el rival reconectó
+                    // a mitad de la cadena de reacciones -> le empujo ESTE prompt para que lo re-muestre.
+                    if (this._espejandoReaccion && this.gameMode === 'online' && this.myPlayerId !== intendedPlayer) {
+                        this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'PENDING_REACTION', pr: this.pendingReaction });
+                    }
+                } else {
+                    this.pendingReaction = null;
                 }
                 document.getElementById('choice-title').innerText = title;
 
@@ -5871,8 +5896,21 @@
                     document.getElementById('action-banner').style.display = 'none';
                 }
 
+                this.pendingReaction = null; // este prompt ya se resolvió (si en cadena hay otro, se re-fijará al mostrarlo)
                 if (this.currentChoices && this.currentChoices[index]) {
                     this.currentChoices[index].action();
+                }
+                // Modo espejo: acabo de aplicar (en mi corrutina viva) la respuesta que me mandó
+                // el reconectado. Si tras reanudar NO aparece otro prompt de la cadena (la acción
+                // terminó), le vuelco el estado FINAL. Si aparece otro, ya se lo empujó su
+                // openChoiceModal (PENDING_REACTION), así que no volcamos aún.
+                if (this._espejandoReaccion && isRemote) {
+                    setTimeout(() => {
+                        if (!this.pendingReaction) {
+                            this._espejandoReaccion = false;
+                            this._syncAutoritativo();
+                        }
+                    }, 700); // deja reanudar la corrutina (y sus animaciones) para ver si encadena otra reacción
                 }
                 this._reSyncTrasEleccionSiHaceFalta();
             }
@@ -7875,7 +7913,10 @@
                     directAttackUsedThisTurn: this.directAttackUsedThisTurn || false,
                     p1: exportPlayer(this.players.p1),
                     p2: exportPlayer(this.players.p2),
-                    logHistory: this.logHistory || []
+                    logHistory: this.logHistory || [],
+                    // Prompt de reacción pendiente (si lo hay): permite RE-MOSTRARLo al que
+                    // reconecte a mitad de la cadena de reacciones (ver openChoiceModal/importGameState).
+                    pendingReaction: this.pendingReaction || null
                 };
             }
 
@@ -8000,7 +8041,33 @@
                     this.dslPick = null;
                     this.currentChoices = null;
                     this._interaccionChooser = null;
+                    this.pendingReaction = null;
                 }
+
+                // Reanudar perfecto: si el estado trae un prompt de reacción pendiente del que
+                // YO soy el elector y no tengo ya uno vivo (reconecté a mitad de la reacción),
+                // lo RE-MUESTRO. Sus botones solo mandan mi respuesta a la corrutina VIVA del
+                // rival, que hace el trabajo y me devuelve el estado final.
+                if (state.pendingReaction && state.pendingReaction.chooserId === this.myPlayerId && !this.currentChoices) {
+                    this._reMostrarReaccionPendiente(state.pendingReaction);
+                } else if (state.pendingReaction && state.pendingReaction.chooserId !== this.myPlayerId && this.myPlayerId !== 'spectator' && this.activePlayerId !== 'setup') {
+                    // Soy el NO-elector (p. ej. el atacante que reconecta mientras el rival aún
+                    // elige): muestro el cartel de espera hasta que el rival responda y llegue el sync final.
+                    const banner = document.getElementById('action-banner');
+                    banner.innerText = `Esperando a que ${this.getDisplayName(state.pendingReaction.chooserId)} elija...`;
+                    banner.style.display = 'block';
+                }
+            }
+
+            _reMostrarReaccionPendiente(pr) {
+                const atacante = this.findCard(pr.atacanteId);
+                const defensor = this.findCard(pr.defensorId);
+                const mano = pr.manoId ? this.findCard(pr.manoId) : null;
+                if (!atacante || !defensor) return;
+                // Botones "mudos": la acción local es un no-op (aquí no hay corrutina que resolver);
+                // executeChoice emite CHOICE_SELECTED y el rival estable resuelve su reacción.
+                const choices = (pr.opciones && pr.opciones.length ? pr.opciones : ['SÍ', 'NO REACCIONAR']).map(label => ({ label, action: () => {} }));
+                this.openChoiceModal(pr.prompt, choices, pr.chooserId, { reaccion: { atacante, defensor, mano } });
             }
 
             // Aborta la interacción pendiente de ESTE cliente (una reacción/elección donde
@@ -8012,6 +8079,7 @@
                 // Quita el cartel "Esperando a que X elija..." (lo puse yo al empezar a
                 // esperar la elección del rival; al abortar ya no espero nada).
                 const _ab = document.getElementById('action-banner'); if (_ab) _ab.style.display = 'none';
+                this.pendingReaction = null;
                 if (this.currentVisualResolve) {
                     const r = this.currentVisualResolve;
                     this.currentVisualResolve = null; this.dslPick = null;
