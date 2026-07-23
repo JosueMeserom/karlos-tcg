@@ -35,6 +35,12 @@
 //  · Diferencias intencionadas de log (p. ej. paso a 3ª persona) se declaran en
 //    el escenario con `logsIntencionados: [{de, a, motivo}]` y se aplican a la
 //    salida VIEJA antes de comparar. Nunca se ignoran en silencio.
+//  · Líneas de log/flotante que SOLO aparecen en la nueva (comportamiento nuevo
+//    a propósito, p. ej. una pasiva que antes no se anunciaba) se declaran con
+//    `logsSoloNueva`/`flotantesSoloNueva: [{linea, motivo}]` y se filtran de la
+//    salida NUEVA antes de comparar (estricto: si la línea declarada no
+//    aparece, falla). `logsSoloVieja` es la dirección contraria (log que la
+//    nueva quitó a propósito).
 //
 // API para las suites:
 //   const { correrSuite } = require('./harness');
@@ -738,10 +744,23 @@ function compararCapturas(esc, vieja, nueva) {
         }
     }
 
-    const maxF = Math.max(vieja.flotantes.length, nueva.flotantes.length);
+    // Flotantes que SOLO la nueva emite (mismo patrón que logsSoloNueva): p. ej.
+    // una pasiva que antes nunca se anunciaba y ahora sí, a petición de Toto.
+    // Estricto en el mismo sentido: si la línea declarada no aparece, falla.
+    let flotantesNuevos = nueva.flotantes;
+    for (const regla of (esc.flotantesSoloNueva || [])) {
+        if (!regla.motivo) throw new Error(`escenario "${esc.nombre}": flotantesSoloNueva sin "motivo" documentado`);
+        const antes = flotantesNuevos.length;
+        flotantesNuevos = flotantesNuevos.filter(l => !l.includes(regla.linea));
+        if (flotantesNuevos.length === antes) {
+            diffs.push(`flotantesSoloNueva: la línea declarada "${regla.linea}" no aparece en la salida nueva`);
+        }
+    }
+
+    const maxF = Math.max(vieja.flotantes.length, flotantesNuevos.length);
     for (let i = 0; i < maxF; i++) {
-        if (vieja.flotantes[i] !== nueva.flotantes[i]) {
-            diffs.push(`flotante[${i}]:\n      vieja: ${vieja.flotantes[i]}\n      nueva: ${nueva.flotantes[i]}`);
+        if (vieja.flotantes[i] !== flotantesNuevos[i]) {
+            diffs.push(`flotante[${i}]:\n      vieja: ${vieja.flotantes[i]}\n      nueva: ${flotantesNuevos[i]}`);
         }
     }
 

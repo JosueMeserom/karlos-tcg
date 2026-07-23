@@ -3424,16 +3424,24 @@
                         effects = effects.filter(l => !/^[+-]?\d+ (ATQ|DEF|ATK)\b/.test(String(l)));
                         let acumA = 0, acumD = 0;
                         // Fusión por fuente: los cambios que vienen del mismo sitio comparten línea
-                        // ("+2 ATQ y +2 DEF, fuente: Overclock" en vez de una entrada por stat)
+                        // ("+2 ATQ y +2 DEF, fuente: Overclock" en vez de una entrada por stat).
+                        // combinaStatsPropios (Toto, 23-jul-2026): cartas cuya propia pasiva toca
+                        // Vida/Def/Atq A LA VEZ (p. ej. Spencer) construyen ELLAS MISMAS la línea
+                        // combinada de las 3 vía onGetPreviewEffects (único sitio que puede incluir
+                        // VIDA MÁX., que este registro no rastrea); se omite aquí su contribución
+                        // AUTO-sourced para no duplicarla en una segunda línea. acumA/acumD se siguen
+                        // contando igual para que el residuo "valor arrastrado" no las reporte de más.
+                        const _combinaPropio = !!template.combinaStatsPropios;
                         const porFuente = new Map();
                         mods.forEach(m => {
                             if (m.stat === 'OCULTO') { if (!curadoOculto) effects.push(`${this.generoTexto(card, 'Oculto', 'Oculta')}, fuente: ${(m.srcId === card.instanceId) ? String(m.fuente).replace(`(${this.nCarta(card)})`, '(esta carta)') : m.fuente}`); return; }
                             if (m.stat === 'SILENCIO') { if (!curadoSilencio) effects.push(`${this.generoTexto(card, 'Silenciado', 'Silenciada')}, fuente: ${(m.srcId === card.instanceId) ? String(m.fuente).replace(`(${this.nCarta(card)})`, '(esta carta)') : m.fuente}`); return; }
+                            if (m.stat === 'ATQ') acumA += m.delta; else acumD += m.delta;
+                            if (_combinaPropio && m.srcId === card.instanceId) return;
                             const _fm = (m.srcId === card.instanceId) ? 'esta carta' : m.fuente;
                             const clave = (m.srcId || '') + '|' + _fm;
                             if (!porFuente.has(clave)) porFuente.set(clave, { partes: [], fuente: _fm });
                             porFuente.get(clave).partes.push(`${m.delta > 0 ? '+' : ''}${m.delta} ${m.stat}`);
-                            if (m.stat === 'ATQ') acumA += m.delta; else acumD += m.delta;
                         });
                         porFuente.forEach(g => {
                             const txt = g.partes.length > 1 ? g.partes.slice(0, -1).join(', ') + ' y ' + g.partes[g.partes.length - 1] : g.partes[0];
@@ -3442,8 +3450,8 @@
                         // Residuo que el registro no explica (p. ej. valores arrastrados en cartas fuera de mesa)
                         const resA = (card.currentAtk - base.atk) - acumA;
                         const resD = (card.currentDef - base.def) - acumD;
-                        if (resA) effects.push(`${resA > 0 ? '+' : ''}${resA} ATQ, fuente: desconocida (valor arrastrado)`);
                         if (resD) effects.push(`${resD > 0 ? '+' : ''}${resD} DEF, fuente: desconocida (valor arrastrado)`);
+                        if (resA) effects.push(`${resA > 0 ? '+' : ''}${resA} ATQ, fuente: desconocida (valor arrastrado)`);
                     }
 
                     if (card.attachedTo) {
@@ -4667,8 +4675,10 @@
                         const dA = c.currentAtk - b[0], dD = c.currentDef - b[1];
                         if (!dA && !dD && !(!b[2] && c.stealth) && !(!b[3] && c.isSilenced)) return;
                         const arr = this._statMods[c.instanceId] = this._statMods[c.instanceId] || [];
-                        if (dA) arr.push({ stat: 'ATQ', delta: dA, fuente, srcId, srcAltId, srcZone });
+                        // Orden VIDA/DEF/ATQ (Toto, 23-jul-2026): así se muestran los stats en la
+                        // propia carta; DEF va antes que ATQ en "Afectado por:" para ser consistente.
                         if (dD) arr.push({ stat: 'DEF', delta: dD, fuente, srcId, srcAltId, srcZone });
+                        if (dA) arr.push({ stat: 'ATQ', delta: dA, fuente, srcId, srcAltId, srcZone });
                         if (!b[2] && c.stealth) arr.push({ stat: 'OCULTO', delta: 1, fuente, srcId, srcAltId, srcZone, badgeKey: 'oculto' });
                         if (!b[3] && c.isSilenced) arr.push({ stat: 'SILENCIO', delta: 1, fuente, srcId, srcAltId, srcZone, badgeKey: 'silencio' });
                     });

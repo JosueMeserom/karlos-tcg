@@ -58,17 +58,29 @@ const escenarios = [
         ],
     },
     {
-        nombre: 'Karlos (KL): DAME TRABAJOS (silenciosa) se activa y desactiva sin log, igual que la vieja',
+        // Toto (23-jul-2026): la vieja Karlos (KL) nunca anunciaba su pasiva (asimetría sin
+        // motivo respecto a Karlos, MISMA pasiva); a petición suya, la nueva SÍ la anuncia,
+        // igual que Karlos. Cambio de comportamiento deliberado, no un artefacto de migración
+        // -> logsSoloNueva (dos líneas nuevas: activación y desactivación).
+        nombre: 'Karlos (KL): DAME TRABAJOS ahora SÍ se anuncia (igual que Karlos), a petición de Toto',
         turnoDe: 'p2',
         p1: { vanguardia: [{ carta: 'Karlos (KL)', vida: 5 }], mano: ['Manzanahoria'] },
         p2: { vanguardia: ['Garret'] },
         pasos: [
-            { atacar: 'Garret', objetivo: 'Karlos (KL)' }, // dmg = 9-7 = 2 -> Vida 5->3: activa (+2 Atq), sin anuncio
+            { atacar: 'Garret', objetivo: 'Karlos (KL)' }, // dmg = 9-7 = 2 -> Vida 5->3: activa (+2 Atq), CON anuncio
             { finTurno: true },
             { jugar: 'Manzanahoria' },
-            { seleccionar: 'Karlos (KL)' }, // cura 2 -> Vida 3->5: desactiva, sin anuncio
+            { seleccionar: 'Karlos (KL)' }, // cura 2 -> Vida 3->5: desactiva, CON anuncio
         ],
         logsIntencionados: [],
+        logsSoloNueva: [
+            { linea: 'Habilidad pasiva de Karlos (KL)', motivo: 'la vieja nunca anunciaba esta pasiva; a petición de Toto la nueva sí, igual que Karlos (base) con el mismo umbral' },
+            { linea: 'DAME TRABAJOS', motivo: 'log de desactivación, nuevo a petición de Toto (mismo patrón que la desactivación de MEGADRENALINA en Karlos)' },
+        ],
+        flotantesSoloNueva: [
+            { linea: '· DAME TRABAJOS · ft-ability', motivo: 'flotante del nombre de la pasiva al activarse, nuevo a petición de Toto' },
+            { linea: '· +2 ATQ · ft-green', motivo: 'flotante del delta al activarse, nuevo a petición de Toto' },
+        ],
     },
     {
         // Solo el caso ESTÁTICO (activación en el setup, sin pasos posteriores):

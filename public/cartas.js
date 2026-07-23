@@ -828,6 +828,10 @@ const CARD_DB = [
         id: 8, name: "Spencer", hp: 4, def: 4, atk: 4, type: "Personaje", subtype: "Máquina", tags: ['Con conciencia'], gender: 'M', rarity: "A",
         text: "P: Al final del turno, si Vida <= 3, cura 1. Puede usar su Activa aunque haya atacado. A: CAMBIO DE PAJARITA (1F): +3 a una stat (Vida, Def, Atq) y -1 a las otras. Vida no baja de 1 por esto. No gasta acción.",
         passiveName: "BATERÍA AUTÓNOMA", activeName: "CAMBIO DE PAJARITA", activeCost: 1, series: 1,
+        // combinaStatsPropios: su propia pasiva toca Vida MÁX., Def y Atq a la vez; se combinan
+        // en UNA línea en onGetPreviewEffects (única vía que puede incluir VIDA MÁX., que el
+        // registro automático de "Afectado por" no rastrea) en vez de dos líneas separadas.
+        combinaStatsPropios: true,
         // silencioso: la pasiva dinámica de la pajarita (elegida por el jugador vía la Activa,
         // que ya anuncia el cambio por su cuenta) no tiene su propio log/floating por pasada.
         abilities: [
@@ -927,13 +931,17 @@ const CARD_DB = [
             ]);
         },
 
-        // HOOK 4: Información súper detallada en el panel lateral
+        // HOOK 4: Información súper detallada en el panel lateral. Línea COMBINADA (Vida, Def,
+        // Atq, en ese orden — el mismo orden de la propia carta; ver combinaStatsPropios más
+        // arriba, que evita que el registro automático duplique Def/Atq en una segunda línea.
         onGetPreviewEffects: function(card, game) {
-            // Solo la parte de VIDA MÁX.: el resto (Atq/Def) ya lo informa el registro de modificadores
-            if (card.pajaritaStance === 'VIDA') return [`+3 VIDA MÁX. (Pajarita: VIDA), fuente: esta carta`];
-            if (card.pajaritaStance === 'DEFENSA') return [`-1 VIDA MÁX. (Pajarita: DEFENSA), fuente: esta carta`];
-            if (card.pajaritaStance === 'ATAQUE') return [`-1 VIDA MÁX. (Pajarita: ATAQUE), fuente: esta carta`];
-            return [];
+            const deltas = { DEFENSA: { hp: -1, def: 3, atk: -1 }, ATAQUE: { hp: -1, def: -1, atk: 3 }, VIDA: { hp: 3, def: -1, atk: -1 } };
+            const d = deltas[card.pajaritaStance];
+            if (!d) return [];
+            const f = (n) => (n > 0 ? '+' : '') + n;
+            const partes = [`${f(d.hp)} VIDA MÁX.`, `${f(d.def)} DEF`, `${f(d.atk)} ATQ`];
+            const texto = partes.slice(0, -1).join(', ') + ' y ' + partes[partes.length - 1];
+            return [`${texto} (Pajarita: ${card.pajaritaStance}), fuente: esta carta`];
         }
     },
     { 
@@ -5133,9 +5141,11 @@ const CARD_DB = [
         text: "Requisito: Karolina, Karlitos o Igniz en tu campo o bien Coste: 2 de Furor. P: DAME TRABAJOS: Si su Vida <= 3, +2 Atq. A: ULTRA-CHOQUE (2F): Dos ataques normales a vanguardia rival.",
         passiveName: "DAME TRABAJOS", activeName: "ULTRA-CHOQUE", activeCost: 2,
         abilities: [
-            // silencioso: la vieja no anuncia esta pasiva (sin log ni floating), a diferencia
-            // de la MEGADRENALINA de Karlos (base), que sí lo hace con el mismo umbral.
-            { trigger: "PASIVA_CONTINUA", nombre: "DAME TRABAJOS", silencioso: true,
+            // Sin silencioso (Toto, 23-jul-2026): es la MISMA pasiva que MEGADRENALINA de
+            // Karlos (base) con el mismo umbral — solo cambia el Coste/Requisito para colocar
+            // al Personaje, no la pasiva en sí. La vieja nunca la anunciaba (asimetría sin
+            // motivo aparente respecto a Karlos); se le da el mismo anuncio a propósito.
+            { trigger: "PASIVA_CONTINUA", nombre: "DAME TRABAJOS",
               if: { campo: "self.hp", op: "<=", valor: 3 },
               then: [ { op: "MODIFICAR_STAT", stat: "atk", delta: 2 } ] }
         ],
