@@ -1558,6 +1558,27 @@
                     }
                 });
 
+                // Reinicio "desde el principio" pedido por el debugger de cualquiera de los dos.
+                // Llega a AMBOS clientes (y a los espectadores) con el estado inicial ya incluido:
+                // se importa ese estado común y se rearranca la preparación entera, que vuelve a ser
+                // a dos bandas (elegir apartadas -> barajar -> manos iniciales).
+                this.socket.on('restartSetup', (data) => {
+                    if (data && data.estado) this.importGameState(data.estado);
+                    this._ssTurno1Hecha = false; // la próxima foto de "primer turno" es la de esta ronda nueva
+                    this.logMsg('[ADMIN] Partida reiniciada desde el principio.', 'system');
+                    // Se limpia cualquier interacción/candado que hubiera en curso al reiniciar.
+                    this.currentChoices = null; this.currentVisualResolve = null; this.dslPick = null;
+                    this.pendingReaction = null; this.pendingInteraction = null;
+                    this._interaccionChooser = null; this.isActionLocked = false;
+                    this.actionQueue = [];
+                    ['choice-modal', 'discard-viewer', 'turn-overlay', 'coin-overlay', 'confirmation-overlay'].forEach(id => {
+                        const el = document.getElementById(id); if (el) el.style.display = 'none';
+                    });
+                    this.updatePassives();
+                    this.render();
+                    if (typeof this.doOnlineSetup === 'function') this.doOnlineSetup();
+                });
+
                 // Si intentamos entrar a una sala que el anfitrión ya destruyó
                 this.socket.on('roomError', (msg) => {
                     localStorage.removeItem('karlos_partida_en_curso');
@@ -2867,10 +2888,22 @@
             debugRestartDialog() {
                 const eleccion = prompt('♻️ REINICIAR PARTIDA — escribe:\n  1 = desde el PRINCIPIO (elección de apartadas incluida)\n  2 = desde el PRIMER TURNO\n(Cancelar para no hacer nada)', '2');
                 if (eleccion === '1') {
-                    if (!this._ssApply(this._ssKey('inicio'), '[ADMIN] Partida reiniciada desde el principio.')) return;
-                    // Relanzamos la preparación entera (baraja de nuevo y vuelve a la elección de apartadas)
-                    if (this.gameMode === 'online') { if (typeof this.doOnlineSetup === 'function') this.doOnlineSetup(); }
-                    else if (typeof this.doLocalSetup === 'function') this.doLocalSetup(true);
+                    if (this.gameMode === 'online') {
+                        // La preparación online es a DOS BANDAS (ver el handler 'restartSetup' del
+                        // servidor): NO basta con relanzar mi setup, hay que limpiar el registro de
+                        // preparación de la sala y rearrancar en AMBOS clientes desde el MISMO estado.
+                        // Ese estado viaja en el propio mensaje (en vez de un HARD_SYNC aparte) para
+                        // que no haya carrera entre "te mando el estado" y "rearranca".
+                        const raw = localStorage.getItem(this._ssKey('inicio'));
+                        if (!raw) { this.logError('No hay foto del inicio de la partida en este cliente.'); return; }
+                        let estado;
+                        try { estado = JSON.parse(raw).estado; }
+                        catch (e) { this.logError('La foto del inicio no se pudo leer (¿corrupta?).'); return; }
+                        this.socket.emit('restartSetup', { roomCode: this.roomCode, estado });
+                    } else {
+                        if (!this._ssApply(this._ssKey('inicio'), '[ADMIN] Partida reiniciada desde el principio.')) return;
+                        if (typeof this.doLocalSetup === 'function') this.doLocalSetup();
+                    }
                 } else if (eleccion === '2') this._ssApply(this._ssKey('turno1'), '[ADMIN] Partida reiniciada desde el primer turno.');
             }
 
@@ -4361,7 +4394,6 @@
 
                 const pName = this.getDisplayName(this.activePlayerId);
                 this.logMsg(`--- Inicio Turno ${this.turn}: ${pName} ---`, 'phase');
-                if (this.turn === 1 && !this._ssTurno1Hecha) { this._ssTurno1Hecha = true; this._ssStore(this._ssKey('turno1')); } // auto-foto: reiniciar desde el primer turno
                 this.inputState = 'EXECUTING';
                 this.placedUnitThisTurn = false;
                 this.directAttackUsedThisTurn = false;
@@ -4448,6 +4480,16 @@
                 this.inputState = 'IDLE';
                 this.updatePassives();
                 this.render();
+
+                // Auto-foto "reiniciar desde el primer turno". Se toma AQUÍ, con la partida ya
+                // ASENTADA (fase PRINCIPAL, input IDLE, robo/efectos/furor del turno 1 hechos), no
+                // al principio de startTurn: antes se guardaba con phase='FASES_INICIALES' e
+                // inputState='EXECUTING', o sea, a mitad del arranque de turno. Al restaurar ese
+                // estado nadie continuaba el flujo suspendido, así que la partida quedaba
+                // literalmente congelada ahí (sin poder jugar ni pasar turno). Bug de betasteo de
+                // Toto, 23-jul-2026. Guardando un estado jugable, restaurarlo no necesita relanzar
+                // nada — ni en el cliente que restaura ni en el rival que recibe el HARD_SYNC.
+                if (this.turn === 1 && !this._ssTurno1Hecha) { this._ssTurno1Hecha = true; this._ssStore(this._ssKey('turno1')); }
 
                 // --- DESPERTAR A LA IA SI LE TOCA ---
                 if (this.isVsAI && this.activePlayerId === this.ai.aiPlayerId) {

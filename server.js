@@ -550,6 +550,22 @@ io.on('connection', (socket) => {
         }
     });
 
+    // Reinicio de partida "desde el principio" (debugger). La preparación online es a
+    // DOS BANDAS: bothCardsAside/bothDecksShuffled solo se emiten cuando han llegado los
+    // datos de AMBOS jugadores. Si solo relanzase su setup el cliente que pulsa el botón,
+    // se quedaría esperando para siempre (y además `setup.aside` conserva las apartadas de
+    // la ronda anterior, así que el primer setAsideCards dispararía un bothCardsAside
+    // prematuro mezclando datos viejos y nuevos -> mazos divergentes). Por eso el reinicio
+    // pasa por aquí: se limpia el registro de preparación y se ordena a los DOS clientes
+    // (y espectadores) rearrancar el setup desde el mismo estado.
+    socket.on('restartSetup', (data) => {
+        const room = rooms[data.roomCode];
+        if (!room || !room.setup) return;
+        room.setup.aside = { p1: null, p2: null };
+        room.setup.orders = { p1: null, p2: null };
+        io.to(data.roomCode).emit('restartSetup', { estado: data.estado });
+    });
+
     socket.on('deckShuffled', (data) => {
         const room = rooms[data.roomCode];
         if (!room || !room.setup) return;
