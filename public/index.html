@@ -3230,7 +3230,7 @@
                     while ((_mH = _txtBase.match(/^Requisito:\s*(.+?)\s+o bien\s+Coste:\s*(.+?)\.\s*/i))) {
                         resultHtml += `<div class="ev-dur-box" style="flex-direction:column; align-items:stretch; gap:0;">`
                             + `<div style="display:flex; align-items:center; padding-left:10px;">${_filaStat('REQUISITO', _obien(_mH[1]), _VS)}</div>`
-                            + `<div style="text-align:center; padding:5px 0; line-height:1;"><span class="coste-obien" style="margin:0; transform:none; vertical-align:baseline;">o bien</span></div>`
+                            + `<div style="text-align:center; padding:8px 0; line-height:1;"><span class="coste-obien" style="margin:0; transform:none; vertical-align:baseline;">o bien</span></div>` /* <-- padding vertical del "o bien": subir/bajar el 8px */
                             + `<div style="display:flex; align-items:center; padding-left:10px;">${_filaStat('COSTE', _obien(_mH[2]), _VS)}</div>`
                             + `</div>`;
                         _txtBase = _txtBase.slice(_mH[0].length);
