@@ -2,28 +2,14 @@
 
 const CARD_DB = [
     { 
-        id: 1, name: "Karlos", hp: 6, def: 6, atk: 5, type: "Personaje", subtype: "Ser vivo", tags: ['Mercenario', 'Usuario de VP'], gender: 'M', rarity: "A", 
-        text: "P: Si Vida <= 3, +2 Atq. A: BI-CHOQUE (1F) Ataca a 2 enemigos con Atq-1.", 
+        id: 1, name: "Karlos", hp: 6, def: 6, atk: 5, type: "Personaje", subtype: "Ser vivo", tags: ['Mercenario', 'Usuario de VP'], gender: 'M', rarity: "A",
+        text: "P: Si Vida <= 3, +2 Atq. A: BI-CHOQUE (1F) Ataca a 2 enemigos con Atq-1.",
         passiveName: "MEGADRENALINA", activeName: "BI-CHOQUE", series: 1,
-        
-        // HOOK 1: La Pasiva
-        onUpdatePassive: function(card, game) {
-            const isActive = card.currentHp <= 3;
-            
-            if (isActive && !card.passiveActive) {
-                game.logMsg(`¡Habilidad pasiva de ${game.getCardNameWithOwner(card)}: ${card.passiveName} tiene lugar! (+2 de Atq por tener Vida <= 3)`, 'ability');
-                showFloatingText(card.instanceId, card.passiveName, "ft-ability", -40); 
-                showFloatingText(card.instanceId, "+2 ATQ", "ft-green", -20);
-                card.passiveActive = true;
-            } else if (!isActive && card.passiveActive) {
-                game.logMsg(`${card.passiveName} (${game.getCardNameWithOwner(card)}) desactivada.`, 'system');
-                card.passiveActive = false;
-            }
-            
-            if (isActive) {
-                card.currentAtk += 2;
-            }
-        },
+        abilities: [
+            { trigger: "PASIVA_CONTINUA", nombre: "MEGADRENALINA",
+              if: { campo: "self.hp", op: "<=", valor: 3 },
+              then: [ { op: "MODIFICAR_STAT", stat: "atk", delta: 2 } ] }
+        ],
 
        // HOOK 2: Validar si puede usar su habilidad activa
         canActivateAbility: function(card, game) {
@@ -151,23 +137,13 @@ const CARD_DB = [
     },
     {
         id: 2, name: "Zoe", hp: 2, def: 2, atk: 7, type: "Personaje", subtype: "Ser vivo", tags: ['Usuaria de VP'], gender: 'F', rarity: "A",
-        text: "SISAR (1 de Furor): Tu rival descarta una Ayuda. Moneda: Cara = Ataque con Atq-3 sin pasiva.", 
+        text: "SISAR (1 de Furor): Tu rival descarta una Ayuda. Moneda: Cara = Ataque con Atq-3 sin pasiva.",
         passiveName: "JUSTICIERA ARDIENTE", activeName: "SISAR", activeCost: 1, series: 1,
-
-        // HOOK 1: Pasiva de Defensa
-        onUpdatePassive: function(card, game) {
-            const hasDoT = card.status && card.status.dot && card.status.dot.duration > 0;
-            if (hasDoT && !card.zoeDefBuffActive) {
-                game.logMsg(`¡Habilidad pasiva de ${game.getCardNameWithOwner(card)}: ${card.passiveName} tiene lugar! (+2 DEF)`, 'ability');
-                showFloatingText(card.instanceId, card.passiveName, "ft-ability", -40);
-                showFloatingText(card.instanceId, "+2 DEF", "ft-green", -20);
-                card.currentDef += 2;
-                card.zoeDefBuffActive = true;
-            } else if (!hasDoT && card.zoeDefBuffActive) {
-                card.currentDef -= 2;
-                card.zoeDefBuffActive = false;
-            }
-        },
+        abilities: [
+            { trigger: "PASIVA_CONTINUA", nombre: "JUSTICIERA ARDIENTE",
+              if: { campo: "dotActivo", op: "truthy" },
+              then: [ { op: "MODIFICAR_STAT", stat: "def", delta: 2 } ] }
+        ],
 
         // HOOK 2: Transformar Daño por Tiempo (DoT) en Curación
         onDoTTick: function(card, game) {
@@ -849,9 +825,22 @@ const CARD_DB = [
         }
     },
     { 
-        id: 8, name: "Spencer", hp: 4, def: 4, atk: 4, type: "Personaje", subtype: "Máquina", tags: ['Con conciencia'], gender: 'M', rarity: "A", 
-        text: "P: Al final del turno, si Vida <= 3, cura 1. Puede usar su Activa aunque haya atacado. A: CAMBIO DE PAJARITA (1F): +3 a una stat (Vida, Def, Atq) y -1 a las otras. Vida no baja de 1 por esto. No gasta acción.", 
+        id: 8, name: "Spencer", hp: 4, def: 4, atk: 4, type: "Personaje", subtype: "Máquina", tags: ['Con conciencia'], gender: 'M', rarity: "A",
+        text: "P: Al final del turno, si Vida <= 3, cura 1. Puede usar su Activa aunque haya atacado. A: CAMBIO DE PAJARITA (1F): +3 a una stat (Vida, Def, Atq) y -1 a las otras. Vida no baja de 1 por esto. No gasta acción.",
         passiveName: "BATERÍA AUTÓNOMA", activeName: "CAMBIO DE PAJARITA", activeCost: 1, series: 1,
+        // silencioso: la pasiva dinámica de la pajarita (elegida por el jugador vía la Activa,
+        // que ya anuncia el cambio por su cuenta) no tiene su propio log/floating por pasada.
+        abilities: [
+            { trigger: "PASIVA_CONTINUA", nombre: "PAJARITA", silencioso: true,
+              if: { campo: "pajaritaStance", op: "==", valor: "DEFENSA" },
+              then: [ { op: "MODIFICAR_STAT", stat: "def", delta: 3 }, { op: "MODIFICAR_STAT", stat: "atk", delta: -1 } ],
+              else: [
+                { if: { campo: "pajaritaStance", op: "==", valor: "ATAQUE" },
+                  then: [ { op: "MODIFICAR_STAT", stat: "def", delta: -1 }, { op: "MODIFICAR_STAT", stat: "atk", delta: 3 } ],
+                  else: [
+                    { if: { campo: "pajaritaStance", op: "==", valor: "VIDA" },
+                      then: [ { op: "MODIFICAR_STAT", stat: "def", delta: -1 }, { op: "MODIFICAR_STAT", stat: "atk", delta: -1 } ] } ] } ] }
+        ],
         uncopyable: true, // Requiere el modificador único "PajaritaStance"
         
         abilityWhileExhausted: true,
@@ -870,22 +859,6 @@ const CARD_DB = [
                 if (typeof template.onBeforeHealed === 'function') amount = template.onBeforeHealed(card, amount, card, game);
                 
                 game.modifyStat(card, 'currentHp', amount);
-            }
-        },
-
-        // HOOK 2: Pasiva dinámica para Ataque y Defensa
-        onUpdatePassive: function(card, game) {
-            if (!card.pajaritaStance) return;
-
-            if (card.pajaritaStance === 'DEFENSA') {
-                card.currentDef += 3;
-                card.currentAtk -= 1;
-            } else if (card.pajaritaStance === 'ATAQUE') {
-                card.currentDef -= 1;
-                card.currentAtk += 3;
-            } else if (card.pajaritaStance === 'VIDA') {
-                card.currentDef -= 1;
-                card.currentAtk -= 1;
             }
         },
 
@@ -5159,6 +5132,13 @@ const CARD_DB = [
         name: "Karlos (KL)", hp: 6, def: 7, atk: 6, type: "Personaje", subtype: "Ser vivo", tags: ["Mercenario", "Usuario de VP"], gender: "M", rarity: "A", cost: 4, series: 2,
         text: "Requisito: Karolina, Karlitos o Igniz en tu campo o bien Coste: 2 de Furor. P: DAME TRABAJOS: Si su Vida <= 3, +2 Atq. A: ULTRA-CHOQUE (2F): Dos ataques normales a vanguardia rival.",
         passiveName: "DAME TRABAJOS", activeName: "ULTRA-CHOQUE", activeCost: 2,
+        abilities: [
+            // silencioso: la vieja no anuncia esta pasiva (sin log ni floating), a diferencia
+            // de la MEGADRENALINA de Karlos (base), que sí lo hace con el mismo umbral.
+            { trigger: "PASIVA_CONTINUA", nombre: "DAME TRABAJOS", silencioso: true,
+              if: { campo: "self.hp", op: "<=", valor: 3 },
+              then: [ { op: "MODIFICAR_STAT", stat: "atk", delta: 2 } ] }
+        ],
         onBeforePlayAsync: async function(card, game, p) {
             const hasFriend = [...p.vanguard, ...p.rearguard].some(c => c.name === 'Karolina' || c.name === 'Karlitos' || c.name === 'Igniz');
             if (hasFriend) {
@@ -5178,9 +5158,6 @@ const CARD_DB = [
                 return true;
             }
             return false;
-        },
-        onUpdatePassive: function(card, game) {
-            if (card.currentHp <= 3) card.currentAtk += 2;
         },
         canActivateAbility: function(card, game) {
             if (card.furor < 2) { game.logError("Falta Furor (2)."); return false; }
@@ -7662,6 +7639,7 @@ const DSL = {
         if (k === 'atk') return c.currentAtk;
         if (k === 'def') return c.currentDef;
         if (k === 'furorMax') return KARLOS_RULES.getFurorMax(c); // campo computado (capa de reglas)
+        if (k === 'dotActivo') return !!(c.status && c.status.dot && c.status.dot.duration > 0); // campo computado: ¿tiene Daño por Tiempo activo?
         return c[k];
     },
     _ref(path, ctx) { // "objetivo.furorMax" | "self.atk" | "vars.sumaAtq" (guardado por ELEGIR)
@@ -7723,7 +7701,9 @@ const DSL = {
         return n;
     },
     _value(ownerId, game, v, selfCard, ctx) {
-        if (typeof v === 'number') return v;
+        // Literales pasan tal cual (número, string o booleano: p. ej. PASIVA_CONTINUA
+        // comparando campo:"pajaritaStance" contra valor:"DEFENSA" — Toto, 23-jul-2026).
+        if (typeof v === 'number' || typeof v === 'string' || typeof v === 'boolean') return v;
         if (v && v.COUNT) return DSL._count(ownerId, game, v.COUNT, selfCard);
         if (v && v.REF) return DSL._ref(v.REF, ctx || { self: selfCard });
         return 0;
@@ -8392,6 +8372,7 @@ const DSL = {
                     const d = DSL._passiveDeltas(card, game, efs);
                     card.currentAtk += d.atk;
                     card.currentDef += d.def;
+                    if (ab.silencioso) return; // sin log ni floating (p. ej. Karlos (KL), Spencer): solo aplica el delta
                     // Anuncio (estilo Karlos): al activarse o intensificarse; 'desactivada' al volver a 0.
                     const mag = Math.abs(d.atk) + Math.abs(d.def);
                     const key = '_dslPas' + i;

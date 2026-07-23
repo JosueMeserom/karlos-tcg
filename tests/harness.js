@@ -659,6 +659,12 @@ async function ejecutarEscenario(cual, esc) {
 // viejas solo llevaban {sourceId, ownerId}. Campo nuevo intencionado e inerte
 // para el comportamiento comparado.
 function esDiffInerte(ruta, a, b) {
+    // zoeDefBuffActive: bandera de bookkeeping de la Zoe VIEJA (imperativa), sustituida
+    // por el _dslPasN genérico (ver más abajo) en la nueva (PASIVA_CONTINUA). Única
+    // excepción en la dirección CONTRARIA a las demás (vieja=true -> nueva=ausente: la
+    // nueva ni siquiera declara el campo), así que va ANTES del guard `a !== undefined`
+    // de abajo (que solo cubre la dirección undefined -> valor-inerte).
+    if (ruta.endsWith('.zoeDefBuffActive') && a === true && b === undefined) return true;
     if (a !== undefined) return false;
     if (ruta.endsWith('.counters') && b && typeof b === 'object' && Object.keys(b).length === 0) return true;
     if (ruta.endsWith('.hasAttackedThisTurn') && b === false) return true;
@@ -669,6 +675,12 @@ function esDiffInerte(ruta, a, b) {
     // empíricamente (no solo leído) que ambos puntos de limpieza caen en el
     // mismo hueco del ciclo de turno: no hay divergencia observable de estado.
     if (ruta.endsWith('.hastaFinDeTurnoPropio') && b === true) return true;
+    // _dslPasN: bookkeeping interno del trigger PASIVA_CONTINUA (Toto, 23-jul-2026)
+    // para saber cuándo anunciar activación/desactivación de la pasiva (compara
+    // magnitud actual vs anterior). Puramente interno, nunca leído por el motor ni
+    // por ninguna otra carta; aparece en CUALQUIER carta migrada a PASIVA_CONTINUA
+    // (con cualquier valor >= 0, activa o no) allí donde la vieja no tiene nada.
+    if (/\._dslPas\d+$/.test(ruta) && typeof b === 'number') return true;
     return false;
 }
 
