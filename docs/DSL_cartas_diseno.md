@@ -282,29 +282,38 @@ pasa a ser `objetivo:`.
 | Parte | Cuándo se pone | Notas |
 |---|---|---|
 | **afección** | siempre | Modificador de stat (`+2 ATQ`), estado alterado (`Daño por tiempo`), contador o texto libre de la carta. Varios stats de una misma fuente van **en una sola línea**. |
-| **(N turnos)** | solo si tiene duración | Se **omite** en auras y efectos permanentes. Singular/plural automático. |
+| **(N turnos restantes)** | solo si tiene duración | Se **omite** en auras y efectos permanentes. Vale igual para estados alterados y efectos temporales: con la cuenta atrás ya se sobreentiende que es temporal (por eso no existe un "(efecto temporal)"). Singular/plural automático. |
 | **por HABILIDAD** | solo si lo causa una **Pasiva o Activa** | Se **omite** si el origen es un **Evento** o una **Ayuda**: ahí basta con la carta. |
 | **referencia** | siempre | Ver 13.2. |
 
 ### 13.2 La referencia a una carta
 
 ```
-[evento ]<Nombre>[ [copyId]] de <JX (Nick)>        ·  o bien la cadena  esta carta
+[evento ]<Nombre>[ [copyId]] de <JX (Nick)>[, en su pila de descartes]   ·  o bien  esta carta
 ```
 
 * Prefijo **`evento `** solo si la carta origen es de tipo Evento.
 * **`[copyId]`** solo si **no** es un Personaje (misma regla que `nCarta`).
 * El **dueño** siempre, con el nick real del jugador.
+* Sufijo **`, en su pila de descartes`** solo si la carta origen ya no está en mesa. Una carta que
+  afecta a otra solo puede estar en el campo (no se indica), ser un Evento (ya se marca con su
+  prefijo) o haberse ido al descarte dejando el efecto detrás — típico de las Ayudas temporales.
 * **`esta carta`** cuando el origen es la propia carta inspeccionada (sustituye a todo lo anterior).
 
 ### 13.3 Ejemplos canónicos
 
 ```
-Daño por tiempo (3 turnos) por PUÑALADA, fuente: Sra. Kumicho [1] de J1 (Ultra_K)
+Daño por tiempo (3 turnos restantes) por PUÑALADA, fuente: Sra. Kumicho [1] de J1 (Ultra_K)
 +2 ATQ por MEGADRENALINA, fuente: esta carta
 Puede retirarse sin coste de Furor, fuente: evento Escape con bomba de humo [1] de J1 (Ultra_K)
 -1 VIDA MÁX., +3 DEF y -1 ATQ por CAMBIO DE PAJARITA (DEFENSA), fuente: esta carta
++1 DEF y +1 ATQ (3 turnos restantes), fuente: Poción revitalizante [1] de J1 (Ultra_K), en su pila de descartes
 ```
+
+**Agrupación:** los stats que vienen del **mismo efecto** (misma carta origen + misma habilidad)
+comparten **una sola línea**, en **ambas** vistas. Si una carta provoca **varios efectos distintos**
+(otra habilidad o disparador), esos sí salen en líneas separadas, porque cambia la clave de
+agrupación.
 
 Y la misma línea vista desde el Evento que la provoca (`Efectos actuales:`):
 

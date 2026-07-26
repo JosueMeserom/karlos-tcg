@@ -4196,17 +4196,11 @@ const CARD_DB = [
             }
             return true;
         },
-        onGetPreviewEffects: function(card, game, effect) {
-            if (card.type === 'Personaje' || card.type === 'Esbirro') {
-                // Leemos la duración directamente del efecto que nos pasa el motor
-                // Ayuda -> sin "por HABILIDAD"; la carta origen puede estar ya en descartes.
-                const turnos = effect ? effect.duration : null;
-                const src = (effect && effect.sourceInstanceId && typeof game.findCard === 'function') ? game.findCard(effect.sourceInstanceId) : null;
-                const ref = src && typeof game.refCarta === 'function' ? game.refCarta(src) : 'Poción revitalizante';
-                return [`+1 DEF y +1 ATQ${turnos !== null ? ` (${turnos} turno${turnos === 1 ? '' : 's'})` : ''}, fuente: ${ref}`];
-            }
-            return [];
-        }
+        // Sin onGetPreviewEffects (27-jul-2026): el registro automático de modificadores
+        // (updatePassives -> _anota sobre onUpdateTempEffect) ya produce la línea con la
+        // sintaxis estándar, incluida su cuenta atrás y la referencia a la carta en el
+        // descarte. La línea que devolvía este hook era además SIEMPRE descartada por el
+        // dedupe de stats del panel, así que era código muerto.
     },
     {
         name: "Plan de equipo", type: "Evento", rarity: "C", cost: 1, duration: 1, series: 1,

@@ -1985,13 +1985,17 @@
 
             // === SINTAXIS ESTÁNDAR DE "Afectado por:" / "Efectos actuales:" (Toto, 23-jul-2026) ===
             // Referencia a una carta origen/destino:
-            //     [evento ]<Nombre>[ [copyId]] de <JX (Nick)>
+            //     [evento ]<Nombre>[ [copyId]] de <JX (Nick)>[, en su pila de descartes]
             // El prefijo "evento " solo para Eventos; el [copyId] solo si NO es Personaje
             // (misma regla que nCarta); el dueño siempre, con el nick real del jugador.
+            // El sufijo de descartes solo si la carta origen ya no está en mesa (Toto,
+            // 27-jul-2026): una carta que afecta a otra solo puede estar en el campo, ser un
+            // Evento (que ya se marca) o haberse ido al descarte dejando su efecto detrás.
             refCarta(c) {
                 if (!c) return 'desconocida';
                 const pref = c.type === 'Evento' ? 'evento ' : '';
-                return `${pref}${this.nCarta(c)} de ${this.getDisplayName(c.owner)}`;
+                const enDescarte = c.location === 'discard' ? ', en su pila de descartes' : '';
+                return `${pref}${this.nCarta(c)} de ${this.getDisplayName(c.owner)}${enDescarte}`;
             }
 
             // Monta una línea completa con la sintaxis estándar:
@@ -2003,8 +2007,11 @@
             // · comoObjetivo: usa "objetivo:" en vez de "fuente:" (panel "Efectos actuales",
             //   que es la vista inversa: a quién está afectando ESTA carta).
             lineaEfecto(afeccion, { turnos, habilidad, ref, comoObjetivo } = {}) {
+                // "(N turnos restantes)" (Toto, 27-jul-2026): igual para estados alterados y
+                // efectos temporales; con la cuenta atrás ya se sobreentiende que es temporal,
+                // así que sustituye también al antiguo "(efecto temporal)".
                 const t = (turnos !== undefined && turnos !== null && turnos !== '')
-                    ? ` (${turnos} turno${turnos === 1 ? '' : 's'})` : '';
+                    ? ` (${turnos} turno${turnos === 1 ? '' : 's'} restante${turnos === 1 ? '' : 's'})` : '';
                 const h = habilidad ? ` por ${habilidad}` : '';
                 return `${afeccion}${t}${h}, ${comoObjetivo ? 'objetivo' : 'fuente'}: ${ref}`;
             }
@@ -3517,12 +3524,12 @@
                             if (_combinaPropio && m.srcId === card.instanceId) return;
                             const _fm = _refMod(m);
                             const clave = (m.srcId || '') + '|' + _fm + '|' + (m.habilidad || '');
-                            if (!porFuente.has(clave)) porFuente.set(clave, { partes: [], fuente: _fm, habilidad: m.habilidad });
+                            if (!porFuente.has(clave)) porFuente.set(clave, { partes: [], fuente: _fm, habilidad: m.habilidad, turnos: m.turnos });
                             porFuente.get(clave).partes.push(`${m.delta > 0 ? '+' : ''}${m.delta} ${m.stat}`);
                         });
                         porFuente.forEach(g => {
                             const txt = g.partes.length > 1 ? g.partes.slice(0, -1).join(', ') + ' y ' + g.partes[g.partes.length - 1] : g.partes[0];
-                            effects.push(this.lineaEfecto(txt, { habilidad: g.habilidad, ref: g.fuente }));
+                            effects.push(this.lineaEfecto(txt, { habilidad: g.habilidad, turnos: g.turnos, ref: g.fuente }));
                         });
                         // Residuo que el registro no explica (p. ej. valores arrastrados en cartas fuera de mesa)
                         const resA = (card.currentAtk - base.atk) - acumA;
@@ -3587,17 +3594,32 @@
                         if (otra.counters) for (const [k, d] of Object.entries(otra.counters)) {
                             if (d && d.count > 0 && d.source === card.name) _salientes.push(this.lineaEfecto(`${d.icon ? d.icon + ' ' : ''}${d.name || k} x${d.count}`, { ref: _obj, comoObjetivo: true }));
                         }
+                        // Los stats que vienen del MISMO efecto (misma fuente + misma habilidad)
+                        // comparten UNA línea, igual que en la vista "Afectado por" (Toto,
+                        // 27-jul-2026): antes esta vista inversa empujaba una línea por stat, así
+                        // que el detalle de un equipo listaba "+2 DEF" y "+2 ATQ" por separado.
+                        // Si una carta tiene VARIOS efectos distintos (otra habilidad/disparador),
+                        // siguen saliendo separados porque la clave de agrupación cambia.
+                        const _grupos = new Map();
                         ((this._statMods && this._statMods[otra.instanceId]) || []).forEach(m => {
                             if (m.srcId === card.instanceId || m.srcAltId === card.instanceId) {
                                 const _cs = curadoPorObjetivo.get(otra.instanceId);
                                 if (m.stat === 'OCULTO') { if (!_cs || !_cs.has('oculto')) _salientes.push(this.lineaEfecto(this.generoTexto(otra, 'Oculto', 'Oculta'), { habilidad: m.habilidad, ref: _obj, comoObjetivo: true })); return; }
                                 if (m.stat === 'SILENCIO') { if (!_cs || !_cs.has('silencio')) _salientes.push(this.lineaEfecto(this.generoTexto(otra, 'Silenciado', 'Silenciada'), { habilidad: m.habilidad, ref: _obj, comoObjetivo: true })); return; }
-                                _salientes.push(this.lineaEfecto(`${m.delta > 0 ? '+' : ''}${m.delta} ${m.stat}`, { habilidad: m.habilidad, ref: _obj, comoObjetivo: true }));
+                                const clave = (m.srcId || '') + '|' + (m.habilidad || '');
+                                if (!_grupos.has(clave)) _grupos.set(clave, { partes: [], habilidad: m.habilidad, turnos: m.turnos });
+                                _grupos.get(clave).partes.push(`${m.delta > 0 ? '+' : ''}${m.delta} ${m.stat}`);
                             }
+                        });
+                        _grupos.forEach(g => {
+                            const txt = g.partes.length > 1 ? g.partes.slice(0, -1).join(', ') + ' y ' + g.partes[g.partes.length - 1] : g.partes[0];
+                            _salientes.push(this.lineaEfecto(txt, { habilidad: g.habilidad, turnos: g.turnos, ref: _obj, comoObjetivo: true }));
                         });
                         [...(otra.tempEffects || []), ...(otra.activeEffects || [])].forEach(eff => {
                             const t = getCardTemplate(eff.sourceId);
-                            if (eff.sourceInstanceId ? eff.sourceInstanceId === card.instanceId : (t && t.name === card.name)) _salientes.push(this.lineaEfecto(`${t ? t.name : 'Efecto'} (temporal)`, { ref: _obj, comoObjetivo: true }));
+                            if (eff.sourceInstanceId ? eff.sourceInstanceId === card.instanceId : (t && t.name === card.name)) {
+                                _salientes.push(this.lineaEfecto(t ? t.name : 'Efecto', { turnos: eff.duration, ref: _obj, comoObjetivo: true }));
+                            }
                         });
                     });
 
@@ -4761,7 +4783,7 @@
                 // origen) se guardan POR SEPARADO, no fusionados en un texto: el panel de detalle
                 // los recompone con la sintaxis estándar (ver lineaEfecto). `fuente` queda solo
                 // como respaldo textual para orígenes que no son una carta (p. ej. el límite 0-9).
-                const _anota = (antes, fuente, srcId, srcAltId, srcZone, habilidad, srcCard) => {
+                const _anota = (antes, fuente, srcId, srcAltId, srcZone, habilidad, srcCard, turnos) => {
                     const ref = srcCard ? this.refCarta(srcCard) : fuente;
                     _mesa().forEach(c => {
                         const b = antes[c.instanceId];
@@ -4769,7 +4791,7 @@
                         const dA = c.currentAtk - b[0], dD = c.currentDef - b[1];
                         if (!dA && !dD && !(!b[2] && c.stealth) && !(!b[3] && c.isSilenced)) return;
                         const arr = this._statMods[c.instanceId] = this._statMods[c.instanceId] || [];
-                        const meta = { fuente, ref, habilidad: habilidad || null, srcId, srcAltId, srcZone };
+                        const meta = { fuente, ref, habilidad: habilidad || null, turnos: (turnos !== undefined ? turnos : null), srcId, srcAltId, srcZone };
                         // Orden VIDA/DEF/ATQ (Toto, 23-jul-2026): así se muestran los stats en la
                         // propia carta; DEF va antes que ATQ en "Afectado por:" para ser consistente.
                         if (dD) arr.push(Object.assign({ stat: 'DEF', delta: dD }, meta));
@@ -4840,10 +4862,19 @@
                                 if (typeof template.onUpdateTempEffect === 'function') {
                                     const antes = _foto();
                                     template.onUpdateTempEffect(card, eff, this);
-                                    // Efecto temporal dejado por una Ayuda/Evento: sin "por HABILIDAD".
-                                    // La carta origen puede haberse ido al descarte, así que se busca; si
-                                    // no aparece, queda el respaldo textual con el nombre de la plantilla.
-                                    _anota(antes, `${template.name} (efecto temporal)`, eff.sourceInstanceId || null, null, null, null, eff.sourceInstanceId ? this.findCard(eff.sourceInstanceId) : null);
+                                    // Efecto temporal dejado por una Ayuda/Evento: sin "por HABILIDAD",
+                                    // pero CON su cuenta atrás. La carta origen casi siempre está ya en
+                                    // el descarte (la Ayuda se consume al usarse); findCard la localiza
+                                    // ahí y refCarta añade ", en su pila de descartes". Como respaldo,
+                                    // si no aparece, se busca por id de plantilla en ambos descartes.
+                                    let _srcTemp = eff.sourceInstanceId ? this.findCard(eff.sourceInstanceId) : null;
+                                    if (!_srcTemp) {
+                                        for (const _p2 of ['p1', 'p2']) {
+                                            const _hit = (this.players[_p2].discard || []).find(x => x.id === eff.sourceId && (eff.ownerId ? x.owner === eff.ownerId : true));
+                                            if (_hit) { _srcTemp = _hit; break; }
+                                        }
+                                    }
+                                    _anota(antes, template.name, eff.sourceInstanceId || null, null, null, null, _srcTemp, eff.duration);
                                 }
                             });
                         }

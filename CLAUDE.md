@@ -65,7 +65,7 @@ La batería histórica (r1–r23 + humo) se perdió con los transcripts de chat 
 ## Normas de UX del cliente (INNEGOCIABLES)
 - **Elegir una carta que ya está EN EL CAMPO** (vanguardia/retaguardia, propia o rival) para un efecto de Habilidad/Ayuda/Evento: SIEMPRE reborde verde en el propio tablero (como atacar, o como Manzanahoria/Longaniza), NUNCA el modal genérico de búsqueda visual. El modal queda solo para mano, mazo (el mazo además usa el visor de mazo completo, no el modal simple) o descartes. En el DSL: `ELEGIR` con `de: "ALIADOS"|"ENEMIGOS"|"TODOS"` usa `pickBoardTargets` por defecto; `forzarModal: true` debe justificarse caso a caso, auditar cada vez que se use en una carta nueva.
 - **Sintaxis de «Afectado por:» / «Efectos actuales:»** (detalle) — gramática ÚNICA, ver §13 del doc de diseño para el detalle completo:
-  `<afección> [(N turnos)] [por HABILIDAD], fuente: [evento ]<Nombre>[ [copyId]] de <JX (Nick)>` · o `fuente: esta carta`.
+  `<afección> [(N turnos restantes)] [por HABILIDAD], fuente: [evento ]<Nombre>[ [copyId]] de <JX (Nick)>[, en su pila de descartes]` · o `fuente: esta carta`.
   Los turnos se omiten si no procede (auras/permanentes); el `por HABILIDAD` **solo** si lo causa una Pasiva/Activa (se omite en Eventos y Ayudas). `Efectos actuales:` es la vista inversa: idéntica pero con `objetivo:`. Orden de stats **VIDA → DEF → ATQ** (como en la cara de la carta). Construir SIEMPRE con los helpers `refCarta()` y `lineaEfecto()` de `index.html`; nunca concatenar el nombre a mano.
 
 ## Preferencias de Toto
