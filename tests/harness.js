@@ -671,6 +671,11 @@ function esDiffInerte(ruta, a, b) {
     // nueva ni siquiera declara el campo), así que va ANTES del guard `a !== undefined`
     // de abajo (que solo cubre la dirección undefined -> valor-inerte).
     if (ruta.endsWith('.zoeDefBuffActive') && a === true && b === undefined) return true;
+    // passiveActive: idéntico caso al de arriba pero para Karlos/Kyle (bandera del anuncio
+    // manual de su pasiva vieja, sustituida por el _dslPasN genérico). Aquí la nueva SÍ
+    // declara el campo —createCardInstance lo inicializa a false— así que el diff es
+    // true -> false. Nada del motor ni de ninguna carta lo lee: es solo bookkeeping.
+    if (ruta.endsWith('.passiveActive') && a === true && b === false) return true;
     if (a !== undefined) return false;
     if (ruta.endsWith('.counters') && b && typeof b === 'object' && Object.keys(b).length === 0) return true;
     if (ruta.endsWith('.hasAttackedThisTurn') && b === false) return true;
@@ -744,6 +749,18 @@ function compararCapturas(esc, vieja, nueva) {
         }
     }
 
+    // Flotantes que SOLO la VIEJA emitía (simétrico de logsSoloVieja): p. ej. un anuncio
+    // de pasiva escrito a mano que la migración sustituye por el genérico del trigger.
+    let flotantesViejos = vieja.flotantes;
+    for (const regla of (esc.flotantesSoloVieja || [])) {
+        if (!regla.motivo) throw new Error(`escenario "${esc.nombre}": flotantesSoloVieja sin "motivo" documentado`);
+        const antes = flotantesViejos.length;
+        flotantesViejos = flotantesViejos.filter(l => !l.includes(regla.linea));
+        if (flotantesViejos.length === antes) {
+            diffs.push(`flotantesSoloVieja: la línea declarada "${regla.linea}" no aparece en la salida vieja`);
+        }
+    }
+
     // Flotantes que SOLO la nueva emite (mismo patrón que logsSoloNueva): p. ej.
     // una pasiva que antes nunca se anunciaba y ahora sí, a petición de Toto.
     // Estricto en el mismo sentido: si la línea declarada no aparece, falla.
@@ -757,10 +774,10 @@ function compararCapturas(esc, vieja, nueva) {
         }
     }
 
-    const maxF = Math.max(vieja.flotantes.length, flotantesNuevos.length);
+    const maxF = Math.max(flotantesViejos.length, flotantesNuevos.length);
     for (let i = 0; i < maxF; i++) {
-        if (vieja.flotantes[i] !== flotantesNuevos[i]) {
-            diffs.push(`flotante[${i}]:\n      vieja: ${vieja.flotantes[i]}\n      nueva: ${flotantesNuevos[i]}`);
+        if (flotantesViejos[i] !== flotantesNuevos[i]) {
+            diffs.push(`flotante[${i}]:\n      vieja: ${flotantesViejos[i]}\n      nueva: ${flotantesNuevos[i]}`);
         }
     }
 

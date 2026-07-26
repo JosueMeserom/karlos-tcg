@@ -337,34 +337,13 @@ const CARD_DB = [
         text: "P: Mientras tenga 4 o más de vida, su Def y su Atq aumentan en 2. A: REPARACIÓN MOLECULAR (1F): Cura 2 de Vida a un aliado.", 
         passiveName: "ENTEREZA DEL INGENUO", activeName: "REPARACIÓN MOLECULAR", series: 1,
 
-        // HOOK 1: La Pasiva con temporizador inteligente
-        onUpdatePassive: function(card, game) {
-            const isActive = card.currentHp >= 4;
-            
-            if (isActive && !card.passiveActive) {
-                // Función para disparar los efectos visuales
-                const triggerVisuals = () => {
-                    game.logMsg(`¡Habilidad pasiva de ${game.getCardNameWithOwner(card)}: ${card.passiveName} activa! (+2 ATQ y +2 DEF)`, 'ability');
-                    showFloatingText(card.instanceId, card.passiveName, "ft-ability"); 
-                };
-
-                // Si la carta acaba de ser jugada, esperamos 450ms (lo que tarda la animación de entrar)
-                if (card.justPlayed) {
-                    setTimeout(triggerVisuals, 450);
-                } else {
-                    triggerVisuals();
-                }
-                card.passiveActive = true;
-            } else if (!isActive && card.passiveActive) {
-                game.logMsg(`${card.passiveName} (${game.getCardNameWithOwner(card)}) desactivada.`, 'system');
-                card.passiveActive = false;
-            }
-            
-            if (isActive) {
-                card.currentAtk += 2;
-                card.currentDef += 2;
-            }
-        },
+        abilities: [
+            // retrasoSiRecienJugada: conserva el "temporizador inteligente" que tenía a mano
+            // (espera a que acabe la animación de colocación antes de anunciarse).
+            { trigger: "PASIVA_CONTINUA", nombre: "ENTEREZA DEL INGENUO", retrasoSiRecienJugada: 450,
+              if: { campo: "self.hp", op: ">=", valor: 4 },
+              then: [ { op: "MODIFICAR_STAT", stat: "def", delta: 2 }, { op: "MODIFICAR_STAT", stat: "atk", delta: 2 } ] }
+        ],
 
         canActivateAbility: function(card, game) {
             if (card.furor < 1) { game.logError("Falta Furor (1)."); return false; }
@@ -2400,12 +2379,11 @@ const CARD_DB = [
             }
             return false;
         },
-        onUpdatePassive: function(card, game) {
-            const base = getCardTemplate(card.id);
-            if (card.currentDef < base.def) card.currentDef = base.def;
-            if (card.currentAtk < base.atk) card.currentAtk = base.atk;
-        },
         abilities: [
+            // "Stats no bajan de base": SUELO_STAT los sube de vuelta si algo los rebajó.
+            // silencioso: la vieja nunca anunciaba esta parte de la pasiva.
+            { trigger: "PASIVA_CONTINUA", nombre: "ÚLTIMA MISIÓN", silencioso: true,
+              then: [ { op: "SUELO_STAT", stat: "def" }, { op: "SUELO_STAT", stat: "atk" } ] },
             { trigger: "INICIO_TURNO", soloTurnoPropio: true,
               efectos: [
                 { op: "CURAR", completa: true, log: "¡ÚLTIMA MISIÓN! {carta} restaura toda su Vida.", floating: "RESTAURADA", floatingStyle: "ft-green", offsetFloating: -30,
@@ -4646,9 +4624,11 @@ const CARD_DB = [
             return true;
         },
         
-        onUpdatePassive: function(card, game) {
-            card.stealth = true; // Siempre Oculta
-        },
+        // silencioso: la vieja nunca anunciaba esta pasiva (solo marcaba el campo).
+        abilities: [
+            { trigger: "PASIVA_CONTINUA", nombre: "IDOL A DISTANCIA", silencioso: true,
+              then: [ { op: "MARCAR", campo: "stealth", valor: true } ] }
+        ],
         
         canActivateAbility: function(card, game) {
             if (card.furor < 1) { game.logError("Falta Furor (1)."); return false; }
@@ -6932,9 +6912,13 @@ const CARD_DB = [
             game.updatePassives();
             game.render();
         },
-        onUpdatePassive: function(card, game) {
-            if (card.permanentStealth) card.stealth = true;
-        }
+        // silencioso: la vieja nunca anunciaba esta pasiva. permanentStealth lo enciende su
+        // Activa SEDUCCIÓN (imperativa); la pasiva solo lo sostiene mientras siga en el campo.
+        abilities: [
+            { trigger: "PASIVA_CONTINUA", nombre: "DEMONIO VOLUPTUOSO", silencioso: true,
+              if: { campo: "permanentStealth", op: "truthy" },
+              then: [ { op: "MARCAR", campo: "stealth", valor: true } ] }
+        ]
     },
     {
         name: "Fanático", hp: 3, def: 3, atk: 3, type: "Esbirro", subtype: "Ser vivo", tags: ["Usuario de magia"], rarity: "B", cost: 1, series: 2,
@@ -7642,7 +7626,7 @@ const DSL = {
     // DSL._runReaccion, no _doEffect): controlan el resultado que la reacción
     // devuelve al motor de combate (redirigir el ataque, cancelarlo, drenar Furor
     // tras él, fijar el daño, autoataque del atacante).
-    OPS_EFECTO: ['MODIFICAR_STAT', 'CURAR', 'DAÑO', 'APLICAR_ESTADO', 'MODIFICAR_CONTADORES', 'ATACAR', 'MONEDA', 'ROBAR', 'BUSCAR', 'MARCAR', 'VER_MANO', 'LIMPIAR_ESTADOS', 'ELEGIR', 'DESTRUIR_EVENTO', 'MARCAR_TEMPORAL', 'DESCARTAR', 'EQUIPAR', 'MARCAR_JUGADOR', 'FLOTANTE', 'FIJAR_STAT', 'REDIRIGIR', 'CANCELAR_ATAQUE', 'MARCAR_DRENAJE', 'FIJAR_DAÑO', 'ATACANTE_SE_AUTOATACA', 'VOLVER_A_MANO', 'RETRIBUCION'],
+    OPS_EFECTO: ['MODIFICAR_STAT', 'CURAR', 'DAÑO', 'APLICAR_ESTADO', 'MODIFICAR_CONTADORES', 'ATACAR', 'MONEDA', 'ROBAR', 'BUSCAR', 'MARCAR', 'VER_MANO', 'LIMPIAR_ESTADOS', 'ELEGIR', 'DESTRUIR_EVENTO', 'MARCAR_TEMPORAL', 'DESCARTAR', 'EQUIPAR', 'MARCAR_JUGADOR', 'FLOTANTE', 'FIJAR_STAT', 'REDIRIGIR', 'CANCELAR_ATAQUE', 'MARCAR_DRENAJE', 'FIJAR_DAÑO', 'ATACANTE_SE_AUTOATACA', 'VOLVER_A_MANO', 'RETRIBUCION', 'SUELO_STAT'],
     OPS_CMP: ['==', '!=', '<=', '>=', '<', '>', 'includes', 'truthy', 'falsy'],
     QUIEN: ['SELF', 'ALIADO', 'ENEMIGO', 'TODOS', 'ATACANTE', 'DEFENSOR'], // ATACANTE/DEFENSOR: solo en GLOBAL_TRAS_ATAQUE y REACCION
 
@@ -7750,6 +7734,25 @@ const DSL = {
             }
         });
         return out;
+    },
+    // Efectos de PASIVA_CONTINUA que NO son un delta de Atq/Def y por tanto no pasan por
+    // _passiveDeltas (que solo suma/resta). Se aplican directamente sobre la carta, DESPUÉS
+    // de los deltas, con la misma recursión de if/then/else:
+    //   · MARCAR      -> pone un campo de la propia carta (p. ej. stealth: siempre Oculta).
+    //   · SUELO_STAT  -> impide que un stat baje de su valor base de plantilla ("no bajan de base").
+    // El motor los recoge igual en el registro de modificadores (updatePassives diffea antes
+    // y después), así que salen en "Afectado por:" con la sintaxis estándar sin nada extra.
+    _passiveExtras(card, game, effects) {
+        (effects || []).forEach(e => {
+            if (e.if) { DSL._passiveExtras(card, game, DSL._cond(card, game, e.if) ? e.then : (e.else || [])); return; }
+            if (e.op === 'MARCAR') {
+                card[e.campo] = (e.valor !== undefined) ? e.valor : true;
+            } else if (e.op === 'SUELO_STAT') {
+                const base = getCardTemplate(card.id) || {};
+                if (e.stat === 'atk' && card.currentAtk < base.atk) card.currentAtk = base.atk;
+                else if (e.stat === 'def' && card.currentDef < base.def) card.currentDef = base.def;
+            }
+        });
     },
     _applyPassive(card, game, effects) {
         (effects || []).forEach(e => {
@@ -8386,6 +8389,7 @@ const DSL = {
                     const d = DSL._passiveDeltas(card, game, efs);
                     card.currentAtk += d.atk;
                     card.currentDef += d.def;
+                    DSL._passiveExtras(card, game, efs); // MARCAR / SUELO_STAT (no son deltas)
                     if (ab.silencioso) return; // sin log ni floating (p. ej. Karlos (KL), Spencer): solo aplica el delta
                     // Anuncio (estilo Karlos): al activarse o intensificarse; 'desactivada' al volver a 0.
                     const mag = Math.abs(d.atk) + Math.abs(d.def);
@@ -8393,15 +8397,23 @@ const DSL = {
                     const prev = card[key] || 0;
                     const nombre = ab.nombre || tmpl.passiveName || 'PASIVA';
                     if (mag > prev) {
+                        // Orden DEF -> ATQ, como en la cara de la carta y en "Afectado por:".
                         const partes = [];
-                        if (d.atk) partes.push((d.atk > 0 ? '+' : '') + d.atk + ' de Atq');
                         if (d.def) partes.push((d.def > 0 ? '+' : '') + d.def + ' de Def');
-                        game.logMsg(`¡Habilidad pasiva de ${DSL._nombre(game, card)}: ${nombre} tiene lugar! (${partes.join(', ')})`, 'ability');
-                        if (typeof showFloatingText === 'function') {
-                            showFloatingText(card.instanceId, nombre, 'ft-ability', -40);
-                            if (d.atk) showFloatingText(card.instanceId, (d.atk > 0 ? '+' : '') + d.atk + ' ATQ', d.atk > 0 ? 'ft-green' : 'ft-red-stat', -20);
-                            if (d.def) showFloatingText(card.instanceId, (d.def > 0 ? '+' : '') + d.def + ' DEF', d.def > 0 ? 'ft-green' : 'ft-red-stat', -10);
-                        }
+                        if (d.atk) partes.push((d.atk > 0 ? '+' : '') + d.atk + ' de Atq');
+                        // retrasoSiRecienJugada: espera N ms si la carta ACABA de entrar en juego,
+                        // para que el anuncio no se pise con la animación de colocación (Kyle lo
+                        // hacía a mano con un setTimeout de 450 ms; se conserva como flag).
+                        const _emitir = () => {
+                            game.logMsg(`¡Habilidad pasiva de ${DSL._nombre(game, card)}: ${nombre} tiene lugar! (${partes.join(', ')})`, 'ability');
+                            if (typeof showFloatingText === 'function') {
+                                showFloatingText(card.instanceId, nombre, 'ft-ability', -40);
+                                if (d.def) showFloatingText(card.instanceId, (d.def > 0 ? '+' : '') + d.def + ' DEF', d.def > 0 ? 'ft-green' : 'ft-red-stat', -20);
+                                if (d.atk) showFloatingText(card.instanceId, (d.atk > 0 ? '+' : '') + d.atk + ' ATQ', d.atk > 0 ? 'ft-green' : 'ft-red-stat', -10);
+                            }
+                        };
+                        if (ab.retrasoSiRecienJugada && card.justPlayed) setTimeout(_emitir, ab.retrasoSiRecienJugada);
+                        else _emitir();
                     } else if (prev > 0 && mag === 0) {
                         game.logMsg(`${nombre} (${DSL._nombre(game, card)}) desactivada.`, 'system');
                     }
