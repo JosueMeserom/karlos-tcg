@@ -563,7 +563,7 @@ io.on('connection', (socket) => {
         if (!room || !room.setup) return;
         room.setup.aside = { p1: null, p2: null };
         room.setup.orders = { p1: null, p2: null };
-        io.to(data.roomCode).emit('restartSetup', { estado: data.estado });
+        io.to(data.roomCode).emit('restartSetup', { estado: data.estado, ignorarInicioRapido: !!data.ignorarInicioRapido });
     });
 
     socket.on('deckShuffled', (data) => {

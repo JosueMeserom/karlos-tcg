@@ -1576,7 +1576,7 @@
                     });
                     this.updatePassives();
                     this.render();
-                    if (typeof this.doOnlineSetup === 'function') this.doOnlineSetup();
+                    if (typeof this.doOnlineSetup === 'function') this.doOnlineSetup(data && data.ignorarInicioRapido);
                 });
 
                 // Si intentamos entrar a una sala que el anfitrión ya destruyó
@@ -1983,6 +1983,32 @@
                 return c.name + ((c.type !== 'Personaje' && c.copyId) ? ` [${c.copyId}]` : '');
             }
 
+            // === SINTAXIS ESTÁNDAR DE "Afectado por:" / "Efectos actuales:" (Toto, 23-jul-2026) ===
+            // Referencia a una carta origen/destino:
+            //     [evento ]<Nombre>[ [copyId]] de <JX (Nick)>
+            // El prefijo "evento " solo para Eventos; el [copyId] solo si NO es Personaje
+            // (misma regla que nCarta); el dueño siempre, con el nick real del jugador.
+            refCarta(c) {
+                if (!c) return 'desconocida';
+                const pref = c.type === 'Evento' ? 'evento ' : '';
+                return `${pref}${this.nCarta(c)} de ${this.getDisplayName(c.owner)}`;
+            }
+
+            // Monta una línea completa con la sintaxis estándar:
+            //     <afección> [(N turnos)] [por HABILIDAD], fuente|objetivo: <ref>
+            // · turnos: se omite si no procede (auras, efectos permanentes).
+            // · habilidad: nombre de la Pasiva/Activa que lo provoca; se OMITE cuando el
+            //   origen es un Evento o una Ayuda (ahí basta con la carta).
+            // · ref: `refCarta(...)` o la cadena 'esta carta' cuando el origen es uno mismo.
+            // · comoObjetivo: usa "objetivo:" en vez de "fuente:" (panel "Efectos actuales",
+            //   que es la vista inversa: a quién está afectando ESTA carta).
+            lineaEfecto(afeccion, { turnos, habilidad, ref, comoObjetivo } = {}) {
+                const t = (turnos !== undefined && turnos !== null && turnos !== '')
+                    ? ` (${turnos} turno${turnos === 1 ? '' : 's'})` : '';
+                const h = habilidad ? ` por ${habilidad}` : '';
+                return `${afeccion}${t}${h}, ${comoObjetivo ? 'objetivo' : 'fuente'}: ${ref}`;
+            }
+
             getCardSourceString(card) {
                 return this.getCardNameWithOwner(card);
             }
@@ -2219,7 +2245,8 @@
                 }
             }
 
-            async doLocalSetup(forceStart) {
+            // ignorarInicioRapido: ver el comentario en doOnlineSetup (mismo propósito).
+            async doLocalSetup(forceStart, ignorarInicioRapido) {
                 const banner = document.getElementById('action-banner');
                 banner.innerText = "Preparación de partida";
                 banner.style.display = 'block';
@@ -2229,7 +2256,7 @@
                 this._ssTurno1Hecha = false;
                 this._ssStore(this._ssKey('inicio')); // auto-foto: reiniciar desde el principio
 
-                const fastStart = localStorage.getItem('karlos_fast_start') === 'true';
+                const fastStart = !ignorarInicioRapido && localStorage.getItem('karlos_fast_start') === 'true';
                 let p1Aside = [];
                 let p2Aside = [];
 
@@ -2355,7 +2382,13 @@
                 }
             }
 
-            async doOnlineSetup() {
+            // ignorarInicioRapido: fuerza el flujo NORMAL de preparación (elegir 3 cartas para
+            // apartar) aunque el anfitrión tenga activado el "Inicio rápido". Lo usa el
+            // "Reiniciar partida > desde el principio" del debugger: su propósito es justamente
+            // poder testear el arranque normal en una partida que empezó con inicio rápido
+            // (Toto, 23-jul-2026). Debe valer lo MISMO en ambos clientes, así que viaja en el
+            // mensaje 'restartSetup' del servidor, no se lee de la config local de cada uno.
+            async doOnlineSetup(ignorarInicioRapido) {
                 const banner = document.getElementById('action-banner');
                 this._ssTurno1Hecha = false;
                 this._ssStore(this._ssKey('inicio')); // auto-foto: reiniciar desde el principio
@@ -2364,7 +2397,7 @@
                 banner.style.display = 'block';
 
                 this._testConfig = this.readTestConfig();
-                const fastStart = !!(this._testConfig && this._testConfig.fastStart);
+                const fastStart = !ignorarInicioRapido && !!(this._testConfig && this._testConfig.fastStart);
 
                 if (this.myPlayerId === 'spectator') {
                     banner.innerText = "Esperando a que los jugadores preparen sus mazos...";
@@ -2810,6 +2843,7 @@
 
                 this.debugSelectedCard = null;
                 document.getElementById('dbg-edit-panel').style.display = 'none';
+                this.updatePassives(); // quitar una carta puede desactivar auras/pasivas que daba o recibía
                 this.render();
                 this.syncDebugState();
             }
@@ -2899,10 +2933,13 @@
                         let estado;
                         try { estado = JSON.parse(raw).estado; }
                         catch (e) { this.logError('La foto del inicio no se pudo leer (¿corrupta?).'); return; }
-                        this.socket.emit('restartSetup', { roomCode: this.roomCode, estado });
+                        // ignorarInicioRapido: reiniciar "desde el principio" siempre rehace la
+                        // preparación NORMAL (elegir apartadas), aunque la partida arrancase con
+                        // Inicio rápido — es justo para poder testear ese flujo.
+                        this.socket.emit('restartSetup', { roomCode: this.roomCode, estado, ignorarInicioRapido: true });
                     } else {
                         if (!this._ssApply(this._ssKey('inicio'), '[ADMIN] Partida reiniciada desde el principio.')) return;
-                        if (typeof this.doLocalSetup === 'function') this.doLocalSetup();
+                        if (typeof this.doLocalSetup === 'function') this.doLocalSetup(null, true);
                     }
                 } else if (eleccion === '2') this._ssApply(this._ssKey('turno1'), '[ADMIN] Partida reiniciada desde el primer turno.');
             }
@@ -3114,7 +3151,8 @@
                 if (p.activeEvent) {
                     const dur = parseInt(document.getElementById('dbg-edit-event-dur').value);
                     if (!isNaN(dur)) {
-                        p.activeEvent.duration = Math.max(0, dur); 
+                        p.activeEvent.duration = Math.max(0, dur);
+                        this.updatePassives(); // el evento puede dar auras/líneas de influencia
                         this.render();
                         this.logMsg(`Debug: Evento de ${pid} fijado a ${dur} turnos.`, 'system');
                         this.syncDebugState();
@@ -3151,6 +3189,7 @@
                     this.logMsg(`[debug] ${card.name} insertada en el mazo de ${this.getDisplayName(pid)} (posición ${n} desde arriba).`, 'system');
                 }
 
+                this.updatePassives(); // crear una carta en mesa puede activar auras/pasivas al instante
                 this.render();
                 this.syncDebugState();
             }
@@ -3178,6 +3217,12 @@
                 if (!isNaN(fur)) this.debugSelectedCard.furor = Math.max(0, Math.min(4, fur));
 
                 this.checkDeath(this.debugSelectedCard);
+                // updatePassives ANTES de render (Toto, 23-jul-2026): editar stats por el debug
+                // puede cruzar el umbral de una pasiva (p. ej. bajar a Karlos a Vida<=3 activa
+                // MEGADRENALINA). Sin esto, el que editaba NO veía activarse la pasiva (ni el
+                // flotante, ni el +2 ATQ, ni la línea de "Afectado por:") mientras que el rival SÍ,
+                // porque su importGameState del HARD_SYNC sí llama a updatePassives.
+                this.updatePassives();
                 this.render();
                 this.syncDebugState();
             }
@@ -3195,7 +3240,8 @@
                     delete card.status.dot;
                     this.logMsg(`Daño por tiempo eliminado de ${this.getCardNameWithOwner(card)}.`, 'system');
                 }
-                
+
+                this.updatePassives(); // idem: el DoT activa/desactiva pasivas (p. ej. la de Zoe)
                 this.render();
                 this.syncDebugState();
             }
@@ -3363,17 +3409,14 @@
                                 else if (key === 'sueno') name = 'Sueño';
                                 const _todo = [...this.players.p1.vanguard, ...this.players.p1.rearguard, ...this.players.p2.vanguard, ...this.players.p2.rearguard, ...(this.players.p1.discard || []), ...(this.players.p2.discard || [])];
                                 const _srcC = val.sourceInstanceId ? _todo.find(x => x.instanceId === val.sourceInstanceId) : null;
-                                const _fu = (val.sourceInstanceId && val.sourceInstanceId === card.instanceId) ? 'esta carta' : (_srcC ? this.nCarta(_srcC) : val.source);
-                                effects.push(`${name} (${val.duration} turno${val.duration === 1 ? '' : 's'})${val.sourceAbility ? ' por ' + val.sourceAbility : ''}, fuente: ${_fu}`);
+                                const _fu = (val.sourceInstanceId && val.sourceInstanceId === card.instanceId) ? 'esta carta' : (_srcC ? this.refCarta(_srcC) : (val.source || val.sourceName || 'desconocida'));
+                                effects.push(this.lineaEfecto(name, { turnos: val.duration, habilidad: val.sourceAbility, ref: _fu }));
                             }
                         }
                     }
 
-                    if (card.counters && typeof card.counters === 'object') {
-                        for (const [key, data] of Object.entries(card.counters)) {
-                            effects.push(`${data.icon} ${data.name}: ${data.count} (fuente: ${data.source})`);
-                        }
-                    }
+                    // (Los contadores se listan UNA sola vez, más abajo con la sintaxis estándar.
+                    // Antes había aquí un segundo bloque con otro formato: salían duplicados.)
 
                     let customModifiersFound = false;
                     const template = getCardTemplate(card.id);
@@ -3444,7 +3487,7 @@
                         for (const [k, d] of Object.entries(card.counters)) {
                             if (d && d.count > 0) {
                                 const _fc = d.source === card.name ? 'esta carta' : (d.source || 'desconocida');
-                                effects.push(`${d.icon || ''} ${d.name || k} x${d.count}, fuente: ${_fc}`);
+                                effects.push(this.lineaEfecto(`${d.icon ? d.icon + ' ' : ''}${d.name || k} x${d.count}`, { ref: _fc }));
                             }
                         }
                     }
@@ -3466,25 +3509,26 @@
                         // contando igual para que el residuo "valor arrastrado" no las reporte de más.
                         const _combinaPropio = !!template.combinaStatsPropios;
                         const porFuente = new Map();
+                        const _refMod = (m) => (m.srcId === card.instanceId) ? 'esta carta' : (m.ref || m.fuente);
                         mods.forEach(m => {
-                            if (m.stat === 'OCULTO') { if (!curadoOculto) effects.push(`${this.generoTexto(card, 'Oculto', 'Oculta')}, fuente: ${(m.srcId === card.instanceId) ? String(m.fuente).replace(`(${this.nCarta(card)})`, '(esta carta)') : m.fuente}`); return; }
-                            if (m.stat === 'SILENCIO') { if (!curadoSilencio) effects.push(`${this.generoTexto(card, 'Silenciado', 'Silenciada')}, fuente: ${(m.srcId === card.instanceId) ? String(m.fuente).replace(`(${this.nCarta(card)})`, '(esta carta)') : m.fuente}`); return; }
+                            if (m.stat === 'OCULTO') { if (!curadoOculto) effects.push(this.lineaEfecto(this.generoTexto(card, 'Oculto', 'Oculta'), { habilidad: m.habilidad, ref: _refMod(m) })); return; }
+                            if (m.stat === 'SILENCIO') { if (!curadoSilencio) effects.push(this.lineaEfecto(this.generoTexto(card, 'Silenciado', 'Silenciada'), { habilidad: m.habilidad, ref: _refMod(m) })); return; }
                             if (m.stat === 'ATQ') acumA += m.delta; else acumD += m.delta;
                             if (_combinaPropio && m.srcId === card.instanceId) return;
-                            const _fm = (m.srcId === card.instanceId) ? 'esta carta' : m.fuente;
-                            const clave = (m.srcId || '') + '|' + _fm;
-                            if (!porFuente.has(clave)) porFuente.set(clave, { partes: [], fuente: _fm });
+                            const _fm = _refMod(m);
+                            const clave = (m.srcId || '') + '|' + _fm + '|' + (m.habilidad || '');
+                            if (!porFuente.has(clave)) porFuente.set(clave, { partes: [], fuente: _fm, habilidad: m.habilidad });
                             porFuente.get(clave).partes.push(`${m.delta > 0 ? '+' : ''}${m.delta} ${m.stat}`);
                         });
                         porFuente.forEach(g => {
                             const txt = g.partes.length > 1 ? g.partes.slice(0, -1).join(', ') + ' y ' + g.partes[g.partes.length - 1] : g.partes[0];
-                            effects.push(`${txt}, fuente: ${g.fuente}`);
+                            effects.push(this.lineaEfecto(txt, { habilidad: g.habilidad, ref: g.fuente }));
                         });
                         // Residuo que el registro no explica (p. ej. valores arrastrados en cartas fuera de mesa)
                         const resA = (card.currentAtk - base.atk) - acumA;
                         const resD = (card.currentDef - base.def) - acumD;
-                        if (resD) effects.push(`${resD > 0 ? '+' : ''}${resD} DEF, fuente: desconocida (valor arrastrado)`);
-                        if (resA) effects.push(`${resA > 0 ? '+' : ''}${resA} ATQ, fuente: desconocida (valor arrastrado)`);
+                        if (resD) effects.push(this.lineaEfecto(`${resD > 0 ? '+' : ''}${resD} DEF`, { ref: 'desconocida (valor arrastrado)' }));
+                        if (resA) effects.push(this.lineaEfecto(`${resA > 0 ? '+' : ''}${resA} ATQ`, { ref: 'desconocida (valor arrastrado)' }));
                     }
 
                     if (card.attachedTo) {
@@ -3518,7 +3562,9 @@
                             if (typeof _tpl.onGlobalGetPreviewEffects === 'function') {
                                 _mesaAll.forEach(otra => {
                                     (_tpl.onGlobalGetPreviewEffects(_ev, otra, this) || []).forEach(lin => {
-                                        _salientes.push(`${String(lin).replace(/,\s*fuente:.*$/, '')}, objetivo: ${this.getCardNameWithOwner(otra)}`);
+                                        // La carta devuelve la línea ya con ", fuente: ..."; aquí se
+                                        // sustituye por el destino (vista inversa), conservando el resto.
+                                        _salientes.push(`${String(lin).replace(/,\s*fuente:.*$/, '')}, objetivo: ${this.refCarta(otra)}`);
                                         const tl = String(lin).toLowerCase();
                                         if (!curadoPorObjetivo.has(otra.instanceId)) curadoPorObjetivo.set(otra.instanceId, new Set());
                                         const _cs = curadoPorObjetivo.get(otra.instanceId);
@@ -3531,26 +3577,27 @@
                     }
                     _mesaAll.forEach(otra => {
                         if (otra.instanceId === card.instanceId) return;
+                        const _obj = this.refCarta(otra); // misma sintaxis que "fuente:", pero como destino
                         if (otra.status) for (const [k, v2] of Object.entries(otra.status)) {
                             if (v2 && v2.duration > 0 && ((v2.sourceInstanceId && v2.sourceInstanceId === card.instanceId) || v2.sourceName === card.name || v2.source === card.name)) {
                                 const nm = k === 'dot' ? 'Daño por tiempo' : k === 'confusion' ? 'Confusión' : k === 'ceguera' ? 'Ceguera' : k === 'sueno' ? 'Sueño' : k;
-                                _salientes.push(`${nm} (${v2.duration} turno${v2.duration === 1 ? '' : 's'})${v2.sourceAbility ? ' por ' + v2.sourceAbility : ''}, objetivo: ${this.getCardNameWithOwner(otra)}`);
+                                _salientes.push(this.lineaEfecto(nm, { turnos: v2.duration, habilidad: v2.sourceAbility, ref: _obj, comoObjetivo: true }));
                             }
                         }
                         if (otra.counters) for (const [k, d] of Object.entries(otra.counters)) {
-                            if (d && d.count > 0 && d.source === card.name) _salientes.push(`${d.name || k} x${d.count}, objetivo: ${this.getCardNameWithOwner(otra)}`);
+                            if (d && d.count > 0 && d.source === card.name) _salientes.push(this.lineaEfecto(`${d.icon ? d.icon + ' ' : ''}${d.name || k} x${d.count}`, { ref: _obj, comoObjetivo: true }));
                         }
                         ((this._statMods && this._statMods[otra.instanceId]) || []).forEach(m => {
                             if (m.srcId === card.instanceId || m.srcAltId === card.instanceId) {
                                 const _cs = curadoPorObjetivo.get(otra.instanceId);
-                                if (m.stat === 'OCULTO') { if (!_cs || !_cs.has('oculto')) _salientes.push(`${this.generoTexto(otra, 'Oculto', 'Oculta')}, objetivo: ${this.getCardNameWithOwner(otra)}`); return; }
-                                if (m.stat === 'SILENCIO') { if (!_cs || !_cs.has('silencio')) _salientes.push(`${this.generoTexto(otra, 'Silenciado', 'Silenciada')}, objetivo: ${this.getCardNameWithOwner(otra)}`); return; }
-                                _salientes.push(`${m.delta > 0 ? '+' : ''}${m.delta} ${m.stat}, objetivo: ${this.getCardNameWithOwner(otra)}`);
+                                if (m.stat === 'OCULTO') { if (!_cs || !_cs.has('oculto')) _salientes.push(this.lineaEfecto(this.generoTexto(otra, 'Oculto', 'Oculta'), { habilidad: m.habilidad, ref: _obj, comoObjetivo: true })); return; }
+                                if (m.stat === 'SILENCIO') { if (!_cs || !_cs.has('silencio')) _salientes.push(this.lineaEfecto(this.generoTexto(otra, 'Silenciado', 'Silenciada'), { habilidad: m.habilidad, ref: _obj, comoObjetivo: true })); return; }
+                                _salientes.push(this.lineaEfecto(`${m.delta > 0 ? '+' : ''}${m.delta} ${m.stat}`, { habilidad: m.habilidad, ref: _obj, comoObjetivo: true }));
                             }
                         });
                         [...(otra.tempEffects || []), ...(otra.activeEffects || [])].forEach(eff => {
                             const t = getCardTemplate(eff.sourceId);
-                            if (eff.sourceInstanceId ? eff.sourceInstanceId === card.instanceId : (t && t.name === card.name)) _salientes.push(`${t ? t.name : 'Efecto'} (temporal), objetivo: ${this.getCardNameWithOwner(otra)}`);
+                            if (eff.sourceInstanceId ? eff.sourceInstanceId === card.instanceId : (t && t.name === card.name)) _salientes.push(this.lineaEfecto(`${t ? t.name : 'Efecto'} (temporal)`, { ref: _obj, comoObjetivo: true }));
                         });
                     });
 
@@ -4710,19 +4757,25 @@
                 this._statMods = {}; // instanceId -> [{stat, delta, fuente, srcId, srcAltId, srcZone}]
                 const _mesa = () => [...this.players.p1.vanguard, ...this.players.p1.rearguard, ...this.players.p2.vanguard, ...this.players.p2.rearguard];
                 const _foto = () => { const m = {}; _mesa().forEach(c => m[c.instanceId] = [c.currentAtk, c.currentDef, !!c.stealth, !!c.isSilenced]); return m; };
-                const _anota = (antes, fuente, srcId, srcAltId, srcZone) => {
+                // `habilidad` (nombre de la Pasiva/Activa) y `ref` (referencia estándar a la carta
+                // origen) se guardan POR SEPARADO, no fusionados en un texto: el panel de detalle
+                // los recompone con la sintaxis estándar (ver lineaEfecto). `fuente` queda solo
+                // como respaldo textual para orígenes que no son una carta (p. ej. el límite 0-9).
+                const _anota = (antes, fuente, srcId, srcAltId, srcZone, habilidad, srcCard) => {
+                    const ref = srcCard ? this.refCarta(srcCard) : fuente;
                     _mesa().forEach(c => {
                         const b = antes[c.instanceId];
                         if (!b) return;
                         const dA = c.currentAtk - b[0], dD = c.currentDef - b[1];
                         if (!dA && !dD && !(!b[2] && c.stealth) && !(!b[3] && c.isSilenced)) return;
                         const arr = this._statMods[c.instanceId] = this._statMods[c.instanceId] || [];
+                        const meta = { fuente, ref, habilidad: habilidad || null, srcId, srcAltId, srcZone };
                         // Orden VIDA/DEF/ATQ (Toto, 23-jul-2026): así se muestran los stats en la
                         // propia carta; DEF va antes que ATQ en "Afectado por:" para ser consistente.
-                        if (dD) arr.push({ stat: 'DEF', delta: dD, fuente, srcId, srcAltId, srcZone });
-                        if (dA) arr.push({ stat: 'ATQ', delta: dA, fuente, srcId, srcAltId, srcZone });
-                        if (!b[2] && c.stealth) arr.push({ stat: 'OCULTO', delta: 1, fuente, srcId, srcAltId, srcZone, badgeKey: 'oculto' });
-                        if (!b[3] && c.isSilenced) arr.push({ stat: 'SILENCIO', delta: 1, fuente, srcId, srcAltId, srcZone, badgeKey: 'silencio' });
+                        if (dD) arr.push(Object.assign({ stat: 'DEF', delta: dD }, meta));
+                        if (dA) arr.push(Object.assign({ stat: 'ATQ', delta: dA }, meta));
+                        if (!b[2] && c.stealth) arr.push(Object.assign({ stat: 'OCULTO', delta: 1, badgeKey: 'oculto' }, meta));
+                        if (!b[3] && c.isSilenced) arr.push(Object.assign({ stat: 'SILENCIO', delta: 1, badgeKey: 'silencio' }, meta));
                     });
                 };
 
@@ -4750,8 +4803,9 @@
                         if (typeof template.onUpdatePassive === 'function') {
                             const antes = _foto();
                             template.onUpdatePassive(card, this);
+                            // Pasiva de una carta en mesa -> "por NOMBREPASIVA, fuente: <carta>"
                             const nom = template.passiveName ? `${template.passiveName} (${this.nCarta(card)})` : `Pasiva de ${this.nCarta(card)}`;
-                            _anota(antes, nom, card.instanceId, null, null);
+                            _anota(antes, nom, card.instanceId, null, null, template.passiveName || null, card);
                         }
                     });
 
@@ -4762,7 +4816,8 @@
                                 if (eqTemp.onEquipUpdate) {
                                     const antes = _foto();
                                     eqTemp.onEquipUpdate(eq, c, this);
-                                    _anota(antes, `${eq.name} (equipado en ${this.nCarta(c)})`, eq.instanceId, c.instanceId, null);
+                                    // Equipo (Ayuda anexada): la sintaxis omite el "por HABILIDAD"; basta la carta.
+                                    _anota(antes, `${eq.name} (equipado en ${this.nCarta(c)})`, eq.instanceId, c.instanceId, null, null, eq);
                                 }
                             });
                         }
@@ -4773,7 +4828,8 @@
                         if (typeof evTemplate.onUpdatePassive === 'function') {
                             const antes = _foto();
                             evTemplate.onUpdatePassive(p.activeEvent, this, p);
-                            _anota(antes, `${p.activeEvent.name} (Evento de ${this.getDisplayName(pid)})`, p.activeEvent.instanceId, null, `${pid}-event-slot`);
+                            // Evento activo: la sintaxis omite el "por HABILIDAD" (refCarta ya le pone "evento ").
+                            _anota(antes, `${p.activeEvent.name} (Evento de ${this.getDisplayName(pid)})`, p.activeEvent.instanceId, null, `${pid}-event-slot`, null, p.activeEvent);
                         }
                     }
 
@@ -4784,7 +4840,10 @@
                                 if (typeof template.onUpdateTempEffect === 'function') {
                                     const antes = _foto();
                                     template.onUpdateTempEffect(card, eff, this);
-                                    _anota(antes, `${template.name} (efecto temporal)`, eff.sourceInstanceId || null, null, null);
+                                    // Efecto temporal dejado por una Ayuda/Evento: sin "por HABILIDAD".
+                                    // La carta origen puede haberse ido al descarte, así que se busca; si
+                                    // no aparece, queda el respaldo textual con el nombre de la plantilla.
+                                    _anota(antes, `${template.name} (efecto temporal)`, eff.sourceInstanceId || null, null, null, null, eff.sourceInstanceId ? this.findCard(eff.sourceInstanceId) : null);
                                 }
                             });
                         }

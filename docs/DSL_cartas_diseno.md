@@ -263,3 +263,69 @@ abilities: [{
 **Consumo de la carta y cancelación** los gestiona el motor: si la reacción devuelve `{used:true}`, el bucle la descarta; si el reactor declina el prompt o cancela una elección (p. ej. la víctima de Pequeña traición), devuelve `{used:false}` y la carta se queda en la mano (`result.abortar`).
 
 **Cobertura DSL:** Cortarrollos, Inspiración, Pequeña traición, Jugada arriesgada (ATAQUE) y Escudo mágico (DAÑO). Frasco maldito sigue imperativa. Suite `regresion18`.
+
+---
+
+## 13. Sintaxis estándar de «Afectado por:» / «Efectos actuales:» (23-jul-2026)
+
+Las dos listas del panel de detalle (el rectángulo azul del hover) comparten **una única
+gramática**. `Afectado por:` lista lo que *recibe* la carta; `Efectos actuales:` es la vista
+**inversa** — lo que esa misma carta *provoca* en otras — y es idéntica salvo que `fuente:`
+pasa a ser `objetivo:`.
+
+### 13.1 La gramática
+
+```
+<afección> [ (N turnos) ] [ por HABILIDAD ], fuente|objetivo: <referencia>
+```
+
+| Parte | Cuándo se pone | Notas |
+|---|---|---|
+| **afección** | siempre | Modificador de stat (`+2 ATQ`), estado alterado (`Daño por tiempo`), contador o texto libre de la carta. Varios stats de una misma fuente van **en una sola línea**. |
+| **(N turnos)** | solo si tiene duración | Se **omite** en auras y efectos permanentes. Singular/plural automático. |
+| **por HABILIDAD** | solo si lo causa una **Pasiva o Activa** | Se **omite** si el origen es un **Evento** o una **Ayuda**: ahí basta con la carta. |
+| **referencia** | siempre | Ver 13.2. |
+
+### 13.2 La referencia a una carta
+
+```
+[evento ]<Nombre>[ [copyId]] de <JX (Nick)>        ·  o bien la cadena  esta carta
+```
+
+* Prefijo **`evento `** solo si la carta origen es de tipo Evento.
+* **`[copyId]`** solo si **no** es un Personaje (misma regla que `nCarta`).
+* El **dueño** siempre, con el nick real del jugador.
+* **`esta carta`** cuando el origen es la propia carta inspeccionada (sustituye a todo lo anterior).
+
+### 13.3 Ejemplos canónicos
+
+```
+Daño por tiempo (3 turnos) por PUÑALADA, fuente: Sra. Kumicho [1] de J1 (Ultra_K)
++2 ATQ por MEGADRENALINA, fuente: esta carta
+Puede retirarse sin coste de Furor, fuente: evento Escape con bomba de humo [1] de J1 (Ultra_K)
+-1 VIDA MÁX., +3 DEF y -1 ATQ por CAMBIO DE PAJARITA (DEFENSA), fuente: esta carta
+```
+
+Y la misma línea vista desde el Evento que la provoca (`Efectos actuales:`):
+
+```
+Puede retirarse sin coste de Furor, objetivo: Karlos de J1 (Ultra_K)
+```
+
+### 13.4 Cómo se construye (implementación)
+
+En `index.html`:
+
+* **`refCarta(c)`** → arma la referencia de 13.2. Úsalo **siempre**; nunca concatenes el nombre a mano.
+* **`lineaEfecto(afección, { turnos, habilidad, ref, comoObjetivo })`** → arma la línea completa.
+  `comoObjetivo: true` cambia `fuente:` por `objetivo:`.
+* **`_anota(...)`** (dentro de `updatePassives`) registra cada modificación de stat guardando
+  `habilidad` y `ref` **por separado** (no un texto ya fusionado), para que el panel pueda
+  recomponer la línea con esta gramática.
+
+**Orden de los stats: VIDA → DEF → ATQ**, el mismo con el que se muestran en la cara de la carta.
+
+Cuando una carta genera su propia línea vía `onGetPreviewEffects` (único sitio que puede
+mencionar **VIDA MÁX.**, que el registro automático no rastrea) y esa línea ya cubre stats que
+el registro también vería, la plantilla debe marcar **`combinaStatsPropios: true`** para que el
+registro ceda y no salga duplicada (p. ej. Spencer).

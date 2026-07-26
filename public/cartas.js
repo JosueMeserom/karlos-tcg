@@ -941,7 +941,7 @@ const CARD_DB = [
             const f = (n) => (n > 0 ? '+' : '') + n;
             const partes = [`${f(d.hp)} VIDA MÁX.`, `${f(d.def)} DEF`, `${f(d.atk)} ATQ`];
             const texto = partes.slice(0, -1).join(', ') + ' y ' + partes[partes.length - 1];
-            return [`${texto} (Pajarita: ${card.pajaritaStance}), fuente: esta carta`];
+            return [`${texto} por ${card.activeName} (${card.pajaritaStance}), fuente: esta carta`];
         }
     },
     { 
@@ -1111,7 +1111,7 @@ const CARD_DB = [
 
         onGetPreviewEffects: function(card, game) {
             if (card.stealth) {
-                return [`OCULTO: Inmune a ataques normales (fuente: esta carta).`];
+                return [`Oculto: inmune a ataques normales por ${card.passiveName}, fuente: esta carta`];
             }
             return [];
         }
@@ -4199,8 +4199,11 @@ const CARD_DB = [
         onGetPreviewEffects: function(card, game, effect) {
             if (card.type === 'Personaje' || card.type === 'Esbirro') {
                 // Leemos la duración directamente del efecto que nos pasa el motor
-                const turnos = effect ? effect.duration : '?';
-                return [`+1 ATQ, +1 DEF (fuente: Poción revitalizante, ${turnos} turnos restantes)`];
+                // Ayuda -> sin "por HABILIDAD"; la carta origen puede estar ya en descartes.
+                const turnos = effect ? effect.duration : null;
+                const src = (effect && effect.sourceInstanceId && typeof game.findCard === 'function') ? game.findCard(effect.sourceInstanceId) : null;
+                const ref = src && typeof game.refCarta === 'function' ? game.refCarta(src) : 'Poción revitalizante';
+                return [`+1 DEF y +1 ATQ${turnos !== null ? ` (${turnos} turno${turnos === 1 ? '' : 's'})` : ''}, fuente: ${ref}`];
             }
             return [];
         }
@@ -4814,8 +4817,7 @@ const CARD_DB = [
         onGlobalGetPreviewEffects: function(eventCard, targetCard, game) {
             if (targetCard.owner === eventCard.owner && targetCard.tags &&
                 (targetCard.tags.includes("Usuario de magia") || targetCard.tags.includes("Usuaria de magia") || targetCard.tags.includes("Monstruo"))) {
-                const dn = typeof game.getDisplayName === 'function' ? game.getDisplayName(eventCard.owner) : eventCard.owner;
-                return [`Doble Furor al inicio del turno, fuente: Dáedra (Evento de ${dn})`];
+                return [`Doble Furor al inicio del turno, fuente: ${typeof game.refCarta === 'function' ? game.refCarta(eventCard) : eventCard.name}`];
             }
             return [];
         },
@@ -5077,7 +5079,10 @@ const CARD_DB = [
         onStartTurnTempEffect: function() { return true; }, // Supervivencia infinita
         onEndTurnTempEffect: function() { return true; },
         onGetPreviewEffects: function(card, game, effect) {
-            if (effect && effect.isDomador) return ["+2 ATQ, +2 DEF permanentemente (fuente: Domador)"];
+            if (effect && effect.isDomador) {
+                const src = (effect.sourceInstanceId && typeof game.findCard === 'function') ? game.findCard(effect.sourceInstanceId) : null;
+                return [`+2 DEF y +2 ATQ (permanente), fuente: ${src && typeof game.refCarta === 'function' ? game.refCarta(src) : 'Domador'}`];
+            }
             return [];
         }
     },
@@ -5290,9 +5295,11 @@ const CARD_DB = [
             }
             return true;
         },
-        onGetPreviewEffects: function(card, game) {
-            if (card.type === 'Personaje' || card.type === 'Esbirro') return ["Stats bloqueados a 9. Devuelve a la mano. (fuente: Poder Legado)"];
-            return [];
+        // Equipo: el 3er parámetro es la propia carta equipada (el motor la pasa así).
+        onGetPreviewEffects: function(card, game, eq) {
+            if (card.type !== 'Personaje' && card.type !== 'Esbirro') return [];
+            const ref = eq && typeof game.refCarta === 'function' ? game.refCarta(eq) : 'Poder Legado';
+            return [`Stats bloqueados a 9; vuelve a la mano al inicio de tu próximo turno, fuente: ${ref}`];
         }
     },
     {
@@ -6389,8 +6396,12 @@ const CARD_DB = [
         name: "Escape con bomba de humo", type: "Evento", rarity: "C", cost: 1, duration: 1, series: 2,
         text: "1 turno. Mientras esté en juego, puedes retirar a tus aliados sin coste de Furor. Al expirar, cura 3 de Vida a cada aliado con etiqueta 'Ninja'.",
         abilities: [
-            { trigger: "PREVIEW_GLOBAL", lineas: [ { quien: "ALIADO", soloTipos: ["Personaje", "Esbirro"], texto: "Puede retirarse sin coste de Furor" } ] },
-            { trigger: "PREVIEW_GLOBAL", lineas: [ { quien: "ALIADO", soloTipos: ["Personaje", "Esbirro"], texto: "Puede retirarse sin coste de Furor" } ] },
+            // zona VANGUARDIA (Toto, 23-jul-2026): retirarse es pasar de vanguardia a
+            // retaguardia, así que quien YA está en retaguardia no puede beneficiarse — el
+            // motor siempre lo hizo bien (executeRetreat parte de la carta de vanguardia),
+            // pero la línea de preview y su flecha sí salían en los de retaguardia.
+            // (Esta ability estaba además DUPLICADA, lo que la listaba dos veces.)
+            { trigger: "PREVIEW_GLOBAL", lineas: [ { quien: "ALIADO", zona: "VANGUARDIA", soloTipos: ["Personaje", "Esbirro"], texto: "Puede retirarse sin coste de Furor" } ] },
             { trigger: "AL_JUGAR", log: "¡Bomba de humo! El campo se llena de niebla.", logTipo: "ability" },
             { trigger: "AL_CADUCAR", log: "La niebla se disipa.", logTipo: "system",
               efectos: [ { op: "CURAR", valor: 3, conBeforeHealed: false, soloSiHerido: true,
@@ -6660,9 +6671,8 @@ const CARD_DB = [
         onGlobalGetPreviewEffects: function(eventCard, targetCard, game) {
             if (targetCard.type === 'Personaje' || targetCard.type === 'Esbirro') {
                 const original = targetCard.bankruptStoredFuror !== undefined ? targetCard.bankruptStoredFuror : 0;
-                const dn = typeof game.getDisplayName === 'function' ? game.getDisplayName(eventCard.owner) : eventCard.owner;
                 if (targetCard.owner !== eventCard.owner && (getCardTemplate(targetCard.id) || {}).immuneToEnemyEvents) return [];
-                return [`Furor agotado (originalmente ${original}), fuente: Bancarrota (Evento de ${dn})`];
+                return [`Furor agotado (originalmente ${original}), fuente: ${typeof game.refCarta === 'function' ? game.refCarta(eventCard) : eventCard.name}`];
             }
             return [];
         },
@@ -6961,7 +6971,7 @@ const CARD_DB = [
             card.currentDef += card.fanaticoBoost;
         },
         onGetPreviewEffects: function(card, game) {
-            if (card.fanaticoBoost > 0) return [`+${card.fanaticoBoost} ATQ/DEF/VIDA MÁX. (fuente: Adoración perversa)`];
+            if (card.fanaticoBoost > 0) return [`+${card.fanaticoBoost} VIDA MÁX., +${card.fanaticoBoost} DEF y +${card.fanaticoBoost} ATQ por ${card.passiveName}, fuente: esta carta`];
             return [];
         }
     },
@@ -8830,8 +8840,9 @@ const DSL = {
                         if (si.algunaEtiqueta && !(targetCard.tags && si.algunaEtiqueta.some(t => targetCard.tags.includes(t)))) continue;
                         if (si.campoObjetivo && !DSL._cmp(DSL._field(targetCard, si.campoObjetivo.campo), si.campoObjetivo.op, si.campoObjetivo.valor)) continue;
                         if (si.campoSelf && !DSL._cmp(DSL._field(ev, si.campoSelf.campo), si.campoSelf.op, si.campoSelf.valor)) continue;
-                        const dn = typeof game.getDisplayName === 'function' ? game.getDisplayName(ev.owner) : ev.owner;
-                        out.push(`${r.preview}, fuente: ${ev.name} (Evento de ${dn})`);
+                        // Sintaxis estándar de "Afectado por:" (ver refCarta/lineaEfecto en index.html):
+                        // el origen es un Evento -> sin "por HABILIDAD", y refCarta ya antepone "evento ".
+                        out.push(`${r.preview}, fuente: ${typeof game.refCarta === 'function' ? game.refCarta(ev) : ev.name}`);
                     }
                     return out;
                 };
@@ -8967,12 +8978,14 @@ const DSL = {
                     if (l.quien === 'ALIADO' && target.owner !== ev.owner) continue;
                     if (l.quien === 'ENEMIGO' && target.owner === ev.owner) continue;
                     if (l.soloTipos && !l.soloTipos.includes(target.type)) continue;
+                    if (l.zona === 'VANGUARDIA' && target.location !== 'vanguard') continue; // p. ej. retirarse solo aplica a quien está EN vanguardia
+                    if (l.zona === 'RETAGUARDIA' && target.location !== 'rearguard') continue;
                     if (l.algunaEtiqueta && !(target.tags && l.algunaEtiqueta.some(t => target.tags.includes(t)))) continue;
                     if (l.filtros && !l.filtros.every(f => DSL._match(target, f))) continue;
                     if (l.exentoPlantilla && tplT[l.exentoPlantilla]) continue;
                     if (l.campoSelfId && ev[l.campoSelfId] !== target.instanceId) continue;
                     if (l.campoSelfLista && !(Array.isArray(ev[l.campoSelfLista]) && ev[l.campoSelfLista].includes(target.instanceId))) continue;
-                    out.push(`${DSL._fill(l.texto, { genero: target.gender })}, fuente: ${ev.name} (Evento de ${dn})`);
+                    out.push(`${DSL._fill(l.texto, { genero: target.gender })}, fuente: ${typeof game.refCarta === 'function' ? game.refCarta(ev) : ev.name}`);
                 }
                 if (typeof _prevHook === 'function') out.push(...(_prevHook(ev, target, game) || []));
                 return out;
@@ -8988,7 +9001,12 @@ const DSL = {
             }
             if (tmpl.tempEffectText && typeof tmpl.onGetPreviewEffects !== 'function') {
                 tmpl.onGetPreviewEffects = function (card, game, eff) {
-                    return eff ? [DSL._fill(tmpl.tempEffectText, { genero: card.gender }) + ', fuente: ' + tmpl.name] : [];
+                    if (!eff) return [];
+                    // La carta origen (Ayuda/Evento que dejó la marca) puede estar ya en descartes:
+                    // se busca por instanceId y, si no aparece, queda su nombre como respaldo.
+                    const src = (eff.sourceInstanceId && typeof game.findCard === 'function') ? game.findCard(eff.sourceInstanceId) : null;
+                    const ref = src && typeof game.refCarta === 'function' ? game.refCarta(src) : tmpl.name;
+                    return [`${DSL._fill(tmpl.tempEffectText, { genero: card.gender })}, fuente: ${ref}`];
                 };
             }
         }
