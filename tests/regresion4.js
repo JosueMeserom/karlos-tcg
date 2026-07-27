@@ -18,7 +18,7 @@ const escenarios = [
             { seleccionar: 'Oso con armadura' },
         ],
         logsIntencionados: [
-            { de: '¡Oso con armadura desata', a: '¡Oso con armadura [1] (J1 (Jugador 1)) desata',
+            { de: '¡Oso con armadura desata', a: '¡Oso con armadura [1] de J1 (Jugador 1) desata',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño/jugador): la vieja usaba nombres a secas o 2ª persona; la nueva usa DSL._nombre / {jugador}' },
         ],
     },
@@ -31,7 +31,7 @@ const escenarios = [
             { seleccionar: 'Eris' },
         ],
         logsIntencionados: [
-            { de: '¡Eris desata', a: '¡Eris (J1 (Jugador 1)) desata',
+            { de: '¡Eris desata', a: '¡Eris de J1 (Jugador 1) desata',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño/jugador): la vieja usaba nombres a secas o 2ª persona; la nueva usa DSL._nombre / {jugador}' },
         ],
     },
@@ -44,7 +44,7 @@ const escenarios = [
             { seleccionar: 'Oso con armadura' },
         ],
         logsIntencionados: [
-            { de: '¡Oso con armadura desata', a: '¡Oso con armadura [1] (J1 (Jugador 1)) desata',
+            { de: '¡Oso con armadura desata', a: '¡Oso con armadura [1] de J1 (Jugador 1) desata',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño/jugador): la vieja usaba nombres a secas o 2ª persona; la nueva usa DSL._nombre / {jugador}' },
         ],
     },
@@ -58,7 +58,7 @@ const escenarios = [
             { elegir: ['Mini-tigre', 'Droide antidisturbios'] }, // vieja: modal visual · nueva: tablero
         ],
         logsIntencionados: [
-            { de: '¡Oso con armadura hace explotar', a: '¡Oso con armadura [1] (J1 (Jugador 1)) hace explotar',
+            { de: '¡Oso con armadura hace explotar', a: '¡Oso con armadura [1] de J1 (Jugador 1) hace explotar',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño/jugador): la vieja usaba nombres a secas o 2ª persona; la nueva usa DSL._nombre / {jugador}' },
         ],
     },
@@ -81,7 +81,7 @@ const escenarios = [
               motivo: 'atribución de jugador pedida por Toto (21-jul-2026): los logs de zonas ocultas dicen de quién son; la vieja decía "Barajando el mazo..." a secas' },
             { de: 'El Hexagrama brilla y te permite buscar en tu mazo...', a: 'El Hexagrama brilla y permite a J1 (Jugador 1) buscar en su mazo...',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño/jugador): la vieja usaba nombres a secas o 2ª persona; la nueva usa DSL._nombre / {jugador}' },
-            { de: 'Añades Gólem multielemental a tu mano.', a: 'J1 (Jugador 1) añade Gólem multielemental (J1 (Jugador 1)) a su mano.',
+            { de: 'Añades Gólem multielemental a tu mano.', a: 'J1 (Jugador 1) añade Gólem multielemental de J1 (Jugador 1) a su mano.',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño/jugador): la vieja usaba nombres a secas o 2ª persona; la nueva usa DSL._nombre / {jugador}' },
         ],
     },

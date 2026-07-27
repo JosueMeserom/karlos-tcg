@@ -1967,13 +1967,10 @@
                 }
             }
 
+            // Formato unificado con refCarta()/lineaEfecto() (Toto, 27-jul-2026): "Fanático [1]
+            // de J1 (Ultra_K)" en vez de paréntesis anidados ("Fanático [1] (J1 (Ultra_K))").
             getCardNameWithOwner(card) {
-                const ownerTag = this.getDisplayName(card.owner);
-                let name = card.name;
-                if (card.type !== 'Personaje' && card.copyId) {
-                    name += ` [${card.copyId}]`;
-                }
-                return `${name} (${ownerTag})`;
+                return `${this.nCarta(card)} de ${this.getDisplayName(card.owner)}`;
             }
 
             // Concordancia de género (Toto, 21-jul-2026): reutiliza card.gender, que ya
@@ -4909,10 +4906,17 @@
 
                         if (typeof template.onUpdatePassive === 'function') {
                             const antes = _foto();
+                            delete card._pasivaHabilidadReal; // se re-declara en esta pasada si aplica (ver PASIVA_CONTINUA)
                             template.onUpdatePassive(card, this);
-                            // Pasiva de una carta en mesa -> "por NOMBREPASIVA, fuente: <carta>"
-                            const nom = template.passiveName ? `${template.passiveName} (${this.nCarta(card)})` : `Pasiva de ${this.nCarta(card)}`;
-                            _anota(antes, nom, card.instanceId, null, null, template.passiveName || null, card);
+                            // Pasiva de una carta en mesa -> "por NOMBREHABILIDAD, fuente: <carta>". Por
+                            // defecto es la Pasiva de la carta (template.passiveName), PERO una
+                            // PASIVA_CONTINUA puede reaplicar aquí un bono que en realidad concede una
+                            // ACTIVA distinta (Xidachane/Karolina: el contador lo sube su Activa, la
+                            // Pasiva solo lo reaplica o pone un techo) — en ese caso el compilador deja
+                            // la atribución correcta en card._pasivaHabilidadReal (Toto, 27-jul-2026).
+                            const habilidadReal = card._pasivaHabilidadReal || template.passiveName || null;
+                            const nom = habilidadReal ? `${habilidadReal} (${this.nCarta(card)})` : `Pasiva de ${this.nCarta(card)}`;
+                            _anota(antes, nom, card.instanceId, null, null, habilidadReal, card);
                         }
                     });
 
@@ -6844,7 +6848,7 @@
                                 const moved = p.rearguard.splice(candidateIdx, 1)[0];
                                 moved.location = 'vanguard';
                                 p.vanguard.push(moved);
-                                this.logMsg(`${moved.name} avanza a la vanguardia para cubrir el hueco.`, 'system');
+                                this.logMsg(`${this.getCardNameWithOwner(moved)} avanza a la vanguardia para cubrir el hueco.`, 'system');
                             }
                         }
 

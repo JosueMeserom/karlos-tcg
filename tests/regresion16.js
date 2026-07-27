@@ -103,7 +103,7 @@ const escenarios = [
             { elegir: ['Mini-tigre'] },
         ],
         logsIntencionados: [
-            { de: '¡Mini-tigre no sabe la respuesta y pierde 2 de Furor!', a: '¡Mini-tigre [1] (J2 (Jugador 2)) no sabe la respuesta y pierde 2 de Furor!',
+            { de: '¡Mini-tigre no sabe la respuesta y pierde 2 de Furor!', a: '¡Mini-tigre [1] de J2 (Jugador 2) no sabe la respuesta y pierde 2 de Furor!',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba chosen.name a secas; la nueva rellena {objetivo} con DSL._nombre' },
         ],
     },
@@ -118,7 +118,7 @@ const escenarios = [
             { elegir: ['Droide antidisturbios'] }, // lo clica el rival (elegidoPor: RIVAL)
         ],
         logsIntencionados: [
-            { de: 'El rival decide sacrificar 1 Furor de Droide antidisturbios.', a: 'El rival decide sacrificar 1 Furor de Droide antidisturbios [1] (J2 (Jugador 2)).',
+            { de: 'El rival decide sacrificar 1 Furor de Droide antidisturbios.', a: 'El rival decide sacrificar 1 Furor de Droide antidisturbios [1] de J2 (Jugador 2).',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba chosen.name a secas; la nueva rellena {objetivo} con DSL._nombre' },
         ],
     },

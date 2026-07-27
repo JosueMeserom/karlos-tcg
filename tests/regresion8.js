@@ -77,7 +77,7 @@ const escenarios = [
         // (§11). Mismas dos diferencias intencionadas que documenta regresion13.
         logsIntencionados: [
             { de: '¡Mini-tigre y Robot de seguridad SP unen fuerzas! El ATQ de Oso con armadura sube a 4.',
-              a: '¡Mini-tigre [1] (J1 (Jugador 1)) y Robot de seguridad SP [1] (J1 (Jugador 1)) unen fuerzas! El ATQ de Oso con armadura [1] (J1 (Jugador 1)) sube a 4.',
+              a: '¡Mini-tigre [1] de J1 (Jugador 1) y Robot de seguridad SP [1] de J1 (Jugador 1) unen fuerzas! El ATQ de Oso con armadura [1] de J1 (Jugador 1) sube a 4.',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba chosen[n].name y attacker.name a secas; la nueva rellena {duo}/{objetivo} con DSL._nombre' },
         ],
         diferenciasEsperadas: [
@@ -111,7 +111,7 @@ const escenarios = [
         // DSL (ANTES_DE_JUGAR + AURA + objetivoSelfId); ciclo completo en r15.
         logsIntencionados: [
             { de: '¡Oso con armadura se ha endeudado con la mafia! Queda silenciado y sin cobrar Furor.',
-              a: '¡Oso con armadura [1] (J1 (Jugador 1)) se ha endeudado con la mafia! Queda silenciado y sin cobrar Furor.',
+              a: '¡Oso con armadura [1] de J1 (Jugador 1) se ha endeudado con la mafia! Queda silenciado y sin cobrar Furor.',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba target.name a secas; la nueva rellena {deudor} con DSL._nombre' },
         ],
     },

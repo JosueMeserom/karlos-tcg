@@ -52,8 +52,8 @@ const escenarios = [
             { seleccionar: 'Karlos' }, // cura 2 -> Vida 3->5: desactiva
         ],
         logsIntencionados: [
-            { de: '¡Habilidad pasiva de Karlos (J1 (Jugador 1)): MEGADRENALINA tiene lugar! (+2 de Atq por tener Vida <= 3)',
-              a: '¡Habilidad pasiva de Karlos (J1 (Jugador 1)): MEGADRENALINA tiene lugar! (+2 de Atq)',
+            { de: '¡Habilidad pasiva de Karlos de J1 (Jugador 1): MEGADRENALINA tiene lugar! (+2 de Atq por tener Vida <= 3)',
+              a: '¡Habilidad pasiva de Karlos de J1 (Jugador 1): MEGADRENALINA tiene lugar! (+2 de Atq)',
               motivo: 'PASIVA_CONTINUA (motor) anuncia con un mensaje genérico (nombre + delta) que no incluye la cláusula de motivo que Karlos redactaba a mano ("por tener Vida <= 3"); la desactivación es idéntica en ambas.' },
         ],
     },

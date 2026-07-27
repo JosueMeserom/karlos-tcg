@@ -702,6 +702,11 @@ function esDiffInerte(ruta, a, b) {
     // _sueloAvisado: bookkeeping del aviso de SUELO_STAT/TECHO_STAT (27-jul-2026) — evita
     // repetir el log/flotante en cada pasada mientras el límite siga corrigiendo algo.
     if (ruta.endsWith('._sueloAvisado') && typeof b === 'boolean') return true;
+    // _pasivaHabilidadReal: bookkeeping interno (27-jul-2026) que deja la PASIVA_CONTINUA
+    // compilada para que el _anota genérico de updatePassives (index.html) atribuya el
+    // Atq/Def reaplicado a la Habilidad real (Activa) en vez de siempre a template.passiveName.
+    // No existe en la vieja; nunca se lee fuera de ese _anota.
+    if (ruta.endsWith('._pasivaHabilidadReal') && a === undefined) return true;
     return false;
 }
 

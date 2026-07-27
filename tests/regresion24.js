@@ -41,8 +41,8 @@ const escenarios = [
             { seleccionar: 'Kyle' }, // cura 2 -> Vida 3->5: activa la pasiva
         ],
         logsIntencionados: [
-            { de: '¡Habilidad pasiva de Kyle (J1 (Jugador 1)): ENTEREZA DEL INGENUO activa! (+2 ATQ y +2 DEF)',
-              a: '¡Habilidad pasiva de Kyle (J1 (Jugador 1)): ENTEREZA DEL INGENUO tiene lugar! (+2 de Def, +2 de Atq)',
+            { de: '¡Habilidad pasiva de Kyle de J1 (Jugador 1): ENTEREZA DEL INGENUO activa! (+2 ATQ y +2 DEF)',
+              a: '¡Habilidad pasiva de Kyle de J1 (Jugador 1): ENTEREZA DEL INGENUO tiene lugar! (+2 de Def, +2 de Atq)',
               motivo: 'el anuncio pasa al genérico de PASIVA_CONTINUA (mismo formato que Karlos/Zoe), con los stats en orden Def -> Atq como en la cara de la carta' },
         ],
         flotantesSoloNueva: [
@@ -99,7 +99,7 @@ const escenarios = [
             { elegir: ['Sadame (retornada)'] },
         ],
         logsIntencionados: [
-            { de: 'Sadame (retornada) se pone la Chaqueta', a: 'Sadame (retornada) (J1 (Jugador 1)) se pone la Chaqueta',
+            { de: 'Sadame (retornada) se pone la Chaqueta', a: 'Sadame (retornada) de J1 (Jugador 1) se pone la Chaqueta',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba target.name a secas; la nueva rellena {objetivo} con DSL._nombre' },
         ],
         diferenciasEsperadas: [

@@ -4306,7 +4306,7 @@ const CARD_DB = [
     },
     {
         name: "Karlitos", hp: 3, def: 2, atk: 3, type: "Personaje", subtype: "Ser vivo", tags: ["Usuario de Súper Evolución"], gender: "M", rarity: "A", cost: 4, series: 1,
-        text: "[Stats Súper Evolución: ♥4 / 🛡7 / ⚔7]. P: PRÁCTICA CONSTANTE: Inicio de tu turno: +1 contador. A los 3, busca 'Super Evolución' en mazo o descarte. A: APRENDIZ DE ARMAS (1F): Equipa un Arma de tu mano ignorando requisitos, luego ataca normal.",
+        text: "P: PRÁCTICA CONSTANTE: Inicio de tu turno: +1 contador. A los 3, busca 'Super Evolución' en mazo o descarte. A: APRENDIZ DE ARMAS (1F): Equipa un Arma de tu mano ignorando requisitos, luego ataca normal.",
         passiveName: "PRÁCTICA CONSTANTE", activeName: "APRENDIZ DE ARMAS", activeCost: 1,
         superStats: { hp: 4, def: 7, atk: 7 }, 
         
@@ -4528,14 +4528,17 @@ const CARD_DB = [
             card.karolinaDefBoosts = 0; // Reiniciamos sus bufos al ser jugada
         },
         
-        // silencioso: la vieja no anunciaba esta reaplicación (el "+1 Def" real lo anuncia su
-        // Activa HOSTIA MÁGICA TERRIBLE, imperativa, al incrementar karolinaDefBoosts).
-        // TECHO_STAT (Def máxima 6, fija, no ligada a su base) SÍ se anuncia si de verdad
-        // corrige algo: ver el clamp final en updatePassives (index.html).
+        // El +Def se atribuye a su Activa HOSTIA MÁGICA TERRIBLE (Toto, 27-jul-2026): es ella
+        // quien de verdad concede el bono al incrementar karolinaDefBoosts; esta PASIVA_CONTINUA
+        // solo lo REAPLICA en cada pasada (mismo criterio que Xidachane/FRUSTRACIÓN). El techo
+        // de Def SÍ es de su Pasiva real (HUESO DURO), así que TECHO_STAT lleva su propio nombre.
+        // silencioso: la vieja no anunciaba la reaplicación (el "+1 Def" real lo anuncia la
+        // Activa, imperativa, al incrementar karolinaDefBoosts). El techo SÍ se anuncia si de
+        // verdad corrige algo: ver el clamp final en updatePassives (index.html).
         abilities: [
-            { trigger: "PASIVA_CONTINUA", nombre: "HUESO DURO", silencioso: true,
+            { trigger: "PASIVA_CONTINUA", nombre: "HOSTIA MÁGICA TERRIBLE", silencioso: true,
               then: [ { op: "MODIFICAR_STAT", stat: "def", delta: { REF: "self.karolinaDefBoosts" } },
-                      { op: "TECHO_STAT", stat: "def", valor: 6 } ] }
+                      { op: "TECHO_STAT", stat: "def", valor: 6, nombre: "HUESO DURO" } ] }
         ],
         
         onBeforeTakeDamage: async function(card, attacker, dmg, isSpecial, game) {
@@ -8421,10 +8424,15 @@ const DSL = {
         if (passives.length && !tmpl.sueloStats && !tmpl.techoStats) {
             const _suelos = [], _techos = [];
             let _nombreLimite = null;
+            // El propio SUELO_STAT/TECHO_STAT puede llevar un `nombre` propio (Toto,
+            // 27-jul-2026): hace falta cuando el resto de la ability (el REF que reaplica un
+            // contador) se atribuye a OTRA habilidad distinta de la que pone el límite —
+            // Karolina: el +Def lo da la Activa HOSTIA MÁGICA TERRIBLE, pero el techo de 6 SÍ
+            // es de su Pasiva HUESO DURO. Si no se especifica, cae al nombre de la ability.
             const _recoge = (efs, nombreAb) => (efs || []).forEach(e => {
                 if (e.if) { _recoge(e.then, nombreAb); _recoge(e.else, nombreAb); return; }
-                if (e.op === 'SUELO_STAT' && e.stat) { _suelos.push(e.stat); _nombreLimite = _nombreLimite || nombreAb; }
-                if (e.op === 'TECHO_STAT' && e.stat) { _techos.push({ stat: e.stat, valor: e.valor }); _nombreLimite = _nombreLimite || nombreAb; }
+                if (e.op === 'SUELO_STAT' && e.stat) { _suelos.push(e.stat); _nombreLimite = _nombreLimite || e.nombre || nombreAb; }
+                if (e.op === 'TECHO_STAT' && e.stat) { _techos.push({ stat: e.stat, valor: e.valor }); _nombreLimite = _nombreLimite || e.nombre || nombreAb; }
             });
             passives.forEach(ab => { _recoge(ab.then, ab.nombre); _recoge(ab.else, ab.nombre); });
             if (_suelos.length) tmpl.sueloStats = [...new Set(_suelos)];
@@ -8439,9 +8447,19 @@ const DSL = {
                 passives.forEach((ab, i) => {
                     const efs = DSL._cond(card, game, ab.if) ? ab.then : (ab.else || []);
                     const d = DSL._passiveDeltas(card, game, efs);
+                    // nombre real de la habilidad que produce ESTE Atq/Def (Toto, 27-jul-2026):
+                    // no siempre es la Pasiva de la carta (passiveName) — Xidachane/Karolina
+                    // reaplican aquí un bono que en realidad concedió su ACTIVA (FRUSTRACIÓN /
+                    // HOSTIA MÁGICA TERRIBLE) al incrementar un contador propio; la pasiva en sí
+                    // solo lleva la cuenta o pone un techo. Se calcula ANTES del guard de
+                    // `silencioso` (más abajo) y se deja en la carta para que el registro
+                    // genérico de Atq/Def (el _anota del bucle principal en updatePassives,
+                    // index.html) lo use en vez de asumir siempre template.passiveName.
+                    const _nombreReal = ab.nombre || tmpl.passiveName || 'PASIVA';
+                    card._pasivaHabilidadReal = _nombreReal;
                     card.currentAtk += d.atk;
                     card.currentDef += d.def;
-                    DSL._passiveExtras(card, game, efs, ab.nombre || tmpl.passiveName || null); // MARCAR (no son deltas)
+                    DSL._passiveExtras(card, game, efs, _nombreReal); // MARCAR (no son deltas)
 
                     // Vida Máx.: a diferencia de atk/def, maxHp NO se resetea cada pasada (persiste
                     // entre pasadas como cualquier stat normal), así que d.hp no es un delta a sumar
@@ -8471,10 +8489,9 @@ const DSL = {
                         // muestre siempre el bonus vigente, incluso en pasadas donde d.hp no cambió.
                         // Con d.hp=0 no hay nada que declarar (no hay línea "+0 VIDA MÁX.").
                         if (d.hp && typeof game.registrarStatMod === 'function') {
-                            const _nom = ab.nombre || tmpl.passiveName || 'PASIVA';
                             game.registrarStatMod(card, {
-                                stat: 'VIDA MÁX.', delta: d.hp, fuente: _nom, ref: 'esta carta',
-                                habilidad: ab.silencioso ? null : _nom, turnos: null,
+                                stat: 'VIDA MÁX.', delta: d.hp, fuente: _nombreReal, ref: 'esta carta',
+                                habilidad: ab.silencioso ? null : _nombreReal, turnos: null,
                                 srcId: card.instanceId, srcAltId: null, srcZone: null,
                             });
                         }
@@ -8490,7 +8507,7 @@ const DSL = {
                     const mag = Math.abs(d.atk) + Math.abs(d.def) + Math.abs(d.hp);
                     const key = '_dslPas' + i;
                     const prev = card[key] || 0;
-                    const nombre = ab.nombre || tmpl.passiveName || 'PASIVA';
+                    const nombre = _nombreReal;
                     if (mag !== prev && mag > 0) {
                         // Orden VIDA -> DEF -> ATQ, como en la cara de la carta y en "Afectado por:".
                         const partes = [];

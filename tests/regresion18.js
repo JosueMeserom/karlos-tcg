@@ -30,7 +30,7 @@ const escenarios = [
         ],
         logsIntencionados: [
             { de: 'anula la inercia de Robot de seguridad SP! Pierde',
-              a: 'anula la inercia de Robot de seguridad SP [1] (J1 (Jugador 1))! Pierde',
+              a: 'anula la inercia de Robot de seguridad SP [1] de J1 (Jugador 1)! Pierde',
               motivo: 'norma del proyecto (3ª persona con dueño): la vieja usaba attacker.name a secas; la nueva rellena {atacante} con DSL._nombre (nombre + copyId + dueño)' },
         ],
     },
@@ -55,7 +55,7 @@ const escenarios = [
         ],
         logsIntencionados: [
             { de: 'redirigido vilmente hacia Droide antidisturbios.',
-              a: 'redirigido vilmente hacia Droide antidisturbios [1] (J2 (Jugador 2)).',
+              a: 'redirigido vilmente hacia Droide antidisturbios [1] de J2 (Jugador 2).',
               motivo: 'norma del proyecto (3ª persona con dueño): la vieja usaba chosen.name a secas; la nueva rellena {objetivo} con DSL._nombre' },
         ],
     },
@@ -82,7 +82,7 @@ const escenarios = [
         logsIntencionados: [
             { de: '¡JUGADOR 2 opta por una Jugada arriesgada!', a: '¡J2 (Jugador 2) opta por una Jugada arriesgada!',
               motivo: 'norma del proyecto (3ª persona): la vieja hardcodeaba "JUGADOR 2"; la nueva rellena {reactor} con getDisplayName' },
-            { de: 'ataque de Robot de seguridad SP rebota', a: 'ataque de Robot de seguridad SP [1] (J1 (Jugador 1)) rebota',
+            { de: 'ataque de Robot de seguridad SP rebota', a: 'ataque de Robot de seguridad SP [1] de J1 (Jugador 1) rebota',
               motivo: 'norma del proyecto (3ª persona con dueño): la vieja usaba attacker.name a secas; la nueva rellena {atacante} con DSL._nombre' },
         ],
     },
@@ -118,7 +118,7 @@ const escenarios = [
               motivo: 'norma del proyecto (3ª persona): la vieja decía "te da" (2ª persona); la nueva lo pasa a 3ª persona con {reactor}' },
         ],
         logsSoloNueva: [
-            { linea: 'añade Atomización (J2 (Jugador 2)) a su mano.',
+            { linea: 'añade Atomización de J2 (Jugador 2) a su mano.',
               motivo: 'pedido por Toto: al coger cartas del mazo debe informarse siempre a ambos jugadores (sintaxis estándar "{jugador} añade {objetivo} a su mano."); la vieja las movía en silencio. Filtra las 2 líneas (una por Técnica cogida)' },
         ],
     },
@@ -145,7 +145,7 @@ const escenarios = [
         ],
         logsIntencionados: [
             { de: '¡JUGADOR 2 lanza un Frasco maldito a Droide antidisturbios!',
-              a: '¡J2 (Jugador 2) lanza un Frasco maldito a Droide antidisturbios [1] (J1 (Jugador 1))!',
+              a: '¡J2 (Jugador 2) lanza un Frasco maldito a Droide antidisturbios [1] de J1 (Jugador 1)!',
               motivo: 'norma del proyecto (3ª persona con dueño): la vieja hardcodeaba "JUGADOR 2" y attacker.name a secas; la nueva rellena {reactor}/{atacante} con getDisplayName/DSL._nombre' },
         ],
     },

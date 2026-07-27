@@ -32,7 +32,7 @@ const escenarios = [
             { elegir: ['Incluso En El KG'] },
         ],
         logsIntencionados: [
-            { de: 'a Incluso En El KG en la retaguardia', a: 'a Incluso En El KG (J1 (Jugador 1)) en la retaguardia',
+            { de: 'a Incluso En El KG en la retaguardia', a: 'a Incluso En El KG de J1 (Jugador 1) en la retaguardia',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba recovered.name a secas; la nueva rellena {objetivo} con DSL._nombre' },
         ],
     },
@@ -70,7 +70,7 @@ const escenarios = [
             { elegir: ['Robot de seguridad SP'] }, // vieja: modal visual · nueva: selección-en-tablero
         ],
         logsIntencionados: [
-            { de: '¡Robot de seguridad SP recibe Overclock!', a: '¡Robot de seguridad SP [1] (J1 (Jugador 1)) recibe Overclock!',
+            { de: '¡Robot de seguridad SP recibe Overclock!', a: '¡Robot de seguridad SP [1] de J1 (Jugador 1) recibe Overclock!',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba target.name a secas; la nueva rellena {objetivo} con DSL._nombre' },
         ],
     },
@@ -86,7 +86,7 @@ const escenarios = [
             { finTurno: true },   // vuelve a p1 (roba Mini-tigre): el Overclock se apaga
         ],
         logsIntencionados: [
-            { de: '¡Robot de seguridad SP recibe Overclock!', a: '¡Robot de seguridad SP [1] (J1 (Jugador 1)) recibe Overclock!',
+            { de: '¡Robot de seguridad SP recibe Overclock!', a: '¡Robot de seguridad SP [1] de J1 (Jugador 1) recibe Overclock!',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba target.name a secas; la nueva rellena {objetivo} con DSL._nombre' },
         ],
     },

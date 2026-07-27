@@ -28,7 +28,7 @@ const escenarios = [
         logsIntencionados: [
             { de: 'Barajando el mazo...', a: 'Barajando el mazo de J1 (Jugador 1)...',
               motivo: 'atribución de jugador pedida por Toto (21-jul-2026): los logs de zonas ocultas dicen de quién son; la vieja decía "Barajando el mazo..." a secas' },
-            { de: 'Contratas a Karlos desde tu mazo.', a: 'J1 (Jugador 1) contrata a Karlos (J1 (Jugador 1)) desde su mazo.',
+            { de: 'Contratas a Karlos desde tu mazo.', a: 'J1 (Jugador 1) contrata a Karlos de J1 (Jugador 1) desde su mazo.',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño/jugador): la vieja usaba nombres a secas o 2ª persona; la nueva usa DSL._nombre / {jugador}' },
         ],
     },
@@ -81,7 +81,7 @@ const escenarios = [
             { elegir: ['Robot de seguridad SP'] },
         ],
         logsIntencionados: [
-            { de: '¡El PEM fríe los circuitos de Robot de seguridad SP! Se saltará', a: '¡El PEM fríe los circuitos de Robot de seguridad SP [1] (J2 (Jugador 2))! Se saltará',
+            { de: '¡El PEM fríe los circuitos de Robot de seguridad SP! Se saltará', a: '¡El PEM fríe los circuitos de Robot de seguridad SP [1] de J2 (Jugador 2)! Se saltará',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba target.name a secas; la nueva rellena {objetivo} con DSL._nombre' },
         ],
         logsSoloVieja: [
@@ -101,7 +101,7 @@ const escenarios = [
             { elegir: ['Oso con armadura'] },
         ],
         logsIntencionados: [
-            { de: '¡Oso con armadura rebobina su tiempo', a: '¡Oso con armadura [1] (J1 (Jugador 1)) rebobina su tiempo',
+            { de: '¡Oso con armadura rebobina su tiempo', a: '¡Oso con armadura [1] de J1 (Jugador 1) rebobina su tiempo',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño/jugador): la vieja usaba nombres a secas o 2ª persona; la nueva usa DSL._nombre / {jugador}' },
         ],
     },

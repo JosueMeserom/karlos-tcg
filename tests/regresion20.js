@@ -34,7 +34,7 @@ const escenarios = [
         ],
         logsIntencionados: [
             { de: '¡Mini-tigre y Oso con armadura se ocultan para dividir el esfuerzo!',
-              a: '¡Mini-tigre [1] (J1 (Jugador 1)) y Oso con armadura [1] (J1 (Jugador 1)) se ocultan para dividir el esfuerzo!',
+              a: '¡Mini-tigre [1] de J1 (Jugador 1) y Oso con armadura [1] de J1 (Jugador 1) se ocultan para dividir el esfuerzo!',
               motivo: 'norma del proyecto (3ª persona con dueño): la vieja usaba t1.name/t2.name a secas; la nueva rellena {elegidos} con DSL._nombre (nombre + copyId + dueño)' },
         ],
         logsSoloVieja: [
@@ -56,7 +56,7 @@ const escenarios = [
         ],
         logsIntencionados: [
             { de: '¡Mini-tigre y Oso con armadura se ocultan para dividir el esfuerzo!',
-              a: '¡Mini-tigre [1] (J1 (Jugador 1)) y Oso con armadura [1] (J1 (Jugador 1)) se ocultan para dividir el esfuerzo!',
+              a: '¡Mini-tigre [1] de J1 (Jugador 1) y Oso con armadura [1] de J1 (Jugador 1) se ocultan para dividir el esfuerzo!',
               motivo: 'norma del proyecto (3ª persona con dueño), igual que el escenario anterior' },
         ],
         logsSoloVieja: [

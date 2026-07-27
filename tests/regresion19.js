@@ -48,7 +48,7 @@ const escenarios = [
         ],
         logsIntencionados: [
             { de: 'Añades Mini-tigre a la mano desde el mazo.',
-              a: 'J2 (Jugador 2) añade Mini-tigre (J2 (Jugador 2)) a su mano desde el mazo.',
+              a: 'J2 (Jugador 2) añade Mini-tigre de J2 (Jugador 2) a su mano desde el mazo.',
               motivo: 'norma del proyecto (3ª persona con jugador/dueño): la vieja usaba "Añades {name}" (2ª persona); la nueva rellena {jugador}/{objetivo} con getDisplayName/DSL._nombre' },
             { de: 'Barajando el mazo...', a: 'Barajando el mazo de J2 (Jugador 2)...',
               motivo: 'normalización estándar de barajarDespues (como el resto de cartas migradas): la vieja decía el genérico "Barajando el mazo..."; la nueva incluye el jugador con {jugador}' },

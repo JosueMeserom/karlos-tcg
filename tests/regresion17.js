@@ -36,7 +36,7 @@ const escenarios = [
             { elegir: ['Robot de seguridad SP'] }, // toca completar la elección igualmente
         ],
         logsIntencionados: [
-            { de: '¡El PEM fríe los circuitos de Robot de seguridad SP! Se saltará', a: '¡El PEM fríe los circuitos de Robot de seguridad SP [1] (J2 (Jugador 2))! Se saltará',
+            { de: '¡El PEM fríe los circuitos de Robot de seguridad SP! Se saltará', a: '¡El PEM fríe los circuitos de Robot de seguridad SP [1] de J2 (Jugador 2)! Se saltará',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba target.name a secas; la nueva rellena {objetivo} con DSL._nombre' },
         ],
         logsSoloVieja: [
@@ -60,7 +60,7 @@ const escenarios = [
             { elegir: ['Mini-tigre'] },
         ],
         logsIntencionados: [
-            { de: '¡Mini-tigre no sabe la respuesta y pierde 2 de Furor!', a: '¡Mini-tigre [1] (J2 (Jugador 2)) no sabe la respuesta y pierde 2 de Furor!',
+            { de: '¡Mini-tigre no sabe la respuesta y pierde 2 de Furor!', a: '¡Mini-tigre [1] de J2 (Jugador 2) no sabe la respuesta y pierde 2 de Furor!',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba chosen.name a secas; la nueva rellena {objetivo} con DSL._nombre' },
         ],
         logsSoloNueva: [
@@ -78,7 +78,7 @@ const escenarios = [
         ],
         logsIntencionados: [
             { de: '¡Ayudante perturbada se ha endeudado con la mafia! Queda silenciado y sin cobrar Furor.',
-              a: '¡Ayudante perturbada [1] (J1 (Jugador 1)) se ha endeudado con la mafia! Queda silenciada y sin cobrar Furor.',
+              a: '¡Ayudante perturbada [1] de J1 (Jugador 1) se ha endeudado con la mafia! Queda silenciada y sin cobrar Furor.',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño) + fix de género (Toto, 21-jul-2026): la vieja usaba target.name a secas y siempre en masculino; la nueva rellena {deudor} con DSL._nombre y {deudorG?...} con el género real de la carta elegida' },
         ],
     },

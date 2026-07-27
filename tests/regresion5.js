@@ -32,7 +32,7 @@ const escenarios = [
         logsIntencionados: [
             { de: 'Barajando el mazo...', a: 'Barajando el mazo de J1 (Jugador 1)...',
               motivo: 'atribución de jugador pedida por Toto (21-jul-2026): los logs de zonas ocultas dicen de quién son; la vieja decía "Barajando el mazo..." a secas' },
-            { de: 'Has comprado: Longaniza.', a: 'J1 (Jugador 1) ha comprado: Longaniza (J1 (Jugador 1)).',
+            { de: 'Has comprado: Longaniza.', a: 'J1 (Jugador 1) ha comprado: Longaniza de J1 (Jugador 1).',
               motivo: 'norma del proyecto (3ª persona con {jugador}): la vieja hablaba en 2ª persona' },
             { de: 'Has mirado toda la tienda y no quedaba nada de eso.', a: 'J1 (Jugador 1) ha mirado toda la tienda y no quedaba nada de eso.',
               motivo: 'norma del proyecto (3ª persona con {jugador}): la vieja hablaba en 2ª persona' },

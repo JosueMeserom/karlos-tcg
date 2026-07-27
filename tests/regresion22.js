@@ -40,7 +40,7 @@ const escenarios = [
             { elegir: ['Agah'] }, // selección-en-tablero en ambas bases (SELECT_AYUDA_TARGET)
         ],
         logsIntencionados: [
-            { de: '¡Agah empuña la mítica Espada V!', a: 'Agah (J1 (Jugador 1)) empuña la mítica Espada V.',
+            { de: '¡Agah empuña la mítica Espada V!', a: 'Agah de J1 (Jugador 1) empuña la mítica Espada V.',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño, sin exclamación): la vieja usaba target.name a secas con "¡...!"; la nueva rellena {objetivo} con DSL._nombre, sin exclamación (coherente con Shichishito)' },
         ],
     },
@@ -59,7 +59,7 @@ const escenarios = [
             { jugar: 'Espada V' },
         ],
         logsIntencionados: [
-            { de: '¡Karlos empuña la mítica Espada V!', a: 'Karlos (J1 (Jugador 1)) empuña la mítica Espada V.',
+            { de: '¡Karlos empuña la mítica Espada V!', a: 'Karlos de J1 (Jugador 1) empuña la mítica Espada V.',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño, sin exclamación): la vieja usaba target.name a secas con "¡...!"; la nueva rellena {objetivo} con DSL._nombre, sin exclamación' },
         ],
     },

@@ -11,7 +11,7 @@ const { correrSuite } = require('./harness');
 
 const MAPA_ENDEUDADO = {
     de: '¡Oso con armadura se ha endeudado con la mafia! Queda silenciado y sin cobrar Furor.',
-    a: '¡Oso con armadura [1] (J1 (Jugador 1)) se ha endeudado con la mafia! Queda silenciado y sin cobrar Furor.',
+    a: '¡Oso con armadura [1] de J1 (Jugador 1) se ha endeudado con la mafia! Queda silenciado y sin cobrar Furor.',
     motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba target.name a secas; la nueva rellena {deudor} con DSL._nombre',
 };
 
@@ -63,7 +63,7 @@ const escenarios = [
         logsIntencionados: [
             { de: 'Barajando el mazo...', a: 'Barajando el mazo de J1 (Jugador 1)...',
               motivo: 'atribución de jugador pedida por Toto (21-jul-2026): los logs de zonas ocultas dicen de quién son; la vieja decía "Barajando el mazo..." a secas' },
-            { de: 'J1 (Jugador 1) recibe a Guardaespaldas desde el submundo.', a: 'J1 (Jugador 1) recibe a Guardaespaldas (J1 (Jugador 1)) desde el submundo.',
+            { de: 'J1 (Jugador 1) recibe a Guardaespaldas desde el submundo.', a: 'J1 (Jugador 1) recibe a Guardaespaldas de J1 (Jugador 1) desde el submundo.',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba c.name a secas; la nueva rellena {objetivo} con DSL._nombre' },
         ],
     },
@@ -85,7 +85,7 @@ const escenarios = [
         logsIntencionados: [
             { de: 'Barajando el mazo...', a: 'Barajando el mazo de J2 (Jugador 2)...',
               motivo: 'atribución de jugador pedida por Toto (21-jul-2026): los logs de zonas ocultas dicen de quién son; la vieja decía "Barajando el mazo..." a secas' },
-            { de: 'J2 (Jugador 2) recibe a Guardaespaldas desde el submundo.', a: 'J2 (Jugador 2) recibe a Guardaespaldas (J2 (Jugador 2)) desde el submundo.',
+            { de: 'J2 (Jugador 2) recibe a Guardaespaldas desde el submundo.', a: 'J2 (Jugador 2) recibe a Guardaespaldas de J2 (Jugador 2) desde el submundo.',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba c.name a secas; la nueva rellena {objetivo} con DSL._nombre' },
         ],
     },

@@ -20,7 +20,7 @@ const escenarios = [
             { elegir: ['Gladiador'] }, // vieja: modal visual · nueva: selección-en-tablero
         ],
         logsIntencionados: [
-            { de: 'Gladiador se equipa con', a: 'Gladiador (J1 (Jugador 1)) se equipa con',
+            { de: 'Gladiador se equipa con', a: 'Gladiador de J1 (Jugador 1) se equipa con',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba target.name a secas; la nueva rellena {objetivo} con DSL._nombre' },
         ],
     },
@@ -39,7 +39,7 @@ const escenarios = [
             { jugar: 'Shichishito' },
         ],
         logsIntencionados: [
-            { de: 'Karlos empuña la legendaria', a: 'Karlos (J1 (Jugador 1)) empuña la legendaria',
+            { de: 'Karlos empuña la legendaria', a: 'Karlos de J1 (Jugador 1) empuña la legendaria',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba target.name a secas; la nueva rellena {objetivo} con DSL._nombre' },
         ],
     },
@@ -55,7 +55,7 @@ const escenarios = [
             { elegir: ['Mini-tigre'] },
         ],
         logsIntencionados: [
-            { de: 'Mini-tigre se pone la Chaqueta', a: 'Mini-tigre [1] (J1 (Jugador 1)) se pone la Chaqueta',
+            { de: 'Mini-tigre se pone la Chaqueta', a: 'Mini-tigre [1] de J1 (Jugador 1) se pone la Chaqueta',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba target.name a secas; la nueva rellena {objetivo} con DSL._nombre' },
         ],
     },

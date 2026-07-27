@@ -47,7 +47,7 @@ const escenarios = [
             { elegir: ['Experimento fallido'] },
         ],
         logsIntencionados: [
-            { de: 'Experimento fallido es reanimado y se añade a la mano.', a: 'Experimento fallido (J1 (Jugador 1)) es reanimado y se añade a la mano.',
+            { de: 'Experimento fallido es reanimado y se añade a la mano.', a: 'Experimento fallido de J1 (Jugador 1) es reanimado y se añade a la mano.',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba target.name a secas; la nueva rellena {objetivo} con DSL._nombre' },
         ],
     },
@@ -112,9 +112,9 @@ const escenarios = [
         logsIntencionados: [
             { de: 'Barajando el mazo...', a: 'Barajando el mazo de J1 (Jugador 1)...',
               motivo: 'atribución de jugador pedida por Toto (21-jul-2026): los logs de zonas ocultas dicen de quién son; la vieja decía "Barajando el mazo..." a secas' },
-            { de: '¡Llamada del deber inspira a Capitán Guardia Real!', a: '¡Llamada del deber inspira a Capitán Guardia Real [1] (J1 (Jugador 1))!',
+            { de: '¡Llamada del deber inspira a Capitán Guardia Real!', a: '¡Llamada del deber inspira a Capitán Guardia Real [1] de J1 (Jugador 1)!',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba c.name a secas; la nueva rellena {objetivo} con DSL._nombre (incluye el [n] de copia, ya asignado al salir de la mano)' },
-            { de: 'Reclutas a Águila desde tu cuartel.', a: 'J1 (Jugador 1) recluta a Águila (J1 (Jugador 1)) desde su cuartel.',
+            { de: 'Reclutas a Águila desde tu cuartel.', a: 'J1 (Jugador 1) recluta a Águila de J1 (Jugador 1) desde su cuartel.',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño/jugador): la vieja hablaba en 2ª persona con target.name a secas; la nueva usa {jugador} y DSL._nombre' },
         ],
     },

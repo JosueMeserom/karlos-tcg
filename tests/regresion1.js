@@ -58,7 +58,7 @@ const escenarios = [
             { elegir: ['Mini-tigre'] }, // vieja: modal de búsqueda visual · nueva: selección-en-tablero
         ],
         logsIntencionados: [
-            { de: 'usa 1 Furor de Mini-tigre y', a: 'usa 1 Furor de Mini-tigre [1] (J1 (Jugador 1)) y',
+            { de: 'usa 1 Furor de Mini-tigre y', a: 'usa 1 Furor de Mini-tigre [1] de J1 (Jugador 1) y',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja logueaba payer.name a secas; la nueva usa getCardNameWithOwner vía DSL._nombre' },
         ],
     },
@@ -75,7 +75,7 @@ const escenarios = [
             { seleccionar: 'Oso con armadura' },
         ],
         logsIntencionados: [
-            { de: 'usa 1 Furor de Oso con armadura y cura', a: 'usa 1 Furor de Oso con armadura [1] (J1 (Jugador 1)) y cura',
+            { de: 'usa 1 Furor de Oso con armadura y cura', a: 'usa 1 Furor de Oso con armadura [1] de J1 (Jugador 1) y cura',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja logueaba payer.name a secas; la nueva usa getCardNameWithOwner vía DSL._nombre' },
         ],
     },
@@ -88,7 +88,7 @@ const escenarios = [
             { seleccionar: 'Mini-tigre' },
         ],
         logsIntencionados: [
-            { de: 'a Mini-tigre y consume', a: 'a Mini-tigre [1] (J1 (Jugador 1)) y consume',
+            { de: 'a Mini-tigre y consume', a: 'a Mini-tigre [1] de J1 (Jugador 1) y consume',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja logueaba target.name a secas; la nueva usa getCardNameWithOwner vía DSL._nombre' },
         ],
     },
