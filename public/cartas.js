@@ -6670,6 +6670,11 @@ const CARD_DB = [
         name: "Gul guerrero", hp: 3, def: 2, atk: 5, type: "Esbirro", subtype: "No-muerto", tags: ["Monstruo", "Ninja"], rarity: "B", cost: 1, series: 2,
         text: "Coste: 2 de Furor. P: DEMONIO BELICOSO: Al atacar con éxito, el enemigo pierde 1 de Furor. A: SANGRE MALDITA (1F): Ataque normal. Aplica Daño por tiempo al enemigo (3 turnos).",
         passiveName: "DEMONIO BELICOSO", activeName: "SANGRE MALDITA", activeCost: 1,
+        // El tributo y DEMONIO BELICOSO (reacciona a CUALQUIER ataque de esta carta, no solo su
+        // Activa) se quedan imperativos (27-jul-2026, tanda de volumen): DSL.tributoFuror ya usa
+        // selección en tablero, y no hay trigger DSL para "tras un ataque de ESTA carta en
+        // concreto" (GLOBAL_TRAS_ATAQUE es de ámbito Evento/todos-los-aliados). SANGRE MALDITA
+        // sí migra: ataque normal + éxito -> Daño por tiempo, mismo patrón que PUÑALADA.
         onBeforePlayAsync: async function(card, game, p) {
             return await DSL.tributoFuror(card, game, p, 2, { msgSinPagador: `Necesitas un aliado con 2 Furor para el tributo.` });
         },
@@ -6688,35 +6693,16 @@ const CARD_DB = [
                 delete attacker._enemyHpBefore;
             }
         },
-        canActivateAbility: function(card, game) {
-            if (card.furor < 1) { game.logError("Falta Furor (1)."); return false; }
-            const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
-            if (game.players[enemyId].vanguard.length === 0) return false;
-            return true;
-        },
-        onExecuteAbility: function(card, game) {
-            game.selectedCard = card;
-            game.inputState = 'SELECT_ABILITY_TARGETS';
-            game.abilityContext = { targets: [], maxTargets: 1, name: 'SANGRE MALDITA', targetType: 'enemy', isNormalAttack: true };
-            game.render();
-        },
-        onValidateTarget: function(card, target, game, isSilent) {
-            if (target.owner === card.owner || target.location !== 'vanguard' || getCardTemplate(target.id).isAvatar) return false;
-            return true;
-        },
-        onTargetsReady: async function(card, game) {
-            const target = game.abilityContext.targets[0];
-            game.modifyStat(card, 'furor', -1);
-            showFloatingText(card.instanceId, card.activeName, "ft-ability", -30);
-            
-            const startHp = target.currentHp;
-            await game.performAttack(card, target);
-            
-            if (target.currentHp < startHp && target.currentHp > 0) {
-                game.logMsg(`La sangre maldita infecta a ${target.name}.`, 'ability');
-                game.applyStatus(target, 'dot', 3, card.name);
-            }
-        }
+        abilities: [
+            { trigger: "ACTIVA", nombre: "SANGRE MALDITA", coste: { furor: 1 },
+              requisitos: [ { count: { quien: "ENEMIGO", zona: "vanguardia" }, op: ">=", valor: 1 } ],
+              target: { quien: "ENEMIGO", cantidad: 1 },
+              ataqueNormal: true,
+              efectos: [
+                { op: "ATACAR",
+                  siExito: [ { op: "APLICAR_ESTADO", estado: "dot", duracion: 3, log: "La sangre maldita infecta a {objetivo}." } ] }
+              ] }
+        ]
     },
     {
         name: "Oni ancho", hp: 4, def: 4, atk: 6, type: "Esbirro", subtype: "Ser mágico", tags: ["Monstruo"], rarity: "B", cost: 1, series: 2,
@@ -6996,34 +6982,24 @@ const CARD_DB = [
         name: "Hiposaurio", hp: 6, def: 4, atk: 2, type: "Esbirro", subtype: "Ser vivo", tags: ["Bestia salvaje"], rarity: "B", cost: 1, series: 2,
         text: "P: ECOSISTEMA VIVIENTE: Al sufrir Daño por tiempo, pierde 3 de Vida en vez de 1. A: CABREO (3F): Realiza un ataque normal subiendo en 2 puntos su Atq durante dicho ataque.",
         passiveName: "ECOSISTEMA VIVIENTE", activeName: "CABREO", activeCost: 3,
+        // ECOSISTEMA VIVIENTE se queda imperativa (27-jul-2026, tanda de volumen): no hay
+        // trigger DSL para "modificar el tick de Daño por tiempo", y no compensa crear uno
+        // para una sola carta. CABREO sí migra: ataque normal + bono de Atq, mismo patrón
+        // ya usado por BOMBAZO (Contendiente).
         onDoTTick: function(card, game) {
             // El motor base quita 1 HP. Quitamos 2 más para llegar a 3.
             game.logMsg(`¡${card.passiveName}! El veneno afecta drásticamente al Hiposaurio.`, 'ability');
             showFloatingText(card.instanceId, "-2 VIDA EXTRA", "ft-purple", -30);
             game.modifyStat(card, 'currentHp', -2);
         },
-        canActivateAbility: function(card, game) {
-            if (card.furor < 3) { game.logError("Falta Furor (3)."); return false; }
-            const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
-            if (game.players[enemyId].vanguard.length === 0) return false;
-            return true;
-        },
-        onExecuteAbility: function(card, game) {
-            game.selectedCard = card;
-            game.inputState = 'SELECT_ABILITY_TARGETS';
-            game.abilityContext = { targets: [], maxTargets: 1, name: 'CABREO', targetType: 'enemy', isNormalAttack: true };
-            game.render();
-        },
-        onTargetsReady: async function(card, game) {
-            const target = game.abilityContext.targets[0];
-            game.modifyStat(card, 'furor', -3);
-            showFloatingText(card.instanceId, "CABREO", "ft-ability", -30);
-            showFloatingText(card.instanceId, "+2 ATQ", "ft-green", -10);
-            
-            card.currentAtk += 2;
-            await game.performAttack(card, target);
-            card.currentAtk -= 2;
-        }
+        abilities: [
+            { trigger: "ACTIVA", nombre: "CABREO", coste: { furor: 3 },
+              requisitos: [ { count: { quien: "ENEMIGO", zona: "vanguardia" }, op: ">=", valor: 1 } ],
+              target: { quien: "ENEMIGO", cantidad: 1 },
+              ataqueNormal: true,
+              floatingExtra: [ { texto: "+2 ATQ", estilo: "ft-green", offset: -10 } ],
+              efectos: [ { op: "ATACAR", bonoAtq: 2 } ] }
+        ]
     },
     {
         name: "Lolita", hp: 2, def: 2, atk: 2, type: "Esbirro", subtype: "Ser vivo", tags: ["Otaku"], rarity: "A", cost: 1, series: 2,
@@ -7207,38 +7183,22 @@ const CARD_DB = [
         name: "Hechicero", hp: 3, def: 3, atk: 4, type: "Esbirro", subtype: "Ser vivo", tags: ["Usuario de magia"], rarity: "B", cost: 1, series: 2,
         text: "A: CHIRIBITA (1F): Realiza un ataque especial, aumentando en 1 el Atq de esta carta durante dicho ataque.",
         activeName: "CHIRIBITA", activeCost: 1,
-        canActivateAbility: function(card, game) {
-            if (card.furor < 1) { game.logError("Falta Furor (1)."); return false; }
-            const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
-            if (game.players[enemyId].vanguard.length === 0) return false;
-            return true;
-        },
-        onExecuteAbility: function(card, game) {
-            game.selectedCard = card;
-            game.inputState = 'SELECT_ABILITY_TARGETS';
-            game.abilityContext = { targets: [], maxTargets: 1, name: 'CHIRIBITA', targetType: 'enemy' };
-            game.render();
-        },
-        onTargetsReady: async function(card, game) {
-            const target = game.abilityContext.targets[0];
-            game.modifyStat(card, 'furor', -1);
-            showFloatingText(card.instanceId, "CHIRIBITA", "ft-ability", -30);
-            showFloatingText(card.instanceId, "+1 ATQ", "ft-green", -10);
-            
-            card.currentAtk += 1;
-            let dmg = card.currentAtk - target.currentDef;
-            if (dmg <= 0) dmg = (card.type === 'Esbirro' && target.type === 'Personaje') ? 0.5 : 1;
-            
-            await game.dealDamage(card, target, dmg, true); 
-            await game.checkDeath(target);
-            card.currentAtk -= 1;
-            
-            card.exhausted = true;
-            game.isActionLocked = false;
-            game.cancelAction();
-            game.updatePassives();
-            game.render();
-        }
+        // Migrada por completo (27-jul-2026, tanda de volumen). Estrena `especial: true` en el
+        // op ATACAR: la fórmula de daño de un ataque especial (Atq-Def, suelo 0.5/1 para
+        // Esbirro-vs-Personaje) estaba duplicada a mano en más de una docena de sitios del
+        // archivo; ahora es un op reutilizable. CORRECCIÓN encontrada en la migración: la vieja
+        // NO comprobaba `onBeforeDefend` (esquiva) antes de golpear —a diferencia de Karolina o
+        // Raiju, que sí lo hacen en su propio ataque especial—, así que un objetivo con una
+        // habilidad de esquiva no podía usarla contra CHIRIBITA. El op genérico SÍ la comprueba,
+        // igual que el resto de ataques especiales; solo importa si el rival tiene una de las 4
+        // cartas del juego con `onBeforeDefend`, caso raro no cubierto por la vieja.
+        abilities: [
+            { trigger: "ACTIVA", nombre: "CHIRIBITA", coste: { furor: 1 },
+              requisitos: [ { count: { quien: "ENEMIGO", zona: "vanguardia" }, op: ">=", valor: 1 } ],
+              target: { quien: "ENEMIGO", cantidad: 1 },
+              floatingExtra: [ { texto: "+1 ATQ", estilo: "ft-green", offset: -10 } ],
+              efectos: [ { op: "ATACAR", especial: true, bonoAtq: 1 } ] }
+        ]
     },
     {
         name: "Megalimo", hp: 6, def: 3, atk: 2, type: "Esbirro", subtype: "Ser vivo", tags: ["Creación artificial"], rarity: "S", cost: 1, series: 2,
@@ -7411,20 +7371,21 @@ const CARD_DB = [
         name: "Ángel", hp: 4, def: 4, atk: 4, type: "Esbirro", subtype: "Ser mágico", tags: ["Monstruo"], rarity: "A", cost: 1, series: 2,
         text: "Coste: 2 de Furor. P: PRODIGIO: Al colocarla, cura 1 de Vida a tu vanguardia. A: SANCIÓN (2F): Ataque especial a dos enemigos de la vanguardia rival.",
         passiveName: "PRODIGIO", activeName: "SANCIÓN", activeCost: 2,
+        // El tributo y SANCIÓN (ataque especial a DOS objetivos, con canStopEarly) se quedan
+        // imperativos (27-jul-2026, tanda de volumen): el multi-objetivo con parada anticipada
+        // es más arquitectura de la que compensa para esta tanda. PRODIGIO sí migra: curar 1 a
+        // toda la vanguardia dañada, mismo patrón ya usado por Escape con bomba de humo
+        // (CURAR soloSiHerido en grupo) — ahora también en AL_JUGAR gracias a logSiAplicado.
         onBeforePlayAsync: async function(card, game, p) {
             return await DSL.tributoFuror(card, game, p, 2, { msgSinPagador: "Necesitas un aliado con 2 Furor para el tributo.", titulo: `TRIBUTO PARA ÁNGEL (-2 FUROR)` });
         },
-        onAfterPlayAsync: async function(card, game, p) {
-            let healed = false;
-            p.vanguard.forEach(c => {
-                if (c.currentHp < c.maxHp) {
-                    game.modifyStat(c, 'currentHp', 1, -20, 'healing');
-                    showFloatingText(c.instanceId, "+1 VIDA", "ft-green", -40);
-                    healed = true;
-                }
-            });
-            if (healed) game.logMsg(`¡La luz del Ángel sana a la vanguardia!`, 'healing');
-        },
+        abilities: [
+            { trigger: "AL_JUGAR",
+              efectos: [ { op: "CURAR", valor: 1, conBeforeHealed: false, soloSiHerido: true,
+                           floating: "+1 VIDA", floatingStyle: "ft-green", offsetY: -20, fuente: "healing",
+                           target: { quien: "ALIADO", zona: "VANGUARDIA" } } ],
+              logSiAplicado: { msg: "¡La luz del Ángel sana a la vanguardia!", tipo: "healing" } }
+        ],
         canActivateAbility: function(card, game) {
             if (card.furor < 2) { game.logError("Falta Furor (2)."); return false; }
             const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
@@ -7861,7 +7822,28 @@ const DSL = {
             const startHp = target.currentHp;
             const bono = DSL._value(ownerId, game, e.bonoAtq, sourceCard, ctx) || 0;
             if (bono) sourceCard.currentAtk += bono;
-            await game.performAttack(sourceCard, target);
+            if (e.especial) {
+                // Ataque especial (Toto, 27-jul-2026): NO pasa por performAttack (ese es el
+                // pipeline de ataque NORMAL — reacciones de moneda, etc.). Reproduce fielmente
+                // lo que hacían a mano Hechicero/Karolina/Raiju/Ángel: comprueba la esquiva de
+                // onBeforeDefend, calcula el daño (Atq-Def, con el suelo 0.5/1 de siempre para
+                // Esbirro-vs-Personaje) y llama a dealDamage(..., true) directamente. dealDamage
+                // YA trae su propio pipeline (onBeforeTakeDamage, guardaespaldas, reacciones de
+                // mano); lo único que hacían las cartas a mano ADEMÁS de eso era la esquiva.
+                const defTpl = DSL._tmpl(target.id);
+                let dodged = false;
+                if (defTpl && typeof defTpl.onBeforeDefend === 'function') {
+                    dodged = await defTpl.onBeforeDefend(target, sourceCard, game, habilidad || sourceCard.name);
+                }
+                if (!dodged) {
+                    let dmg = sourceCard.currentAtk - target.currentDef;
+                    if (dmg <= 0) dmg = (sourceCard.type === 'Esbirro' && target.type === 'Personaje') ? 0.5 : 1;
+                    await game.dealDamage(sourceCard, target, dmg, true);
+                    await game.checkDeath(target);
+                }
+            } else {
+                await game.performAttack(sourceCard, target);
+            }
             if (bono) { if (typeof game.updatePassives === 'function') game.updatePassives(); else sourceCard.currentAtk -= bono; }
             const exito = target.currentHp < startHp && target.currentHp > 0; // dañó y sigue vivo
             if (exito && Array.isArray(e.siExito)) await DSL._runEffectList(e.siExito, sourceCard, game, ownerId, [target], habilidad);
@@ -8597,7 +8579,11 @@ const DSL = {
                 // ELEGIR de ANTES_DE_JUGAR, como el deudor de Deuda con la mafia).
                 const varsJ = (DSL._vars && DSL._vars[card.instanceId]) || {};
                 if (alJugar.log) game.logMsg(DSL._fill(alJugar.log, Object.assign({}, varsJ, { carta: card.name, jugador: (typeof game.getDisplayName === 'function' ? game.getDisplayName(card.owner) : card.owner) })), alJugar.logTipo || 'ability');
-                await DSL._runEffectList(alJugar.efectos || [], card, game, card.owner, null);
+                const res = await DSL._runEffectList(alJugar.efectos || [], card, game, card.owner, null);
+                // logSiAplicado (Ángel/Serafín, 27-jul-2026): mismo campo que ya tenía AL_CADUCAR,
+                // ahora también en AL_JUGAR — anuncia solo si algún efecto (p. ej. un CURAR
+                // soloSiHerido en grupo) de verdad hizo algo, como el `if (healed)` a mano.
+                if (res && res.anyApplied && alJugar.logSiAplicado) game.logMsg(DSL._fill(alJugar.logSiAplicado.msg, { carta: card.name }), alJugar.logSiAplicado.tipo || 'ability');
                 // Refresco inmediato (Kazuo/Gladiador lo hacían a mano tras anexar, para que
                 // el Atq/Def/Vida suba sin esperar a la siguiente pasada natural).
                 if (typeof game.updatePassives === 'function') game.updatePassives();
