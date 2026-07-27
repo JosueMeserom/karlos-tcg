@@ -4840,6 +4840,16 @@
                     await getCardTemplate(myEvent.id).onEndTurn(myEvent, this, this.activePlayerId);
                 }
 
+                // Betasteo de Toto (27-jul-2026): un tempEffect eliminado arriba (p. ej. Poción
+                // revitalizante al agotar su cuenta) dejaba el Atq/Def "congelado" con el bono
+                // hasta la PRÓXIMA vez que algo llamara a updatePassives() por su cuenta — que
+                // resultaba ser el inicio del turno del RIVAL (processStartPhaseEffects), no el
+                // final del turno de quien lo tenía, que es cuando de verdad se quita. Mismo
+                // fallo para cualquier onEndTurnTempEffect que retire un bono continuo (además
+                // de Poción, el efecto "Liderazgo"), así que se arregla aquí, en el único punto
+                // por el que pasan todos: justo tras procesar los tempEffects de esta fase.
+                this.updatePassives();
+
                 this.activePlayerId = this.activePlayerId === 'p1' ? 'p2' : 'p1';
                 if (this.activePlayerId === this.startingPlayerId) this.turn++;
 
