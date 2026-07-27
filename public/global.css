@@ -620,6 +620,12 @@ button.game-btn:disabled { background: #64748b; cursor: not-allowed; opacity: 0.
 .ability-box strong { color: #fbbf24; display: inline-block; margin-bottom: 2px; }
 
 .preview-stats { display: flex; justify-content: space-around; background: rgba(0, 0, 0, 0.5); border: 1px solid #475569; padding: 8px 5px; border-radius: 6px; margin-top: auto; }
+/* Caja de stats alternativos de los 'Usuarios de Súper Evolución'. Mismo formato que la
+   caja normal pero apilada (título arriba) y con un violeta tenue que encaja con la
+   paleta del detalle sin competir con la caja principal. */
+.preview-stats-super { flex-direction: column; align-items: stretch; gap: 5px; background: rgba(139, 92, 246, 0.14); border-color: #7c3aed; margin-top: 6px; }
+.preview-stats-super .super-title { font-size: 0.62rem; letter-spacing: 1px; color: #c4b5fd; font-weight: bold; text-align: center; text-transform: uppercase; }
+.preview-stats-super .super-row { display: flex; justify-content: space-around; }
 .stat-buff { color: #4ade80; font-weight: 900; text-shadow: 0 0 3px black; }
 .stat-nerf { color: #facc15; font-weight: 900; text-shadow: 0 0 3px black; }
 .hp-low { color: #ef4444; font-weight: 900; text-shadow: 0 0 3px white; font-size: 0.9rem; }

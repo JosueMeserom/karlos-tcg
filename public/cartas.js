@@ -1202,7 +1202,7 @@ const CARD_DB = [
                 return false;
             }
 
-            const chosen = await game.openVisualSearchModal('TRIBUTO PARA GARRET (-4 FUROR)', validTributes, 1, true, card.owner);
+            const chosen = await game.pickBoardTargets(validTributes, 1, 'TRIBUTO PARA GARRET (-4 FUROR)', card, card.owner, true);
             if (chosen && chosen.length > 0) {
                 card.tributeSourceId = chosen[0].instanceId;
                 return true;
@@ -1424,7 +1424,7 @@ const CARD_DB = [
                 return false;
             }
             
-            const chosen = await game.openVisualSearchModal('TRIBUTO PARA EL GÓLEM (-1 FUROR)', validTributes, 1, true, card.owner);
+            const chosen = await game.pickBoardTargets(validTributes, 1, 'TRIBUTO PARA EL GÓLEM (-1 FUROR)', card, card.owner, true);
             if (chosen && chosen.length > 0) {
                 card.tributeSourceId = chosen[0].instanceId;
                 card.tributeCost = 1; 
@@ -3896,15 +3896,9 @@ const CARD_DB = [
         passiveName: "BELLEZA INCOMPARABLE", activeName: "TORMENTA PERFECTA", activeCost: 4,
         
         onBeforePlayAsync: async function(card, game, p) {
-            const valid = [...p.vanguard, ...p.rearguard].filter(c => c.furor >= 4 && !getCardTemplate(c.id).isAvatar);
-            if (valid.length === 0) { game.logError("Necesitas un aliado con 4 de Furor para invocar a Edrielle."); return false; }
-            
-            const chosen = await game.openVisualSearchModal('TRIBUTO PARA EDRIELLE (-4 FUROR)', valid, 1, true, card.owner);
-            if (chosen && chosen.length > 0) {
-                game.modifyStat(chosen[0], 'furor', -4);
-                return true;
-            }
-            return false;
+            return await DSL.tributoFuror(card, game, p, 4, {
+                msgSinPagador: "Necesitas un aliado con 4 de Furor para invocar a Edrielle.",
+                titulo: 'TRIBUTO PARA EDRIELLE (-4 FUROR)' });
         },
         
         onStartTurn: async function(card, game) {
@@ -4834,7 +4828,7 @@ const CARD_DB = [
             // Loop para exprimir furor carta a carta hasta llegar a 6
             while (remaining > 0) {
                 const valid = [...p.vanguard, ...p.rearguard].filter(c => c.furor > 0 && !getCardTemplate(c.id).isAvatar);
-                const chosen = await game.openVisualSearchModal(`TRIBUTO PARA LA BESTIA (Faltan ${remaining})`, valid, 1, true, card.owner);
+                const chosen = await game.pickBoardTargets(valid, 1, `TRIBUTO PARA LA BESTIA (Faltan ${remaining})`, card, card.owner, true);
                 if (!chosen || chosen.length === 0) return false; // Canceló el tributo
                 
                 game.modifyStat(chosen[0], 'furor', -1);
@@ -4898,11 +4892,13 @@ const CARD_DB = [
         text: "P: PIRATA GALÁCTICO: Sus stats base son (3/3/4). Cada vez que destruye a un enemigo, gana un contador. A los 3 contadores, vuelve a tu mano. A: FRUSTRACIÓN (1F): Ataque normal. Si no tuviera éxito (no hace daño), aumenta todas sus stats y Vida en +2 permanentemente.",
         passiveName: "PIRATA GALÁCTICO", activeName: "FRUSTRACIÓN", activeCost: 1,
         superStats: { hp: 6, def: 5, atk: 7 },
-        // silencioso: la vieja no anunciaba esta reaplicación (el aviso real -"+2 A TODO"- lo
-        // emite onTargetsReady, imperativo, en el momento en que xidachaneBoosts se incrementa;
-        // esta pasiva solo REAPLICA el bonus ya anunciado en cada pasada).
+        // Atribuida a FRUSTRACIÓN, no a PIRATA GALÁCTICO (Toto, 27-jul-2026): el +2 a Atq/Def
+        // por contador lo concede la ACTIVA (que sube xidachaneBoosts cuando su ataque no tiene
+        // éxito); la pasiva PIRATA GALÁCTICO solo lleva la cuenta de bajas y la vuelta a la mano.
+        // Esta PASIVA_CONTINUA únicamente REAPLICA en cada pasada el bonus que dio la Activa.
+        // silencioso: el aviso real ("+2 A TODO") lo emite onTargetsReady en el momento de subirlo.
         abilities: [
-            { trigger: "PASIVA_CONTINUA", nombre: "PIRATA GALÁCTICO", silencioso: true,
+            { trigger: "PASIVA_CONTINUA", nombre: "FRUSTRACIÓN", silencioso: true,
               then: [
                 { op: "MODIFICAR_STAT", stat: "def", delta: { REF: "self.xidachaneBoosts", factor: 2 } },
                 { op: "MODIFICAR_STAT", stat: "atk", delta: { REF: "self.xidachaneBoosts", factor: 2 } } ] }
@@ -6702,17 +6698,7 @@ const CARD_DB = [
         text: "Coste: 2 de Furor. P: DEMONIO VIL: Cada vez que sea atacado, el atacante pierde 1 de Furor.",
         passiveName: "DEMONIO VIL",
         onBeforePlayAsync: async function(card, game, p) {
-            const valid = [...p.vanguard, ...p.rearguard].filter(c => c.furor >= 2 && !getCardTemplate(c.id).isAvatar);
-            if (valid.length === 0) {
-                game.logError(`Necesitas un aliado con al menos 2 de Furor para invocar al ${card.name}.`);
-                return false;
-            }
-            const chosen = await game.openVisualSearchModal(`${card.name}: ELIGE TRIBUTO (-2 FUROR)`, valid, 1, true, card.owner);
-            if (chosen && chosen.length > 0) {
-                game.modifyStat(chosen[0], 'furor', -2);
-                return true;
-            }
-            return false;
+            return await DSL.tributoFuror(card, game, p, 2, { msgSinPagador: `Necesitas un aliado con al menos 2 de Furor para invocar al ${card.name}.`, titulo: `${card.name}: ELIGE TRIBUTO (-2 FUROR)` });
         },
         onBeforeDefend: async function(defender, attacker, game, abilityName) {
             if (attacker.furor > 0) {
@@ -6728,11 +6714,7 @@ const CARD_DB = [
         text: "Coste: 2 de Furor. P: DEMONIO BELICOSO: Al atacar con éxito, el enemigo pierde 1 de Furor. A: SANGRE MALDITA (1F): Ataque normal. Aplica Daño por tiempo al enemigo (3 turnos).",
         passiveName: "DEMONIO BELICOSO", activeName: "SANGRE MALDITA", activeCost: 1,
         onBeforePlayAsync: async function(card, game, p) {
-            const valid = [...p.vanguard, ...p.rearguard].filter(c => c.furor >= 2 && !getCardTemplate(c.id).isAvatar);
-            if (valid.length === 0) { game.logError(`Necesitas un aliado con 2 Furor para el tributo.`); return false; }
-            const chosen = await game.openVisualSearchModal(`${card.name}: ELIGE TRIBUTO (-2 FUROR)`, valid, 1, true, card.owner);
-            if (chosen && chosen.length > 0) { game.modifyStat(chosen[0], 'furor', -2); return true; }
-            return false;
+            return await DSL.tributoFuror(card, game, p, 2, { msgSinPagador: `Necesitas un aliado con 2 Furor para el tributo.` });
         },
         onBeforeAttack: async function(attacker, defender, game) {
             attacker._enemyHpBefore = defender.currentHp;
@@ -6784,11 +6766,7 @@ const CARD_DB = [
         text: "Coste: 2 de Furor. P: YŌKAI VIOLENTO: Al realizar un ataque normal, echa una moneda. Cara: +1 Atq. Cruz: -1 Atq durante ese ataque.",
         passiveName: "YŌKAI VIOLENTO",
         onBeforePlayAsync: async function(card, game, p) {
-            const valid = [...p.vanguard, ...p.rearguard].filter(c => c.furor >= 2 && !getCardTemplate(c.id).isAvatar);
-            if (valid.length === 0) return false;
-            const chosen = await game.openVisualSearchModal(`${card.name}: ELIGE TRIBUTO (-2 FUROR)`, valid, 1, true, card.owner);
-            if (chosen && chosen.length > 0) { game.modifyStat(chosen[0], 'furor', -2); return true; }
-            return false;
+            return await DSL.tributoFuror(card, game, p, 2, { titulo: `${card.name}: ELIGE TRIBUTO (-2 FUROR)` });
         },
         onBeforeAttack: async function(attacker, defender, game) {
             const isNormal = !game.abilityContext || game.abilityContext.isNormalAttack;
@@ -6820,14 +6798,12 @@ const CARD_DB = [
     },
     {
         name: "Tengu orgulloso", hp: 5, def: 2, atk: 5, type: "Esbirro", subtype: "Ser mágico", tags: ["Monstruo"], rarity: "B", cost: 1, series: 2,
-        text: "Coste: 2 de Furor. P: YŌKAI SOBERBIO. A: DOMINANCIA ILUSORIA (1F): Echa 2 monedas. Por cada cara, realiza 2 ataques normales a un enemigo (pudiendo elegir objetivos distintos para cada ráfaga).",
-        passiveName: "YŌKAI SOBERBIO", activeName: "DOMINANCIA ILUSORIA", activeCost: 1,
+        // Sin passiveName ni "P: ..." (Toto, 27-jul-2026): mismo caso que Raiju/Súcubo —
+        // YŌKAI SOBERBIO era solo el tributo de colocación, ya visible en la caja COSTE.
+        text: "Coste: 2 de Furor. A: DOMINANCIA ILUSORIA (1F): Echa 2 monedas. Por cada cara, realiza 2 ataques normales a un enemigo (pudiendo elegir objetivos distintos para cada ráfaga).",
+        activeName: "DOMINANCIA ILUSORIA", activeCost: 1,
         onBeforePlayAsync: async function(card, game, p) {
-            const valid = [...p.vanguard, ...p.rearguard].filter(c => c.furor >= 2 && !getCardTemplate(c.id).isAvatar);
-            if (valid.length === 0) return false;
-            const chosen = await game.openVisualSearchModal(`${card.name}: ELIGE TRIBUTO (-2 FUROR)`, valid, 1, true, card.owner);
-            if (chosen && chosen.length > 0) { game.modifyStat(chosen[0], 'furor', -2); return true; }
-            return false;
+            return await DSL.tributoFuror(card, game, p, 2, { titulo: `${card.name}: ELIGE TRIBUTO (-2 FUROR)` });
         },
         canActivateAbility: function(card, game) {
             if (card.furor < (card.activeCost || 1)) { game.logError(`Falta Furor.`); return false; }
@@ -6915,11 +6891,7 @@ const CARD_DB = [
         text: "Coste: 2 de Furor. A: SEDUCCIÓN (1F): Permanece Oculta permanentemente mientras siga en el campo.",
         activeName: "SEDUCCIÓN", activeCost: 1,
         onBeforePlayAsync: async function(card, game, p) {
-            const valid = [...p.vanguard, ...p.rearguard].filter(c => c.furor >= 2 && !getCardTemplate(c.id).isAvatar);
-            if (valid.length === 0) return false;
-            const chosen = await game.openVisualSearchModal(`${card.name}: ELIGE TRIBUTO (-2 FUROR)`, valid, 1, true, card.owner);
-            if (chosen && chosen.length > 0) { game.modifyStat(chosen[0], 'furor', -2); return true; }
-            return false;
+            return await DSL.tributoFuror(card, game, p, 2, { titulo: `${card.name}: ELIGE TRIBUTO (-2 FUROR)` });
         },
         canActivateAbility: function(card, game) {
             if (card.furor < 1) { game.logError("Falta Furor (1)."); return false; }
@@ -6968,14 +6940,13 @@ const CARD_DB = [
     },
     {
         name: "Raiju", hp: 2, def: 4, atk: 5, type: "Esbirro", subtype: "Ser mágico", tags: ["Invocación", "Monstruo"], rarity: "B", cost: 1, series: 2,
-        text: "Coste: 1 de Furor. P: ENTIDAD ELÉCTRICA. A: FOSFORESCENCIA (1F): Realiza 2 ataques especiales a enemigos distintos y les ciega (2 turnos).",
-        passiveName: "ENTIDAD ELÉCTRICA", activeName: "FOSFORESCENCIA", activeCost: 1,
+        // Sin passiveName ni "P: ..." (Toto, 27-jul-2026): ENTIDAD ELÉCTRICA no tenía
+        // descripción — era solo el tributo de colocación, que ya sale en la caja COSTE del
+        // detalle. El parser la listaba como "Pasiva:" con la descripción partida.
+        text: "Coste: 1 de Furor. A: FOSFORESCENCIA (1F): Realiza 2 ataques especiales a enemigos distintos y les ciega (2 turnos).",
+        activeName: "FOSFORESCENCIA", activeCost: 1,
         onBeforePlayAsync: async function(card, game, p) {
-            const valid = [...p.vanguard, ...p.rearguard].filter(c => c.furor >= 1 && !getCardTemplate(c.id).isAvatar);
-            if (valid.length === 0) return false;
-            const chosen = await game.openVisualSearchModal(`${card.name}: ELIGE TRIBUTO (-1 FUROR)`, valid, 1, true, card.owner);
-            if (chosen && chosen.length > 0) { game.modifyStat(chosen[0], 'furor', -1); return true; }
-            return false;
+            return await DSL.tributoFuror(card, game, p, 1, { titulo: `${card.name}: ELIGE TRIBUTO (-1 FUROR)` });
         },
         canActivateAbility: function(card, game) {
             if (card.furor < 1) { game.logError("Falta Furor (1)."); return false; }
@@ -7061,11 +7032,7 @@ const CARD_DB = [
         text: "Coste: 1 de Furor. P: ABOMINACIÓN AFABLE: Su coste se tributa al colocarla en el campo.",
         passiveName: "ABOMINACIÓN AFABLE",
         onBeforePlayAsync: async function(card, game, p) {
-            const valid = [...p.vanguard, ...p.rearguard].filter(c => c.furor >= 1 && !getCardTemplate(c.id).isAvatar);
-            if (valid.length === 0) { game.logError("Necesitas un aliado con al menos 1 de Furor para el tributo."); return false; }
-            const chosen = await game.openVisualSearchModal(`${card.name}: ELIGE TRIBUTO (-1 FUROR)`, valid, 1, true, card.owner);
-            if (chosen && chosen.length > 0) { game.modifyStat(chosen[0], 'furor', -1); return true; }
-            return false;
+            return await DSL.tributoFuror(card, game, p, 1, { msgSinPagador: "Necesitas un aliado con al menos 1 de Furor para el tributo.", titulo: `${card.name}: ELIGE TRIBUTO (-1 FUROR)` });
         }
     },
     {
@@ -7462,7 +7429,7 @@ const CARD_DB = [
                 const validAllies = [...p.vanguard, ...p.rearguard].filter(c => c.furor >= 2 && c.instanceId !== card.instanceId && !getCardTemplate(c.id).isAvatar);
                 
                 if (validAllies.length > 0) {
-                    const chosen = await game.openVisualSearchModal(`GÁRGOLA: ELIGE TRIBUTO O SE DESTRUYE (-2 FUROR)`, validAllies, 1, true, card.owner);
+                    const chosen = await game.pickBoardTargets(validAllies, 1, `GÁRGOLA: ELIGE TRIBUTO O SE DESTRUYE (-2 FUROR)`, card, card.owner, true);
                     if (chosen && chosen.length > 0) {
                         game.modifyStat(chosen[0], 'furor', -2);
                     } else {
@@ -7488,11 +7455,7 @@ const CARD_DB = [
         text: "Coste: 2 de Furor. P: PRODIGIO: Al colocarla, cura 1 de Vida a tu vanguardia. A: SANCIÓN (2F): Ataque especial a dos enemigos de la vanguardia rival.",
         passiveName: "PRODIGIO", activeName: "SANCIÓN", activeCost: 2,
         onBeforePlayAsync: async function(card, game, p) {
-            const valid = [...p.vanguard, ...p.rearguard].filter(c => c.furor >= 2 && !getCardTemplate(c.id).isAvatar);
-            if (valid.length === 0) { game.logError("Necesitas un aliado con 2 Furor para el tributo."); return false; }
-            const chosen = await game.openVisualSearchModal(`TRIBUTO PARA ÁNGEL (-2 FUROR)`, valid, 1, true, card.owner);
-            if (chosen && chosen.length > 0) { game.modifyStat(chosen[0], 'furor', -2); return true; }
-            return false;
+            return await DSL.tributoFuror(card, game, p, 2, { msgSinPagador: "Necesitas un aliado con 2 Furor para el tributo.", titulo: `TRIBUTO PARA ÁNGEL (-2 FUROR)` });
         },
         onAfterPlayAsync: async function(card, game, p) {
             let healed = false;
@@ -7745,6 +7708,30 @@ const DSL = {
         return s;
     },
     _nombre(game, c) { return (game && typeof game.getCardNameWithOwner === 'function') ? game.getCardNameWithOwner(c) : c.name; },
+
+    // Tributo de Furor al colocar una carta ("Coste: N de Furor"): elige un aliado del CAMPO
+    // que pueda pagarlo y le resta el Furor. Devuelve true si se pagó (la colocación sigue) o
+    // false si no hay pagador o se canceló. Comparte forma con una docena de cartas que lo
+    // hacían copiado-y-pegado con el modal genérico de búsqueda; ahora usan la selección en
+    // tablero (reborde verde), que es la norma del proyecto para elegir cartas YA EN EL CAMPO
+    // (Toto, 27-jul-2026). Sirve tanto en onBeforePlayAsync como a mitad de partida (Gárgola).
+    //   opts.excluirSelf  -> no puede pagarse a sí misma (la carta ya está en el campo)
+    //   opts.msgSinPagador-> logError si nadie puede pagar (si se omite, mensaje genérico)
+    //   opts.titulo       -> texto del prompt de selección
+    async tributoFuror(card, game, p, coste, opts) {
+        const o = opts || {};
+        const valid = [...p.vanguard, ...p.rearguard].filter(c =>
+            c.furor >= coste && !(getCardTemplate(c.id) || {}).isAvatar &&
+            !(o.excluirSelf && c.instanceId === card.instanceId));
+        if (valid.length === 0) {
+            game.logError(o.msgSinPagador || `Necesitas un aliado con al menos ${coste} de Furor para el tributo de ${card.name}.`);
+            return false;
+        }
+        const titulo = o.titulo || `${card.name}: ELIGE TRIBUTO (-${coste} FUROR)`;
+        const sel = await game.pickBoardTargets(valid, 1, titulo, card, card.owner, true);
+        if (sel && sel.length > 0) { game.modifyStat(sel[0], 'furor', -coste); return true; }
+        return false;
+    },
 
     // `hp` significa Vida Máx. OJO: a diferencia de atk/def, maxHp NO se resetea en cada
     // pasada de updatePassives (persiste entre pasadas, como cualquier otro stat "normal"
@@ -8494,12 +8481,17 @@ const DSL = {
                     }
 
                     if (ab.silencioso) return; // sin log ni floating (p. ej. Karlos (KL), Spencer): solo aplica el delta
-                    // Anuncio (estilo Karlos): al activarse o intensificarse; 'desactivada' al volver a 0.
+                    // Anuncio (estilo Karlos): al activarse o CAMBIAR de intensidad; 'desactivada'
+                    // al volver a 0. Antes solo avisaba al SUBIR (mag > prev), así que una pasiva
+                    // escalable que PIERDE fuerza sin llegar a 0 (Fanático al morir uno de sus
+                    // aliados 'Monstruo' teniendo más de uno) cambiaba los stats en silencio —
+                    // Toto lo notó betasteando. Ahora cualquier cambio de magnitud se anuncia,
+                    // que es lo que hacía la Fanático vieja (avisaba de cualquier diff, ± incluido).
                     const mag = Math.abs(d.atk) + Math.abs(d.def) + Math.abs(d.hp);
                     const key = '_dslPas' + i;
                     const prev = card[key] || 0;
                     const nombre = ab.nombre || tmpl.passiveName || 'PASIVA';
-                    if (mag > prev) {
+                    if (mag !== prev && mag > 0) {
                         // Orden VIDA -> DEF -> ATQ, como en la cara de la carta y en "Afectado por:".
                         const partes = [];
                         if (d.hp) partes.push((d.hp > 0 ? '+' : '') + d.hp + ' de Vida Máx.');

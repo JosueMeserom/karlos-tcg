@@ -369,6 +369,12 @@
             <div>DEF: <span id="cp-def">0</span></div>
             <div>ATQ: <span id="cp-atk">0</span></div>
         </div>
+        <!-- Segundo juego de stats para los 'Usuarios de Súper Evolución' (Xidachane,
+             Karlitos): sus stats cambian si se les equipa Súper Evolución. Mismo formato
+             que la caja normal, con título propio y un fondo violáceo tenue para
+             distinguirla sin salirse de la paleta. Solo se muestra si la carta tiene
+             superStats en su plantilla (Toto, 27-jul-2026). -->
+        <div class="preview-stats preview-stats-super" id="cp-stats-super" style="display:none;"></div>
     </div>
 
     <div id="log-container" onclick="event.stopPropagation()">
@@ -3024,7 +3030,23 @@
                     add(cfg.mano || cfg.hand, 'hand', p.hand);
                     [...(cfg.mazo || cfg.deck || [])].reverse().forEach(s => p.deck.push(this._scenarioCard(s, pid, 'deck')));
                     add(cfg.descartes || cfg.discard, 'discard', p.discard);
-                    add(cfg.retribucion || cfg.retribution, 'retribution', p.retribution);
+                    // Retribución: si el escenario NO la especifica, se rellena con 6 cartas (lo
+                    // que reparte la preparación normal). Sin esto quedaba VACÍA, y como esa pila
+                    // ES la vida del jugador, la primera muerte terminaba la partida al instante
+                    // (processRetribution: sin cartas que coger -> hp 0 -> gameOver). Betasteo de
+                    // Toto, 27-jul-2026: creía que era por los mazos vacíos, pero era esto.
+                    // Se toman del mazo si lo hay; si no, se generan como relleno (nunca se ven
+                    // salvo que se roben, y para entonces ya son cartas normales y corrientes).
+                    if (cfg.retribucion || cfg.retribution) {
+                        add(cfg.retribucion || cfg.retribution, 'retribution', p.retribution);
+                    } else {
+                        for (let i = 0; i < 6; i++) {
+                            const c = p.deck.length ? p.deck.pop() : this._scenarioCard('Mini-tigre', pid, 'retribution');
+                            c.location = 'retribution';
+                            p.retribution.push(c);
+                        }
+                    }
+                    if (cfg.hp === undefined) p.hp = p.retribution.length; // la vida ES el tamaño de la pila
                     if (cfg.evento || cfg.event) p.activeEvent = this._scenarioCard(cfg.evento || cfg.event, pid, 'event');
                 }
                 // Resolver refs `padre` (parentId por nombre; el padre puede estar en cualquier zona).
@@ -3690,8 +3712,35 @@
                                 ${displayStat(card.currentAtk, base.atk)}
                             </div>
                         `;
+
+                        // Segunda caja para los 'Usuarios de Súper Evolución' (Toto, 27-jul-2026):
+                        // estas cartas tienen DOS juegos de stats según lleven o no equipada la
+                        // Súper Evolución. Se muestran los alternativos tal cual (valores de
+                        // plantilla), sin el formato actual/base: son los que TENDRÍA, no los que
+                        // tiene ahora. Mismo orden VIDA -> DEF -> ATQ que la cara de la carta.
+                        const _super = document.getElementById('cp-stats-super');
+                        if (_super) {
+                            if (base.superStats) {
+                                const _celda = (etq, val, color) => `
+                                    <div style="display:flex; flex-direction:column; align-items:center; color:${color}; font-weight:900; font-size:1.1rem; text-shadow:1px 1px 2px black;">
+                                        <span style="font-size:0.8rem; color:#94a3b8; font-weight:bold;">${etq}</span>
+                                        ${val}
+                                    </div>`;
+                                _super.innerHTML = `<span class="super-title">Con Súper Evolución</span>
+                                    <div class="super-row">
+                                        ${_celda('VIDA', base.superStats.hp, '#60a5fa')}
+                                        ${_celda('DEF', base.superStats.def, '#facc15')}
+                                        ${_celda('ATQ', base.superStats.atk, '#ef4444')}
+                                    </div>`;
+                                _super.style.display = 'flex';
+                            } else {
+                                _super.style.display = 'none';
+                            }
+                        }
                     } else {
                         document.getElementById('cp-stats').style.display = 'none';
+                        const _super = document.getElementById('cp-stats-super');
+                        if (_super) _super.style.display = 'none';
                     }
                     panel.style.display = 'flex';
                 }, 500);
@@ -4944,22 +4993,30 @@
                         if (!tieneSuelo && !tieneTecho) return;
                         const antesSuelo = _foto();
                         const subidos = [], bajados = [];
+                        // statsTocados: qué estadísticas concretas corrigió el límite, para
+                        // nombrarlas en el aviso en vez de decir "su característica" en genérico
+                        // (Toto, 27-jul-2026). Se listan como VIDA/DEF/ATQ, la nomenclatura de la carta.
+                        const statsTocados = [];
                         (tpl.sueloStats || []).forEach(st => {
-                            if (st === 'atk' && card.currentAtk < tpl.atk) { subidos.push(`+${tpl.atk - card.currentAtk} ATQ`); card.currentAtk = tpl.atk; }
-                            else if (st === 'def' && card.currentDef < tpl.def) { subidos.push(`+${tpl.def - card.currentDef} DEF`); card.currentDef = tpl.def; }
+                            if (st === 'atk' && card.currentAtk < tpl.atk) { subidos.push(`+${tpl.atk - card.currentAtk} ATQ`); card.currentAtk = tpl.atk; statsTocados.push('ATQ'); }
+                            else if (st === 'def' && card.currentDef < tpl.def) { subidos.push(`+${tpl.def - card.currentDef} DEF`); card.currentDef = tpl.def; statsTocados.push('DEF'); }
                         });
                         (tpl.techoStats || []).forEach(t => {
-                            if (t.stat === 'atk' && card.currentAtk > t.valor) { bajados.push(`${t.valor - card.currentAtk} ATQ`); card.currentAtk = t.valor; }
-                            else if (t.stat === 'def' && card.currentDef > t.valor) { bajados.push(`${t.valor - card.currentDef} DEF`); card.currentDef = t.valor; }
+                            if (t.stat === 'atk' && card.currentAtk > t.valor) { bajados.push(`${t.valor - card.currentAtk} ATQ`); card.currentAtk = t.valor; statsTocados.push('ATQ'); }
+                            else if (t.stat === 'def' && card.currentDef > t.valor) { bajados.push(`${t.valor - card.currentDef} DEF`); card.currentDef = t.valor; statsTocados.push('DEF'); }
                         });
                         const nom = tpl.sueloNombre || tpl.passiveName || 'PASIVA';
                         if (subidos.length || bajados.length) {
                             _anota(antesSuelo, nom, card.instanceId, null, null, nom, card);
                             if (!card._sueloAvisado) {
                                 card._sueloAvisado = true;
-                                const _motivo = subidos.length && bajados.length ? 'sus características tienen un límite fijo'
-                                    : subidos.length ? 'sus características no pueden bajar de su valor base' : 'su característica no puede subir de su límite';
-                                this.logMsg(`¡Habilidad pasiva de ${this.getCardNameWithOwner(card)}: ${nom} tiene lugar! ${_motivo.charAt(0).toUpperCase()}${_motivo.slice(1)}.`, 'ability');
+                                const _lista = [...new Set(statsTocados)];
+                                const _nombra = _lista.length > 1 ? `Sus ${_lista.slice(0, -1).join(', ')} y ${_lista[_lista.length - 1]}` : `Su ${_lista[0]}`;
+                                const _plural = _lista.length > 1;
+                                const _motivo = subidos.length && bajados.length ? (_plural ? 'tienen un límite fijo' : 'tiene un límite fijo')
+                                    : subidos.length ? (_plural ? 'no pueden bajar de su valor base' : 'no puede bajar de su valor base')
+                                    : (_plural ? 'no pueden subir de su límite' : 'no puede subir de su límite');
+                                this.logMsg(`¡Habilidad pasiva de ${this.getCardNameWithOwner(card)}: ${nom} tiene lugar! ${_nombra} ${_motivo}.`, 'ability');
                                 if (typeof showFloatingText === 'function') {
                                     showFloatingText(card.instanceId, nom, 'ft-ability', -40);
                                     showFloatingText(card.instanceId, 'STATS PROTEGIDAS', 'ft-green', -20);
