@@ -2819,7 +2819,13 @@
                 // es cancelable: se cancela (se propaga al rival por su vía normal) y esa
                 // misma carta pasa a estar seleccionada por el debug (reborde morado + panel).
                 // cancelAction respeta lo no-cancelable: si no limpia, no auto-seleccionamos.
-                if (abriendo && this.selectedCard &&
+                // Solo se adopta la selección si la hice YO: online, el clic del rival se replica
+                // en mi cliente y dejaba this.selectedCard puesto, así que al abrir el debug me
+                // "robaba" su carta al panel de edición (Toto, 27-jul-2026). En local todo clic es
+                // propio. Para un pick del DSL vale con que el elector sea yo.
+                const _selMia = this.gameMode !== 'online' || this._seleccionLocal ||
+                    (this.dslPick && (this.dslPick.chooserId || this.activePlayerId) === this.myPlayerId);
+                if (abriendo && this.selectedCard && _selMia &&
                     ['SELECT_TARGET', 'SELECT_DSL_TARGETS', 'SELECT_ABILITY_TARGETS', 'SELECT_ESBIRRO_TO_SWAP', 'CONFIRM_RETREAT'].includes(this.inputState)) {
                     const cardSel = this.selectedCard;
                     this.cancelAction();
@@ -5177,6 +5183,12 @@
                     if (card) this.onDebugCardClick(card);
                     return;
                 }
+
+                // ¿La selección que va a quedar en curso la hice YO o es el replay del clic del
+                // rival? (Toto, 27-jul-2026). Online todo se reproduce en ambos clientes, así que
+                // sin esto el debug de un jugador adoptaba la carta que había seleccionado el OTRO
+                // (reborde morado en su cliente). Lo consume toggleDebugMenu.
+                this._seleccionLocal = !isRemote;
 
                 if (this.phase !== 'PRINCIPAL' || this.inputState === 'EXECUTING') return;
 

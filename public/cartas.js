@@ -1111,7 +1111,7 @@ const CARD_DB = [
 
         onGetPreviewEffects: function(card, game) {
             if (card.stealth) {
-                return [`Oculto: inmune a ataques normales por ${card.passiveName}, fuente: esta carta`];
+                return [`${game.generoTexto(card, 'Oculto', 'Oculta')}: inmune a ataques normales por ${card.passiveName}, fuente: esta carta`];
             }
             return [];
         }
@@ -1879,7 +1879,7 @@ const CARD_DB = [
         name: "Entrenamiento arduo", type: "Evento", rarity: "A", cost: 0, duration: 3, series: 1,
         text: "3 turnos. Requiere a Zoe en el campo. Al colocarla, oculta y agota a Zoe. Mientras esté en juego, si Zoe muere, esta carta se destruye. Al expirar, cura a Zoe, busca a Zoe (calcinante) en tu mazo y la evoluciona.",
         abilities: [
-            { trigger: "PREVIEW_GLOBAL", lineas: [ { quien: "ALIADO", filtros: [ { campo: "name", op: "==", valor: "Zoe" } ], texto: "Oculta y agotada por el entrenamiento; si muere, el Evento se destruye" } ] }
+            { trigger: "PREVIEW_GLOBAL", lineas: [ { quien: "ALIADO", filtros: [ { campo: "name", op: "==", valor: "Zoe" } ], texto: "{genero?Oculto y agotado|Oculta y agotada} por el entrenamiento; si muere, el Evento se destruye" } ] }
         ], 
         canPlayCard: function(card, game, p) {
             const hasZoe = [...p.vanguard, ...p.rearguard].some(c => c.name === 'Zoe');
@@ -3119,7 +3119,7 @@ const CARD_DB = [
     },
     {
         name: "Rebobinar", type: "Ayuda", subtype: "Técnica", tags: ["Consumible"], rarity: "C", cost: 0, series: 1,
-        tempEffectText: "{genero?Rebobinado|Rebobinada}: no puede volver a ser rebobinado este turno",
+        tempEffectText: "{genero?Rebobinado|Rebobinada}: no puede volver a ser {genero?rebobinado|rebobinada} este turno",
         text: "Coste: 3 de Furor del aliado agotado que elijas. Ese aliado refresca su acción. Sólo 1 vez por aliado cada turno.",
         abilities: [
             { trigger: "JUGAR", requisitos: [ { count: { filtros: [ { campo: "exhausted", op: "truthy" }, { campo: "furor", op: ">=", valor: 3 } ], sinMarcaTemporalPropia: true }, op: ">=", valor: 1, msg: "No hay aliados válidos que no hayan sido rebobinados ya." } ] },
