@@ -4126,40 +4126,25 @@ const CARD_DB = [
     {
         name: "Poción revitalizante", type: "Ayuda", subtype: "Mágico", tags: ["Consumible"], rarity: "C", cost: 1, series: 1,
         text: "+1 Def y +1 Atq a un aliado durante 3 turnos (baja la cuenta al final de tu turno). No acumulable en el mismo aliado.",
-        canPlayCard: function(card, game, p) {
-            const valid = [...p.vanguard, ...p.rearguard].filter(c => !(c.tempEffects && c.tempEffects.some(e => e.sourceId === card.id)));
-            if (valid.length === 0) { game.logError("Todos tus aliados ya tienen los efectos de la poción activos."); return false; }
-            return true;
-        },
-        onPlay: async function(card, game) {
-            const p = game.players[card.owner];
-            const valid = [...p.vanguard, ...p.rearguard].filter(c => !(c.tempEffects && c.tempEffects.some(e => e.sourceId === card.id)));
-            
-            const chosen = await game.openVisualSearchModal('ELIGE A QUIÉN REVITALIZAR', valid, 1, true, card.owner);
-            if (!chosen || chosen.length === 0) { game.cancelAction(); return; }
-            const target = chosen[0];
-            
-            if (!target.tempEffects) target.tempEffects = [];
-            
-            // GUARDAMOS EL DUEÑO Y EL TURNO ACTUAL
-            target.tempEffects.push({ sourceId: card.id, ownerId: card.owner, duration: 3, turnApplied: game.turn });
-            
-            showFloatingText(target.instanceId, "REVITALIZANTE", "ft-ability", -40);
-            showFloatingText(target.instanceId, "+1 ATQ / +1 DEF", "ft-green", -20);
-            game.logMsg(`¡${target.name} bebe la Poción revitalizante! (+1 Atq, +1 Def por 3 turnos).`, 'ability');
-            
-            const handIdx = p.hand.findIndex(c => c.instanceId === card.instanceId);
-            if (handIdx !== -1) { 
-                const selfCard = p.hand.splice(handIdx, 1)[0];
-                if (typeof game.resetCard === 'function') game.resetCard(selfCard);
-                p.discard.push(selfCard); 
-                selfCard.location = 'discard'; 
-            }
-            
-            game.updatePassives();
-            game.cancelAction();
-            game.render();
-        },
+        // Migrada al DSL (27-jul-2026): usaba el modal genérico para elegir un aliado YA EN EL
+        // CAMPO, violación de la norma de targeting en tablero (única infracción conocida que
+        // quedaba). sinMarcaTemporalPropia (ya existente en requisitos/ELEGIR) cubre el "no
+        // acumulable". La cuenta atrás de 3 turnos se queda imperativa a propósito (ver
+        // comentario de `duracion` en MARCAR_TEMPORAL): no hay aún trigger DSL genérico para
+        // eso, y no compensa inventarlo para una sola carta.
+        abilities: [
+            { trigger: "JUGAR", requisitos: [
+                { count: { sinMarcaTemporalPropia: true }, op: ">=", valor: 1, msg: "Todos tus aliados ya tienen los efectos de la poción activos." } ] },
+            { trigger: "AL_CONSUMIR",
+              efectos: [
+                { op: "ELEGIR", de: "ALIADOS", sinMarcaTemporalPropia: true, cantidad: 1,
+                  titulo: "Elige a quién revitalizar",
+                  efectos: [
+                    { op: "MARCAR_TEMPORAL", conOwner: true, actualizaPasivas: true, duracion: 3,
+                      floating: { texto: "REVITALIZANTE", estilo: "ft-ability", offset: -40 },
+                      log: "¡{objetivo} bebe la Poción revitalizante! (+1 Atq, +1 Def por 3 turnos)." },
+                    { op: "FLOTANTE", texto: "+1 ATQ / +1 DEF", estilo: "ft-green", offset: -20 } ] } ] }
+        ],
         onUpdateTempEffect: function(target, effect, game) {
             target.currentAtk += 1;
             target.currentDef += 1;
@@ -4172,7 +4157,7 @@ const CARD_DB = [
             if (currentTurnPlayerId === effect.ownerId) {
                 effect.duration--;
                 if (effect.duration <= 0) {
-                    game.logMsg(`Los efectos de la Poción revitalizante sobre ${target.name} se han desvanecido.`, 'system');
+                    game.logMsg(`Los efectos de la Poción revitalizante sobre ${DSL._nombre(game, target)} se han desvanecido.`, 'system');
                     return false; // Se elimina el efecto
                 }
             }
@@ -8229,6 +8214,13 @@ const DSL = {
             const marca = { sourceId: sourceCard.id, sourceInstanceId: sourceCard.instanceId };
             if (e.conOwner) marca.ownerId = ownerId;
             if (e.hastaFinDeTurnoPropio) marca.hastaFinDeTurnoPropio = true; // se limpia al acabar el turno del dueño de la carta marcada
+            // duracion (Poción revitalizante, 27-jul-2026): opt-in — solo las cartas que la
+            // declaran ganan estos dos campos. El DSL solo ESTAMPA la marca (duration = N,
+            // turnApplied = turno actual); decrementar la cuenta sigue siendo cosa del propio
+            // onEndTurnTempEffect imperativo de la carta (no hay aún un trigger DSL genérico
+            // para cuentas atrás de varios turnos — sería una arquitectura nueva, como
+            // PASIVA_CONTINUA o REACCION, que no compensa para una sola carta).
+            if (e.duracion !== undefined) { marca.duration = e.duracion; marca.turnApplied = game.turn; }
             target.tempEffects.push(marca);
             if (e.floating && typeof showFloatingText === 'function') showFloatingText(target.instanceId, e.floating.texto || e.floating, e.floating.estilo || e.floatingStyle || 'ft-ability', (e.floating.offset !== undefined ? e.floating.offset : (e.offsetFloating !== undefined ? e.offsetFloating : -40)));
             if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
