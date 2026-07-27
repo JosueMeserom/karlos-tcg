@@ -54,7 +54,10 @@ const escenarios = [
         logsIntencionados: [
             { de: '¡Habilidad pasiva de Karlos de J1 (Jugador 1): MEGADRENALINA tiene lugar! (+2 de Atq por tener Vida <= 3)',
               a: '¡Habilidad pasiva de Karlos de J1 (Jugador 1): MEGADRENALINA tiene lugar! (+2 de Atq)',
-              motivo: 'PASIVA_CONTINUA (motor) anuncia con un mensaje genérico (nombre + delta) que no incluye la cláusula de motivo que Karlos redactaba a mano ("por tener Vida <= 3"); la desactivación es idéntica en ambas.' },
+              motivo: 'PASIVA_CONTINUA (motor) anuncia con un mensaje genérico (nombre + delta) que no incluye la cláusula de motivo que Karlos redactaba a mano ("por tener Vida <= 3")' },
+            { de: 'MEGADRENALINA (Karlos de J1 (Jugador 1)) desactivada.',
+              a: 'Habilidad pasiva de Karlos de J1 (Jugador 1): MEGADRENALINA desactivada.',
+              motivo: 'la desactivación adopta la misma forma que su línea hermana de activación (Toto, 27-jul-2026): el formato viejo envolvía en paréntesis un nombre que YA los lleva ("Karlos de J1 (Ultra_K)"), produciendo paréntesis anidados' },
         ],
     },
     {
@@ -73,9 +76,12 @@ const escenarios = [
             { seleccionar: 'Karlos (KL)' }, // cura 2 -> Vida 3->5: desactiva, CON anuncio
         ],
         logsIntencionados: [],
+        // Las dos reglas deben ser DISTINGUIBLES entre sí: desde que la desactivación usa la
+        // misma cabecera que la activación ("Habilidad pasiva de <carta>: ..."), filtrar por esa
+        // cabecera se tragaba las dos líneas y dejaba la segunda regla sin nada que casar.
         logsSoloNueva: [
-            { linea: 'Habilidad pasiva de Karlos (KL)', motivo: 'la vieja nunca anunciaba esta pasiva; a petición de Toto la nueva sí, igual que Karlos (base) con el mismo umbral' },
-            { linea: 'DAME TRABAJOS', motivo: 'log de desactivación, nuevo a petición de Toto (mismo patrón que la desactivación de MEGADRENALINA en Karlos)' },
+            { linea: 'DAME TRABAJOS tiene lugar', motivo: 'la vieja nunca anunciaba esta pasiva; a petición de Toto la nueva sí, igual que Karlos (base) con el mismo umbral' },
+            { linea: 'DAME TRABAJOS desactivada.', motivo: 'log de desactivación, nuevo a petición de Toto (mismo patrón que la desactivación de MEGADRENALINA en Karlos)' },
         ],
         flotantesSoloNueva: [
             { linea: '· DAME TRABAJOS · ft-ability', motivo: 'flotante del nombre de la pasiva al activarse, nuevo a petición de Toto' },

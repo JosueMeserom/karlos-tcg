@@ -601,6 +601,10 @@ const CARD_DB = [
         text: "P: Cobrecura max 6. Gana +1 Furor extra de cartas. A: ZOMBIFICAR (1F): Anexa aliado 'Ser vivo'. Regenera 2 HP fin de turno, no puede recibir Ayudas de curación. Puede deshacer anexos.", 
         passiveName: "RAÍCES NINJA", activeName: "ZOMBIFICAR", series: 1,
         uncopyable: true, // Zombificar usa arrays exclusivos de anexo
+        // El vínculo lo crea su ACTIVA, no la Pasiva: sin este campo, el detalle lo atribuiría
+        // a RAÍCES NINJA (mismo tipo de error que se corrigió en Karolina/Xidachane).
+        annexHabilidad: "ZOMBIFICAR",
+        // annexEffectText = lo que la unión provoca EN EL ANEXADO (aquí sí lo hay: el zombi).
         annexEffectText: "Zombificado: regenera 2 de Vida al final del turno y no puede recibir Ayudas de curación",
 
         onBeforeHealed: function(card, amount, source, game) {
@@ -3461,7 +3465,9 @@ const CARD_DB = [
         name: "Kazuo", hp: 3, def: 5, atk: 5, type: "Personaje", subtype: "Ser vivo", tags: ["Samurái"], gender: "M", rarity: "A", cost: 4, series: 1,
         text: "P: BÚSQUEDA DE MAESTRO: Sólo colocable si tienes otro aliado en campo. Al colocarlo, anéxale un aliado del campo (+2 Atq mientras dure la unión). A: TSUBAMEGAESHI (2F): Realiza 3 ataques normales (máx 2 al mismo objetivo). No puedes atacar directo con los sobrantes.",
         passiveName: "BÚSQUEDA DE MAESTRO", activeName: "TSUBAMEGAESHI", activeCost: 2,
-        annexEffectText: "+2 Atq mientras dure la unión",
+        // Sin annexEffectText (Toto, 27-jul-2026): ese campo es para lo que la unión provoca en
+        // el ANEXADO (el zombi de Sadame). El +2 Atq lo recibe Kazuo, y su propia línea de stats
+        // ya lo declara ("+2 ATQ por BÚSQUEDA DE MAESTRO, fuente: esta carta"): sería duplicarlo.
         // El gate de colocación (necesita OTRO aliado ya en campo) se queda imperativo:
         // es un booleano trivial, no compensa una nueva pieza de DSL solo para esto
         // (Toto, 27-jul-2026 — arquitectura de anexo). El resto (elegir maestro/a y
@@ -6127,9 +6133,10 @@ const CARD_DB = [
     },
     {
         name: "Gladiador", hp: 5, def: 4, atk: 5, type: "Personaje", subtype: "Ser vivo", tags: ["Mercenario", "Draconiano", "Maleante"], rarity: "C", cost: 1, series: 2,
-        text: "P: OBSESIÓN DE VENGANZA: Al colocar, puedes anexar un aliado en tu campo a él. Mientras la unión esté activa, Gladiador aumenta en 1 su Vida, Def y Atq. (Su Vida no bajará de 1 al perderlo).",
+        text: "P: OBSESIÓN DE VENGANZA: Al colocar, puedes anexar un aliado en tu campo a él. Mientras la unión esté activa, Gladiador aumenta en 1 su Vida, Def y Atq. (Su Vida no puede llegar a 0 tras perderlo).",
         passiveName: "OBSESIÓN DE VENGANZA",
-        annexEffectText: "+1 Vida, Def y Atq mientras dure la unión",
+        // Sin annexEffectText: igual que Kazuo, el +1 lo recibe Gladiador y su propia línea de
+        // stats ya lo declara ("+1 VIDA MÁX., +1 DEF y +1 ATQ por OBSESIÓN DE VENGANZA").
         // ANEXAR (Toto, 27-jul-2026): mismo criterio que Kazuo (ver su comentario) — el
         // vínculo pasa por el ELEGIR en tablero (norma del proyecto) en vez del modal
         // genérico, y ahora es cancelable (nada irreversible se ha comprometido aún).
@@ -8474,8 +8481,22 @@ const DSL = {
                         diffHp = d.hp - prevHp;
                         if (diffHp !== 0) {
                             card.maxHp += diffHp;
-                            card.currentHp += diffHp;
-                            if (diffHp < 0 && card.currentHp < 1 && card.maxHp >= 1) card.currentHp = 1;
+                            if (diffHp > 0) {
+                                // Ganar el bono sube AMBAS (es una Vida extra de verdad, no solo techo).
+                                card.currentHp += diffHp;
+                            } else {
+                                // Perderlo baja SOLO la Vida Máx.; la actual únicamente se recorta si
+                                // se sale del nuevo techo (Toto, 27-jul-2026, betasteo de Gladiador):
+                                // restarla siempre era doblemente incorrecto — quitaba 1 de Vida a
+                                // quien no estaba a tope, y el viejo suelo "no bajar de 1" CURABA a
+                                // quien estuviera por debajo (0.5 -> 1). Con el recorte, quien está a
+                                // tope pierde 1 (6/6 -> 5/5) y quien no, conserva su Vida (0.5/6 -> 0.5/5).
+                                if (card.currentHp > card.maxHp) card.currentHp = card.maxHp;
+                                // "Su Vida no puede llegar a 0 tras perderlo": red de seguridad para que
+                                // el recorte nunca mate por sí solo (0.5 es el mínimo vivo del juego,
+                                // por las medias Vidas de Esbirro contra Personaje).
+                                if (card.currentHp <= 0 && card.maxHp > 0) card.currentHp = 0.5;
+                            }
                             card[hpKey] = d.hp;
                         }
                         // "Afectado por:" (Toto, 27-jul-2026): el registro automático de
@@ -8524,7 +8545,11 @@ const DSL = {
                         if (ab.retrasoSiRecienJugada && card.justPlayed) setTimeout(_emitir, ab.retrasoSiRecienJugada);
                         else _emitir();
                     } else if (prev > 0 && mag === 0) {
-                        game.logMsg(`${nombre} (${DSL._nombre(game, card)}) desactivada.`, 'system');
+                        // Misma forma que el anuncio de activación de arriba (Toto, 27-jul-2026):
+                        // "Habilidad pasiva de <carta>: <NOMBRE> ...". Antes era
+                        // "<NOMBRE> (<carta>) desactivada", que con el nombre-con-dueño nuevo
+                        // ("Fanático [1] de J1 (Ultra_K)") producía paréntesis anidados.
+                        game.logMsg(`Habilidad pasiva de ${DSL._nombre(game, card)}: ${nombre} desactivada.`, 'system');
                     }
                     card[key] = mag;
                 });

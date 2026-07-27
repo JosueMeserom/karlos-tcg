@@ -105,7 +105,7 @@ const escenarios = [
         ],
         logsIntencionados: [
             { de: '[ability] ¡ADORACIÓN PERVERSA! Fanático siente el poder de los monstruos (-1 a todo).',
-              a: '[system] ADORACIÓN PERVERSA (Fanático [1] de J1 (Jugador 1)) desactivada.',
+              a: '[system] Habilidad pasiva de Fanático [1] de J1 (Jugador 1): ADORACIÓN PERVERSA desactivada.',
               motivo: 'anuncio estandarizado al formato genérico de PASIVA_CONTINUA: al llegar a 0 usa la frase fija "desactivada" (tipo system), la vieja seguía usando su "(-1 a todo)" de siempre (tipo ability) también para el caso de desactivación total' },
         ],
         flotantesSoloVieja: [

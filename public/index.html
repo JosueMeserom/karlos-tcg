@@ -535,7 +535,7 @@
         <div class="eg-card">
             <div class="eg-trophy">🏆</div>
             <div class="eg-kicker">Partida finalizada</div>
-            <div class="eg-winner" id="endgame-winner-name">—</div>
+            <div class="eg-winner" id="endgame-winner-name">-</div>
             <div class="eg-sub" id="endgame-sub">ha ganado el duelo.</div>
             <div class="eg-presence" id="endgame-presence"></div>
             <div class="eg-actions"></div>
@@ -2950,7 +2950,7 @@
                 if (!this._ssApply(this._ssKey(n), `[ADMIN] Partida cargada del slot ${n}.`)) { this._ssSlot = prev; this._ssRefresh(); }
             }
             debugRestartDialog() {
-                const eleccion = prompt('♻️ REINICIAR PARTIDA — escribe:\n  1 = desde el PRINCIPIO (elección de apartadas incluida)\n  2 = desde el PRIMER TURNO\n(Cancelar para no hacer nada)', '2');
+                const eleccion = prompt('♻️ REINICIAR PARTIDA - escribe:\n  1 = desde el PRINCIPIO (elección de apartadas incluida)\n  2 = desde el PRIMER TURNO\n(Cancelar para no hacer nada)', '2');
                 if (eleccion === '1') {
                     if (this.gameMode === 'online') {
                         // La preparación online es a DOS BANDAS (ver el handler 'restartSetup' del
@@ -3591,18 +3591,32 @@
                         if (resA) effects.push(this.lineaEfecto(`${resA > 0 ? '+' : ''}${resA} ATQ`, { ref: 'desconocida (valor arrastrado)' }));
                     }
 
+                    // Anexos (Toto, 27-jul-2026): misma gramática que el resto de líneas, vía
+                    // lineaEfecto() — antes eran texto suelto con el efecto colgando de un guion.
+                    // La afección nombra a la OTRA carta SIN dueño (hoy todos los anexos son entre
+                    // cartas del mismo jugador); el "de JX (Nick)" sigue estando en la fuente.
+                    // `annexHabilidad` en la plantilla del anfitrión dice QUÉ Habilidad crea el
+                    // vínculo: no siempre es la Pasiva (Sadame lo anexa con su Activa ZOMBIFICAR),
+                    // mismo caso que la atribución de Karolina/Xidachane.
                     if (card.attachedTo) {
                         const origin = this.findCard(card.attachedTo);
                         if (origin) {
-                            const _fxA = (getCardTemplate(origin.id) || {}).annexEffectText;
-                            effects.push(`Anexado a: ${this.nCarta(origin)}${_fxA ? ' — ' + _fxA : ''}`);
+                            const _tO = getCardTemplate(origin.id) || {};
+                            const _habO = _tO.annexHabilidad || _tO.passiveName || null;
+                            const _refO = this.refCarta(origin);
+                            effects.push(this.lineaEfecto(`Anexado a: ${this.nCarta(origin)}`, { habilidad: _habO, ref: _refO }));
+                            // annexEffectText describe lo que la unión provoca EN EL ANEXADO (el
+                            // Zombificado de Sadame); es una afección más, así que va en su propia
+                            // línea con la misma gramática, no pegada a la del vínculo.
+                            if (_tO.annexEffectText) effects.push(this.lineaEfecto(_tO.annexEffectText, { habilidad: _habO, ref: _refO }));
                         }
                     }
                     if (card.attachments && card.attachments.length > 0) {
-                        const _fxH = (getCardTemplate(card.id) || {}).annexEffectText;
+                        const _tH = getCardTemplate(card.id) || {};
+                        const _habH = _tH.annexHabilidad || _tH.passiveName || null;
                         card.attachments.forEach(id => {
                             const c = this.findCard(id);
-                            effects.push(`Anexo: ${c ? this.nCarta(c) : 'Desconocido'}${_fxH ? ' — ' + _fxH : ''}`);
+                            effects.push(this.lineaEfecto(`Anexo: ${c ? this.nCarta(c) : 'Desconocido'}`, { habilidad: _habH, ref: 'esta carta' }));
                         });
                     }
 
@@ -3938,7 +3952,7 @@
                 document.getElementById('discard-viewer').style.display = 'none';
                 const viewer = document.getElementById('deck-insert-viewer');
                 const content = document.getElementById('deck-insert-content');
-                document.getElementById('deck-insert-title').innerText = `MAZO DE ${this.getDisplayName(pid)} — ELIGE EL HUECO`;
+                document.getElementById('deck-insert-title').innerText = `MAZO DE ${this.getDisplayName(pid)} - ELIGE EL HUECO`;
                 content.innerHTML = '';
                 const ghost = document.createElement('div');
                 ghost.id = 'dbg-ghost-slot';
@@ -7142,7 +7156,7 @@
                     if (!pl) {
                         rows += `<div class="eg-row"><span class="eg-dot off"></span>` +
                             `<span class="eg-name" style="opacity:.6;">Asiento libre</span>` +
-                            `<span class="eg-tag spec">—</span></div>`;
+                            `<span class="eg-tag spec">-</span></div>`;
                         continue;
                     }
                     const st = estado(pl);

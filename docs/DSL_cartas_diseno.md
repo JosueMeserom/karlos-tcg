@@ -321,6 +321,33 @@ Y la misma línea vista desde el Evento que la provoca (`Efectos actuales:`):
 Puede retirarse sin coste de Furor, objetivo: Karlos de J1 (Ultra_K)
 ```
 
+### 13.3.bis Anexos (27-jul-2026)
+
+Los vínculos de anexo (Gladiador, Kazuo, Sadame) usan **esta misma gramática**: lo único que
+cambia es que en el hueco de la *afección* va el vínculo.
+
+```
+Anexo: <Nombre>[ [copyId]] ...        (en el ANFITRIÓN: la carta que anexa)
+Anexado a: <Nombre>[ [copyId]] ...    (en la carta ANEXADA)
+```
+
+* La carta nombrada en la afección va **sin dueño**: hoy todos los anexos son entre cartas del
+  mismo jugador. El `de <JX (Nick)>` sigue estando donde toca, en la **referencia**.
+* **`por HABILIDAD`** sale de `annexHabilidad` en la plantilla del **anfitrión**, con
+  `passiveName` como fallback. Hace falta declararlo cuando el vínculo **no** lo crea la Pasiva:
+  Sadame anexa con su Activa `ZOMBIFICAR`, y sin el campo se atribuiría a `RAÍCES NINJA` (el
+  mismo error de atribución que se corrigió en Karolina/Xidachane).
+* **`annexEffectText`** (plantilla del anfitrión) describe lo que la unión provoca **en el
+  anexado** — el `Zombificado: ...` de Sadame. Sale como **línea propia** del anexado, con la
+  misma gramática. No se declara cuando el efecto lo recibe el anfitrión (Gladiador, Kazuo):
+  eso ya lo publica su propia línea de stats, y repetirlo sería duplicar.
+
+```
+Anexo: Mini-tigre [1] por OBSESIÓN DE VENGANZA, fuente: esta carta
+Anexado a: Gladiador por OBSESIÓN DE VENGANZA, fuente: Gladiador de J1 (Ultra_K)
+Zombificado: regenera 2 de Vida al final del turno y no puede recibir Ayudas de curación por ZOMBIFICAR, fuente: Sadame de J1 (Ultra_K)
+```
+
 ### 13.4 Cómo se construye (implementación)
 
 En `index.html`:

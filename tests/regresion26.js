@@ -135,7 +135,7 @@ const escenarios = [
         ],
         logsSoloNueva: [
             { linea: 'OBSESIÓN DE VENGANZA tiene lugar', motivo: 'idem escenario anterior: anuncio de activación' },
-            { linea: 'OBSESIÓN DE VENGANZA (Gladiador de J1 (Jugador 1)) desactivada.',
+            { linea: 'OBSESIÓN DE VENGANZA desactivada.',
               motivo: 'anuncio genérico de ROTURA del vínculo; antes era un log a mano ("La obsesión de Gladiador ha sido erradicada...") que se estandariza al mismo formato de Karlos/Kyle' },
         ],
         flotantesSoloVieja: [
@@ -152,6 +152,54 @@ const escenarios = [
               motivo: 'BUG de la vieja documentado (no "corregido" a mano, es la propia migración quien lo arregla): la limpieza genérica del motor (checkDeath) vacía attachments de Gladiador EN CUANTO muere el anexado, antes de que su propio onUpdatePassive note la ruptura — así que la vieja nunca revierte el +1 Vida Máx. (Atq/Def sí, porque esos se resetean solos cada pasada, no dependen de detectar la ruptura). La nueva usa el manejo genérico de "hp" de PASIVA_CONTINUA, que no depende de esa carrera de tiempos: revierte correctamente a la base (5) en vez de quedarse en 6 para siempre.' },
             { contiene: 'estado.p1.vanguard.0.maxHp', motivo: 'mismo bug/corrección que currentHp' },
         ],
+    },
+    {
+        // Betasteo de Toto (27-jul-2026): "no pierde siempre 1 de Vida al deshacerse el anexo,
+        // solamente si su Vida máxima y su Vida actual son las mismas". Aquí Gladiador llega a la
+        // ruptura DAÑADO (por debajo de su máximo), así que la bajada de Vida Máx. no debe
+        // costarle Vida actual: solo se recorta lo que se salga del nuevo techo.
+        nombre: 'Gladiador dañado: al romperse el vínculo baja la Vida Máx., NO la Vida actual',
+        p1: { vanguardia: [{ carta: 'Mini-tigre', vida: 1 }], mano: ['Gladiador'] },
+        p2: { vanguardia: ['Garret', 'Robot de seguridad SP'] },
+        pasos: [
+            { jugar: 'Gladiador' },
+            { elegir: ['Mini-tigre'] },   // anexo: Gladiador pasa a 6/6 (Def 5, Atq 6)
+            { finTurno: true },           // p1 -> p2
+            { atacar: 'Garret', objetivo: 'Gladiador' },              // 9-5 = 4 -> 2/6 (ya no está a tope)
+            { atacar: 'Robot de seguridad SP', objetivo: 'Mini-tigre' }, // mata al anexado: rompe el vínculo
+        ],
+        logsIntencionados: [
+            { de: '¡Gladiador se obsesiona y anexa a Mini-tigre!',
+              a: '¡Gladiador se obsesiona y anexa a Mini-tigre [1] de J1 (Jugador 1)!',
+              motivo: 'cambio de formato de nombre en el log' },
+        ],
+        logsSoloNueva: [
+            { linea: 'OBSESIÓN DE VENGANZA tiene lugar', motivo: 'idem escenarios anteriores: anuncio de activación' },
+            { linea: 'OBSESIÓN DE VENGANZA desactivada.', motivo: 'idem: anuncio genérico de rotura del vínculo' },
+        ],
+        flotantesSoloVieja: [
+            { linea: '+1 A TODO', motivo: 'idem escenarios anteriores' },
+        ],
+        flotantesSoloNueva: [
+            { linea: 'OBSESIÓN DE VENGANZA · ft-ability', motivo: 'idem' },
+            { linea: '+1 VIDA MÁX. · ft-green', motivo: 'idem' },
+            { linea: '+1 DEF · ft-green', motivo: 'idem' },
+            { linea: '+1 ATQ · ft-green', motivo: 'idem' },
+        ],
+        diferenciasEsperadas: [
+            { contiene: 'estado.p1.vanguard.0.maxHp',
+              motivo: 'la vieja no revertía nunca la Vida Máx. al romperse el vínculo (ver el escenario anterior); la nueva la devuelve a su base 5' },
+        ],
+        // La Vida ACTUAL sí coincide en ambas (2), y eso es justo lo que este escenario fija:
+        // la nueva solo recorta lo que exceda el nuevo techo, y 2 no lo excede. Ojo con leer de
+        // más en esa coincidencia: la vieja no restaba aquí porque en esta ruta (anexado muerto
+        // en combate) su onUpdatePassive ni siquiera llegaba a ejecutarse -el motor ya le había
+        // vaciado `attachments`-, así que su resta incondicional quedaba latente. Es la ruta del
+        // DSL la que sí detecta siempre la ruptura, y por eso la resta -y el viejo suelo que
+        // CURABA hasta 1- sí afloraban en la instancia viva: es el caso que reportó Toto
+        // (Gladiador a 0.5 de Vida subía a 1 al perder el anexo). Ese caso concreto no se puede
+        // montar en el harness sin encadenar varios turnos de daño de Esbirro, y se verificó
+        // con probe directa sobre el motor real.
     },
 ];
 
