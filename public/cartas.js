@@ -358,6 +358,27 @@ const CARD_DB = [
             game.render();
         },
 
+        // Solo son objetivo válido los aliados a los que REALMENTE puede curar (Toto,
+        // 27-jul-2026): antes valía cualquier aliado, así que se podía gastar el Furor y
+        // la acción sobre uno con la Vida llena para que el efecto no hiciera nada.
+        // Excepciones respetadas: los Zombificados rechazan la reparación, y quien puede
+        // REBASAR su Vida máxima (onBeforeHealed, p. ej. Limo primario) sí es válido
+        // aunque esté al máximo — mismo criterio que usa el DSL para CURAR.
+        onValidateTarget: function(card, target, game, isSilent) {
+            if (target.owner !== card.owner) return false;
+            if (target.esZombi) {
+                if (!isSilent) game.logError(`${game.getCardNameWithOwner(target)} está Zombificado y rechaza la reparación.`);
+                return false;
+            }
+            const tpl = getCardTemplate(target.id) || {};
+            const puedeSobrecurar = typeof tpl.onBeforeHealed === 'function';
+            if (target.currentHp >= target.maxHp && !puedeSobrecurar) {
+                if (!isSilent) game.logError(`${game.getCardNameWithOwner(target)} ya tiene la Vida completa.`);
+                return false;
+            }
+            return true;
+        },
+
         onTargetsReady: async function(card, game) {
             const target = game.abilityContext.targets[0];
             game.modifyStat(card, 'furor', -1);
@@ -4627,7 +4648,7 @@ const CARD_DB = [
         // silencioso: la vieja nunca anunciaba esta pasiva (solo marcaba el campo).
         abilities: [
             { trigger: "PASIVA_CONTINUA", nombre: "IDOL A DISTANCIA", silencioso: true,
-              then: [ { op: "MARCAR", campo: "stealth", valor: true } ] }
+              then: [ { op: "MARCAR", campo: "stealth", valor: true, badge: "oculto" } ] }
         ],
         
         canActivateAbility: function(card, game) {
@@ -6883,9 +6904,14 @@ const CARD_DB = [
         }
     },
     {
-        name: "Súcubo", hp: 2, def: 3, atk: 4, type: "Esbirro", subtype: "Ser mágico", tags: ["Monstruo"], rarity: "B", cost: 1, series: 2,
-        text: "Coste: 2 de Furor. P: DEMONIO VOLUPTUOSO. A: SEDUCCIÓN (1F): Permanece Oculta permanentemente mientras siga en el campo.",
-        passiveName: "DEMONIO VOLUPTUOSO", activeName: "SEDUCCIÓN", activeCost: 1,
+        // Sin passiveName ni "P: ..." en el text (Toto, 27-jul-2026): su supuesta pasiva
+        // DEMONIO VOLUPTUOSO no tenía descripción — era solo el tributo para colocarla, que
+        // ya sale en la caja COSTE del detalle. Se listaba como "Pasiva: DEMONIO" con la
+        // descripción partida ("VOLUPTUOSO.") por el parser. El Oculto continuo lo concede
+        // su Activa SEDUCCIÓN, así que la pasiva continua se atribuye a ella.
+        name: "Súcubo", hp: 2, def: 3, atk: 4, type: "Esbirro", subtype: "Ser mágico", tags: ["Monstruo"], gender: 'F', rarity: "B", cost: 1, series: 2,
+        text: "Coste: 2 de Furor. A: SEDUCCIÓN (1F): Permanece Oculta permanentemente mientras siga en el campo.",
+        activeName: "SEDUCCIÓN", activeCost: 1,
         onBeforePlayAsync: async function(card, game, p) {
             const valid = [...p.vanguard, ...p.rearguard].filter(c => c.furor >= 2 && !getCardTemplate(c.id).isAvatar);
             if (valid.length === 0) return false;
@@ -6912,12 +6938,13 @@ const CARD_DB = [
             game.updatePassives();
             game.render();
         },
-        // silencioso: la vieja nunca anunciaba esta pasiva. permanentStealth lo enciende su
-        // Activa SEDUCCIÓN (imperativa); la pasiva solo lo sostiene mientras siga en el campo.
+        // silencioso: la vieja nunca anunciaba esto. permanentStealth lo enciende su Activa
+        // SEDUCCIÓN (imperativa); esta pasiva continua solo lo SOSTIENE mientras siga en el
+        // campo, así que se atribuye a SEDUCCIÓN en el detalle.
         abilities: [
-            { trigger: "PASIVA_CONTINUA", nombre: "DEMONIO VOLUPTUOSO", silencioso: true,
+            { trigger: "PASIVA_CONTINUA", nombre: "SEDUCCIÓN", silencioso: true,
               if: { campo: "permanentStealth", op: "truthy" },
-              then: [ { op: "MARCAR", campo: "stealth", valor: true } ] }
+              then: [ { op: "MARCAR", campo: "stealth", valor: true, badge: "oculto" } ] }
         ]
     },
     {
@@ -7742,16 +7769,26 @@ const DSL = {
     //   · SUELO_STAT  -> impide que un stat baje de su valor base de plantilla ("no bajan de base").
     // El motor los recoge igual en el registro de modificadores (updatePassives diffea antes
     // y después), así que salen en "Afectado por:" con la sintaxis estándar sin nada extra.
-    _passiveExtras(card, game, effects) {
+    _passiveExtras(card, game, effects, nombreHab) {
         (effects || []).forEach(e => {
-            if (e.if) { DSL._passiveExtras(card, game, DSL._cond(card, game, e.if) ? e.then : (e.else || [])); return; }
+            if (e.if) { DSL._passiveExtras(card, game, DSL._cond(card, game, e.if) ? e.then : (e.else || []), nombreHab); return; }
             if (e.op === 'MARCAR') {
                 card[e.campo] = (e.valor !== undefined) ? e.valor : true;
-            } else if (e.op === 'SUELO_STAT') {
-                const base = getCardTemplate(card.id) || {};
-                if (e.stat === 'atk' && card.currentAtk < base.atk) card.currentAtk = base.atk;
-                else if (e.stat === 'def' && card.currentDef < base.def) card.currentDef = base.def;
+                // badge: la marca es CONTINUA y debe salir en "Afectado por:" en TODAS las
+                // pasadas. El registro por diferencias solo la vería la primera vez (el campo
+                // persiste), así que se declara explícitamente. Ver registrarStatMod.
+                if (e.badge && typeof game.registrarStatMod === 'function') {
+                    game.registrarStatMod(card, {
+                        stat: e.badge === 'oculto' ? 'OCULTO' : 'SILENCIO', delta: 1,
+                        fuente: nombreHab, ref: 'esta carta', habilidad: nombreHab || null, turnos: null,
+                        srcId: card.instanceId, srcAltId: null, srcZone: null, badgeKey: e.badge,
+                    });
+                }
             }
+            // SUELO_STAT no se aplica aquí: sería inútil, porque equipos, eventos y efectos
+            // temporales se procesan DESPUÉS de las pasivas de carta y volverían a bajar el
+            // stat. El compilador lo traduce a `tmpl.sueloStats` y updatePassives lo aplica
+            // como CLAMP FINAL (junto al tope 0-9), que es lo que significa "no bajan de base".
         });
     },
     _applyPassive(card, game, effects) {
@@ -8379,6 +8416,23 @@ const DSL = {
         const abs = tmpl.abilities || [];
 
         const passives = abs.filter(a => a.trigger === 'PASIVA_CONTINUA');
+        // SUELO_STAT -> se declara en la plantilla para que updatePassives lo aplique como
+        // CLAMP FINAL ("sus stats no pueden bajar de la base, bajo ningún concepto"), después
+        // de equipos/eventos/temporales y del tope 0-9. Aplicarlo dentro de la pasiva no
+        // serviría: lo procesado después volvería a bajarlo.
+        if (passives.length && !tmpl.sueloStats) {
+            const _suelos = [];
+            const _recoge = (efs) => (efs || []).forEach(e => {
+                if (e.if) { _recoge(e.then); _recoge(e.else); return; }
+                if (e.op === 'SUELO_STAT' && e.stat) _suelos.push(e.stat);
+            });
+            passives.forEach(ab => { _recoge(ab.then); _recoge(ab.else); });
+            if (_suelos.length) {
+                tmpl.sueloStats = [...new Set(_suelos)];
+                const _abSuelo = passives.find(ab => JSON.stringify([ab.then, ab.else]).includes('"SUELO_STAT"'));
+                tmpl.sueloNombre = (_abSuelo && _abSuelo.nombre) || tmpl.passiveName || 'PASIVA';
+            }
+        }
         if (passives.length && typeof tmpl.onUpdatePassive !== 'function') {
             tmpl.onUpdatePassive = function (card, game) {
                 // Las pasivas solo actúan con la carta EN MESA (mano/mazo/descartes quedan intactos).
@@ -8389,7 +8443,7 @@ const DSL = {
                     const d = DSL._passiveDeltas(card, game, efs);
                     card.currentAtk += d.atk;
                     card.currentDef += d.def;
-                    DSL._passiveExtras(card, game, efs); // MARCAR / SUELO_STAT (no son deltas)
+                    DSL._passiveExtras(card, game, efs, ab.nombre || tmpl.passiveName || null); // MARCAR (no son deltas)
                     if (ab.silencioso) return; // sin log ni floating (p. ej. Karlos (KL), Spencer): solo aplica el delta
                     // Anuncio (estilo Karlos): al activarse o intensificarse; 'desactivada' al volver a 0.
                     const mag = Math.abs(d.atk) + Math.abs(d.def);

@@ -2006,6 +2006,20 @@
             // · ref: `refCarta(...)` o la cadena 'esta carta' cuando el origen es uno mismo.
             // · comoObjetivo: usa "objetivo:" en vez de "fuente:" (panel "Efectos actuales",
             //   que es la vista inversa: a quién está afectando ESTA carta).
+            // Registra un modificador en el "Afectado por:" de forma EXPLÍCITA, sin depender del
+            // registro por diferencias de updatePassives (Toto, 27-jul-2026). Hace falta para las
+            // marcas CONTINUAS como `stealth`: ese campo también se asigna fuera de updatePassives
+            // (Mill al acabar su turno, o al perderlo por recibir daño), así que NO se puede
+            // resetear en la pre-pasada como se hace con isSilenced; al persistir entre pasadas,
+            // el diff false->true solo se veía en la PRIMERA y la línea desaparecía después.
+            registrarStatMod(card, entry) {
+                if (!card) return;
+                if (!this._statMods) this._statMods = {};
+                const arr = this._statMods[card.instanceId] = this._statMods[card.instanceId] || [];
+                if (arr.some(m => m.stat === entry.stat && m.srcId === entry.srcId && m.habilidad === entry.habilidad)) return;
+                arr.push(entry);
+            }
+
             lineaEfecto(afeccion, { turnos, habilidad, ref, comoObjetivo } = {}) {
                 // "(N turnos restantes)" (Toto, 27-jul-2026): igual para estados alterados y
                 // efectos temporales; con la cuenta atrás ya se sobreentiende que es temporal,
@@ -4796,8 +4810,10 @@
                         // propia carta; DEF va antes que ATQ en "Afectado por:" para ser consistente.
                         if (dD) arr.push(Object.assign({ stat: 'DEF', delta: dD }, meta));
                         if (dA) arr.push(Object.assign({ stat: 'ATQ', delta: dA }, meta));
-                        if (!b[2] && c.stealth) arr.push(Object.assign({ stat: 'OCULTO', delta: 1, badgeKey: 'oculto' }, meta));
-                        if (!b[3] && c.isSilenced) arr.push(Object.assign({ stat: 'SILENCIO', delta: 1, badgeKey: 'silencio' }, meta));
+                        // El guard `!arr.some(...)` evita duplicar la línea cuando la marca ya se
+                        // registró explícitamente (registrarStatMod, p. ej. un MARCAR continuo).
+                        if (!b[2] && c.stealth && !arr.some(m => m.stat === 'OCULTO' && m.srcId === srcId)) arr.push(Object.assign({ stat: 'OCULTO', delta: 1, badgeKey: 'oculto' }, meta));
+                        if (!b[3] && c.isSilenced && !arr.some(m => m.stat === 'SILENCIO' && m.srcId === srcId)) arr.push(Object.assign({ stat: 'SILENCIO', delta: 1, badgeKey: 'silencio' }, meta));
                     });
                 };
 
@@ -4894,6 +4910,37 @@
                         }
                     });
                     _anota(antesCaps, 'Límite de características (0-9)', null, null, null);
+
+                    // SUELO DE STATS ("no bajan de base"): CLAMP FINAL, después de pasivas,
+                    // equipos, eventos, temporales y del tope 0-9 (Toto, 27-jul-2026). Va aquí y
+                    // no dentro de la pasiva de la carta porque todo lo procesado después habría
+                    // vuelto a bajarlo — que era justo lo que pasaba con la Chaqueta metálica
+                    // sobre Sadame (retornada). Se anuncia (log + flotante) solo cuando de verdad
+                    // levanta algún stat, y solo en el flanco (no en cada pasada).
+                    [...p.vanguard, ...p.rearguard].forEach(card => {
+                        const tpl = getCardTemplate(card.id);
+                        if (!tpl.sueloStats || !tpl.sueloStats.length) return;
+                        const antesSuelo = _foto();
+                        const subidos = [];
+                        tpl.sueloStats.forEach(st => {
+                            if (st === 'atk' && card.currentAtk < tpl.atk) { subidos.push(`+${tpl.atk - card.currentAtk} ATQ`); card.currentAtk = tpl.atk; }
+                            else if (st === 'def' && card.currentDef < tpl.def) { subidos.push(`+${tpl.def - card.currentDef} DEF`); card.currentDef = tpl.def; }
+                        });
+                        const nom = tpl.sueloNombre || tpl.passiveName || 'PASIVA';
+                        if (subidos.length) {
+                            _anota(antesSuelo, nom, card.instanceId, null, null, nom, card);
+                            if (!card._sueloAvisado) {
+                                card._sueloAvisado = true;
+                                this.logMsg(`¡Habilidad pasiva de ${this.getCardNameWithOwner(card)}: ${nom} tiene lugar! Sus características no pueden bajar de su valor base.`, 'ability');
+                                if (typeof showFloatingText === 'function') {
+                                    showFloatingText(card.instanceId, nom, 'ft-ability', -40);
+                                    showFloatingText(card.instanceId, 'STATS PROTEGIDAS', 'ft-green', -20);
+                                }
+                            }
+                        } else if (card._sueloAvisado) {
+                            card._sueloAvisado = false; // ya nada intenta bajarlos: se rearma el aviso
+                        }
+                    });
                 });
             }
 

@@ -85,6 +85,34 @@ const escenarios = [
         pasos: [],
         logsIntencionados: [],
     },
+    {
+        // CAMBIO DE COMPORTAMIENTO PEDIDO POR TOTO (27-jul-2026). En la vieja, el "stats no
+        // bajan de base" se aplicaba DENTRO de la pasiva de la carta, y como los equipos se
+        // procesan DESPUÉS, la Chaqueta metálica (-3 ATQ) sí conseguía bajarle el ATQ a 4.
+        // Ahora el suelo es un CLAMP FINAL (tras equipos/eventos/temporales y del tope 0-9):
+        // "si no pueden bajar, es que no pueden, bajo ningún concepto". Además se anuncia.
+        nombre: 'Sadame (retornada): la Chaqueta metálica ya NO puede bajarle el ATQ (clamp final)',
+        p1: { vanguardia: ['Sadame (retornada)'], mano: ['Chaqueta metálica defensiva de la muerte'] },
+        p2: { vanguardia: ['Mini-tigre'] },
+        pasos: [
+            { jugar: 'Chaqueta metálica defensiva de la muerte' },
+            { elegir: ['Sadame (retornada)'] },
+        ],
+        logsIntencionados: [
+            { de: 'Sadame (retornada) se pone la Chaqueta', a: 'Sadame (retornada) (J1 (Jugador 1)) se pone la Chaqueta',
+              motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba target.name a secas; la nueva rellena {objetivo} con DSL._nombre' },
+        ],
+        diferenciasEsperadas: [
+            { contiene: 'estado.p1.vanguard.0.currentAtk',
+              motivo: 'la vieja dejaba el ATQ en 4 (la Chaqueta se aplicaba después del suelo); la nueva lo devuelve a su base 7 con el clamp final, que es lo que significa "no bajan de base"' },
+            { contiene: '_sueloAvisado',
+              motivo: 'bookkeeping nuevo del aviso de suelo (solo anuncia en el flanco, no en cada pasada de updatePassives)' },
+            { contiene: 'ÚLTIMA MISIÓN',
+              motivo: 'aviso nuevo pedido por Toto (log + flotante del nombre de la pasiva): cuando el suelo IMPIDE de verdad una bajada, se avisa' },
+            { contiene: 'STATS PROTEGIDAS',
+              motivo: 'flotante nuevo del mismo aviso' },
+        ],
+    },
 ];
 
 correrSuite('regresion24', escenarios);
