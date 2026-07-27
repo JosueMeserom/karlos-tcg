@@ -105,8 +105,9 @@ const escenarios = [
         diferenciasEsperadas: [
             { contiene: 'estado.p1.vanguard.0.currentAtk',
               motivo: 'la vieja dejaba el ATQ en 4 (la Chaqueta se aplicaba después del suelo); la nueva lo devuelve a su base 7 con el clamp final, que es lo que significa "no bajan de base"' },
-            { contiene: '_sueloAvisado',
-              motivo: 'bookkeeping nuevo del aviso de suelo (solo anuncia en el flanco, no en cada pasada de updatePassives)' },
+            // _sueloAvisado ya NO aparece aquí: pasó a ser una excepción GLOBAL de diff
+            // inerte en harness.js (tanda de contadores/acumuladores, 27-jul-2026), porque
+            // el mismo bookkeeping se repite en cualquier carta con SUELO_STAT/TECHO_STAT.
             { contiene: 'ÚLTIMA MISIÓN',
               motivo: 'aviso nuevo pedido por Toto (log + flotante del nombre de la pasiva): cuando el suelo IMPIDE de verdad una bajada, se avisa' },
             { contiene: 'STATS PROTEGIDAS',

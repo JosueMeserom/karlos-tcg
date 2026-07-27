@@ -676,6 +676,13 @@ function esDiffInerte(ruta, a, b) {
     // declara el campo —createCardInstance lo inicializa a false— así que el diff es
     // true -> false. Nada del motor ni de ninguna carta lo lee: es solo bookkeeping.
     if (ruta.endsWith('.passiveActive') && a === true && b === false) return true;
+    // xidachaneBoosts/karolinaDefBoosts/fanaticoBoost (Toto, 27-jul-2026): la vieja los
+    // inicializaba a 0 (o al valor real) dentro de su propio onUpdatePassive imperativo; la
+    // pasiva DSL solo los LEE (vía REF/COUNT), nunca los escribe -así que se activan/leen a
+    // través de la Activa imperativa que sigue intacta, pero nunca quedan "a 0 por defecto".
+    // Ambos lados los tratan como 0 si faltan (ver `|| 0` en _passiveDeltas/_ref), así que la
+    // diferencia es inerte. Dirección vieja=número -> nueva=ausente.
+    if (/\.(xidachaneBoosts|karolinaDefBoosts|fanaticoBoost)$/.test(ruta) && typeof a === 'number' && b === undefined) return true;
     if (a !== undefined) return false;
     if (ruta.endsWith('.counters') && b && typeof b === 'object' && Object.keys(b).length === 0) return true;
     if (ruta.endsWith('.hasAttackedThisTurn') && b === false) return true;
@@ -686,12 +693,15 @@ function esDiffInerte(ruta, a, b) {
     // empíricamente (no solo leído) que ambos puntos de limpieza caen en el
     // mismo hueco del ciclo de turno: no hay divergencia observable de estado.
     if (ruta.endsWith('.hastaFinDeTurnoPropio') && b === true) return true;
-    // _dslPasN: bookkeeping interno del trigger PASIVA_CONTINUA (Toto, 23-jul-2026)
-    // para saber cuándo anunciar activación/desactivación de la pasiva (compara
-    // magnitud actual vs anterior). Puramente interno, nunca leído por el motor ni
-    // por ninguna otra carta; aparece en CUALQUIER carta migrada a PASIVA_CONTINUA
-    // (con cualquier valor >= 0, activa o no) allí donde la vieja no tiene nada.
-    if (/\._dslPas\d+$/.test(ruta) && typeof b === 'number') return true;
+    // _dslPasN / _dslPasHpN: bookkeeping interno del trigger PASIVA_CONTINUA (23 y
+    // 27-jul-2026) para saber cuándo anunciar activación/desactivación de la pasiva
+    // (compara magnitud/valor actual vs anterior; _dslPasHpN es la variante para el stat
+    // "hp", que necesita guardar el TOTAL aportado, no una magnitud). Puramente interno,
+    // nunca leído por el motor ni por ninguna otra carta.
+    if (/\._dslPas(Hp)?\d+$/.test(ruta) && typeof b === 'number') return true;
+    // _sueloAvisado: bookkeeping del aviso de SUELO_STAT/TECHO_STAT (27-jul-2026) — evita
+    // repetir el log/flotante en cada pasada mientras el límite siga corrigiendo algo.
+    if (ruta.endsWith('._sueloAvisado') && typeof b === 'boolean') return true;
     return false;
 }
 

@@ -4534,16 +4534,15 @@ const CARD_DB = [
             card.karolinaDefBoosts = 0; // Reiniciamos sus bufos al ser jugada
         },
         
-        onUpdatePassive: function(card, game) {
-            // Aplicamos los bufos de su Activa
-            if (card.karolinaDefBoosts) {
-                card.currentDef += card.karolinaDefBoosts;
-            }
-            // Tope estricto de Hueso Duro: La máxima Def que puede alcanzar es 6.
-            if (card.currentDef > 6) {
-                card.currentDef = 6;
-            }
-        },
+        // silencioso: la vieja no anunciaba esta reaplicación (el "+1 Def" real lo anuncia su
+        // Activa HOSTIA MÁGICA TERRIBLE, imperativa, al incrementar karolinaDefBoosts).
+        // TECHO_STAT (Def máxima 6, fija, no ligada a su base) SÍ se anuncia si de verdad
+        // corrige algo: ver el clamp final en updatePassives (index.html).
+        abilities: [
+            { trigger: "PASIVA_CONTINUA", nombre: "HUESO DURO", silencioso: true,
+              then: [ { op: "MODIFICAR_STAT", stat: "def", delta: { REF: "self.karolinaDefBoosts" } },
+                      { op: "TECHO_STAT", stat: "def", valor: 6 } ] }
+        ],
         
         onBeforeTakeDamage: async function(card, attacker, dmg, isSpecial, game) {
             // Calculamos la diferencia bruta de fuerza antes de que el motor aplique mínimos de daño
@@ -4899,12 +4898,15 @@ const CARD_DB = [
         text: "P: PIRATA GALÁCTICO: Sus stats base son (3/3/4). Cada vez que destruye a un enemigo, gana un contador. A los 3 contadores, vuelve a tu mano. A: FRUSTRACIÓN (1F): Ataque normal. Si no tuviera éxito (no hace daño), aumenta todas sus stats y Vida en +2 permanentemente.",
         passiveName: "PIRATA GALÁCTICO", activeName: "FRUSTRACIÓN", activeCost: 1,
         superStats: { hp: 6, def: 5, atk: 7 },
-        onUpdatePassive: function(card, game) {
-            if (!card.xidachaneBoosts) card.xidachaneBoosts = 0;
-            const base = getCardTemplate(card.id);
-            card.currentAtk = base.atk + (card.xidachaneBoosts * 2);
-            card.currentDef = base.def + (card.xidachaneBoosts * 2);
-        },
+        // silencioso: la vieja no anunciaba esta reaplicación (el aviso real -"+2 A TODO"- lo
+        // emite onTargetsReady, imperativo, en el momento en que xidachaneBoosts se incrementa;
+        // esta pasiva solo REAPLICA el bonus ya anunciado en cada pasada).
+        abilities: [
+            { trigger: "PASIVA_CONTINUA", nombre: "PIRATA GALÁCTICO", silencioso: true,
+              then: [
+                { op: "MODIFICAR_STAT", stat: "def", delta: { REF: "self.xidachaneBoosts", factor: 2 } },
+                { op: "MODIFICAR_STAT", stat: "atk", delta: { REF: "self.xidachaneBoosts", factor: 2 } } ] }
+        ],
         onAfterAttack: async function(attacker, defender, game) {
             // Hook para los Kills
             if (defender.currentHp <= 0) {
@@ -6951,34 +6953,18 @@ const CARD_DB = [
         name: "Fanático", hp: 3, def: 3, atk: 3, type: "Esbirro", subtype: "Ser vivo", tags: ["Usuario de magia"], rarity: "B", cost: 1, series: 2,
         text: "P: ADORACIÓN PERVERSA: Aumenta todas sus estadísticas (+1 Vida, +1 Def, +1 Atq) por cada aliado 'Ser mágico' con etiqueta 'Monstruo' (máximo de +3).",
         passiveName: "ADORACIÓN PERVERSA",
-        onUpdatePassive: function(card, game) {
-            const p = game.players[card.owner];
-            const validMonsters = [...p.vanguard, ...p.rearguard].filter(c => c.instanceId !== card.instanceId && c.subtype === 'Ser mágico' && c.tags && c.tags.includes('Monstruo'));
-            
-            const newBoost = Math.min(3, validMonsters.length);
-            
-            if (card.fanaticoBoost === undefined) card.fanaticoBoost = 0;
-            const diff = newBoost - card.fanaticoBoost;
-            
-            if (diff !== 0) {
-                card.maxHp += diff;
-                card.currentHp += diff;
-                // Prevención: Si el ajuste de salud máxima lo dejaría en 0 o menos, sobrevive a 1 HP.
-                if (card.currentHp < 1 && diff < 0 && card.maxHp >= 1) card.currentHp = 1;
-                
-                card.fanaticoBoost = newBoost;
-                const sign = diff > 0 ? '+' : '';
-                showFloatingText(card.instanceId, `${sign}${diff} A TODO`, diff > 0 ? "ft-green" : "ft-red-stat", -30);
-                game.logMsg(`¡${card.passiveName}! Fanático siente el poder de los monstruos (${sign}${diff} a todo).`, 'ability');
-            }
-            
-            card.currentAtk += card.fanaticoBoost;
-            card.currentDef += card.fanaticoBoost;
-        },
-        onGetPreviewEffects: function(card, game) {
-            if (card.fanaticoBoost > 0) return [`+${card.fanaticoBoost} VIDA MÁX., +${card.fanaticoBoost} DEF y +${card.fanaticoBoost} ATQ por ${card.passiveName}, fuente: esta carta`];
-            return [];
-        }
+        // Vida/Def/Atq suben LOS TRES a la vez, con el mismo recuento (aliados 'Ser mágico'
+        // con etiqueta 'Monstruo', tope 3). El motor ya sabe reaplicar atk/def en cada pasada
+        // (se resetean solos); la Vida Máx. necesita el manejo especial por diferencia que
+        // hace el compilador de PASIVA_CONTINUA con el stat "hp" (ver _passiveDeltas/
+        // onUpdatePassive en el intérprete), porque maxHp NO se resetea cada pasada.
+        abilities: [
+            { trigger: "PASIVA_CONTINUA", nombre: "ADORACIÓN PERVERSA",
+              then: [
+                { op: "MODIFICAR_STAT", stat: "hp", delta: { COUNT: { quien: "ALIADO", excludeSelf: true, filtros: [ { campo: "subtype", op: "==", valor: "Ser mágico" }, { campo: "tags", op: "includes", valor: "Monstruo" } ], max: 3 } } },
+                { op: "MODIFICAR_STAT", stat: "def", delta: { COUNT: { quien: "ALIADO", excludeSelf: true, filtros: [ { campo: "subtype", op: "==", valor: "Ser mágico" }, { campo: "tags", op: "includes", valor: "Monstruo" } ], max: 3 } } },
+                { op: "MODIFICAR_STAT", stat: "atk", delta: { COUNT: { quien: "ALIADO", excludeSelf: true, filtros: [ { campo: "subtype", op: "==", valor: "Ser mágico" }, { campo: "tags", op: "includes", valor: "Monstruo" } ], max: 3 } } } ] }
+        ],
     },
     {
         name: "Raiju", hp: 2, def: 4, atk: 5, type: "Esbirro", subtype: "Ser mágico", tags: ["Invocación", "Monstruo"], rarity: "B", cost: 1, series: 2,
@@ -7653,7 +7639,7 @@ const DSL = {
     // DSL._runReaccion, no _doEffect): controlan el resultado que la reacción
     // devuelve al motor de combate (redirigir el ataque, cancelarlo, drenar Furor
     // tras él, fijar el daño, autoataque del atacante).
-    OPS_EFECTO: ['MODIFICAR_STAT', 'CURAR', 'DAÑO', 'APLICAR_ESTADO', 'MODIFICAR_CONTADORES', 'ATACAR', 'MONEDA', 'ROBAR', 'BUSCAR', 'MARCAR', 'VER_MANO', 'LIMPIAR_ESTADOS', 'ELEGIR', 'DESTRUIR_EVENTO', 'MARCAR_TEMPORAL', 'DESCARTAR', 'EQUIPAR', 'MARCAR_JUGADOR', 'FLOTANTE', 'FIJAR_STAT', 'REDIRIGIR', 'CANCELAR_ATAQUE', 'MARCAR_DRENAJE', 'FIJAR_DAÑO', 'ATACANTE_SE_AUTOATACA', 'VOLVER_A_MANO', 'RETRIBUCION', 'SUELO_STAT'],
+    OPS_EFECTO: ['MODIFICAR_STAT', 'CURAR', 'DAÑO', 'APLICAR_ESTADO', 'MODIFICAR_CONTADORES', 'ATACAR', 'MONEDA', 'ROBAR', 'BUSCAR', 'MARCAR', 'VER_MANO', 'LIMPIAR_ESTADOS', 'ELEGIR', 'DESTRUIR_EVENTO', 'MARCAR_TEMPORAL', 'DESCARTAR', 'EQUIPAR', 'MARCAR_JUGADOR', 'FLOTANTE', 'FIJAR_STAT', 'REDIRIGIR', 'CANCELAR_ATAQUE', 'MARCAR_DRENAJE', 'FIJAR_DAÑO', 'ATACANTE_SE_AUTOATACA', 'VOLVER_A_MANO', 'RETRIBUCION', 'SUELO_STAT', 'TECHO_STAT'],
     OPS_CMP: ['==', '!=', '<=', '>=', '<', '>', 'includes', 'truthy', 'falsy'],
     QUIEN: ['SELF', 'ALIADO', 'ENEMIGO', 'TODOS', 'ATACANTE', 'DEFENSOR'], // ATACANTE/DEFENSOR: solo en GLOBAL_TRAS_ATAQUE y REACCION
 
@@ -7730,7 +7716,17 @@ const DSL = {
         // comparando campo:"pajaritaStance" contra valor:"DEFENSA" — Toto, 23-jul-2026).
         if (typeof v === 'number' || typeof v === 'string' || typeof v === 'boolean') return v;
         if (v && v.COUNT) return DSL._count(ownerId, game, v.COUNT, selfCard);
-        if (v && v.REF) return DSL._ref(v.REF, ctx || { self: selfCard });
+        if (v && v.REF) {
+            const base = DSL._ref(v.REF, ctx || { self: selfCard });
+            // factor (Toto, 27-jul-2026): multiplica el valor referenciado — p. ej. Xidachane,
+            // cuyo Atq/Def suben 2 por cada contador acumulado en un campo propio. OJO: si el
+            // ref no resuelve (undefined), se propaga TAL CUAL, sin inventar un 0 — FIJAR_STAT
+            // depende de recibir undefined para saber que debe omitirse sin abortar la cadena
+            // (bug real encontrado con Plan de equipo: una elección cancelada dejaba de
+            // detectarse porque este helper devolvía 0 en vez de undefined).
+            if (v.factor === undefined || typeof base !== 'number') return base;
+            return base * v.factor;
+        }
         return 0;
     },
     _cond(card, game, c) {
@@ -7750,14 +7746,26 @@ const DSL = {
     },
     _nombre(game, c) { return (game && typeof game.getCardNameWithOwner === 'function') ? game.getCardNameWithOwner(c) : c.name; },
 
+    // `hp` significa Vida Máx. OJO: a diferencia de atk/def, maxHp NO se resetea en cada
+    // pasada de updatePassives (persiste entre pasadas, como cualquier otro stat "normal"
+    // fuera de las pasivas) — así que out.hp NO es un delta a sumar directamente: es el valor
+    // TOTAL que la pasiva quiere aportar en ESTA pasada, y quien lo consume (más abajo en el
+    // compilador de PASIVA_CONTINUA) debe compararlo con el aportado en la pasada anterior y
+    // aplicar solo la DIFERENCIA (igual que hacían a mano Fanático/Xidachane/Gladiador).
     _passiveDeltas(card, game, effects) {
-        const out = { atk: 0, def: 0 };
+        const out = { atk: 0, def: 0, hp: 0 };
         (effects || []).forEach(e => {
-            if (e.if) { const s = DSL._passiveDeltas(card, game, DSL._cond(card, game, e.if) ? e.then : (e.else || [])); out.atk += s.atk; out.def += s.def; return; }
+            if (e.if) { const s = DSL._passiveDeltas(card, game, DSL._cond(card, game, e.if) ? e.then : (e.else || [])); out.atk += s.atk; out.def += s.def; out.hp += s.hp; return; }
             if (e.op === 'MODIFICAR_STAT') {
-                const d = DSL._value(card.owner, game, e.delta, card);
+                // _passiveDeltas SIEMPRE necesita un número (una pasiva se recalcula sola cada
+                // pasada, no hay "elección" que resolver): si _value devuelve undefined (un REF
+                // a un campo aún sin inicializar, p. ej. Xidachane antes de su primer contador),
+                // se trata como 0. Este `|| 0` es LOCAL a las pasivas; _value en general NO lo
+                // aplica, porque FIJAR_STAT depende de que undefined se propague sin tocar.
+                const d = DSL._value(card.owner, game, e.delta, card) || 0;
                 if (e.stat === 'atk') out.atk += d;
                 else if (e.stat === 'def') out.def += d;
+                else if (e.stat === 'hp') out.hp += d;
             }
         });
         return out;
@@ -8416,22 +8424,25 @@ const DSL = {
         const abs = tmpl.abilities || [];
 
         const passives = abs.filter(a => a.trigger === 'PASIVA_CONTINUA');
-        // SUELO_STAT -> se declara en la plantilla para que updatePassives lo aplique como
-        // CLAMP FINAL ("sus stats no pueden bajar de la base, bajo ningún concepto"), después
-        // de equipos/eventos/temporales y del tope 0-9. Aplicarlo dentro de la pasiva no
-        // serviría: lo procesado después volvería a bajarlo.
-        if (passives.length && !tmpl.sueloStats) {
-            const _suelos = [];
-            const _recoge = (efs) => (efs || []).forEach(e => {
-                if (e.if) { _recoge(e.then); _recoge(e.else); return; }
-                if (e.op === 'SUELO_STAT' && e.stat) _suelos.push(e.stat);
+        // SUELO_STAT / TECHO_STAT -> se declaran en la plantilla para que updatePassives los
+        // aplique como CLAMP FINAL ("sus stats no pueden bajar/subir de tal valor, bajo ningún
+        // concepto"), DESPUÉS de equipos/eventos/temporales y del tope 0-9. Aplicarlos dentro de
+        // la pasiva no serviría: lo procesado después podría volver a saltarse el límite (así
+        // era el bug con la Chaqueta metálica sobre Sadame -retornada- antes de este cambio).
+        // SUELO_STAT usa la base de PLANTILLA (no baja de ahí); TECHO_STAT usa un valor FIJO
+        // (`valor`, p. ej. "Def máxima 6" de Karolina, no ligado a su base).
+        if (passives.length && !tmpl.sueloStats && !tmpl.techoStats) {
+            const _suelos = [], _techos = [];
+            let _nombreLimite = null;
+            const _recoge = (efs, nombreAb) => (efs || []).forEach(e => {
+                if (e.if) { _recoge(e.then, nombreAb); _recoge(e.else, nombreAb); return; }
+                if (e.op === 'SUELO_STAT' && e.stat) { _suelos.push(e.stat); _nombreLimite = _nombreLimite || nombreAb; }
+                if (e.op === 'TECHO_STAT' && e.stat) { _techos.push({ stat: e.stat, valor: e.valor }); _nombreLimite = _nombreLimite || nombreAb; }
             });
-            passives.forEach(ab => { _recoge(ab.then); _recoge(ab.else); });
-            if (_suelos.length) {
-                tmpl.sueloStats = [...new Set(_suelos)];
-                const _abSuelo = passives.find(ab => JSON.stringify([ab.then, ab.else]).includes('"SUELO_STAT"'));
-                tmpl.sueloNombre = (_abSuelo && _abSuelo.nombre) || tmpl.passiveName || 'PASIVA';
-            }
+            passives.forEach(ab => { _recoge(ab.then, ab.nombre); _recoge(ab.else, ab.nombre); });
+            if (_suelos.length) tmpl.sueloStats = [...new Set(_suelos)];
+            if (_techos.length) tmpl.techoStats = _techos;
+            if (_suelos.length || _techos.length) tmpl.sueloNombre = _nombreLimite || tmpl.passiveName || 'PASIVA';
         }
         if (passives.length && typeof tmpl.onUpdatePassive !== 'function') {
             tmpl.onUpdatePassive = function (card, game) {
@@ -8444,15 +8455,54 @@ const DSL = {
                     card.currentAtk += d.atk;
                     card.currentDef += d.def;
                     DSL._passiveExtras(card, game, efs, ab.nombre || tmpl.passiveName || null); // MARCAR (no son deltas)
+
+                    // Vida Máx.: a diferencia de atk/def, maxHp NO se resetea cada pasada (persiste
+                    // entre pasadas como cualquier stat normal), así que d.hp no es un delta a sumar
+                    // sin más: es el valor TOTAL que la pasiva aporta EN ESTA pasada. Se compara con
+                    // lo aportado en la pasada anterior (guardado en card[hpKey]) y solo se aplica la
+                    // DIFERENCIA — igual que hacían a mano Fanático/Xidachane/Gladiador. Suelo de
+                    // seguridad a 1 de Vida si la diferencia es negativa (mismo criterio que ellos).
+                    let diffHp = 0;
+                    {
+                        // OJO: NO se puede condicionar este bloque a `if (d.hp)` — cuando el boost
+                        // vuelve a 0 (la pasiva se desactiva del todo), d.hp también es 0, y aun así
+                        // hay que aplicar el diff negativo para devolver la Vida Máx. Bug real
+                        // encontrado y corregido con un probe: Fanático se quedaba con la Vida Máx.
+                        // hinchada al perder todos sus aliados 'Monstruo'.
+                        const hpKey = '_dslPasHp' + i;
+                        const prevHp = card[hpKey] || 0;
+                        diffHp = d.hp - prevHp;
+                        if (diffHp !== 0) {
+                            card.maxHp += diffHp;
+                            card.currentHp += diffHp;
+                            if (diffHp < 0 && card.currentHp < 1 && card.maxHp >= 1) card.currentHp = 1;
+                            card[hpKey] = d.hp;
+                        }
+                        // "Afectado por:" (Toto, 27-jul-2026): el registro automático de
+                        // updatePassives (_anota) solo diffea Atq/Def, no maxHp — se declara
+                        // explícitamente el valor TOTAL actual (no el diff) para que la línea
+                        // muestre siempre el bonus vigente, incluso en pasadas donde d.hp no cambió.
+                        // Con d.hp=0 no hay nada que declarar (no hay línea "+0 VIDA MÁX.").
+                        if (d.hp && typeof game.registrarStatMod === 'function') {
+                            const _nom = ab.nombre || tmpl.passiveName || 'PASIVA';
+                            game.registrarStatMod(card, {
+                                stat: 'VIDA MÁX.', delta: d.hp, fuente: _nom, ref: 'esta carta',
+                                habilidad: ab.silencioso ? null : _nom, turnos: null,
+                                srcId: card.instanceId, srcAltId: null, srcZone: null,
+                            });
+                        }
+                    }
+
                     if (ab.silencioso) return; // sin log ni floating (p. ej. Karlos (KL), Spencer): solo aplica el delta
                     // Anuncio (estilo Karlos): al activarse o intensificarse; 'desactivada' al volver a 0.
-                    const mag = Math.abs(d.atk) + Math.abs(d.def);
+                    const mag = Math.abs(d.atk) + Math.abs(d.def) + Math.abs(d.hp);
                     const key = '_dslPas' + i;
                     const prev = card[key] || 0;
                     const nombre = ab.nombre || tmpl.passiveName || 'PASIVA';
                     if (mag > prev) {
-                        // Orden DEF -> ATQ, como en la cara de la carta y en "Afectado por:".
+                        // Orden VIDA -> DEF -> ATQ, como en la cara de la carta y en "Afectado por:".
                         const partes = [];
+                        if (d.hp) partes.push((d.hp > 0 ? '+' : '') + d.hp + ' de Vida Máx.');
                         if (d.def) partes.push((d.def > 0 ? '+' : '') + d.def + ' de Def');
                         if (d.atk) partes.push((d.atk > 0 ? '+' : '') + d.atk + ' de Atq');
                         // retrasoSiRecienJugada: espera N ms si la carta ACABA de entrar en juego,
@@ -8462,6 +8512,7 @@ const DSL = {
                             game.logMsg(`¡Habilidad pasiva de ${DSL._nombre(game, card)}: ${nombre} tiene lugar! (${partes.join(', ')})`, 'ability');
                             if (typeof showFloatingText === 'function') {
                                 showFloatingText(card.instanceId, nombre, 'ft-ability', -40);
+                                if (d.hp) showFloatingText(card.instanceId, (d.hp > 0 ? '+' : '') + d.hp + ' VIDA MÁX.', d.hp > 0 ? 'ft-green' : 'ft-red-stat', -30);
                                 if (d.def) showFloatingText(card.instanceId, (d.def > 0 ? '+' : '') + d.def + ' DEF', d.def > 0 ? 'ft-green' : 'ft-red-stat', -20);
                                 if (d.atk) showFloatingText(card.instanceId, (d.atk > 0 ? '+' : '') + d.atk + ' ATQ', d.atk > 0 ? 'ft-green' : 'ft-red-stat', -10);
                             }

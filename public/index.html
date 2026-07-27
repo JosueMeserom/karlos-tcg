@@ -3540,15 +3540,29 @@
                         mods.forEach(m => {
                             if (m.stat === 'OCULTO') { if (!curadoOculto) effects.push(this.lineaEfecto(this.generoTexto(card, 'Oculto', 'Oculta'), { habilidad: m.habilidad, ref: _refMod(m) })); return; }
                             if (m.stat === 'SILENCIO') { if (!curadoSilencio) effects.push(this.lineaEfecto(this.generoTexto(card, 'Silenciado', 'Silenciada'), { habilidad: m.habilidad, ref: _refMod(m) })); return; }
-                            if (m.stat === 'ATQ') acumA += m.delta; else acumD += m.delta;
+                            if (m.stat === 'ATQ') acumA += m.delta; else if (m.stat === 'DEF') acumD += m.delta;
+                            // (VIDA MÁX. -stat "VIDA"- no entra en el residuo de ATQ/DEF: no hay
+                            // "tope 0-9" que lo genere, así que no necesita acumulador propio.)
                             if (_combinaPropio && m.srcId === card.instanceId) return;
                             const _fm = _refMod(m);
                             const clave = (m.srcId || '') + '|' + _fm + '|' + (m.habilidad || '');
-                            if (!porFuente.has(clave)) porFuente.set(clave, { partes: [], fuente: _fm, habilidad: m.habilidad, turnos: m.turnos });
-                            porFuente.get(clave).partes.push(`${m.delta > 0 ? '+' : ''}${m.delta} ${m.stat}`);
+                            // netPorStat: SUMA por stat dentro del grupo, no concatena strings sueltas
+                            // (Toto, 27-jul-2026 — encontrado con Karolina: dos contribuciones a DEF
+                            // de la MISMA fuente/habilidad -el bono y el techo- salían como "+5 DEF y
+                            // -2 DEF" en vez de netear a "+3 DEF").
+                            if (!porFuente.has(clave)) porFuente.set(clave, { netPorStat: new Map(), fuente: _fm, habilidad: m.habilidad, turnos: m.turnos });
+                            const _np = porFuente.get(clave).netPorStat;
+                            _np.set(m.stat, (_np.get(m.stat) || 0) + m.delta);
                         });
+                        // Orden VIDA -> DEF -> ATQ dentro de cada línea combinada.
+                        const _ordenStat = { 'VIDA MÁX.': 0, DEF: 1, ATQ: 2 };
                         porFuente.forEach(g => {
-                            const txt = g.partes.length > 1 ? g.partes.slice(0, -1).join(', ') + ' y ' + g.partes[g.partes.length - 1] : g.partes[0];
+                            const partes = [...g.netPorStat.entries()]
+                                .filter(([, v]) => v !== 0) // una fuente que sube y baja el MISMO stat a la vez puede netear a 0: sin línea para ese stat
+                                .sort((a, b) => (_ordenStat[a[0]] ?? 9) - (_ordenStat[b[0]] ?? 9))
+                                .map(([stat, v]) => `${v > 0 ? '+' : ''}${v} ${stat}`);
+                            if (!partes.length) return;
+                            const txt = partes.length > 1 ? partes.slice(0, -1).join(', ') + ' y ' + partes[partes.length - 1] : partes[0];
                             effects.push(this.lineaEfecto(txt, { habilidad: g.habilidad, turnos: g.turnos, ref: g.fuente }));
                         });
                         // Residuo que el registro no explica (p. ej. valores arrastrados en cartas fuera de mesa)
@@ -4917,34 +4931,42 @@
                     });
                     _anota(antesCaps, 'Límite de características (0-9)', null, null, null);
 
-                    // SUELO DE STATS ("no bajan de base"): CLAMP FINAL, después de pasivas,
-                    // equipos, eventos, temporales y del tope 0-9 (Toto, 27-jul-2026). Va aquí y
-                    // no dentro de la pasiva de la carta porque todo lo procesado después habría
-                    // vuelto a bajarlo — que era justo lo que pasaba con la Chaqueta metálica
-                    // sobre Sadame (retornada). Se anuncia (log + flotante) solo cuando de verdad
-                    // levanta algún stat, y solo en el flanco (no en cada pasada).
+                    // SUELO/TECHO DE STATS ("no bajan de base" / "máxima X"): CLAMP FINAL, después
+                    // de pasivas, equipos, eventos, temporales y del tope 0-9 (Toto, 27-jul-2026).
+                    // Va aquí y no dentro de la pasiva de la carta porque todo lo procesado después
+                    // habría vuelto a saltarse el límite — que era justo lo que pasaba con la
+                    // Chaqueta metálica sobre Sadame (retornada). Se anuncia (log + flotante) solo
+                    // cuando de verdad hace falta corregir algún stat, y solo en el flanco.
                     [...p.vanguard, ...p.rearguard].forEach(card => {
                         const tpl = getCardTemplate(card.id);
-                        if (!tpl.sueloStats || !tpl.sueloStats.length) return;
+                        const tieneSuelo = tpl.sueloStats && tpl.sueloStats.length;
+                        const tieneTecho = tpl.techoStats && tpl.techoStats.length;
+                        if (!tieneSuelo && !tieneTecho) return;
                         const antesSuelo = _foto();
-                        const subidos = [];
-                        tpl.sueloStats.forEach(st => {
+                        const subidos = [], bajados = [];
+                        (tpl.sueloStats || []).forEach(st => {
                             if (st === 'atk' && card.currentAtk < tpl.atk) { subidos.push(`+${tpl.atk - card.currentAtk} ATQ`); card.currentAtk = tpl.atk; }
                             else if (st === 'def' && card.currentDef < tpl.def) { subidos.push(`+${tpl.def - card.currentDef} DEF`); card.currentDef = tpl.def; }
                         });
+                        (tpl.techoStats || []).forEach(t => {
+                            if (t.stat === 'atk' && card.currentAtk > t.valor) { bajados.push(`${t.valor - card.currentAtk} ATQ`); card.currentAtk = t.valor; }
+                            else if (t.stat === 'def' && card.currentDef > t.valor) { bajados.push(`${t.valor - card.currentDef} DEF`); card.currentDef = t.valor; }
+                        });
                         const nom = tpl.sueloNombre || tpl.passiveName || 'PASIVA';
-                        if (subidos.length) {
+                        if (subidos.length || bajados.length) {
                             _anota(antesSuelo, nom, card.instanceId, null, null, nom, card);
                             if (!card._sueloAvisado) {
                                 card._sueloAvisado = true;
-                                this.logMsg(`¡Habilidad pasiva de ${this.getCardNameWithOwner(card)}: ${nom} tiene lugar! Sus características no pueden bajar de su valor base.`, 'ability');
+                                const _motivo = subidos.length && bajados.length ? 'sus características tienen un límite fijo'
+                                    : subidos.length ? 'sus características no pueden bajar de su valor base' : 'su característica no puede subir de su límite';
+                                this.logMsg(`¡Habilidad pasiva de ${this.getCardNameWithOwner(card)}: ${nom} tiene lugar! ${_motivo.charAt(0).toUpperCase()}${_motivo.slice(1)}.`, 'ability');
                                 if (typeof showFloatingText === 'function') {
                                     showFloatingText(card.instanceId, nom, 'ft-ability', -40);
                                     showFloatingText(card.instanceId, 'STATS PROTEGIDAS', 'ft-green', -20);
                                 }
                             }
                         } else if (card._sueloAvisado) {
-                            card._sueloAvisado = false; // ya nada intenta bajarlos: se rearma el aviso
+                            card._sueloAvisado = false; // ya nada intenta saltarse el límite: se rearma el aviso
                         }
                     });
                 });
