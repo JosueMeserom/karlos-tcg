@@ -683,6 +683,12 @@ function esDiffInerte(ruta, a, b) {
     // Ambos lados los tratan como 0 si faltan (ver `|| 0` en _passiveDeltas/_ref), así que la
     // diferencia es inerte. Dirección vieja=número -> nueva=ausente.
     if (/\.(xidachaneBoosts|karolinaDefBoosts|fanaticoBoost)$/.test(ruta) && typeof a === 'number' && b === undefined) return true;
+    // reverseArrow: la vieja de Gladiador lo dejaba en `false` explícito al anexar (mismo
+    // valor falsy que por defecto, sin efecto real en la flecha); la nueva simplemente no
+    // lo toca. gladiadorBuffActive: bookkeeping interno que sustituye el propio array
+    // `attachments`/anexoValido en la nueva (Toto, 27-jul-2026, trigger de anexo).
+    if (ruta.endsWith('.reverseArrow') && a === false && b === undefined) return true;
+    if (ruta.endsWith('.gladiadorBuffActive') && typeof a === 'boolean' && b === undefined) return true;
     if (a !== undefined) return false;
     if (ruta.endsWith('.counters') && b && typeof b === 'object' && Object.keys(b).length === 0) return true;
     if (ruta.endsWith('.hasAttackedThisTurn') && b === false) return true;

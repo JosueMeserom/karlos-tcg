@@ -3461,6 +3461,11 @@ const CARD_DB = [
         name: "Kazuo", hp: 3, def: 5, atk: 5, type: "Personaje", subtype: "Ser vivo", tags: ["Samurái"], gender: "M", rarity: "A", cost: 4, series: 1,
         text: "P: BÚSQUEDA DE MAESTRO: Sólo colocable si tienes otro aliado en campo. Al colocarlo, anéxale un aliado del campo (+2 Atq mientras dure la unión). A: TSUBAMEGAESHI (2F): Realiza 3 ataques normales (máx 2 al mismo objetivo). No puedes atacar directo con los sobrantes.",
         passiveName: "BÚSQUEDA DE MAESTRO", activeName: "TSUBAMEGAESHI", activeCost: 2,
+        annexEffectText: "+2 Atq mientras dure la unión",
+        // El gate de colocación (necesita OTRO aliado ya en campo) se queda imperativo:
+        // es un booleano trivial, no compensa una nueva pieza de DSL solo para esto
+        // (Toto, 27-jul-2026 — arquitectura de anexo). El resto (elegir maestro/a y
+        // anexar, +2 Atq mientras dure) sí se migra: ver abilities más abajo.
         onBeforePlayAsync: async function(card, game, p) {
             const allies = [...p.vanguard, ...p.rearguard].filter(c => !getCardTemplate(c.id).isAvatar);
             if (allies.length === 0) {
@@ -3469,43 +3474,21 @@ const CARD_DB = [
             }
             return true;
         },
-        onAfterPlayAsync: async function(card, game, p) {
-            const allies = [...p.vanguard, ...p.rearguard].filter(c => c.instanceId !== card.instanceId && !getCardTemplate(c.id).isAvatar);
-            if (allies.length > 0) {
-                const chosen = await game.openVisualSearchModal(`${card.name}: Elige a tu maestro/a`, allies, 1, true, card.owner);
-                if (chosen && chosen.length > 0) {
-                    const maestro = chosen[0];
-                    
-                    // --- TEXTO DINÁMICO SEGÚN GÉNERO ---
-                    const maestroTitle = maestro.gender === 'F' ? 'maestra' : 'maestro';
-                    const pronoun = maestro.gender === 'F' ? 'ella' : 'él';
-                    game.logMsg(`¡Kazuo reconoce a ${maestro.name} como su ${maestroTitle} y luchará por ${pronoun}!`, 'ability');
-                    
-                    // --- SISTEMA DE ANEXO REAL (Vínculo morado) ---
-                    if (!card.attachments) card.attachments = [];
-                    card.attachments.push(maestro.instanceId);
-                    maestro.attachedTo = card.instanceId;
-                    
-                    // Renderizamos para que el ATQ suba y la línea aparezca de inmediato
-                    game.updatePassives();
-                    game.render();
-                }
-            }
-        },
-        onUpdatePassive: function(card, game) {
-            if (card.attachments && card.attachments.length > 0) {
-                // Comprobamos que el maestro sigue vivo y en el tablero
-                const maestroId = card.attachments[0];
-                const maestro = game.findCard(maestroId);
-                
-                if (maestro && (maestro.location === 'vanguard' || maestro.location === 'rearguard') && maestro.attachedTo === card.instanceId) {
-                    card.currentAtk += 2;
-                } else {
-                    // Si el maestro murió o fue devuelto a la mano, se rompe el vínculo de ATQ
-                    card.attachments = [];
-                }
-            }
-        },
+        // ANEXAR (Toto, 27-jul-2026): reemplaza el modal genérico (openVisualSearchModal)
+        // por selección en tablero (reborde verde), norma del proyecto para elegir un
+        // aliado YA EN EL CAMPO — el imperativo violaba esa norma. anexoValido en la
+        // PASIVA_CONTINUA sustituye al onUpdatePassive a mano (mismo criterio: maestro
+        // vivo, en mesa y con el vínculo intacto; si se rompe, limpia attachments sola).
+        abilities: [
+            { trigger: "AL_JUGAR", efectos: [
+                { op: "ELEGIR", de: "ALIADOS", cantidad: 1, excluirSelf: true,
+                  titulo: "Elige a tu maestro/a", guardaEn: "maestro",
+                  logDespues: "¡Kazuo reconoce a {maestro} como su {maestroG?maestro|maestra} y luchará por {maestroG?él|ella}!",
+                  efectos: [ { op: "ANEXAR" } ] } ] },
+            { trigger: "PASIVA_CONTINUA", nombre: "BÚSQUEDA DE MAESTRO", silencioso: true,
+              if: { anexoValido: true },
+              then: [ { op: "MODIFICAR_STAT", stat: "atk", delta: 2 } ] }
+        ],
         canActivateAbility: function(card, game) {
             if (card.furor < (card.activeCost || 1)) { game.logError(`Falta Furor.`); return false; }
             const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
@@ -6146,50 +6129,29 @@ const CARD_DB = [
         name: "Gladiador", hp: 5, def: 4, atk: 5, type: "Personaje", subtype: "Ser vivo", tags: ["Mercenario", "Draconiano", "Maleante"], rarity: "C", cost: 1, series: 2,
         text: "P: OBSESIÓN DE VENGANZA: Al colocar, puedes anexar un aliado en tu campo a él. Mientras la unión esté activa, Gladiador aumenta en 1 su Vida, Def y Atq. (Su Vida no bajará de 1 al perderlo).",
         passiveName: "OBSESIÓN DE VENGANZA",
-        
-        onAfterPlayAsync: async function(card, game, p) {
-            const validAllies = [...p.vanguard, ...p.rearguard].filter(c => c.instanceId !== card.instanceId && !getCardTemplate(c.id).isAvatar);
-            if (validAllies.length > 0) {
-                const chosen = await game.openVisualSearchModal('OBSESIÓN DE VENGANZA: ANEXAR ALIADO', validAllies, 1, false, card.owner);
-                if (chosen && chosen.length > 0) {
-                    const ally = chosen[0];
-                    
-                    if (!card.attachments) card.attachments = [];
-                    card.attachments.push(ally.instanceId);
-                    ally.attachedTo = card.instanceId;
-                    ally.reverseArrow = false;
-                    
-                    game.logMsg(`¡${card.name} se obsesiona y anexa a ${ally.name}!`, 'ability');
-                    
-                    // Incremento de vida máxima matemática
-                    card.maxHp += 1;
-                    card.currentHp += 1;
-                    showFloatingText(card.instanceId, "+1 A TODO", "ft-green", -30);
-                    
-                    game.updatePassives(); // <--- Fuerza a actualizar sus stats de inmediato
-                }
-            }
-        },
-        onUpdatePassive: function(card, game) {
-            if (card.attachments && card.attachments.length > 0) {
-                const allyId = card.attachments[0];
-                const ally = game.findCard(allyId);
-                if (ally && ally.attachedTo === card.instanceId && ally.currentHp > 0) {
-                    card.currentAtk += 1;
-                    card.currentDef += 1;
-                    card.gladiadorBuffActive = true;
-                } else {
-                    card.attachments = [];
-                    if (card.gladiadorBuffActive) {
-                        game.logMsg(`La obsesión de Gladiador ha sido erradicada. Pierde sus stats de bonificación.`, 'system');
-                        card.maxHp -= 1;
-                        if (card.currentHp > card.maxHp) card.currentHp = card.maxHp;
-                        if (card.currentHp < 1) card.currentHp = 1;
-                        card.gladiadorBuffActive = false;
-                    }
-                }
-            }
-        }
+        annexEffectText: "+1 Vida, Def y Atq mientras dure la unión",
+        // ANEXAR (Toto, 27-jul-2026): mismo criterio que Kazuo (ver su comentario) — el
+        // vínculo pasa por el ELEGIR en tablero (norma del proyecto) en vez del modal
+        // genérico, y ahora es cancelable (nada irreversible se ha comprometido aún).
+        // NO silencioso (a diferencia de Kazuo/Xidachane/Karolina): aquí SÍ interesa el
+        // anuncio genérico de activación/desactivación de PASIVA_CONTINUA, porque es el
+        // único sitio que anuncia la ROTURA del vínculo (antes, un log a mano); se
+        // estandariza al mismo formato ya aprobado por Toto para Karlos/Kyle. El +1 Vida
+        // Máx. (con el suelo de 1 al perderlo) lo cubre el manejo de "hp" ya genérico del
+        // compilador de PASIVA_CONTINUA — el mismo mecanismo por el que se diseñó.
+        abilities: [
+            { trigger: "AL_JUGAR", efectos: [
+                { op: "ELEGIR", de: "ALIADOS", cantidad: 1, excluirSelf: true, opcional: true,
+                  titulo: "OBSESIÓN DE VENGANZA: ANEXAR ALIADO", guardaEn: "aliado",
+                  logDespues: "¡Gladiador se obsesiona y anexa a {aliado}!",
+                  efectos: [ { op: "ANEXAR" } ] } ] },
+            { trigger: "PASIVA_CONTINUA", nombre: "OBSESIÓN DE VENGANZA",
+              if: { anexoValido: true },
+              then: [
+                { op: "MODIFICAR_STAT", stat: "hp", delta: 1 },
+                { op: "MODIFICAR_STAT", stat: "def", delta: 1 },
+                { op: "MODIFICAR_STAT", stat: "atk", delta: 1 } ] }
+        ],
     },
     {
         name: "Contendiente", hp: 3, def: 3, atk: 4, type: "Esbirro", subtype: "Ser vivo", tags: ["Guardia Real", "Draconiana", "Maleante"], rarity: "C", cost: 1, series: 2,
@@ -7697,7 +7659,20 @@ const DSL = {
     },
     _cond(card, game, c) {
         if (!c) return true;
+        if (c.anexoValido !== undefined) return DSL._anexoValido(card, game) === c.anexoValido;
         return DSL._cmp(DSL._field(card, c.campo), c.op, DSL._value(card.owner, game, c.valor, card, { self: card }));
+    },
+    // Un anexo (Kazuo/Gladiador) es válido si la carta tiene un aliado anexado
+    // (attachments[0]) que sigue vivo, en mesa, y cuyo attachedTo aún apunta de
+    // vuelta a esta carta. Si el vínculo se rompió (el anexado murió o volvió a
+    // la mano), se limpia aquí mismo el array — mismo criterio que aplicaban a
+    // mano Kazuo/Gladiador en su onUpdatePassive imperativo (Toto, 27-jul-2026).
+    _anexoValido(card, game) {
+        if (!card.attachments || !card.attachments.length) return false;
+        const t = game.findCard(card.attachments[0]);
+        const ok = !!(t && (t.location === 'vanguard' || t.location === 'rearguard') && t.attachedTo === card.instanceId);
+        if (!ok) card.attachments = [];
+        return ok;
     },
     _fill(txt, ctx) {
         // Genérico: cualquier {clave} presente en ctx se sustituye.
@@ -8107,6 +8082,19 @@ const DSL = {
             if (!e.soloAnexar && typeof game.updatePassives === 'function') game.updatePassives();
             return true;
         }
+        if (e.op === 'ANEXAR') {
+            // Vínculo self<->objetivo (Kazuo/Gladiador): DISTINTO de EQUIPAR (esa es una carta
+            // de Ayuda anexándose a un aliado). Aquí es un aliado ya en el tablero anexado a
+            // OTRO aliado (self), con la flecha morada genérica (attachedTo/attachments, ya
+            // dibujada por el motor) y sin tocar hand/location de nadie. La validez del vínculo
+            // y el bono continuo mientras dure viven en la condición `anexoValido` de
+            // PASIVA_CONTINUA (Toto, 27-jul-2026).
+            if (!sourceCard.attachments) sourceCard.attachments = [];
+            sourceCard.attachments.push(target.instanceId);
+            target.attachedTo = sourceCard.instanceId;
+            if (e.floating && typeof showFloatingText === 'function') showFloatingText(sourceCard.instanceId, e.floating.texto, e.floating.estilo || 'ft-green', e.floating.offset !== undefined ? e.floating.offset : -30);
+            return true;
+        }
         if (e.op === 'ELEGIR') {
             // Selección visual sobre mesa/mano; si el jugador no completa la elección, ABORTA (no consume la carta)
             const p = game.players[ownerId];
@@ -8117,6 +8105,10 @@ const DSL = {
             pool = pool.filter(x => (e.filtros || []).every(f => DSL._match(x, f)) &&
                                     (!e.algunFiltro || e.algunFiltro.some(f => DSL._match(x, f))));
             pool = pool.filter(x => !((getCardTemplate(x.id) || {}).isAvatar)); // Kami: intocable
+            // excluirSelf: la propia carta fuente ya está en el campo cuando ELEGIR corre en
+            // AL_JUGAR (Kazuo/Gladiador eligiendo a quién anexar), así que el pool de ALIADOS
+            // la incluiría por defecto si no se filtra explícitamente (Toto, 27-jul-2026).
+            if (e.excluirSelf) pool = pool.filter(x => x.instanceId !== sourceCard.instanceId);
             if (e.sinMarcaTemporalPropia) pool = pool.filter(x => !(x.tempEffects && x.tempEffects.some(t => t.sourceId === sourceCard.id)));
             if (e.zona === 'VANGUARDIA') pool = pool.filter(x => x.location === 'vanguard');
             else if (e.zona === 'RETAGUARDIA') pool = pool.filter(x => x.location === 'rearguard');
@@ -8150,7 +8142,10 @@ const DSL = {
                 if (e.guardaIdsEnSelf) sourceCard[e.guardaIdsEnSelf] = lista.map(x => x.instanceId);
             };
             const dn = typeof game.getDisplayName === 'function' ? game.getDisplayName(ownerId) : ownerId;
-            const F = (t) => DSL._fill(t, { carta: sourceCard.name, jugador: dn });
+            // F incluye las vars propias de ESTA MISMA elección (p. ej. guardaEn: "maestro"
+            // guardado un poco más abajo) para que logDespues pueda referenciarlas — antes
+            // solo _logAntes las incluía (Toto, 27-jul-2026, migración de Kazuo/Gladiador).
+            const F = (t) => DSL._fill(t, Object.assign({}, (DSL._vars && DSL._vars[sourceCard.instanceId]) || {}, { carta: sourceCard.name, jugador: dn }));
             // elegidoPor: "RIVAL" -> quien clica/decide es el rival del dueño de la
             // carta (p. ej. ACERTIJO en cruz). El pool sigue siendo relativo al
             // DUEÑO (de:"ENEMIGOS" = el rival, elija quien elija); solo cambia el
@@ -8571,17 +8566,27 @@ const DSL = {
             };
         }
 
-        // AL_JUGAR -> onPlay. Nota: para Ayudas el motor NO espera onPlay (síncrono); para Eventos sí.
+        // AL_JUGAR -> onPlay (Ayudas, sin await; Eventos, con await) Y onAfterPlayAsync
+        // (Personajes/Esbirros: el motor NUNCA llama a onPlay para esos tipos, usa
+        // onBeforePlayAsync/onAfterPlayAsync — Toto, 27-jul-2026, arquitectura de anexo
+        // para Kazuo/Gladiador). Comparten el mismo cuerpo de efectos; cada compilador
+        // solo se engancha al hook que su tipo de carta realmente usa (guardas typeof
+        // independientes, como el resto de este compilador).
         // Efectos async (DAÑO) en AL_JUGAR: usar solo en Eventos.
         const alJugar = abs.find(a => a.trigger === 'AL_JUGAR');
-        if (alJugar && typeof tmpl.onPlay !== 'function') {
-            tmpl.onPlay = async function (card, game) {
+        if (alJugar) {
+            const _alJugarFn = async function (card, game) {
                 // El relleno incluye las vars de la carta (p. ej. lo guardado por un
                 // ELEGIR de ANTES_DE_JUGAR, como el deudor de Deuda con la mafia).
                 const varsJ = (DSL._vars && DSL._vars[card.instanceId]) || {};
                 if (alJugar.log) game.logMsg(DSL._fill(alJugar.log, Object.assign({}, varsJ, { carta: card.name, jugador: (typeof game.getDisplayName === 'function' ? game.getDisplayName(card.owner) : card.owner) })), alJugar.logTipo || 'ability');
                 await DSL._runEffectList(alJugar.efectos || [], card, game, card.owner, null);
+                // Refresco inmediato (Kazuo/Gladiador lo hacían a mano tras anexar, para que
+                // el Atq/Def/Vida suba sin esperar a la siguiente pasada natural).
+                if (typeof game.updatePassives === 'function') game.updatePassives();
             };
+            if (typeof tmpl.onPlay !== 'function') tmpl.onPlay = _alJugarFn;
+            if (typeof tmpl.onAfterPlayAsync !== 'function') tmpl.onAfterPlayAsync = async function (card, game, p) { await _alJugarFn(card, game); };
         }
 
         const consumir = abs.find(a => a.trigger === 'AL_CONSUMIR');
