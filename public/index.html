@@ -2242,15 +2242,15 @@
                     sourceAbility: sourceAbility || null,
                     sourceInstanceId: (sourceCard && typeof sourceCard === 'object') ? sourceCard.instanceId : null };
 
-                if (type === 'dot') showFloatingText(card.instanceId, "DAÑO T.", "ft-red");
-                else if (type === 'confusion') showFloatingText(card.instanceId, "CONFUSIÓN", "ft-purple");
-                else if (type === 'ceguera') showFloatingText(card.instanceId, "CEGUERA", "ft-gray");
+                if (type === 'dot') showFloatingText(card.instanceId, "DAÑO T.", "ft-dot");
+                else if (type === 'confusion') showFloatingText(card.instanceId, "CONFUSIÓN", "ft-confusion");
+                else if (type === 'ceguera') showFloatingText(card.instanceId, "CEGUERA", "ft-ceguera");
                 // SUEÑO (Toto, 29-jul-2026): faltaba aquí, junto a los otros tres estados
                 // "comunes" con duración. Silencio NO va en este switch porque ninguna carta lo
                 // aplica como status con duración (siempre es el flag continuo `isSilenced`,
                 // reimpuesto por Auras cada pasada) — su floater vive en updatePassives, en el
                 // punto donde se detecta la transición no-silenciado -> silenciado.
-                else if (type === 'sueno') showFloatingText(card.instanceId, "SUEÑO", "ft-blue");
+                else if (type === 'sueno') showFloatingText(card.instanceId, "SUEÑO", "ft-sueno");
 
                 this.render();
             }
@@ -4978,7 +4978,7 @@
                         // que lo use), así que el floater sale automático sin que cada carta
                         // tenga que ponerlo a mano. El guard `!b[3]` (no estaba silenciado antes
                         // de esta pasada) evita repetirlo mientras el silencio siga activo.
-                        if (!b[3] && c.isSilenced) { if (typeof showFloatingText === 'function') showFloatingText(c.instanceId, "SILENCIADO", "ft-gray"); }
+                        if (!b[3] && c.isSilenced) { if (typeof showFloatingText === 'function') showFloatingText(c.instanceId, "SILENCIADO", "ft-silencio"); }
                         if (!b[3] && c.isSilenced && !arr.some(m => m.stat === 'SILENCIO' && m.srcId === srcId)) arr.push(Object.assign({ stat: 'SILENCIO', delta: 1, badgeKey: 'silencio' }, meta));
                     });
                 };

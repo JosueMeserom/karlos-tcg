@@ -361,6 +361,17 @@ body {
 .ft-blue { color: #60a5fa; font-size: 1.2rem; }
 .ft-purple { color: #d946ef; font-size: 1.5rem; text-shadow: 0 0 5px #a21caf, 1px 1px 0 #000; }
 .ft-gray { color: #9ca3af; font-size: 1.5rem; text-shadow: 0 0 5px #4b5563, 1px 1px 0 #000; }
+
+/* Floaters de estados alterados "comunes" (dot/confusión/ceguera/sueño/silencio):
+   clases dedicadas que NO tocan ft-red/ft-purple/ft-gray/ft-blue (compartidas con
+   floaters ajenos, p. ej. delta de stats o los dramáticos de cartas concretas).
+   Solo fijan color; tamaño/sombra/timing salen tal cual de .floating-text, así
+   quedan idénticos entre sí por construcción. */
+.ft-dot { color: #ef4444; }
+.ft-confusion { color: #d946ef; }
+.ft-ceguera { color: #9ca3af; }
+.ft-sueno { color: #60a5fa; }
+.ft-silencio { color: #9ca3af; }
 .ft-ability { color: #22d3ee; font-size: 1.2rem; text-shadow: 0 0 10px #0891b2, 1px 1px 0 #000; letter-spacing: 1px; }
 
 /* Phase Banner */
