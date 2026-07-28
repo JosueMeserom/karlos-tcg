@@ -814,6 +814,64 @@
             attackerEl.style.zIndex = "";
         }
 
+        // Ataque ESPECIAL (Toto, 28-jul-2026). Tres tiempos, frente al "embestir y volver" del
+        // ataque normal:
+        //   1. El atacante canaliza EN SU SITIO (castCharge): temblor fino y creciente con halo,
+        //      a propósito distinto del hardShake del daño (brusco y con rotación).
+        //   2. Al soltar, el impacto aparece SOBRE el objetivo: anillos de energía que colapsan
+        //      y un núcleo que estalla. Abstracto adrede, para que valga a cualquier ataque
+        //      especial sin comprometerse con fuego/rayo/hielo (ver comentario en global.css).
+        //   3. Poco ANTES de que ese impacto termine, entra el tambaleo de recibir daño de
+        //      siempre (hardShake + borde rojo), así que el golpe se lee como consecuencia.
+        // De aquí en adelante todo es idéntico al ataque normal (daño, logs, muerte...).
+        // PENDIENTE (Toto, 28-jul-2026): cuando se migre Atomización, dar a las Ayudas dirigidas
+        // a un enemigo su propia variante — el "casteo" no sería de la carta que paga, sino de
+        // la Ayuda usándose, y el impacto sobre el objetivo debería evocar algo físico o algo
+        // mágico según la Ayuda (Atomización sería del segundo tipo). El tiempo 3 y el resto,
+        // igual que aquí.
+        async function animateSpecialAttack(attackerId, defenderId) {
+            const attackerEl = getAnimEl(attackerId);
+            const defenderEl = getAnimEl(defenderId);
+            const defenderCard = document.querySelector(`.card[data-id="${defenderId}"]`);
+
+            if (!attackerEl || !defenderEl) return;
+
+            // 1. Canalización en el sitio (sin desplazarse hacia el enemigo)
+            attackerEl.removeAttribute('style');
+            void attackerEl.offsetWidth;
+            attackerEl.classList.add('casting');
+            await game.sleep(450);
+            attackerEl.classList.remove('casting');
+
+            // 2. Impacto sobre el objetivo
+            const rect = (defenderCard || defenderEl).getBoundingClientRect();
+            const fx = document.createElement('div');
+            fx.className = 'special-impact';
+            fx.style.left = `${rect.left + rect.width / 2}px`;
+            fx.style.top = `${rect.top + rect.height / 2}px`;
+            fx.innerHTML = '<div class="si-ring"></div><div class="si-ring si-ring-2"></div><div class="si-core"></div>';
+            document.body.appendChild(fx);
+
+            // 3. Con el impacto aún en pantalla, el tambaleo de daño
+            await game.sleep(350);
+            if (defenderEl) defenderEl.style.animation = "hardShake 0.3s ease-out";
+            if (defenderCard) {
+                defenderCard.style.borderColor = "red";
+                defenderCard.style.boxShadow = "0 0 20px red inset";
+            }
+
+            await game.sleep(300);
+
+            fx.remove();
+            if (defenderEl) defenderEl.style.animation = "";
+            if (defenderCard) {
+                defenderCard.style.borderColor = "";
+                defenderCard.style.boxShadow = "";
+            }
+            attackerEl.style.transform = "";
+            attackerEl.style.zIndex = "";
+        }
+
         async function animateDodge(attackerId, defenderId) {
             const attackerEl = getAnimEl(attackerId);
             const defenderEl = getAnimEl(defenderId);
@@ -6698,7 +6756,10 @@
                     }
                 }
 
-                await animateAttack(attacker.instanceId, defender.instanceId);
+                // isSpecial elige la animación (Toto, 28-jul-2026): embestida física para el
+                // ataque normal, canalización + impacto de energía para el especial.
+                if (isSpecial) await animateSpecialAttack(attacker.instanceId, defender.instanceId);
+                else await animateAttack(attacker.instanceId, defender.instanceId);
 
                 if (dmg > 0) {
                     const oldHp = defender.currentHp;
