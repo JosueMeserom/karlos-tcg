@@ -824,11 +824,15 @@
         //   3. Poco ANTES de que ese impacto termine, entra el tambaleo de recibir daño de
         //      siempre (hardShake + borde rojo), así que el golpe se lee como consecuencia.
         // De aquí en adelante todo es idéntico al ataque normal (daño, logs, muerte...).
-        // PENDIENTE (Toto, 28-jul-2026): cuando se migre Atomización, dar a las Ayudas dirigidas
-        // a un enemigo su propia variante — el "casteo" no sería de la carta que paga, sino de
-        // la Ayuda usándose, y el impacto sobre el objetivo debería evocar algo físico o algo
-        // mágico según la Ayuda (Atomización sería del segundo tipo). El tiempo 3 y el resto,
-        // igual que aquí.
+        // PENDIENTE (Toto, 28-jul-2026, corregido tras su primer betasteo): cuando se migre
+        // Atomización, dar a las Ayudas dirigidas a un enemigo (con coste de Furor de un aliado
+        // o la acción de un aliado) su propia variante — el "casteo" lo hace QUIEN PAGA (la
+        // carta en el tablero que suelta el Furor o la acción), no la Ayuda en sí (que ni
+        // siquiera tiene una carta en el tablero a la que anclar la animación: se juega desde la
+        // mano y va directa al descarte). El impacto sobre el objetivo debe evocar algo físico o
+        // algo mágico/elemental según la Ayuda concreta (Atomización sería del segundo tipo,
+        // reutilizable el mismo .special-impact de aquí). El tiempo 3 (tambaleo de daño) y todo
+        // lo posterior, igual que en el ataque especial.
         async function animateSpecialAttack(attackerId, defenderId) {
             const attackerEl = getAnimEl(attackerId);
             const defenderEl = getAnimEl(defenderId);

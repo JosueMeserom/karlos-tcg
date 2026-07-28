@@ -297,7 +297,12 @@ body {
 }
 
 .special-impact { position: fixed; pointer-events: none; z-index: 1200; }
-.special-impact > div { position: absolute; left: 0; top: 0; border-radius: 50%; }
+/* transform base (Toto, 28-jul-2026): el anillo con animation-delay (.si-ring-2) pasa esos
+   primeros ~90ms SIN animar, con su CSS tal cual — sin este transform de centrado ya puesto,
+   ese hueco lo dejaba pegado a la esquina superior-izquierda del contenedor (el centro de la
+   carta), asomando hacia su esquina inferior-derecha, para luego "saltar" al centro en cuanto
+   arrancaba el keyframe. Con el transform ya aplicado de entrada, nace centrado desde el frame 0. */
+.special-impact > div { position: absolute; left: 0; top: 0; border-radius: 50%; transform: translate(-50%, -50%); }
 
 .special-impact .si-ring {
     width: 94px; height: 94px;
