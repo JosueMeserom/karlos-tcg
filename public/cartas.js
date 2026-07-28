@@ -8395,8 +8395,15 @@ const DSL = {
                 // soloSiHerido en grupo) de verdad hizo algo, como el `if (healed)` a mano.
                 if (res && res.anyApplied && alJugar.logSiAplicado) game.logMsg(DSL._fill(alJugar.logSiAplicado.msg, { carta: card.name }), alJugar.logSiAplicado.tipo || 'ability');
                 // Refresco inmediato (Kazuo/Gladiador lo hacían a mano tras anexar, para que
-                // el Atq/Def/Vida suba sin esperar a la siguiente pasada natural).
-                if (typeof game.updatePassives === 'function') game.updatePassives();
+                // el Atq/Def/Vida suba sin esperar a la siguiente pasada natural). NO para
+                // Eventos (Toto, 29-jul-2026): playCard YA llama a updatePassives() justo
+                // después de onPlay para ese tipo — refrescar aquí también duplicaba la pasada
+                // completa, y con ella cualquier detector de transición dentro de updatePassives
+                // (el SILENCIADO/OCULTO nuevos, que comparan "antes" vs "después" de UNA pasada)
+                // acababa disparando dos veces por el mismo cambio. Personaje/Esbirro
+                // (onAfterPlayAsync) y Ayuda (onPlay sin await, sin refresco posterior
+                // garantizado) sí lo necesitan.
+                if (card.type !== 'Evento' && typeof game.updatePassives === 'function') game.updatePassives();
             };
             if (typeof tmpl.onPlay !== 'function') tmpl.onPlay = _alJugarFn;
             if (typeof tmpl.onAfterPlayAsync !== 'function') tmpl.onAfterPlayAsync = async function (card, game, p) { await _alJugarFn(card, game); };

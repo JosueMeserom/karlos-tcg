@@ -2245,7 +2245,13 @@
                 if (type === 'dot') showFloatingText(card.instanceId, "DAÑO T.", "ft-red");
                 else if (type === 'confusion') showFloatingText(card.instanceId, "CONFUSIÓN", "ft-purple");
                 else if (type === 'ceguera') showFloatingText(card.instanceId, "CEGUERA", "ft-gray");
-                
+                // SUEÑO (Toto, 29-jul-2026): faltaba aquí, junto a los otros tres estados
+                // "comunes" con duración. Silencio NO va en este switch porque ninguna carta lo
+                // aplica como status con duración (siempre es el flag continuo `isSilenced`,
+                // reimpuesto por Auras cada pasada) — su floater vive en updatePassives, en el
+                // punto donde se detecta la transición no-silenciado -> silenciado.
+                else if (type === 'sueno') showFloatingText(card.instanceId, "SUEÑO", "ft-blue");
+
                 this.render();
             }
 
@@ -4965,6 +4971,14 @@
                         // El guard `!arr.some(...)` evita duplicar la línea cuando la marca ya se
                         // registró explícitamente (registrarStatMod, p. ej. un MARCAR continuo).
                         if (!b[2] && c.stealth && !arr.some(m => m.stat === 'OCULTO' && m.srcId === srcId)) arr.push(Object.assign({ stat: 'OCULTO', delta: 1, badgeKey: 'oculto' }, meta));
+                        // SILENCIADO (Toto, 29-jul-2026): mismo punto donde ya se detecta la
+                        // transición no-silenciado -> silenciado para la línea de "Afectado por:"
+                        // — es justo el único sitio por el que pasa CUALQUIER causa de silencio
+                        // (Aura de Feria del cómic, Deuda con la mafia, o cualquier carta futura
+                        // que lo use), así que el floater sale automático sin que cada carta
+                        // tenga que ponerlo a mano. El guard `!b[3]` (no estaba silenciado antes
+                        // de esta pasada) evita repetirlo mientras el silencio siga activo.
+                        if (!b[3] && c.isSilenced) { if (typeof showFloatingText === 'function') showFloatingText(c.instanceId, "SILENCIADO", "ft-gray"); }
                         if (!b[3] && c.isSilenced && !arr.some(m => m.stat === 'SILENCIO' && m.srcId === srcId)) arr.push(Object.assign({ stat: 'SILENCIO', delta: 1, badgeKey: 'silencio' }, meta));
                     });
                 };
