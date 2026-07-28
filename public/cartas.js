@@ -416,80 +416,21 @@ const CARD_DB = [
         immuneToEnemyEvents: true,
         immuneToEnemyAids: true,
 
-        // HOOK 1: Coste de 2 de Furor y Objetivos
-        canActivateAbility: function(card, game) {
-            if (card.furor < 2) { game.logError("Falta Furor (2)."); return false; }
-            const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
-            if (game.players[enemyId].vanguard.length === 0) {
-                game.logError("No hay enemigos en la Vanguardia para TIRO FINAL."); 
-                return false;
-            }
-            return true;
-        },
-
-        // HOOK 2: Iniciar Habilidad
-        onExecuteAbility: function(card, game) {
-            game.selectedCard = card;
-            game.inputState = 'SELECT_ABILITY_TARGETS';
-            game.abilityContext = { targets: [], maxTargets: 1, name: 'TIRO FINAL', targetType: 'enemy', isNormalAttack: true };
-            game.logError("Elige un enemigo para el Tiro Final.");
-            game.render();
-        },
-
-        // HOOK 3: Ejecutar Tiro Final (Ignora Defensa)
-        onTargetsReady: async function(card, game) {
-            const attacker = card;
-            const defender = game.abilityContext.targets[0];
-            
-            game.modifyStat(attacker, 'furor', -2);
-            showFloatingText(attacker.instanceId, attacker.activeName, "ft-ability", -30);
-            game.inputState = 'EXECUTING';
-            game.render();
-
-            game.logMsg(`¡${game.getCardNameWithOwner(attacker)} usa ${attacker.activeName}! (Ignora Defensa)`, 'ability');
-
-            // --- NUEVO FILTRO DE ESTADOS ALTERADOS ---
-            const canAttack = await game.checkAttackStatus(attacker, defender);
-            if (!canAttack) {
-                attacker.exhausted = true;
-                game.isActionLocked = false;
-                game.cancelAction();
-                game.updatePassives();
-                game.render();
-                return;
-            }
-            // -----------------------------------------
-
-            // Chequeo de defensa (Águila ya sabe que no puede esquivar el TIRO_FINAL)
-            let dodged = false;
-            const defTemplate = getCardTemplate(defender.id);
-            if (typeof defTemplate.onBeforeDefend === 'function') {
-                dodged = await defTemplate.onBeforeDefend(defender, attacker, game, game.abilityContext.name);
-            }
-            if (dodged) {
-                attacker.exhausted = true;
-                game.isActionLocked = false;
-                game.cancelAction();
-                game.render();
-                return;
-            }
-
-            // ¡Daño directo sin restar defensa!
-            const dmg = attacker.currentAtk; 
-
-            // Tiro Final es un ataque especial, por lo que ponemos 'true'
-            await game.dealDamage(attacker, defender, dmg, true);
-
-            await game.sleep(600);
-
-            attacker.exhausted = true;
-            await game.checkDeath(defender);
-
-            game.isActionLocked = false;
-            game.cancelAction();
-            game.updatePassives();
-            game.render();
-        },
+        // ACTIVA migrada (27/28-jul-2026, tanda de volumen #2): estrena `ignorarDefensa` (daño
+        // = Atq puro) y `chequearEstado` (comprueba Confusión/Ceguera/Sueño propios antes de
+        // golpear, vía checkAttackStatus — el mismo gate que performAttack usa para el ataque
+        // normal; Hechicero/Lolita nunca lo comprobaban, Eris sí, de ahí el opt-in). El log pasa
+        // a nombrar a Eris a secas (sin dueño): mismo criterio que el resto de auto-referencias
+        // de ACTIVA en el DSL (Hawke, etc.) — el jugador ya sabe qué carta activó, por eso el
+        // resto del log SÍ nombra con dueño a quien RECIBE el efecto, no a quien lo causa.
+        abilities: [
+            { trigger: "ACTIVA", nombre: "TIRO FINAL", coste: { furor: 2 },
+              requisitos: [ { count: { quien: "ENEMIGO", zona: "vanguardia" }, op: ">=", valor: 1, msg: "No hay enemigos en la Vanguardia para TIRO FINAL." } ],
+              target: { quien: "ENEMIGO", cantidad: 1 },
+              ataqueNormal: true,
+              log: "¡{carta} usa TIRO FINAL! (Ignora Defensa)",
+              efectos: [ { op: "ATACAR", especial: true, ignorarDefensa: true, chequearEstado: true } ] }
+        ],
 
         // HOOK 4: Inmunidad a efectos mágicos/eventos/ayudas
         onBeforeAffectedByEnemyEffect: function(card, effectCard, game) {
@@ -1148,43 +1089,19 @@ const CARD_DB = [
             }
         },
 
-        // HOOK 2: Validar Habilidad Activa (Mensajes privados)
-        canActivateAbility: function(card, game) {
-            if (card.furor < 1) { game.logError("Falta Furor (1)."); return false; }
-            const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
-            if (game.players[enemyId].vanguard.length === 0) {
-                game.logError("No hay enemigos en Vanguardia para golpear."); 
-                return false;
-            }
-            return true;
-        },
-
-        // HOOK 3: Seleccionar objetivo (Instrucción privada)
-        onExecuteAbility: function(card, game) {
-            game.selectedCard = card;
-            game.inputState = 'SELECT_ABILITY_TARGETS';
-            game.abilityContext = { targets: [], maxTargets: 1, name: 'PUÑO DE NEUTRONES', targetType: 'enemy', isNormalAttack: true };
-            game.logError("Elige objetivo enemigo para PUÑO DE NEUTRONES.");
-            game.render();
-        },
-
-        // HOOK 4: Ejecutar el ataque "normal" dopado
-        onTargetsReady: async function(card, game) {
-            const target = game.abilityContext.targets[0];
-            
-            game.modifyStat(card, 'furor', -1);
-            game.logMsg(`¡${card.name} prepara su PUÑO DE NEUTRONES! (+2 ATQ en este golpe)`, 'ability');
-            
-            showFloatingText(card.instanceId, card.activeName, "ft-ability", -40);
-            showFloatingText(card.instanceId, "+2 ATQ", "ft-green", -20);
-            
-            card.currentAtk += 2;
-            
-            await game.performAttack(card, target);
-            
-            card.currentAtk -= 2; 
-            showFloatingText(card.instanceId, "-2 ATQ", "ft-red-stat", -20);
-        }
+        // ACTIVA migrada (27/28-jul-2026, tanda de volumen #2): mismo patrón que
+        // Hiposaurio/CABREO — ataque normal + bono de Atq. RADIACIÓN (pasiva de fin de
+        // turno con modal) se queda imperativa: no hay trigger DSL de fin de turno
+        // interactivo por carta, y no compensa crear uno para esta sola pasiva.
+        abilities: [
+            { trigger: "ACTIVA", nombre: "PUÑO DE NEUTRONES", coste: { furor: 1 },
+              requisitos: [ { count: { quien: "ENEMIGO", zona: "vanguardia" }, op: ">=", valor: 1 } ],
+              target: { quien: "ENEMIGO", cantidad: 1 },
+              ataqueNormal: true,
+              log: "¡{carta} prepara su PUÑO DE NEUTRONES! (+2 ATQ en este golpe)",
+              floatingExtra: [ { texto: "+2 ATQ", estilo: "ft-green", offset: -20 } ],
+              efectos: [ { op: "ATACAR", bonoAtq: 2 } ] }
+        ]
     },
     { 
         id: 11, name: "Garret", hp: 4, def: 8, atk: 9, type: "Personaje", subtype: "Ser vivo", tags: ['Usuario de magia'], gender: 'M', rarity: "S", 
@@ -5925,47 +5842,31 @@ const CARD_DB = [
         activeName: "LIDERAZGO", activeCost: 1,
         canUseAbilityFromRearguard: true,
         
-        canActivateAbility: function(card, game) {
-            if (card.furor < 1) { game.logError("Falta Furor (1)."); return false; }
-            const valid = game.players[card.owner].vanguard.filter(c => !c.hasAttackedThisTurn);
-            if (valid.length === 0) { game.logError("No hay aliados válidos en vanguardia que no hayan atacado."); return false; }
-            return true;
-        },
-        onExecuteAbility: function(card, game) {
-            game.selectedCard = card;
-            game.inputState = 'SELECT_ABILITY_TARGETS';
-            game.abilityContext = { targets: [], maxTargets: 1, name: 'LIDERAZGO', targetType: 'ally' };
-            game.render();
-        },
-        onValidateTarget: function(card, target, game, isSilent) {
-            if (target.owner !== card.owner || target.location !== 'vanguard') return false;
-            if (target.hasAttackedThisTurn) { if (!isSilent) game.logError("Ese aliado ya ha atacado este turno."); return false; }
-            return true;
-        },
-        onTargetsReady: async function(card, game) {
-            const target = game.abilityContext.targets[0];
-            game.modifyStat(card, 'furor', -1);
-            showFloatingText(card.instanceId, "LIDERAZGO", "ft-ability", -30);
-            
-            if (!target.tempEffects) target.tempEffects = [];
-            target.tempEffects.push({ sourceId: card.id, ownerId: card.owner, type: 'liderazgo' });
-            
-            game.logMsg(`${card.name} motiva profundamente a ${target.name}. (+2 ATQ temporal)`, 'ability');
-            showFloatingText(target.instanceId, "+2 ATQ", "ft-green", -20);
-            
-            card.exhausted = true;
-            game.isActionLocked = false;
-            game.cancelAction();
-            game.updatePassives();
-            game.render();
-        },
-        onUpdateTempEffect: function(target, effect, game) {
-            if (effect.type === 'liderazgo') target.currentAtk += 2;
-        },
+        // ACTIVA migrada (28-jul-2026, tanda de volumen #2). Estrena `stats` en
+        // MARCAR_TEMPORAL: bono continuo de Atq/Def mientras la marca dure, sin escribir un
+        // onUpdateTempEffect a mano (el compilador lo genera solo, reutilizable por cualquier
+        // carta futura con este mismo patrón "+N hasta que se cumpla X"). El log de expiración
+        // SÍ se queda a mano (más abajo): el `hastaFinDeTurnoPropio` genérico no anuncia nada al
+        // caducar, y aquí Toto quería avisar.
+        abilities: [
+            { trigger: "ACTIVA", nombre: "LIDERAZGO", coste: { furor: 1 },
+              requisitos: [ { count: { zona: "vanguardia", filtros: [ { campo: "hasAttackedThisTurn", op: "falsy" } ] }, op: ">=", valor: 1, msg: "No hay aliados válidos en vanguardia que no hayan atacado." } ],
+              target: { quien: "ALIADO", cantidad: 1 },
+              validarObjetivo: [
+                { campo: "location", op: "==", valor: "vanguard" },
+                { campo: "hasAttackedThisTurn", op: "falsy", msg: "Ese aliado ya ha atacado este turno." }
+              ],
+              efectos: [
+                { op: "MARCAR_TEMPORAL", conOwner: true, actualizaPasivas: true, hastaFinDeTurnoPropio: true,
+                  stats: { atk: 2 },
+                  floating: { texto: "+2 ATQ", estilo: "ft-green", offset: -20 },
+                  log: "{carta} motiva profundamente a {objetivo}. (+2 ATQ temporal)" }
+              ] }
+        ],
         onEndTurnTempEffect: function(target, effect, game, currentTurnPlayerId) {
-            if (currentTurnPlayerId === effect.ownerId && effect.type === 'liderazgo') {
-                game.logMsg(`El Liderazgo sobre ${target.name} expira.`, 'system');
-                return false; 
+            if (effect.hastaFinDeTurnoPropio && target.owner === currentTurnPlayerId) {
+                game.logMsg(`El Liderazgo sobre ${DSL._nombre(game, target)} expira.`, 'system');
+                return false;
             }
             return true;
         }
@@ -7006,38 +6907,16 @@ const CARD_DB = [
         isToken: true, // Esto le quita la retribución al morir automáticamente en checkDeath
         text: "P: PRESTIGIO: Esta carta no te otorga retribución cuando su Vida llega a 0. A: NOCIONES DE OCULTISMO (1F): Realiza un ataque especial subiendo el Atq de esta carta en 2 durante dicho ataque.",
         passiveName: "PRESTIGIO", activeName: "NOCIONES DE OCULTISMO", activeCost: 1,
-        canActivateAbility: function(card, game) {
-            if (card.furor < 1) { game.logError("Falta Furor (1)."); return false; }
-            const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
-            if (game.players[enemyId].vanguard.length === 0) return false;
-            return true;
-        },
-        onExecuteAbility: function(card, game) {
-            game.selectedCard = card;
-            game.inputState = 'SELECT_ABILITY_TARGETS';
-            game.abilityContext = { targets: [], maxTargets: 1, name: 'NOCIONES DE OCULTISMO', targetType: 'enemy' };
-            game.render();
-        },
-        onTargetsReady: async function(card, game) {
-            const target = game.abilityContext.targets[0];
-            game.modifyStat(card, 'furor', -1);
-            showFloatingText(card.instanceId, card.activeName, "ft-ability", -30);
-            showFloatingText(card.instanceId, "+2 ATQ", "ft-green", -10);
-            
-            card.currentAtk += 2;
-            let dmg = card.currentAtk - target.currentDef;
-            if (dmg <= 0) dmg = (card.type === 'Esbirro' && target.type === 'Personaje') ? 0.5 : 1;
-            
-            await game.dealDamage(card, target, dmg, true); // Especial
-            await game.checkDeath(target);
-            card.currentAtk -= 2;
-            
-            card.exhausted = true;
-            game.isActionLocked = false;
-            game.cancelAction();
-            game.updatePassives();
-            game.render();
-        }
+        // Migrada por completo (27/28-jul-2026, tanda de volumen #2). Mismo patrón que
+        // Hechicero/CHIRIBITA: ATACAR especial:true. CORRECCIÓN igual que allí: la vieja
+        // no comprobaba onBeforeDefend antes de golpear.
+        abilities: [
+            { trigger: "ACTIVA", nombre: "NOCIONES DE OCULTISMO", coste: { furor: 1 },
+              requisitos: [ { count: { quien: "ENEMIGO", zona: "vanguardia" }, op: ">=", valor: 1 } ],
+              target: { quien: "ENEMIGO", cantidad: 1 },
+              floatingExtra: [ { texto: "+2 ATQ", estilo: "ft-green", offset: -10 } ],
+              efectos: [ { op: "ATACAR", especial: true, bonoAtq: 2 } ] }
+        ]
     },
     {
         name: "Uniojo", hp: 2, def: 1, atk: 4, type: "Esbirro", subtype: "Ser vivo", tags: ["Animal salvaje"], rarity: "C", cost: 1, series: 2,
@@ -7830,16 +7709,27 @@ const DSL = {
                 // Esbirro-vs-Personaje) y llama a dealDamage(..., true) directamente. dealDamage
                 // YA trae su propio pipeline (onBeforeTakeDamage, guardaespaldas, reacciones de
                 // mano); lo único que hacían las cartas a mano ADEMÁS de eso era la esquiva.
-                const defTpl = DSL._tmpl(target.id);
-                let dodged = false;
-                if (defTpl && typeof defTpl.onBeforeDefend === 'function') {
-                    dodged = await defTpl.onBeforeDefend(target, sourceCard, game, habilidad || sourceCard.name);
-                }
-                if (!dodged) {
-                    let dmg = sourceCard.currentAtk - target.currentDef;
-                    if (dmg <= 0) dmg = (sourceCard.type === 'Esbirro' && target.type === 'Personaje') ? 0.5 : 1;
-                    await game.dealDamage(sourceCard, target, dmg, true);
-                    await game.checkDeath(target);
+                // chequearEstado (Eris, TIRO FINAL): algunas cartas SÍ comprobaban
+                // Confusión/Ceguera/Sueño propios antes de golpear (checkAttackStatus, el mismo
+                // gate que performAttack usa internamente para el ataque normal); otras
+                // (Hechicero, Lolita) nunca lo hicieron. Opt-in para no cambiar a las que no lo
+                // pedían. Si falla, la carta se agota igual que en el ataque normal.
+                if (e.chequearEstado && typeof game.checkAttackStatus === 'function' && !(await game.checkAttackStatus(sourceCard, target))) {
+                    sourceCard.exhausted = true;
+                } else {
+                    const defTpl = DSL._tmpl(target.id);
+                    let dodged = false;
+                    if (defTpl && typeof defTpl.onBeforeDefend === 'function') {
+                        dodged = await defTpl.onBeforeDefend(target, sourceCard, game, habilidad || sourceCard.name);
+                    }
+                    if (!dodged) {
+                        // ignorarDefensa (Eris, TIRO FINAL, 27/28-jul-2026): el daño es el Atq
+                        // puro, sin restar Def. El suelo 0.5/1 sigue aplicando si el Atq es <= 0.
+                        let dmg = e.ignorarDefensa ? sourceCard.currentAtk : sourceCard.currentAtk - target.currentDef;
+                        if (dmg <= 0) dmg = (sourceCard.type === 'Esbirro' && target.type === 'Personaje') ? 0.5 : 1;
+                        await game.dealDamage(sourceCard, target, dmg, true);
+                        await game.checkDeath(target);
+                    }
                 }
             } else {
                 await game.performAttack(sourceCard, target);
@@ -8203,6 +8093,11 @@ const DSL = {
             // para cuentas atrás de varios turnos — sería una arquitectura nueva, como
             // PASIVA_CONTINUA o REACCION, que no compensa para una sola carta).
             if (e.duracion !== undefined) { marca.duration = e.duracion; marca.turnApplied = game.turn; }
+            // stats (Capitán Guardia Real, LIDERAZGO, 28-jul-2026): bono continuo de Atq/Def
+            // mientras la marca dure, sin necesidad de un onUpdateTempEffect escrito a mano —
+            // el compilador wire uno genérico más abajo (ver el guard "MARCAR_TEMPORAL" en
+            // JSON.stringify(abs)) cuando ninguna otra cosa lo haya declarado ya.
+            if (e.stats) marca.stats = e.stats;
             target.tempEffects.push(marca);
             if (e.floating && typeof showFloatingText === 'function') showFloatingText(target.instanceId, e.floating.texto || e.floating, e.floating.estilo || e.floatingStyle || 'ft-ability', (e.floating.offset !== undefined ? e.floating.offset : (e.offsetFloating !== undefined ? e.offsetFloating : -40)));
             if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
@@ -9125,6 +9020,16 @@ const DSL = {
                 // Las marcas con hastaFinDeTurnoPropio caducan al terminar el turno del dueño de la carta marcada
                 tmpl.onEndTurnTempEffect = function (card, eff, game, activePid) {
                     return !(eff.hastaFinDeTurnoPropio && card.owner === activePid);
+                };
+            }
+            // stats (Capitán Guardia Real, LIDERAZGO, 28-jul-2026): reaplica el bono de
+            // Atq/Def de cualquier marca que lo declare (ver `stats` en MARCAR_TEMPORAL) sin
+            // que la carta necesite su propio onUpdateTempEffect a mano.
+            if (typeof tmpl.onUpdateTempEffect !== 'function') {
+                tmpl.onUpdateTempEffect = function (card, eff, game) {
+                    if (!eff.stats) return;
+                    if (eff.stats.atk) card.currentAtk += eff.stats.atk;
+                    if (eff.stats.def) card.currentDef += eff.stats.def;
                 };
             }
             if (tmpl.tempEffectText && typeof tmpl.onGetPreviewEffects !== 'function') {
