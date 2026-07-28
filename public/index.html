@@ -6551,6 +6551,18 @@
                         if (veto) return veto;
                     }
                 }
+                // Marcas temporales SOBRE EL ATACANTE (Toto, 28-jul-2026): faltaba esta capa, así
+                // que un veto que vivía en un tempEffect (la Pesantez Mutua de Clarise) no se
+                // veía hasta el momento del golpe — la carta se dejaba seleccionar, pedía
+                // objetivo y acababa AGOTÁNDOSE sin atacar. Con esta capa el aviso sale al
+                // clicarla, como el resto de vetos de §11b.
+                for (const eff of (attacker && attacker.tempEffects) || []) {
+                    const t = getCardTemplate(eff.sourceId);
+                    if (t && typeof t.onVetoAttackStartTempEffect === 'function') {
+                        const veto = t.onVetoAttackStartTempEffect(attacker, eff, this);
+                        if (veto) return veto;
+                    }
+                }
                 return null;
             }
 

@@ -7343,6 +7343,24 @@ const DSL = {
     QUIEN: ['SELF', 'ALIADO', 'ENEMIGO', 'TODOS', 'ATACANTE', 'DEFENSOR'], // ATACANTE/DEFENSOR: solo en GLOBAL_TRAS_ATAQUE y REACCION
 
     _tmpl(id) { return (typeof getCardTemplate === 'function') ? getCardTemplate(id) : CARD_DB.find(c => c.id === id); },
+
+    // ¿Le afecta de verdad un veto de ataque NORMAL (vetoAtaqueNormal) a esta carta?
+    // (Toto, 28-jul-2026). Dos exenciones, ambas leídas del texto de las cartas implicadas:
+    //   · `uncounterable` (Aniceto, SAPIENCIA MÁGICA: "No se pueden contrarrestar sus ataques
+    //     ni su Habilidad activa con Habilidades, ni con cartas de Ayuda o de Evento") — un
+    //     veto puesto por una Activa enemiga es exactamente eso, así que no le alcanza.
+    //   · `treatAttacksAsSpecial` (marca de instancia, p. ej. la que pone Infusión de maná):
+    //     si TODOS sus ataques cuentan como especiales, un veto de ataques normales no tiene
+    //     nada que vetar.
+    // Se consulta desde los dos sitios que aplican el veto (el temprano, al clicar la carta,
+    // y el del momento del golpe) para que no puedan discrepar.
+    _vetoAtaqueAplica(atacante) {
+        if (!atacante) return false;
+        if (atacante.treatAttacksAsSpecial) return false;
+        const t = DSL._tmpl(atacante.id) || {};
+        if (t.uncounterable) return false;
+        return true;
+    },
     _field(c, campo) {
         const k = String(campo).replace(/^self\./, '');
         if (k === 'hp') return c.currentHp;
@@ -8992,11 +9010,24 @@ const DSL = {
             // en el estado exportado).
             if (typeof tmpl.onBeforeAttackTempEffect !== 'function') {
                 tmpl.onBeforeAttackTempEffect = async function (attacker, eff, defender, game) {
-                    if (!eff.vetoAtaqueNormal) return true;
+                    if (!eff.vetoAtaqueNormal || !DSL._vetoAtaqueAplica(attacker)) return true;
                     const esNormal = !game.abilityContext || game.abilityContext.isNormalAttack;
                     if (!esNormal) return true;
                     if (tmpl.tempEffectVetoLog) game.logMsg(DSL._fill(tmpl.tempEffectVetoLog, { objetivo: DSL._nombre(game, attacker), genero: attacker.gender }), 'ability');
                     return false;
+                };
+            }
+            // Veto TEMPRANO (§11b): el aviso sale al CLICAR la carta, no tras pedir objetivo y
+            // agotarla en balde (betasteo de Toto, 28-jul-2026). Devuelve el texto del aviso, y
+            // el motor (getAttackStartVeto) lo saca por logError. Aquí no hay abilityContext
+            // todavía —se está iniciando un ataque normal desde el tablero— así que basta con
+            // comprobar si el veto alcanza a esta carta.
+            if (typeof tmpl.onVetoAttackStartTempEffect !== 'function') {
+                tmpl.onVetoAttackStartTempEffect = function (attacker, eff, game) {
+                    if (!eff.vetoAtaqueNormal || !DSL._vetoAtaqueAplica(attacker)) return null;
+                    return tmpl.tempEffectVetoLog
+                        ? DSL._fill(tmpl.tempEffectVetoLog, { objetivo: DSL._nombre(game, attacker), genero: attacker.gender })
+                        : null;
                 };
             }
             // hastaInicioTurnoLanzador: caduca al empezar el turno de quien puso la marca.

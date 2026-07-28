@@ -67,6 +67,10 @@ const escenarios = [
     },
     {
         // Caso 1 del texto: ataque NORMAL directo desde el tablero -> vetado.
+        // Betasteo de Toto (28-jul-2026): el veto sale ahora al CLICAR la carta (§11b), no tras
+        // dejarla elegir objetivo y agotarla en balde. Por eso la nueva ni la agota ni le marca
+        // hasAttackedThisTurn, y el aviso pasa de log público a logError privado (el mismo trato
+        // que el resto de vetos de inicio de ataque del motor).
         nombre: 'El marcado NO puede hacer un ataque normal en el turno del rival',
         p1: { vanguardia: [{ carta: 'Clarise', furor: 1 }] },
         p2: { vanguardia: ['Mini-tigre'] },
@@ -75,35 +79,66 @@ const escenarios = [
             { finTurno: true }, // p1 -> p2: la marca sigue activa durante TODO el turno de p2
             { atacar: 'Mini-tigre', objetivo: 'Clarise' }, // vetado por la Pesantez
         ],
-        logsIntencionados: [
-            LOG_MARCA,
-            { de: '¡PESANTEZ MUTUA! Mini-tigre está inmovilizado y no puede realizar ataques físicos.',
-              a: '¡PESANTEZ MUTUA! Mini-tigre [1] de J2 (Jugador 2) está inmovilizado y no puede realizar ataques físicos.',
-              motivo: 'cambio de formato de nombre; el género sigue en masculino porque Mini-tigre es de género neutro (no "F")' },
+        logsIntencionados: [ LOG_MARCA ],
+        logsSoloVieja: [
+            { linea: 'PESANTEZ MUTUA! Mini-tigre',
+              motivo: 'la vieja dejaba iniciar el ataque y avisaba por log público justo antes del golpe; la nueva veta al clicar la carta, con logError privado (no comparado), como el resto de vetos de §11b' },
         ],
-        diferenciasEsperadas: DIFS_MARCA,
+        diferenciasEsperadas: DIFS_MARCA.concat([
+            { contiene: 'estado.p2.vanguard.0.exhausted',
+              motivo: 'CORRECCIÓN pedida por Toto: la vieja agotaba la carta pese a no llegar a atacar; la nueva la deja intacta, así que puede hacer otra cosa con ella ese turno' },
+            { contiene: 'estado.p2.vanguard.0.hasAttackedThisTurn',
+              motivo: 'idem: la vieja la marcaba como "ya atacó" aunque el ataque nunca ocurrió' },
+        ]),
     },
     {
         // Caso 2 del texto: Habilidad que SÍ involucra un ataque normal -> también vetada.
+        // En la NUEVA el veto corta ya en activateAbility (el gate `abilityUsesAttack` que el
+        // compilador pone a las Activas con `ataqueNormal`), así que ni siquiera llega a abrir
+        // el modal de confirmación ni a pedir objetivo: de ahí los pasos `soloEn: 'vieja'`.
         nombre: 'El marcado tampoco puede usar una Habilidad de ataque normal (CABREO)',
         p1: { vanguardia: [{ carta: 'Clarise', furor: 1 }] },
         p2: { vanguardia: [{ carta: 'Hiposaurio', furor: 3 }] },
         pasos: [
             { habilidad: 'Clarise' }, { confirmar: true }, { elegir: ['Hiposaurio'] },
             { finTurno: true },
-            { habilidad: 'Hiposaurio' }, { confirmar: true }, { elegir: ['Clarise'] },
+            { habilidad: 'Hiposaurio' },
+            { soloEn: 'vieja', confirmar: true },
+            { soloEn: 'vieja', elegir: ['Clarise'] },
         ],
         logsIntencionados: [
             { de: '¡Hiposaurio sufre Pesantez Mutua! Sus piernas pesan toneladas.',
               a: '¡Hiposaurio [1] de J2 (Jugador 2) sufre Pesantez Mutua! Sus piernas pesan toneladas.',
               motivo: 'cambio de formato de nombre' },
-            { de: '¡PESANTEZ MUTUA! Hiposaurio está inmovilizado y no puede realizar ataques físicos.',
-              a: '¡PESANTEZ MUTUA! Hiposaurio [1] de J2 (Jugador 2) está inmovilizado y no puede realizar ataques físicos.',
-              motivo: 'idem: cambio de formato de nombre' },
+        ],
+        // "Objetivos listos" es una línea genérica del motor: sale 2 veces en la vieja (una por
+        // el ELEGIR de Clarise, otra al pedir objetivo para CABREO) y 1 en la nueva (solo la de
+        // Clarise, porque el gate corta antes). El harness solo sabe filtrar TODAS las
+        // ocurrencias de una línea, no "una sola", así que se filtra de ambos lados; lo que de
+        // verdad demuestra que la nueva no ejecutó CABREO son los flotantes y el estado de más
+        // abajo (Furor sin gastar, acción sin consumir), que sí son inequívocos.
+        logsSoloVieja: [
+            { linea: 'Objetivos listos', motivo: 'ver comentario: aparece 2x en la vieja, 1x en la nueva' },
+            { linea: 'PESANTEZ MUTUA! Hiposaurio',
+              motivo: 'idem al escenario anterior: el aviso pasa a logError privado al intentar activar la Habilidad' },
+        ],
+        logsSoloNueva: [
+            { linea: 'Objetivos listos', motivo: 'idem: se filtra también aquí para que la comparación no se desalinee' },
+        ],
+        flotantesSoloVieja: [
+            { linea: '-3 FUR · ft-red-stat', motivo: 'la vieja cobraba el coste de CABREO antes de descubrir que el ataque estaba vetado' },
+            { linea: 'CABREO · ft-ability', motivo: 'la vieja llegaba a anunciar la Habilidad; la nueva ni la activa' },
+            { linea: '+2 ATQ · ft-green', motivo: 'idem: la vieja aplicaba el bono de CABREO antes del veto' },
         ],
         diferenciasEsperadas: DIFS_MARCA.concat([
+            { contiene: 'estado.p2.vanguard.0.hasAttackedThisTurn',
+              motivo: 'CORRECCIÓN: la vieja marcaba a Hiposaurio como "ya atacó" pese a que el ataque quedó vetado' },
             { contiene: 'estado.p2.vanguard.0.currentAtk',
-              motivo: 'bug de la Hiposaurio VIEJA, ya documentado en regresion28 y corregido por su propia migración: sumaba el bono a mano, llamaba a performAttack (que internamente resetea los stats con updatePassives) y luego restaba el bono otra vez, dejando el Atq por debajo de su base. Aflora aquí porque el ataque queda vetado por la Pesantez a mitad del proceso; la nueva recalcula con updatePassives y acaba correctamente en su base (2)' },
+              motivo: 'bug de la Hiposaurio VIEJA, ya documentado en regresion28 y corregido por su propia migración: sumaba el bono a mano, llamaba a performAttack (que internamente resetea los stats con updatePassives) y luego restaba el bono otra vez, dejando el Atq por debajo de su base. Aflora aquí porque el ataque queda vetado por la Pesantez a mitad del proceso' },
+            { contiene: 'estado.p2.vanguard.0.exhausted',
+              motivo: 'CORRECCIÓN: la vieja agotaba a Hiposaurio al vetarle el CABREO; la nueva ni le deja activarlo, así que conserva su acción' },
+            { contiene: 'estado.p2.vanguard.0.furor',
+              motivo: 'CORRECCIÓN: la vieja le cobraba los 3 de Furor de CABREO antes de descubrir que el ataque estaba vetado; la nueva corta antes de cobrar nada' },
         ]),
     },
     {
@@ -122,6 +157,43 @@ const escenarios = [
               motivo: 'cambio de formato de nombre' },
         ],
         diferenciasEsperadas: DIFS_MARCA,
+    },
+    {
+        // Exención de Aniceto (Toto, 28-jul-2026). SAPIENCIA MÁGICA: "No se pueden contrarrestar
+        // sus ataques ni su Habilidad activa con Habilidades, ni con cartas de Ayuda o de
+        // Evento" — la Pesantez es una Activa enemiga, así que no le alcanza: la marca se le
+        // puede poner, pero NO le impide atacar. La vieja sí le bloqueaba el ataque (no miraba
+        // `uncounterable` en ninguna parte del veto).
+        nombre: 'Aniceto (uncounterable) ignora la Pesantez y ataca con normalidad',
+        p1: { vanguardia: [{ carta: 'Clarise', furor: 1 }] },
+        p2: { vanguardia: [{ carta: 'Aniceto', furor: 0 }] },
+        pasos: [
+            { habilidad: 'Clarise' }, { confirmar: true }, { elegir: ['Aniceto'] },
+            { finTurno: true },
+            { atacar: 'Aniceto', objetivo: 'Clarise' }, // la vieja lo veta; la nueva lo deja atacar
+        ],
+        logsIntencionados: [
+            { de: '¡Aniceto sufre Pesantez Mutua! Sus piernas pesan toneladas.',
+              a: '¡Aniceto de J2 (Jugador 2) sufre Pesantez Mutua! Sus piernas pesan toneladas.',
+              motivo: 'cambio de formato de nombre' },
+        ],
+        logsSoloVieja: [
+            { linea: 'PESANTEZ MUTUA! Aniceto',
+              motivo: 'BUG de la vieja: vetaba también a Aniceto, ignorando que su Pasiva dice que no se le puede contrarrestar con Habilidades' },
+        ],
+        logsSoloNueva: [
+            { linea: 'recibe', motivo: 'la nueva le deja atacar de verdad, así que Clarise recibe el golpe' },
+        ],
+        flotantesSoloNueva: [
+            { linea: 'VIDA · ft-red', motivo: 'daño real del ataque que la vieja impedía' },
+        ],
+        diferenciasEsperadas: DIFS_MARCA.concat([
+            { contiene: 'estado.p1.vanguard.0.currentHp',
+              motivo: 'CORRECCIÓN: Aniceto sí ataca, así que Clarise pierde Vida; en la vieja el ataque quedaba vetado y no pasaba nada' },
+            // `exhausted`/`hasAttackedThisTurn` NO se declaran: acaban igual en ambas bases (la
+            // vieja lo agotaba por el veto, la nueva por atacar de verdad). Lo que distingue a
+            // una de otra es el daño y el log, ya declarados arriba.
+        ]),
     },
     {
         // La marca cubre el turno del rival y se limpia al volver el turno del lanzador.
