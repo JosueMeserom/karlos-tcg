@@ -80,33 +80,18 @@ const escenarios = [
         pasos: [ { habilidad: 'Hechicero' } ],
     },
     {
-        // CORRECCIÓN (no diferencia neutral): con la moneda de Águila en CARA, esquiva y
-        // CHIRIBITA no hace daño. La vieja jamás llamaba a onBeforeDefend en su ataque
-        // especial, así que SIEMPRE golpeaba a Águila pase lo que pase con su moneda.
-        nombre: 'Hechicero: CHIRIBITA contra Águila con esquiva (bug corregido: ahora si esquiva, la vieja igual golpeaba)',
+        // Betasteo de Toto (28-jul-2026): Águila solo esquiva "ante ataques normales" (así lo
+        // dice su propio texto) — un ataque especial nunca debió poder ser esquivado.
+        // onBeforeDefend ahora recibe un 5º parámetro `isSpecial`; Águila lo comprueba y
+        // declina la esquiva EN SILENCIO (sin log, sin flotante, sin moneda) cuando es true.
+        // La vieja (base congelada) nunca llegó a llamar a onBeforeDefend en su ataque especial
+        // (el primer bug, ya documentado en el escenario "CHIRIBITA (ataque especial + 1 Atq)"
+        // de esta misma suite) — así que el resultado NETO es idéntico en ambas bases: Águila
+        // siempre recibe el golpe, sin ningún log de su Pasiva de por medio.
+        nombre: 'Hechicero: CHIRIBITA contra Águila — nunca esquiva un ataque especial',
         p1: { vanguardia: [{ carta: 'Hechicero', furor: 1 }] },
         p2: { vanguardia: ['Águila'] },
         pasos: [ { habilidad: 'Hechicero' }, { confirmar: true }, { elegir: ['Águila'] } ],
-        // monedas asimétrico: la nueva SÍ pide la moneda de esquiva (onBeforeDefend), la vieja
-        // nunca llega a pedirla — eso es justo el bug que corrige la migración.
-        monedas: { vieja: [], nueva: ['cara'] }, // PSEUDO-PREVASIÓN: cara = esquiva con éxito
-        logsSoloVieja: [
-            { linea: 'recibe 2 daño', motivo: 'bug de la vieja: golpea siempre, sin comprobar la esquiva de Águila' },
-        ],
-        logsSoloNueva: [
-            { linea: 'PSEUDO-PREVASIÓN tiene lugar', motivo: 'la nueva SÍ comprueba onBeforeDefend antes de golpear' },
-            { linea: 'ESQUIVÓ el ataque de Hechicero', motivo: 'con la moneda en cara, Águila esquiva' },
-        ],
-        flotantesSoloVieja: [
-            { linea: '-2 VIDA · ft-red', motivo: 'la vieja sí hace daño (bug)' },
-        ],
-        flotantesSoloNueva: [
-            { linea: 'PSEUDO-PREVASIÓN · ft-ability', motivo: 'flotante de la esquiva, que la vieja nunca dispara' },
-        ],
-        diferenciasEsperadas: [
-            { contiene: 'estado.p2.vanguard.0.currentHp',
-              motivo: 'BUG de la vieja corregido por la migración: nunca comprobaba onBeforeDefend en su ataque especial, así que golpeaba a Águila SIEMPRE, incluso cuando la moneda de su esquiva (PSEUDO-PREVASIÓN) sale cara. La nueva sí respeta la esquiva -misma comprobación que ya hacían Karolina/Raiju en la suya-, así que con esta moneda Águila no pierde Vida.' },
-        ],
     },
     {
         nombre: 'Ángel: PRODIGIO cura 1 a la vanguardia dañada al colocarse',

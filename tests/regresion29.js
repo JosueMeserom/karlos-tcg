@@ -35,23 +35,16 @@ const escenarios = [
         pasos: [ { habilidad: 'Lolita' }, { confirmar: true }, { elegir: ['Robot de seguridad SP'] } ],
     },
     {
-        // Mismo bug corregido que con Hechicero: la vieja nunca comprobaba la esquiva.
-        nombre: 'Lolita: NOCIONES DE OCULTISMO contra Águila con esquiva (bug corregido)',
+        // Betasteo de Toto (28-jul-2026): Águila solo esquiva "ante ataques normales"; los
+        // especiales nunca debieron poder esquivarse. onBeforeDefend ahora recibe `isSpecial`
+        // y Águila declina en silencio cuando es true (ver Hechicero en regresion28 para el
+        // detalle completo). La vieja tampoco llega nunca a llamar a onBeforeDefend en su
+        // ataque especial (el primer bug, ya documentado en el escenario anterior de esta
+        // suite) — el resultado neto es idéntico en ambas bases.
+        nombre: 'Lolita: NOCIONES DE OCULTISMO contra Águila — nunca esquiva un ataque especial',
         p1: { vanguardia: [{ carta: 'Lolita', furor: 1 }] },
         p2: { vanguardia: ['Águila'] },
         pasos: [ { habilidad: 'Lolita' }, { confirmar: true }, { elegir: ['Águila'] } ],
-        monedas: { vieja: [], nueva: ['cara'] },
-        logsSoloVieja: [ { linea: 'recibe', motivo: 'bug de la vieja: golpea siempre, sin comprobar la esquiva de Águila' } ],
-        logsSoloNueva: [
-            { linea: 'PSEUDO-PREVASIÓN tiene lugar', motivo: 'la nueva SÍ comprueba onBeforeDefend antes de golpear' },
-            { linea: 'ESQUIVÓ el ataque de Lolita', motivo: 'con la moneda en cara, Águila esquiva' },
-        ],
-        flotantesSoloVieja: [ { linea: 'VIDA · ft-red', motivo: 'la vieja sí hace daño (bug)' } ],
-        flotantesSoloNueva: [ { linea: 'PSEUDO-PREVASIÓN · ft-ability', motivo: 'flotante de la esquiva' } ],
-        diferenciasEsperadas: [
-            { contiene: 'estado.p2.vanguard.0.currentHp',
-              motivo: 'bug de la vieja corregido: nunca comprobaba onBeforeDefend en su ataque especial. La nueva respeta la esquiva, así que Águila no pierde Vida.' },
-        ],
     },
     {
         // BUG de la vieja encontrado y corregido, no replicado (mismo que Hiposaurio en la
@@ -107,6 +100,8 @@ const escenarios = [
         diferenciasEsperadas: [
             { contiene: 'tempEffects.0.type', motivo: 'bookkeeping interno: la vieja discriminaba el tempEffect con `type:"liderazgo"` (por si el mismo hook servía a más de un efecto); el genérico `stats` de MARCAR_TEMPORAL no lo necesita' },
             { contiene: 'tempEffects.0.stats', motivo: 'idem: representación nueva del mismo bono (+2 Atq), vía el campo genérico `stats` en vez de un type a medida' },
+            { contiene: 'tempEffects.0.duration', motivo: 'nuevo (28-jul-2026, betasteo de Toto): `duracion:1` estampa duration/turnApplied SOLO para que "Afectado por:" muestre "(1 turno restante)" — nada lo decrementa, la expiración real la sigue gobernando hastaFinDeTurnoPropio' },
+            { contiene: 'tempEffects.0.turnApplied', motivo: 'idem: acompaña a duration, mismo mecanismo ya usado por Poción revitalizante' },
         ],
     },
     {

@@ -5822,7 +5822,11 @@
 
                 if (typeof defTemplate.onBeforeDefend === 'function') {
                     const abName = this.abilityContext ? this.abilityContext.name : null;
-                    dodged = await defTemplate.onBeforeDefend(currentDefender, attacker, this, abName);
+                    // isSpecial=false: este es el pipeline de ataque NORMAL (performAttack). Se
+                    // añade el 5º parámetro (Toto, 28-jul-2026) para que pasivas como PSEUDO-
+                    // PREVASIÓN de Águila, que solo esquivan "ante ataques normales", puedan
+                    // distinguirlo — antes esquivaban CUALQUIER ataque, especiales incluidos.
+                    dodged = await defTemplate.onBeforeDefend(currentDefender, attacker, this, abName, false);
                 }
 
                 if (!dodged) {

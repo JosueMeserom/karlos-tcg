@@ -109,7 +109,7 @@ const CARD_DB = [
                     let dodged = false;
                     const defTemplate = getCardTemplate(target.id);
                     if (typeof defTemplate.onBeforeDefend === 'function') {
-                        dodged = await defTemplate.onBeforeDefend(target, attacker, game, game.abilityContext.name);
+                        dodged = await defTemplate.onBeforeDefend(target, attacker, game, game.abilityContext.name, false);
                     }
                     if (dodged) continue;
 
@@ -279,9 +279,9 @@ const CARD_DB = [
             let dodged = false;
             const defTemplate = getCardTemplate(defender.id);
             if (typeof defTemplate.onBeforeDefend === 'function') {
-                dodged = await defTemplate.onBeforeDefend(defender, attacker, game, game.abilityContext ? game.abilityContext.name : null);
+                dodged = await defTemplate.onBeforeDefend(defender, attacker, game, game.abilityContext ? game.abilityContext.name : null, false);
             }
-            
+
             if (dodged) {
                 // Si esquivan, también le devolvemos el stat
                 attacker.currentAtk += 3;
@@ -440,12 +440,26 @@ const CARD_DB = [
         }
     },
     { 
-        id: 5, name: "Águila", hp: 5, def: 3, atk: 6, type: "Personaje", subtype: 'Ser vivo', tags: ['Guardia Real', 'Usuario de VP'], gender: 'M', rarity: "A", 
-        text: "P: Evasión 50% ante ataques normales. A: ESPÍA (2F). Elige tipo, mira mano rival. Quita Furor igual a cartas de ese tipo.", 
+        id: 5, name: "Águila", hp: 5, def: 3, atk: 6, type: "Personaje", subtype: 'Ser vivo', tags: ['Guardia Real', 'Usuario de VP'], gender: 'M', rarity: "A",
+        // Texto reescrito (28-jul-2026, betasteo de Toto) con el formato que el parser del
+        // detalle necesita: nombre en MAYÚSCULAS al principio de cada Pasiva/Activa y ":" justo
+        // tras el coste entre paréntesis. El texto viejo ("Evasión 50%...", "ESPÍA (2F). Elige")
+        // no cumplía ninguna de las dos cosas: la Pasiva se mostraba sin nombre y el (2F) de la
+        // Activa salía como texto suelto en vez del recuadro verde de coste. Redacción oficial
+        // del Excel de Toto, íntegra (antes iba resumida).
+        text: "P: PSEUDO-PREVASIÓN: Cada vez que Águila es atacado por un ataque normal, echa una moneda. Si es cara, evita dicho ataque y sus efectos. A: ESPÍA (2F): Elige un tipo de carta (Personaje, Esbirro, Ayuda o Evento), luego, echa un vistazo a la mano de tu rival; elimina Furor de un enemigo equivalente a la cantidad de cartas del tipo que elegiste que haya en la mano del rival.",
         passiveName: "PSEUDO-PREVASIÓN", activeName: "ESPÍA", activeCost: 2, series: 1,
 
         // HOOK 1: Defensa ante ataques o habilidades (La Esquiva)
-        onBeforeDefend: async function(defender, attacker, game, abilityName) {            
+        // isSpecial (28-jul-2026): PSEUDO-PREVASIÓN solo esquiva "ante ataques normales" (así lo
+        // dice su propio texto) — hasta ahora onBeforeDefend no distinguía el tipo de ataque y
+        // Águila esquivaba TAMBIÉN los especiales (Karolina, Raiju, y ahora Hechicero/Lolita/
+        // Eris). Bug real preexistente, no introducido por la migración de esta sesión: ya
+        // afectaba a Karolina/Raiju antes de tocar nada. El 5º parámetro llega ahora desde los 9
+        // puntos del motor que llaman a onBeforeDefend.
+        onBeforeDefend: async function(defender, attacker, game, abilityName, isSpecial) {
+            if (isSpecial) return false; // Los ataques especiales ni se intentan esquivar
+
             const attackerTemplate = getCardTemplate(attacker.id);
             if (attackerTemplate.uncounterable) {
                 game.logMsg(`${attacker.name} ignora las defensas evasivas gracias a su pasiva.`, 'system');
@@ -454,7 +468,7 @@ const CARD_DB = [
 
             game.logMsg(`¡Habilidad pasiva de ${game.getCardNameWithOwner(defender)}: ${defender.passiveName} tiene lugar! (Esquiva)`, 'ability');
             showFloatingText(defender.instanceId, defender.passiveName, "ft-ability", -30);
-            
+
             const results = await game.triggerCoinFlips(1, defender.owner);
             if (results && results[0] === 'heads') {
                 await animateDodge(attacker.instanceId, defender.instanceId);
@@ -1066,19 +1080,24 @@ const CARD_DB = [
         text: "P: En Vanguardia, al final de tu turno puedes aplicar Daño por tiempo (1T) a 1 enemigo de vanguardia. A: PUÑO DE NEUTRONES (1F): Ataque normal con +2 Atq durante el golpe.", 
         passiveName: "RADIACIÓN", activeName: "PUÑO DE NEUTRONES", activeCost: 1, series: 1,
 
-        // HOOK 1: Pasiva interactiva de Final de Turno con MODAL VISUAL
+        // HOOK 1: Pasiva interactiva de Final de Turno
+        // Selección en tablero (28-jul-2026, betasteo de Toto): usaba el modal genérico para
+        // elegir un enemigo YA EN EL CAMPO, violando la norma de targeting en tablero — se
+        // detectó al pasar por Hawke en la tanda de volumen y quedó anotado para arreglar aquí
+        // mismo, aunque RADIACIÓN se quede imperativa (sigue sin haber trigger DSL de fin de
+        // turno interactivo por carta).
         onEndTurn: async function(card, game) {
             if (card.location !== 'vanguard' || card.owner !== game.activePlayerId) return;
-            
+
             const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
             // Filtramos para ignorar a los Avatares (como Kami) que son intocables
             const enemyVanguard = game.players[enemyId].vanguard.filter(c => !getCardTemplate(c.id).isAvatar);
-            
+
             if (enemyVanguard.length === 0) return;
 
-            // Modal visual: exactCount = 1, y permitimos cancelar para saltar la pasiva
-            const chosen = await game.openVisualSearchModal('RADIACIÓN: ELIGE A QUIÉN IRRADIAR', enemyVanguard, 1, true, card.owner);
-            
+            // Selección en tablero (reborde verde), cancelable
+            const chosen = await game.pickBoardTargets(enemyVanguard, 1, 'RADIACIÓN: elige a quién irradiar (clic en el tablero; X para cancelar)', card, card.owner, true);
+
             if (chosen && chosen.length > 0) {
                 const enemy = chosen[0];
                 game.logMsg(`¡${card.passiveName} de ${card.name} irradia a ${game.getCardNameWithOwner(enemy)}!`, 'ability');
@@ -1274,7 +1293,7 @@ const CARD_DB = [
                     let dodged = false;
                     const defTemplate = getCardTemplate(target.id);
                     if (typeof defTemplate.onBeforeDefend === 'function') {
-                        dodged = await defTemplate.onBeforeDefend(target, attacker, game, game.abilityContext.name);
+                        dodged = await defTemplate.onBeforeDefend(target, attacker, game, game.abilityContext.name, true);
                     }
                     if (dodged) continue;
 
@@ -1395,7 +1414,7 @@ const CARD_DB = [
 
             let dodged = false;
             const defTemplate = getCardTemplate(target.id);
-            if (typeof defTemplate.onBeforeDefend === 'function') dodged = await defTemplate.onBeforeDefend(target, card, game, card.activeName);
+            if (typeof defTemplate.onBeforeDefend === 'function') dodged = await defTemplate.onBeforeDefend(target, card, game, card.activeName, false);
 
             if (!dodged) {
                 let dmg = card.currentAtk - target.currentDef;
@@ -2240,7 +2259,7 @@ const CARD_DB = [
                 
                 let dodged = false;
                 const defTemplate = getCardTemplate(target.id);
-                if (typeof defTemplate.onBeforeDefend === 'function') dodged = await defTemplate.onBeforeDefend(target, attacker, game, game.abilityContext.name);
+                if (typeof defTemplate.onBeforeDefend === 'function') dodged = await defTemplate.onBeforeDefend(target, attacker, game, game.abilityContext.name, false);
                 if (dodged) continue;
 
                 let dmg = attacker.currentAtk - target.currentDef;
@@ -4488,13 +4507,13 @@ const CARD_DB = [
             let dodged = false;
             const defTemplate = getCardTemplate(target.id);
             if (typeof defTemplate.onBeforeDefend === 'function') {
-                dodged = await defTemplate.onBeforeDefend(target, card, game, game.abilityContext.name);
+                dodged = await defTemplate.onBeforeDefend(target, card, game, game.abilityContext.name, true);
             }
-            
+
             if (!dodged) {
                 let dmg = card.currentAtk - target.currentDef;
                 if (dmg <= 0) dmg = (card.type === 'Esbirro' && target.type === 'Personaje') ? 0.5 : 1;
-                
+
                 await game.dealDamage(card, target, dmg, true); // true = Ataque Especial
                 
                 // Efecto de éxito: Aumento permanente de DEF (Máx 2)
@@ -5847,7 +5866,10 @@ const CARD_DB = [
         // onUpdateTempEffect a mano (el compilador lo genera solo, reutilizable por cualquier
         // carta futura con este mismo patrón "+N hasta que se cumpla X"). El log de expiración
         // SÍ se queda a mano (más abajo): el `hastaFinDeTurnoPropio` genérico no anuncia nada al
-        // caducar, y aquí Toto quería avisar.
+        // caducar, y aquí Toto quería avisar. `duracion: 1` (mismo campo de Poción revitalizante)
+        // es SOLO para que "Afectado por:" muestre "(1 turno restante)" — nada lo decrementa,
+        // porque siempre es literalmente cierto mientras la marca exista: expira sí o sí al
+        // final de este mismo turno (hastaFinDeTurnoPropio es quien de verdad la quita).
         abilities: [
             { trigger: "ACTIVA", nombre: "LIDERAZGO", coste: { furor: 1 },
               requisitos: [ { count: { zona: "vanguardia", filtros: [ { campo: "hasAttackedThisTurn", op: "falsy" } ] }, op: ">=", valor: 1, msg: "No hay aliados válidos en vanguardia que no hayan atacado." } ],
@@ -5857,7 +5879,7 @@ const CARD_DB = [
                 { campo: "hasAttackedThisTurn", op: "falsy", msg: "Ese aliado ya ha atacado este turno." }
               ],
               efectos: [
-                { op: "MARCAR_TEMPORAL", conOwner: true, actualizaPasivas: true, hastaFinDeTurnoPropio: true,
+                { op: "MARCAR_TEMPORAL", conOwner: true, actualizaPasivas: true, hastaFinDeTurnoPropio: true, duracion: 1,
                   stats: { atk: 2 },
                   floating: { texto: "+2 ATQ", estilo: "ft-green", offset: -20 },
                   log: "{carta} motiva profundamente a {objetivo}. (+2 ATQ temporal)" }
@@ -6124,7 +6146,7 @@ const CARD_DB = [
                     let dodged = false;
                     const defTemplate = getCardTemplate(target.id);
                     if (typeof defTemplate.onBeforeDefend === 'function') {
-                        dodged = await defTemplate.onBeforeDefend(target, card, game, card.activeName);
+                        dodged = await defTemplate.onBeforeDefend(target, card, game, card.activeName, false);
                     }
                     if (!dodged) {
                         let dmg = card.currentAtk - target.currentDef;
@@ -7720,7 +7742,7 @@ const DSL = {
                     const defTpl = DSL._tmpl(target.id);
                     let dodged = false;
                     if (defTpl && typeof defTpl.onBeforeDefend === 'function') {
-                        dodged = await defTpl.onBeforeDefend(target, sourceCard, game, habilidad || sourceCard.name);
+                        dodged = await defTpl.onBeforeDefend(target, sourceCard, game, habilidad || sourceCard.name, true);
                     }
                     if (!dodged) {
                         // ignorarDefensa (Eris, TIRO FINAL, 27/28-jul-2026): el daño es el Atq
