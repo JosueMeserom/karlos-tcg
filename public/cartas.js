@@ -709,79 +709,24 @@ const CARD_DB = [
         passiveName: "SAPIENCIA MÁGICA", activeName: "LUZ VIRTUOSA", activeCost: 3, series: 1,
         uncounterable: true, // ¡La magia que avisa a Águila!
 
-        canActivateAbility: function(card, game) {
-            if (card.furor < 3) { game.logMsg("Falta Furor (3).", 'system'); return false; }
-            const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
-            if (game.players[enemyId].vanguard.length === 0) {
-                game.logError("No hay enemigos en la Vanguardia."); 
-                return false;
-            }
-            return true;
-        },
-
-        onExecuteAbility: function(card, game) {
-            game.selectedCard = card;
-            game.inputState = 'SELECT_ABILITY_TARGETS';
-            game.abilityContext = { targets: [], maxTargets: 1, name: 'LUZ VIRTUOSA', targetType: 'enemy' };
-            game.logMsg("Elige objetivo enemigo para LUZ VIRTUOSA.", 'system');
-            game.render();
-        },
-
-        onTargetsReady: async function(card, game) {
-            const attacker = card;
-            const defender = game.abilityContext.targets[0];
-            
-            game.modifyStat(attacker, 'furor', -3);
-            showFloatingText(attacker.instanceId, attacker.activeName, "ft-ability", -30);
-            game.inputState = 'EXECUTING';
-            game.render();
-
-            game.logMsg(`¡${game.getCardNameWithOwner(attacker)} usa ${attacker.activeName}!`, 'ability');
-
-            // 1. Chequeamos Confusión/Ceguera en Aniceto mismo antes de lanzar su rayo
-            const canAttack = await game.checkAttackStatus(attacker, defender);
-            if (!canAttack) {
-                attacker.exhausted = true;
-                game.isActionLocked = false;
-                game.cancelAction();
-                game.updatePassives();
-                game.render();
-                return;
-            }
-
-            // 2. Ejecutar Daño (Ignora esquivas gracias a uncounterable)
-            let dmg = attacker.currentAtk - defender.currentDef;
-            if (dmg <= 0) {
-                if (attacker.type === 'Esbirro' && defender.type === 'Personaje') dmg = 0.5;
-                else dmg = 1;
-            }
-
-            // Luz Virtuosa es un ataque especial, por lo que ponemos 'true'
-            await game.dealDamage(attacker, defender, dmg, true);
-            await game.sleep(600);
-            
-            // 3. Aplicar Estado Alterado si sobrevivió
-            if (defender.currentHp > 0) {
-                const results = await game.triggerCoinFlips(1, attacker.owner);
-                if (results) {
-                    if (results[0] === 'heads') {
-                        game.logMsg(`Moneda: CARA - ¡Luz Virtuosa Confunde a ${defender.name}!`, 'ability');
-                        game.applyStatus(defender, 'confusion', 2, attacker);
-                    } else {
-                        game.logMsg(`Moneda: CRUZ - ¡Luz Virtuosa Ciega a ${defender.name}!`, 'ability');
-                        game.applyStatus(defender, 'ceguera', 2, attacker);
-                    }
-                }
-            }
-
-            attacker.exhausted = true;
-            await game.checkDeath(defender);
-
-            game.isActionLocked = false;
-            game.cancelAction();
-            game.updatePassives();
-            game.render();
-        }
+        // ACTIVA migrada (28-jul-2026): mismo patrón que Eris (especial + chequearEstado), con
+        // un MONEDA anidado en siExito para el estado (Confusión/Ceguera) según cara/cruz. El
+        // log de activación pasa a nombrar a Aniceto a secas, mismo criterio ya aplicado a Eris/
+        // Hawke (el jugador ya sabe qué carta activó).
+        abilities: [
+            { trigger: "ACTIVA", nombre: "LUZ VIRTUOSA", coste: { furor: 3 },
+              requisitos: [ { count: { quien: "ENEMIGO", zona: "vanguardia" }, op: ">=", valor: 1, msg: "No hay enemigos en la Vanguardia." } ],
+              target: { quien: "ENEMIGO", cantidad: 1 },
+              log: "¡{carta} usa LUZ VIRTUOSA!",
+              efectos: [
+                { op: "ATACAR", especial: true, chequearEstado: true,
+                  siExito: [
+                    { op: "MONEDA",
+                      cara: [ { op: "APLICAR_ESTADO", estado: "confusion", duracion: 2, log: "Moneda: CARA - ¡Luz Virtuosa Confunde a {objetivo}!" } ],
+                      cruz: [ { op: "APLICAR_ESTADO", estado: "ceguera", duracion: 2, log: "Moneda: CRUZ - ¡Luz Virtuosa Ciega a {objetivo}!" } ] }
+                  ] }
+              ] }
+        ]
     },
     { 
         id: 8, name: "Spencer", hp: 4, def: 4, atk: 4, type: "Personaje", subtype: "Máquina", tags: ['Con conciencia'], gender: 'M', rarity: "A",
