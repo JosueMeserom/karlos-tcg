@@ -4915,56 +4915,21 @@ const CARD_DB = [
         name: "Gólem de tierra", hp: 4, def: 4, atk: 2, type: "Esbirro", subtype: "Ser mágico", tags: ["Invocación", "Gólem"], rarity: "B", cost: 1, series: 2,
         text: "A: SEÍSMO (1F): Elige a dos enemigos distintos de la vanguardia del rival para hacerle un ataque normal a cada uno.",
         activeName: "SEÍSMO", activeCost: 1,
-        canActivateAbility: function(card, game) {
-            if (card.furor < 1) { game.logError("Falta Furor (1)."); return false; }
-            const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
-            const enemyP = game.players[enemyId];
-            
-            const hasTaunt = enemyP.vanguard.some(c => getCardTemplate(c.id).isTaunt);
-            if (hasTaunt) { game.logError("Hay un enemigo Provocando, no puedes atacar a objetivos múltiples."); return false; }
-            
-            const valid = enemyP.vanguard.filter(c => !c.stealth);
-            if (valid.length < 2) { game.logError("No hay suficientes enemigos en vanguardia para Seísmo."); return false; }
-            return true;
-        },
-        onExecuteAbility: function(card, game) {
-            game.selectedCard = card;
-            game.inputState = 'SELECT_ABILITY_TARGETS';
-            game.abilityContext = { targets: [], maxTargets: 2, name: 'SEÍSMO', targetType: 'enemy', isNormalAttack: true };
-            game.logMsg("Elige al primer objetivo del Seísmo.", 'system');
-            game.render();
-        },
-        onValidateTarget: function(card, target, game, isSilent) {
-            if (target.location !== 'vanguard') return false;
-            if (game.abilityContext.targets.some(t => t.instanceId === target.instanceId)) return false;
-            return true;
-        },
-        hasMoreValidTargets: function(card, game) {
-            const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
-            const enemyP = game.players[enemyId];
-            const unselected = enemyP.vanguard.filter(c => !c.stealth && !game.abilityContext.targets.some(t => t.instanceId === c.instanceId)).length;
-            return unselected > 0;
-        },
-        onTargetsReady: async function(card, game) {
-            game.modifyStat(card, 'furor', -1);
-            showFloatingText(card.instanceId, card.activeName, "ft-ability", -30);
-            game.inputState = 'EXECUTING';
-            game.render();
-            await game.sleep(800);
-
-            const targets = game.abilityContext.targets;
-            for (let target of targets) {
-                if (card.currentHp <= 0) break;
-                if (target.currentHp > 0) {
-                    await game.performAttack(card, target);
-                    await game.sleep(400);
-                }
-            }
-            card.exhausted = true;
-            game.isActionLocked = false;
-            game.cancelAction();
-            game.render();
-        }
+        // SEÍSMO exige EXACTAMENTE 2 objetivos (a diferencia de SANCIÓN de Ángel, que
+        // admite parar en 1 con canStopEarly y por eso se quedó imperativa): encaja
+        // limpio en ELEGIR normal (sin hastaCantidad), que ya dedupe por sí solo
+        // (pickBoardTargets/_dslPickClick) y cierra ATACAR por objetivo sin bucle a
+        // mano — mismo patrón que Granada de maná pero con ATACAR en vez de daño fijo.
+        abilities: [
+            { trigger: "ACTIVA", nombre: "SEÍSMO", coste: { furor: 1 }, sinObjetivo: true,
+              requisitos: [
+                { count: { quien: "ENEMIGO", zona: "vanguardia", filtros: [ { campo: "isTaunt", op: "truthy", dePlantilla: true } ] }, op: "==", valor: 0, msg: "Hay un enemigo Provocando, no puedes atacar a objetivos múltiples." },
+                { count: { quien: "ENEMIGO", zona: "vanguardia", filtros: [ { campo: "stealth", op: "falsy" } ] }, op: ">=", valor: 2, msg: "No hay suficientes enemigos en vanguardia para Seísmo." } ],
+              efectos: [
+                { op: "ELEGIR", de: "ENEMIGOS", zona: "VANGUARDIA", cantidad: 2, filtros: [ { campo: "stealth", op: "falsy" } ], cancelable: false,
+                  titulo: "SEÍSMO: elige 2 enemigos distintos de la vanguardia",
+                  efectos: [ { op: "ATACAR" } ] } ] }
+        ]
     },
     {
         name: "Karlos (KL)", hp: 6, def: 7, atk: 6, type: "Personaje", subtype: "Ser vivo", tags: ["Mercenario", "Usuario de VP"], gender: "M", rarity: "A", cost: 4, series: 2,
