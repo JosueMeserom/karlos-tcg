@@ -5861,54 +5861,26 @@ const CARD_DB = [
         name: "Clarise", hp: 4, def: 3, atk: 6, type: "Personaje", subtype: "Ser vivo", tags: ["Usuaria de VP", "Estudiosa"], gender: "F", rarity: "C", cost: 1, series: 2,
         text: "A: PESANTEZ MUTUA (1F): El enemigo que elijas no podrá realizar ataques normales en el próximo turno del rival (sí Habilidades, pero fallarán si involucran ataques).",
         activeName: "PESANTEZ MUTUA", activeCost: 1,
-        
-        canActivateAbility: function(card, game) {
-            if (card.furor < 1) { game.logError("Falta Furor (1)."); return false; }
-            const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
-            if (game.players[enemyId].vanguard.length === 0 && game.players[enemyId].rearguard.length === 0) return false;
-            return true;
-        },
-        onExecuteAbility: function(card, game) {
-            game.selectedCard = card;
-            game.inputState = 'SELECT_ABILITY_TARGETS';
-            game.abilityContext = { targets: [], maxTargets: 1, name: 'PESANTEZ MUTUA', targetType: 'enemy' };
-            game.render();
-        },
-        onTargetsReady: async function(card, game) {
-            const target = game.abilityContext.targets[0];
-            game.modifyStat(card, 'furor', -1);
-            showFloatingText(card.instanceId, "PESANTEZ MUTUA", "ft-ability", -30);
-            
-            if (!target.tempEffects) target.tempEffects = [];
-            target.tempEffects.push({ sourceId: card.id, ownerId: card.owner, type: 'pesantez' });
-            
-            showFloatingText(target.instanceId, "INMOVILIZADO", "ft-purple", -30);
-            game.logMsg(`¡${target.name} sufre Pesantez Mutua! Sus piernas pesan toneladas.`, 'ability');
-            
-            card.exhausted = true;
-            game.isActionLocked = false;
-            game.cancelAction();
-            game.render();
-        },
-        
-        onBeforeAttackTempEffect: async function(attacker, effect, defender, game) {
-            if (effect.type === 'pesantez') {
-                const isNormal = !game.abilityContext || game.abilityContext.isNormalAttack;
-                if (isNormal) {
-                    game.logMsg(`¡PESANTEZ MUTUA! ${attacker.name} está inmovilizado y no puede realizar ataques físicos.`, 'ability');
-                    return false;
-                }
-            }
-            return true;
-        },
-        
-        onStartTurnTempEffect: function(target, effect, game, currentTurnPlayerId) {
-            if (currentTurnPlayerId === effect.ownerId && effect.type === 'pesantez') {
-                game.logMsg(`La Pesantez Mutua sobre ${target.name} desaparece.`, 'system');
-                return false; 
-            }
-            return true;
-        }
+        // Migrada por completo (28-jul-2026). Estrena dos piezas simétricas a las de LIDERAZGO:
+        // `vetoAtaqueNormal` (veto continuo mientras dure la marca, como `stats` es un bono
+        // continuo) y `hastaInicioTurnoLanzador` (caduca al empezar el turno de quien la puso,
+        // o sea que cubre exactamente el turno del rival). Los dos textos van en plantilla,
+        // mismo sitio que el `tempEffectText` del preview, porque los hooks genéricos reciben
+        // la marca y no el op que la creó — y meter strings en la marca ensuciaría el estado
+        // exportado. `tempEffectText` es nuevo: la imperativa no mostraba NADA en el detalle
+        // sobre la Pesantez, ahora sale en "Afectado por:" como cualquier otro efecto temporal.
+        tempEffectText: "{genero?Inmovilizado|Inmovilizada} por Pesantez Mutua: no puede realizar ataques normales",
+        tempEffectVetoLog: "¡PESANTEZ MUTUA! {objetivo} está {genero?inmovilizado|inmovilizada} y no puede realizar ataques físicos.",
+        tempEffectExpiraLog: "La Pesantez Mutua sobre {objetivo} desaparece.",
+        abilities: [
+            { trigger: "ACTIVA", nombre: "PESANTEZ MUTUA", coste: { furor: 1 },
+              requisitos: [ { count: { quien: "ENEMIGO" }, op: ">=", valor: 1 } ],
+              target: { quien: "ENEMIGO", cantidad: 1 },
+              efectos: [
+                { op: "MARCAR_TEMPORAL", conOwner: true, vetoAtaqueNormal: true, hastaInicioTurnoLanzador: true, duracion: 1,
+                  floating: { texto: "INMOVILIZADO", estilo: "ft-purple", offset: -30 },
+                  log: "¡{objetivo} sufre Pesantez Mutua! Sus piernas pesan toneladas." } ] }
+        ]
     },
     {
         name: "Alumno con VP", hp: 2, def: 1, atk: 3, type: "Esbirro", subtype: "Ser vivo", tags: ["Usuario de VP", "Estudioso"], rarity: "C", cost: 1, series: 2,
@@ -8065,6 +8037,16 @@ const DSL = {
             // el compilador wire uno genérico más abajo (ver el guard "MARCAR_TEMPORAL" en
             // JSON.stringify(abs)) cuando ninguna otra cosa lo haya declarado ya.
             if (e.stats) marca.stats = e.stats;
+            // vetoAtaqueNormal (Clarise, PESANTEZ MUTUA, 28-jul-2026): mientras la marca dure,
+            // la carta marcada no puede hacer ataques NORMALES (sí Habilidades que no ataquen).
+            // Simétrico de `stats`: aquel es un bono continuo, este un veto continuo. El
+            // compilador wire el onBeforeAttackTempEffect genérico más abajo.
+            if (e.vetoAtaqueNormal) marca.vetoAtaqueNormal = true;
+            // hastaInicioTurnoLanzador: caduca al EMPEZAR el siguiente turno del jugador que la
+            // puso (marca.ownerId, así que exige `conOwner`), o sea que cubre exactamente el
+            // turno del rival. Distinto de `hastaFinDeTurnoPropio`, que mira al dueño de la
+            // carta MARCADA y caduca al final de su turno.
+            if (e.hastaInicioTurnoLanzador) marca.hastaInicioTurnoLanzador = true;
             target.tempEffects.push(marca);
             if (e.floating && typeof showFloatingText === 'function') showFloatingText(target.instanceId, e.floating.texto || e.floating, e.floating.estilo || e.floatingStyle || 'ft-ability', (e.floating.offset !== undefined ? e.floating.offset : (e.offsetFloating !== undefined ? e.offsetFloating : -40)));
             if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
@@ -8997,6 +8979,32 @@ const DSL = {
                     if (!eff.stats) return;
                     if (eff.stats.atk) card.currentAtk += eff.stats.atk;
                     if (eff.stats.def) card.currentDef += eff.stats.def;
+                };
+            }
+            // vetoAtaqueNormal (Clarise, PESANTEZ MUTUA, 28-jul-2026): la carta marcada no puede
+            // hacer ataques NORMALES mientras la marca dure. La heurística de "¿es normal?" es
+            // la misma que usaba la Clarise imperativa: sin abilityContext es un ataque normal
+            // directo del tablero; con él, cuenta como normal si la Habilidad se declaró
+            // `ataqueNormal` (isNormalAttack) — así una Activa de ataque ESPECIAL (CHIRIBITA,
+            // LUZ VIRTUOSA) sí puede usarse, que es justo lo que dice el texto de la carta.
+            // El mensaje sale de `tempEffectVetoLog` en la plantilla, mismo sitio que el
+            // `tempEffectText` del preview (la marca guarda solo el flag: los textos no viajan
+            // en el estado exportado).
+            if (typeof tmpl.onBeforeAttackTempEffect !== 'function') {
+                tmpl.onBeforeAttackTempEffect = async function (attacker, eff, defender, game) {
+                    if (!eff.vetoAtaqueNormal) return true;
+                    const esNormal = !game.abilityContext || game.abilityContext.isNormalAttack;
+                    if (!esNormal) return true;
+                    if (tmpl.tempEffectVetoLog) game.logMsg(DSL._fill(tmpl.tempEffectVetoLog, { objetivo: DSL._nombre(game, attacker), genero: attacker.gender }), 'ability');
+                    return false;
+                };
+            }
+            // hastaInicioTurnoLanzador: caduca al empezar el turno de quien puso la marca.
+            if (typeof tmpl.onStartTurnTempEffect !== 'function') {
+                tmpl.onStartTurnTempEffect = function (card, eff, game, activePid) {
+                    if (!(eff.hastaInicioTurnoLanzador && eff.ownerId === activePid)) return true;
+                    if (tmpl.tempEffectExpiraLog) game.logMsg(DSL._fill(tmpl.tempEffectExpiraLog, { objetivo: DSL._nombre(game, card), genero: card.gender }), 'system');
+                    return false;
                 };
             }
             if (tmpl.tempEffectText && typeof tmpl.onGetPreviewEffects !== 'function') {
