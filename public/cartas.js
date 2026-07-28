@@ -1335,55 +1335,29 @@ const CARD_DB = [
     { id: 18, name: "Robot de seguridad SP", hp: 4, def: 1, atk: 2, type: "Esbirro", subtype: "Máquina", tags: ["Controlable"], gender: 'N', rarity: "C", text: "-", series: 1 },
     {
         id: 19, name: "Limo artificial", hp: 2, def: 2, atk: 1, type: "Esbirro", subtype: "Ser vivo", tags: ['Creación artificial'], rarity: "C",
-        text: "A: ABRAZO PEGAJOSO (1F): Ataque normal. Si tiene éxito, lanza moneda: Cara = Confunde al enemigo 2 turnos.", 
+        text: "A: ABRAZO PEGAJOSO (1F): Ataque normal. Si tiene éxito, lanza moneda: Cara = Confunde al enemigo 2 turnos.",
         activeName: "ABRAZO PEGAJOSO", activeCost: 1, series: 1,
-        
-        canActivateAbility: function(card, game) {
-            if (card.furor < 1) { game.logMsg("Falta Furor (1).", 'system'); return false; }
-            const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
-            if (game.players[enemyId].vanguard.length === 0) { game.logError("No hay enemigos."); return false; }
-            return true;
-        },
-        onExecuteAbility: function(card, game) {
-            game.selectedCard = card;
-            game.inputState = 'SELECT_ABILITY_TARGETS';
-            game.abilityContext = { targets: [], maxTargets: 1, name: 'ABRAZO PEGAJOSO', targetType: 'enemy', isNormalAttack: true };
-            game.logMsg("Elige objetivo para ABRAZO PEGAJOSO.", 'system');
-            game.render();
-        },
-        onTargetsReady: async function(card, game) {
-            const target = game.abilityContext.targets[0];
-            game.modifyStat(card, 'furor', -1);
-            showFloatingText(card.instanceId, card.activeName, "ft-ability", -30);
-            await game.sleep(400);
-
-            let dodged = false;
-            const defTemplate = getCardTemplate(target.id);
-            if (typeof defTemplate.onBeforeDefend === 'function') dodged = await defTemplate.onBeforeDefend(target, card, game, card.activeName, false);
-
-            if (!dodged) {
-                let dmg = card.currentAtk - target.currentDef;
-                if (dmg <= 0) dmg = target.type === 'Personaje' ? 0.5 : 1;
-                const startHp = target.currentHp;
-                await game.dealDamage(card, target, dmg, false);
-                
-                if (target.currentHp < startHp && target.currentHp > 0) {
-                    await game.sleep(300);
-                    const results = await game.triggerCoinFlips(1, card.owner);
-                    if (results && results[0] === 'heads') {
-                        game.logMsg(`> Moneda: CARA - ¡Confunde a ${target.name}!`, 'system');
-                        game.applyStatus(target, 'confusion', 2, card);
-                    } else {
-                        game.logMsg(`> Moneda: CRUZ`, 'system');
+        // Migrada por completo (28-jul-2026). Estrena `especial: false` en ATACAR: es la MISMA
+        // ruta directa (sin performAttack) que ya usaban Hechicero/Eris/Aniceto con
+        // especial:true, pero marcando el golpe como NORMAL en dealDamage — hacía falta la ruta
+        // directa porque el objetivo era resolver una moneda CONDICIONADA al éxito del golpe
+        // (siExito), no un ataque especial de verdad. Nota de fidelidad: la vieja no comprobaba
+        // onBeforeDefend con isSpecial (ese parámetro no existía todavía) — con la carta que
+        // llame a esta, el comportamiento es idéntico al que ya tenía (siempre pasaba `false`).
+        abilities: [
+            { trigger: "ACTIVA", nombre: "ABRAZO PEGAJOSO", coste: { furor: 1 },
+              requisitos: [ { count: { quien: "ENEMIGO", zona: "vanguardia" }, op: ">=", valor: 1 } ],
+              target: { quien: "ENEMIGO", cantidad: 1 },
+              efectos: [
+                { op: "ATACAR", especial: false,
+                  siExito: [
+                    { op: "MONEDA",
+                      logCruz: { msg: "> Moneda: CRUZ", tipo: "system" },
+                      cara: [ { op: "APLICAR_ESTADO", estado: "confusion", duracion: 2, log: "> Moneda: CARA - ¡Confunde a {objetivo}!", logTipo: "system" } ]
                     }
-                }
-            }
-            card.exhausted = true;
-            game.isActionLocked = false; 
-            game.cancelAction();
-            game.updatePassives();
-            game.render();
-        }
+                  ] }
+              ] }
+        ]
     },
     { 
         id: 20, name: "Guardia", hp: 2, def: 3, atk: 3, type: "Esbirro", subtype: "Ser vivo", tags: ["Traje protector"], gender: 'M', rarity: "C",
@@ -6031,62 +6005,26 @@ const CARD_DB = [
         name: "Investigador demente", hp: 3, def: 4, atk: 2, type: "Esbirro", subtype: "Ser vivo", tags: ["Científico"], gender: "M", rarity: "B", cost: 2, series: 2,
         text: "A: INYECCIÓN DE MEJUNJE (1F): Elige un enemigo y echa una moneda. Cara: Ataque normal y lo duerme 2 turnos. Cruz: Sólo le inflige Daño por tiempo 2 turnos.",
         activeName: "INYECCIÓN DE MEJUNJE", activeCost: 1,
-        canActivateAbility: function(card, game) {
-            if (card.furor < 1) { game.logError("Falta Furor (1)."); return false; }
-            const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
-            if (game.players[enemyId].vanguard.length === 0) return false;
-            return true;
-        },
-        onExecuteAbility: function(card, game) {
-            game.selectedCard = card;
-            game.inputState = 'SELECT_ABILITY_TARGETS';
-            game.abilityContext = { targets: [], maxTargets: 1, name: 'INYECCIÓN DE MEJUNJE', targetType: 'enemy', isNormalAttack: true };
-            game.render();
-        },
-        onValidateTarget: function(card, target, game, isSilent) {
-            if (target.location !== 'vanguard') { if (!isSilent) game.logError("Debe estar en vanguardia."); return false; }
-            return true;
-        },
-        onTargetsReady: async function(card, game) {
-            const target = game.abilityContext.targets[0];
-            game.modifyStat(card, 'furor', -1);
-            showFloatingText(card.instanceId, card.activeName, "ft-ability", -30);
-            game.isActionLocked = true;
-
-            const results = await game.triggerCoinFlips(1, card.owner);
-            if (!results) { game.cancelAction(); return; }
-
-            if (results[0] === 'heads') {
-                game.logMsg("Moneda: CARA - ¡Ataque normal y sedante fuerte!", 'ability');
-                const canAttack = await game.checkAttackStatus(card, target);
-                if (canAttack) {
-                    let dodged = false;
-                    const defTemplate = getCardTemplate(target.id);
-                    if (typeof defTemplate.onBeforeDefend === 'function') {
-                        dodged = await defTemplate.onBeforeDefend(target, card, game, card.activeName, false);
-                    }
-                    if (!dodged) {
-                        let dmg = card.currentAtk - target.currentDef;
-                        if (dmg <= 0) dmg = (card.type === 'Esbirro' && target.type === 'Personaje') ? 0.5 : 1;
-                        await game.dealDamage(card, target, dmg, false);
-                        
-                        if (target.currentHp > 0) {
-                            game.applyStatus(target, 'sueno', 2, card.name);
-                        }
-                        await game.checkDeath(target);
-                    }
+        // Migrada por completo (28-jul-2026). Mismo patrón que Limo artificial: ATACAR
+        // especial:false para el golpe de la rama CARA, con chequearEstado (la vieja SÍ
+        // comprobaba checkAttackStatus antes de golpear, a diferencia de Limo artificial).
+        // Aquí la moneda va ANTES del ataque (decide si se ataca o no), así que MONEDA envuelve
+        // a ATACAR en vez de ir dentro de un siExito.
+        abilities: [
+            { trigger: "ACTIVA", nombre: "INYECCIÓN DE MEJUNJE", coste: { furor: 1 },
+              requisitos: [ { count: { quien: "ENEMIGO", zona: "vanguardia" }, op: ">=", valor: 1 } ],
+              target: { quien: "ENEMIGO", cantidad: 1 },
+              validarObjetivo: [ { campo: "location", op: "==", valor: "vanguard", msg: "Debe estar en vanguardia." } ],
+              efectos: [
+                { op: "MONEDA",
+                  logCara: { msg: "Moneda: CARA - ¡Ataque normal y sedante fuerte!", tipo: "ability" },
+                  logCruz: { msg: "Moneda: CRUZ - ¡El mejunje le quema la piel! (Daño por tiempo 2T)", tipo: "ability" },
+                  cara: [ { op: "ATACAR", especial: false, chequearEstado: true,
+                            siExito: [ { op: "APLICAR_ESTADO", estado: "sueno", duracion: 2 } ] } ],
+                  cruz: [ { op: "APLICAR_ESTADO", estado: "dot", duracion: 2 } ]
                 }
-            } else {
-                game.logMsg("Moneda: CRUZ - ¡El mejunje le quema la piel! (Daño por tiempo 2T)", 'ability');
-                game.applyStatus(target, 'dot', 2, card.name);
-            }
-            
-            card.exhausted = true;
-            game.isActionLocked = false;
-            game.cancelAction();
-            game.updatePassives();
-            game.render();
-        }
+              ] }
+        ]
     },
     {
         name: "Ayudante perturbada", hp: 2, def: 2, atk: 3, type: "Esbirro", subtype: "Ser vivo", tags: ["Científica"], gender: "F", rarity: "C", cost: 1, series: 2,
@@ -7644,7 +7582,11 @@ const DSL = {
             return true;
         }
         if (e.op === 'APLICAR_ESTADO') {
-            if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: DSL._nombre(game, target) }), 'ability');
+            // logTipo (Toto, 28-jul-2026, migración de Limo artificial): faltaba aquí, aunque
+            // ya lo tenían MODIFICAR_STAT (arriba) y la variante de APLICAR_ESTADO que usa
+            // _runReaccion — sin él, un log que quisiera salir como 'system' (Moneda: CARA/CRUZ)
+            // se colaba siempre como 'ability'.
+            if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
             game.applyStatus(target, e.estado, e.duracion, e.fuente !== undefined ? e.fuente : sourceCard, habilidad || null);
             return true;
         }
@@ -7658,33 +7600,39 @@ const DSL = {
             const startHp = target.currentHp;
             const bono = DSL._value(ownerId, game, e.bonoAtq, sourceCard, ctx) || 0;
             if (bono) sourceCard.currentAtk += bono;
-            if (e.especial) {
-                // Ataque especial (Toto, 27-jul-2026): NO pasa por performAttack (ese es el
+            if (e.especial !== undefined) {
+                // Ataque DIRECTO (Toto, 27/28-jul-2026): NO pasa por performAttack (ese es el
                 // pipeline de ataque NORMAL — reacciones de moneda, etc.). Reproduce fielmente
-                // lo que hacían a mano Hechicero/Karolina/Raiju/Ángel: comprueba la esquiva de
-                // onBeforeDefend, calcula el daño (Atq-Def, con el suelo 0.5/1 de siempre para
-                // Esbirro-vs-Personaje) y llama a dealDamage(..., true) directamente. dealDamage
-                // YA trae su propio pipeline (onBeforeTakeDamage, guardaespaldas, reacciones de
-                // mano); lo único que hacían las cartas a mano ADEMÁS de eso era la esquiva.
-                // chequearEstado (Eris, TIRO FINAL): algunas cartas SÍ comprobaban
-                // Confusión/Ceguera/Sueño propios antes de golpear (checkAttackStatus, el mismo
-                // gate que performAttack usa internamente para el ataque normal); otras
-                // (Hechicero, Lolita) nunca lo hicieron. Opt-in para no cambiar a las que no lo
-                // pedían. Si falla, la carta se agota igual que en el ataque normal.
+                // lo que hacían a mano Hechicero/Karolina/Raiju/Ángel (especial:true) y también
+                // Limo artificial/Investigador demente (especial:false — ataque normal en su
+                // formato de daño, pero resuelto directo porque necesitan una moneda CONDICIONADA
+                // al éxito, sin pasar por el pipeline completo de performAttack): comprueba la
+                // esquiva de onBeforeDefend, calcula el daño (Atq-Def, con el suelo 0.5/1 de
+                // siempre para Esbirro-vs-Personaje) y llama a dealDamage(..., especial)
+                // directamente. dealDamage YA trae su propio pipeline (onBeforeTakeDamage,
+                // guardaespaldas, reacciones de mano); lo único que hacían las cartas a mano
+                // ADEMÁS de eso era la esquiva. `especial` decide solo la etiqueta que dealDamage
+                // recibe (afecta a interceptores tipo onBeforeTakeDamage, p. ej. HUESO DURO), no
+                // la fórmula de daño, que es la misma en los dos casos.
+                // chequearEstado: algunas cartas SÍ comprobaban Confusión/Ceguera/Sueño propios
+                // antes de golpear (checkAttackStatus, el mismo gate que performAttack usa
+                // internamente para el ataque normal); otras (Hechicero, Lolita) nunca lo
+                // hicieron. Opt-in para no cambiar a las que no lo pedían. Si falla, la carta se
+                // agota igual que en el ataque normal.
                 if (e.chequearEstado && typeof game.checkAttackStatus === 'function' && !(await game.checkAttackStatus(sourceCard, target))) {
                     sourceCard.exhausted = true;
                 } else {
                     const defTpl = DSL._tmpl(target.id);
                     let dodged = false;
                     if (defTpl && typeof defTpl.onBeforeDefend === 'function') {
-                        dodged = await defTpl.onBeforeDefend(target, sourceCard, game, habilidad || sourceCard.name, true);
+                        dodged = await defTpl.onBeforeDefend(target, sourceCard, game, habilidad || sourceCard.name, !!e.especial);
                     }
                     if (!dodged) {
-                        // ignorarDefensa (Eris, TIRO FINAL, 27/28-jul-2026): el daño es el Atq
-                        // puro, sin restar Def. El suelo 0.5/1 sigue aplicando si el Atq es <= 0.
+                        // ignorarDefensa (Eris, TIRO FINAL): el daño es el Atq puro, sin restar
+                        // Def. El suelo 0.5/1 sigue aplicando si el Atq es <= 0.
                         let dmg = e.ignorarDefensa ? sourceCard.currentAtk : sourceCard.currentAtk - target.currentDef;
                         if (dmg <= 0) dmg = (sourceCard.type === 'Esbirro' && target.type === 'Personaje') ? 0.5 : 1;
-                        await game.dealDamage(sourceCard, target, dmg, true);
+                        await game.dealDamage(sourceCard, target, dmg, !!e.especial);
                         await game.checkDeath(target);
                     }
                 }
