@@ -94,6 +94,8 @@ function coincide(nodo, sel) {
     if (sel === '[data-id]') return nodo.dataset.id !== undefined;
     const h = sel.match(/^\[data-badge="([^"]+)"\]$/);
     if (h) return nodo.dataset.badge === h[1];
+    const cl = sel.match(/^\.([A-Za-z0-9_-]+)$/); // selector de clase simple
+    if (cl) return nodo.classList.contains(cl[1]);
     return false;
 }
 const raiz = Nodo('body');
@@ -138,7 +140,8 @@ const sandbox = {
     localStorage: { getItem: () => null, setItem(){}, removeItem(){} },
     window: {}, setTimeout: () => 0, clearTimeout(){},
     requestAnimationFrame: (fn) => { rafCola.push(fn); return rafCola.length; },
-    navigator: {}, location: { href: '' }, getComputedStyle: () => ({}),
+    navigator: {}, location: { href: '' },
+    getComputedStyle: () => ({ borderLeftWidth: '2px', borderTopWidth: '2px', borderRightWidth: '2px', borderBottomWidth: '2px', backgroundColor: 'rgb(0,0,0)' }),
     addEventListener(){}, removeEventListener(){}, dispatchEvent(){}, alert(){},
 };
 sandbox.window = sandbox;
@@ -186,7 +189,7 @@ check('la capa es el PRIMER hijo del visor (sobre el velo, bajo las cartas)', vi
 check('la capa lleva z-index negativo', /z-index:\s*-1/.test(capa.style.cssText), capa.style.cssText);
 check('el svg de flechas NO cuelga de la capa de clones', !capa.contains(svg), 'sigue dentro');
 check('el svg de flechas cuelga del VISOR', visor.contains(svg), 'no cuelga del visor');
-check('el svg lleva z-index positivo (sobre el contenido del visor)', /z-index:\s*5/.test(svg.style.cssText), svg.style.cssText);
+check('el svg gana a .card:hover (100), .selected (50) y .interactive (2000)', (parseInt((svg.style.cssText.match(/z-index:\s*(\d+)/)||[])[1],10)||0) > 2000, svg.style.cssText);
 check('la capa de clones sigue con z-index negativo (no tapa el visor)', /z-index:\s*-1/.test(capa.style.cssText), capa.style.cssText);
 
 game._elevarAlVisor(cartaCampo);
@@ -267,9 +270,15 @@ game._elevarAlVisor(elSpencer);
 const capa2 = documento.getElementById("viewer-lift");
 const clonSp = capa2 && capa2.children.find(x => x.classList.contains('card'));
 check('el clon de Spencer se genera', !!clonSp, 'no se generó');
-const btnCont = clonSp && clonSp.children.find(x => x.className.includes('action-btn-container'));
-check('el clon LLEVA el contenedor de botones DENTRO', !!btnCont, 'el clon salió sin botón (el bug que reportó Toto)');
+check('el boton NO queda dentro del clon (el filter de .exhausted lo teniria de gris)',
+      !clonSp.children.some(x => x.className.includes('action-btn-container')), 'sigue dentro del clon');
+const holdVl = capa2 && capa2.children.find(x => x.className.includes('vl-btn-hold'));
+check('el boton se eleva a su propio holder, hermano del clon', !!holdVl, 'no hay holder: el clon saldria sin boton');
+const btnCont = holdVl && holdVl.children.find(x => x.className.includes('action-btn-container'));
+check('el holder lleva el contenedor de botones', !!btnCont, 'holder vacio');
 check('el boton dice el nombre de la Activa', !!btnCont && btnCont.children.some(b => (b.innerText || '').includes('PAJARITA')), 'texto: ' + (btnCont && btnCont.children.map(b=>b.innerText).join('|')));
+check('el holder se alinea con la caja interior de la carta (descontando bordes)',
+      !!holdVl && holdVl.style.cssText.includes('left:702px') && holdVl.style.cssText.includes('top:482px'), holdVl && holdVl.style.cssText);
 rafCola.forEach(f => { try { f(); } catch(e){} });
 check('el clon NO manda su boton a btn-lift-layer', !btnLayer.children.some(h => h.dataset.inst === spencer.instanceId), 'lo sacó fuera: se pisaria con la carta real');
 check('_sinLiftBtn vuelve a false', !game._sinLiftBtn, 'quedó activo');
