@@ -4096,6 +4096,7 @@
                 }
 
                 document.getElementById('discard-viewer').style.display = 'none';
+                this._limpiarVisorLift(); // clones del tablero que se hubieran elevado al visor
                 const avisoVisor = document.getElementById('deck-search-notice');
                 if (avisoVisor) avisoVisor.style.display = 'none';
 
@@ -6318,6 +6319,7 @@
                             layer.appendChild(clon);
                             manoEl.style.visibility = 'hidden';
                             this._reaccionManoOrig = manoEl;
+                            this._reaccionManoId = rc.mano.instanceId; // para re-localizar la original tras cada render (ver _reaccionLiftTick)
                             this._reaccionLiftClon = clon;
                             this._reaccionLiftTick(); // sigue el hueco de la carta si la mano se reajusta (resize/reflow)
                         }
@@ -6329,6 +6331,13 @@
                 const layer = document.getElementById('reaccion-lift');
                 if (layer) layer.remove();
                 if (this._reaccionManoOrig) { this._reaccionManoOrig.style.visibility = ''; this._reaccionManoOrig = null; }
+                // La original pudo ser recreada por un render posterior al ocultado: se
+                // desoculta también por instanceId, no solo por la referencia guardada.
+                if (this._reaccionManoId) {
+                    const _viva = document.querySelector(`.card[data-id="${this._reaccionManoId}"]`);
+                    if (_viva) _viva.style.visibility = '';
+                    this._reaccionManoId = null;
+                }
                 this._reaccionLiftClon = null; // detiene el rAF de seguimiento (ver _reaccionLiftTick)
             }
 
@@ -6341,14 +6350,30 @@
                 this._reaccionLiftLoop = true;
                 const paso = () => {
                     const clon = this._reaccionLiftClon;
-                    const orig = this._reaccionManoOrig;
-                    if (!clon || !orig || !document.contains(clon) || !document.contains(orig)) { this._reaccionLiftLoop = false; return; }
-                    const r = orig.getBoundingClientRect();
-                    if (r.width) {
-                        clon.style.left = r.left + 'px';
-                        clon.style.top = r.top + 'px';
-                        clon.style.width = r.width + 'px';
-                        clon.style.height = r.height + 'px';
+                    // La ÚNICA condición de parada es que el clon ya no exista (lo quita
+                    // _limpiarResalteReaccion al resolverse el modal). Antes se paraba también
+                    // si la carta ORIGINAL desaparecía del DOM — y eso pasa en CADA repintado,
+                    // porque render() hace `handEl.innerHTML = ''` y reconstruye la mano entera;
+                    // un resize de la ventana dispara render(). Resultado (betasteo de Toto,
+                    // 29-jul-2026): al redimensionar, el bucle moría, el clon se quedaba clavado
+                    // en la posición vieja y la carta original renacía SIN el visibility:hidden,
+                    // así que se veían las dos y descuadradas. Ahora la referencia muerta se
+                    // considera normal: se re-localiza por instanceId y se reoculta.
+                    if (!clon || !document.contains(clon)) { this._reaccionLiftLoop = false; return; }
+                    let orig = this._reaccionManoOrig;
+                    if (!orig || !document.contains(orig)) {
+                        orig = this._reaccionManoId ? document.querySelector(`.card[data-id="${this._reaccionManoId}"]`) : null;
+                        this._reaccionManoOrig = orig; // puede ser null (mano aún sin repintar): se reintenta al frame siguiente
+                    }
+                    if (orig) {
+                        if (orig.style.visibility !== 'hidden') orig.style.visibility = 'hidden'; // el repintado la devuelve visible
+                        const r = orig.getBoundingClientRect();
+                        if (r.width) {
+                            clon.style.left = r.left + 'px';
+                            clon.style.top = r.top + 'px';
+                            clon.style.width = r.width + 'px';
+                            clon.style.height = r.height + 'px';
+                        }
                     }
                     requestAnimationFrame(paso);
                 };
@@ -7596,24 +7621,126 @@
             }
 
             // === FLECHAS DE MODIFICADORES (detalle de carta) ===
+
+            // Capa elevada para cuando se inspecciona una carta DENTRO de un visor
+            // (descartes/mano/mazo/retribución). Va como primer hijo de #discard-viewer con
+            // z-index NEGATIVO: eso la deja por encima del velo negro del visor (que es el
+            // background del propio visor, y el background del padre siempre se pinta antes
+            // que sus descendientes) pero por debajo de las cartas del visor, que son hijos
+            // normales. Así lo elevado se ve nítido sin llegar a tapar el visor en sí.
+            _capaVisorLift() {
+                const visor = document.getElementById('discard-viewer');
+                if (!visor) return { capa: null, svg: null };
+                let capa = document.getElementById('viewer-lift');
+                if (!capa || !visor.contains(capa)) {
+                    if (capa) capa.remove();
+                    capa = document.createElement('div');
+                    capa.id = 'viewer-lift';
+                    capa.style.cssText = 'position:fixed; inset:0; pointer-events:none; z-index:-1;';
+                    visor.insertBefore(capa, visor.firstChild);
+                }
+                let svg = document.getElementById('viewer-lift-arrows');
+                if (!svg || !capa.contains(svg)) {
+                    svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                    svg.setAttribute('id', 'viewer-lift-arrows');
+                    // Se añade DESPUÉS de los clones para que las flechas se dibujen por encima
+                    // de ellos, igual que mod-arrows-layer (900) queda sobre las cartas del tablero.
+                    svg.setAttribute('style', 'position:absolute; inset:0; width:100%; height:100%; pointer-events:none;');
+                    capa.appendChild(svg);
+                }
+                return { capa, svg };
+            }
+
+            // Sube a la capa elevada una COPIA inerte de un elemento del tablero (carta, hueco
+            // de evento, montón de descartes...). cloneNode se lleva clases, badges, glows y
+            // overlays tal cual están, y NO copia listeners: la copia es puramente decorativa.
+            _elevarAlVisor(el) {
+                if (!el) return;
+                const visor = document.getElementById('discard-viewer');
+                if (!visor || visor.contains(el)) return; // lo que ya está en el visor no se eleva
+                if (!this._visorClones) this._visorClones = new Map();
+                if (this._visorClones.has(el)) return;
+                const r = el.getBoundingClientRect();
+                if (!r.width) return;
+                const { capa, svg } = this._capaVisorLift();
+                const clon = el.cloneNode(true);
+                clon.removeAttribute('data-id'); // solo visual: que no colisione en querySelector
+                clon.querySelectorAll('[data-id]').forEach(x => x.removeAttribute('data-id'));
+                clon.style.position = 'fixed';
+                clon.style.left = r.left + 'px';
+                clon.style.top = r.top + 'px';
+                clon.style.width = r.width + 'px';
+                clon.style.height = r.height + 'px';
+                clon.style.margin = '0';
+                clon.style.pointerEvents = 'none';
+                capa.insertBefore(clon, svg); // los clones, siempre por debajo del SVG de flechas
+                this._visorClones.set(el, clon);
+                // Los botones de una carta AGOTADA pero aún usable (Cambio de pajarita y
+                // compañía) no viven dentro de la carta: _liftExhaustedBtn los saca a
+                // #btn-lift-layer (z-index 3000) para que el filtro gris no los alcance, así
+                // que cloneNode no llega a ellos. Se clonan aparte; su holder ya trae posición
+                // y escala calculadas en su style inline, o sea que basta con copiarlo.
+                const inst = el.getAttribute && el.getAttribute('data-id');
+                if (inst) {
+                    const capaBtn = document.getElementById('btn-lift-layer');
+                    const hold = capaBtn && Array.from(capaBtn.children).find(h => h.dataset.inst === inst);
+                    if (hold) {
+                        const holdClon = hold.cloneNode(true);
+                        holdClon.style.pointerEvents = 'none';
+                        capa.insertBefore(holdClon, svg);
+                    }
+                }
+            }
+
+            _limpiarVisorLift() {
+                const capa = document.getElementById('viewer-lift');
+                if (capa) capa.remove();
+                this._visorClones = null;
+            }
+
             clearModArrows() {
                 this._modArrowCard = null;
                 const layer = document.getElementById('mod-arrows-layer');
                 if (layer) layer.innerHTML = '';
+                this._limpiarVisorLift();
             }
             renderModArrows(card) {
                 const conexiones = document.getElementById('connections-layer');
                 if (!conexiones || !card) return;
-                let layer = document.getElementById('mod-arrows-layer');
-                if (!layer) {
-                    layer = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-                    layer.setAttribute('id', 'mod-arrows-layer');
-                    layer.setAttribute('style', 'position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:900;');
-                    conexiones.parentNode.insertBefore(layer, conexiones.nextSibling);
+                this._limpiarVisorLift(); // clones elevados de la pasada anterior (si los hubo)
+                const $el = iid => document.querySelector(`.card[data-id="${iid}"]`) || document.getElementById(`card-${iid}`);
+
+                // destEl se resuelve ANTES de elegir la capa: si la carta inspeccionada está
+                // dentro de un visor (descartes/mano/mazo/retribución), todo el dibujo se va a
+                // una capa elevada. Motivo: ese visor es un overlay a pantalla completa con un
+                // velo negro al 85% (#discard-viewer, z-index 4000) y la capa de flechas de
+                // siempre vive DENTRO del tablero (z-index 900), o sea por debajo del velo:
+                // las flechas y las cartas del campo a las que apuntan se veían apagadas y
+                // hundidas respecto a la carta del visor (pedido de Toto, 29-jul-2026).
+                let destEl = $el(card.instanceId);
+                if (!destEl) {
+                    for (const _pid of ['p1', 'p2']) {
+                        const _ev = this.players[_pid].activeEvent;
+                        if (_ev && _ev.instanceId === card.instanceId) { destEl = document.getElementById(`${_pid}-event-slot`); break; }
+                    }
+                }
+                const _visor = document.getElementById('discard-viewer');
+                const _enVisor = !!(destEl && _visor && _visor.style.display !== 'none' && _visor.contains(destEl));
+
+                let layer;
+                if (_enVisor) {
+                    layer = this._capaVisorLift().svg;
+                } else {
+                    layer = document.getElementById('mod-arrows-layer');
+                    if (!layer) {
+                        layer = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                        layer.setAttribute('id', 'mod-arrows-layer');
+                        layer.setAttribute('style', 'position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:900;');
+                        conexiones.parentNode.insertBefore(layer, conexiones.nextSibling);
+                    }
                 }
                 layer.innerHTML = '';
                 this._modArrowCard = card;
-                const $el = iid => document.querySelector(`.card[data-id="${iid}"]`) || document.getElementById(`card-${iid}`);
                 const GRIS = '#cbd5e1';
                 const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
                 layer.appendChild(defs);
@@ -7714,6 +7841,12 @@
                 const soloBadges = (pts) => { const b = pts.filter(p => p.esBadge); return b.length ? b : pts; };
                 // Dibuja de srcEl a los puntos de targetEl (con horquilla si hay varios)
                 const dibujaGrupo = (srcEl, targetEl, pts) => {
+                    // Con el visor abierto, los dos extremos de la flecha que estén en el
+                    // TABLERO (o sea, todos menos la carta del propio visor) se suben a la capa
+                    // elevada: si no, quedarían bajo el velo del visor mientras la flecha que
+                    // los conecta se ve nítida encima. Las coordenadas ya calculadas siguen
+                    // valiendo porque el clon se coloca exactamente sobre su original.
+                    if (_enVisor) { this._elevarAlVisor(srcEl); this._elevarAlVisor(targetEl); }
                     const s = centro(srcEl);
                     const unicos = [];
                     pts.forEach(p => { if (!unicos.some(u => Math.abs(u.x - p.x) < 2 && Math.abs(u.y - p.y) < 2)) unicos.push(p); });
@@ -7733,13 +7866,6 @@
                         linea(fx, fy, p.x - (bx / bl) * 22, p.y - (by / bl) * 22, p.color, true); // -8 margen -12 punta
                     });
                 };
-                let destEl = $el(card.instanceId);
-                if (!destEl) {
-                    for (const _pid of ['p1', 'p2']) {
-                        const _ev = this.players[_pid].activeEvent;
-                        if (_ev && _ev.instanceId === card.instanceId) { destEl = document.getElementById(`${_pid}-event-slot`); break; }
-                    }
-                }
                 let entrantes = 0, salientes = 0;
                 // === ENTRANTES: quién afecta a la carta inspeccionada ===
                 if (destEl) {
