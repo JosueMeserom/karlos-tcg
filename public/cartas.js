@@ -4875,55 +4875,30 @@ const CARD_DB = [
     {
         name: "Domador", type: "Ayuda", subtype: "Ser vivo", tags: ["Consumible"], rarity: "C", cost: 1, series: 2,
         text: "Elige un aliado 'Animal salvaje'. Aumenta su Def y Atq en 2 permanentemente (mientras siga en juego).",
-        canPlayCard: function(card, game, p) {
-            const valid = [...p.vanguard, ...p.rearguard].filter(c => c.tags && c.tags.includes('Animal salvaje'));
-            if (valid.length === 0) { game.logError("No tienes 'Animales salvajes' en el campo."); return false; }
-            return true;
-        },
-        onPlay: async function(card, game) {
-            const p = game.players[card.owner];
-            const valid = [...p.vanguard, ...p.rearguard].filter(c => c.tags && c.tags.includes('Animal salvaje'));
-
-            const chosen = await game.openVisualSearchModal('¿A QUÉ ANIMAL DOMAR?', valid, 1, true, card.owner);
-            if (!chosen || chosen.length === 0) { game.cancelAction(); return; }
-
-            const target = chosen[0];
-
-            // Efecto temporal infinito para no modificar la base destructivamente
-            if (!target.tempEffects) target.tempEffects = [];
-            target.tempEffects.push({ sourceId: card.id, ownerId: card.owner, duration: 999, isDomador: true });
-
-            showFloatingText(target.instanceId, "DOMADO", "ft-ability", -40);
-            showFloatingText(target.instanceId, "+2 ATQ / +2 DEF", "ft-green", -20);
-            game.logMsg(`¡${target.name} ha sido domado y recibe +2 Atq y +2 Def!`, 'ability');
-
-            const handIdx = p.hand.findIndex(c => c.instanceId === card.instanceId);
-            if (handIdx !== -1) { 
-                const selfCard = p.hand.splice(handIdx, 1)[0];
-                if (typeof game.resetCard === 'function') game.resetCard(selfCard);
-                p.discard.push(selfCard); 
-                selfCard.location = 'discard'; 
-            }
-
-            game.updatePassives();
-            game.cancelAction();
-            game.render();
-        },
-        onUpdateTempEffect: function(target, effect, game) {
-            if (effect.isDomador) {
-                target.currentAtk += 2;
-                target.currentDef += 2;
-            }
-        },
-        onStartTurnTempEffect: function() { return true; }, // Supervivencia infinita
-        onEndTurnTempEffect: function() { return true; },
-        onGetPreviewEffects: function(card, game, effect) {
-            if (effect && effect.isDomador) {
-                const src = (effect.sourceInstanceId && typeof game.findCard === 'function') ? game.findCard(effect.sourceInstanceId) : null;
-                return [`+2 DEF y +2 ATQ (permanente), fuente: ${src && typeof game.refCarta === 'function' ? game.refCarta(src) : 'Domador'}`];
-            }
-            return [];
-        }
+        // Migrada (29-jul-2026): mismo patrón que Poción revitalizante (JUGAR requisitos +
+        // AL_CONSUMIR con ELEGIR en tablero), pero con `stats` en MARCAR_TEMPORAL (28-jul-2026,
+        // Capitán Guardia Real) en vez de un onUpdateTempEffect a mano — no hace falta escribirlo,
+        // el compilador ya lo reaplica solo. "Permanente" sale gratis: sin duracion/
+        // hastaFinDeTurnoPropio/hastaInicioTurnoLanzador, ninguno de los tres puntos de caducidad
+        // genéricos retira la marca nunca (replica el `return true` a mano de la vieja en
+        // onStartTurnTempEffect/onEndTurnTempEffect). `tempEffectText` conserva LITERAL el texto
+        // rico que tenía el onGetPreviewEffects a mano (orden DEF->ATQ, "(permanente)") vía el
+        // mecanismo genérico ya existente (Clarise/PEM/Rebobinar/Canceladora) — sin él, la marca
+        // habría quedado invisible en "Afectado por:" (le pasa hoy a LIDERAZGO, que no lo declara).
+        tempEffectText: "+2 DEF y +2 ATQ (permanente)",
+        abilities: [
+            { trigger: "JUGAR", requisitos: [
+                { count: { filtros: [ { campo: "tags", op: "includesCI", valor: "animal salvaje" } ] }, op: ">=", valor: 1, msg: "No tienes 'Animales salvajes' en el campo." } ] },
+            { trigger: "AL_CONSUMIR",
+              efectos: [
+                { op: "ELEGIR", de: "ALIADOS", filtros: [ { campo: "tags", op: "includesCI", valor: "animal salvaje" } ], cantidad: 1,
+                  titulo: "¿A qué animal domar?",
+                  efectos: [
+                    { op: "MARCAR_TEMPORAL", conOwner: true, actualizaPasivas: true, stats: { atk: 2, def: 2 },
+                      floating: { texto: "DOMADO", estilo: "ft-ability", offset: -40 },
+                      log: "¡{objetivo} ha sido domado y recibe +2 Atq y +2 Def!" },
+                    { op: "FLOTANTE", texto: "+2 ATQ / +2 DEF", estilo: "ft-green", offset: -20 } ] } ] }
+        ],
     },
     {
         name: "Gólem de tierra", hp: 4, def: 4, atk: 2, type: "Esbirro", subtype: "Ser mágico", tags: ["Invocación", "Gólem"], rarity: "B", cost: 1, series: 2,
