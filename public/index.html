@@ -345,7 +345,8 @@
             /* Flechas vivas: los puntos fluyen hacia la punta sin que la flecha se mueva */
             #connections-layer line, #connections-layer path { stroke-dasharray: 6 4; fill: none; animation: karlosDashAnexo 0.8s linear infinite; opacity: 1 !important; stroke-opacity: 0.85; }
             #connections-layer marker polygon { fill-opacity: 1 !important; opacity: 1 !important; }
-            #mod-arrows-layer line { animation: karlosDashMod 0.9s linear infinite; }
+            /* La capa elevada del visor usa otro id, pero las flechas deben verse igual de vivas */
+            #mod-arrows-layer line, #viewer-lift-arrows line { animation: karlosDashMod 0.9s linear infinite; }
             @keyframes karlosDashAnexo { to { stroke-dashoffset: -10; } }
             @keyframes karlosDashMod { to { stroke-dashoffset: -12; } }
             /* Secciones del detalle de Eventos (título amarillo unificado; fondos/bordes distintivos) */
@@ -4018,6 +4019,7 @@
             openDeckInsertViewer(pid) {
                 // cierra otros visores ocultos abiertos
                 document.getElementById('discard-viewer').style.display = 'none';
+                this._purgarVisor();
                 const viewer = document.getElementById('deck-insert-viewer');
                 const content = document.getElementById('deck-insert-content');
                 document.getElementById('deck-insert-title').innerText = `MAZO DE ${this.getDisplayName(pid)} - ELIGE EL HUECO`;
@@ -4096,7 +4098,7 @@
                 }
 
                 document.getElementById('discard-viewer').style.display = 'none';
-                this._limpiarVisorLift(); // clones del tablero que se hubieran elevado al visor
+                this._purgarVisor(); // vacía el visor (evita cartas fantasma) y quita lo elevado
                 const avisoVisor = document.getElementById('deck-search-notice');
                 if (avisoVisor) avisoVisor.style.display = 'none';
 
@@ -4204,6 +4206,7 @@
                             if (seleccionadas.length < 1) return; // mín. 1 obligatoria
                             this._deckSearchActivo = false;
                             document.getElementById('discard-viewer').style.display = 'none';
+                            this._purgarVisor();
                             avisoEl.style.display = 'none';
                             confirmEl.style.display = 'none';
                             const elegidas = seleccionadas.slice();
@@ -4242,6 +4245,7 @@
                                         ev.stopPropagation();
                                         this._deckSearchActivo = false;
                                         document.getElementById('discard-viewer').style.display = 'none';
+                                        this._purgarVisor();
                                         avisoEl.style.display = 'none';
                                         if (this.gameMode === 'online') {
                                             this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'VISUAL_SEARCH_CONFIRM', ids: [carta.instanceId] });
@@ -7639,21 +7643,26 @@
                     capa.style.cssText = 'position:fixed; inset:0; pointer-events:none; z-index:-1;';
                     visor.insertBefore(capa, visor.firstChild);
                 }
+                // Las FLECHAS van en su propia capa, hermana de la de clones y con z-index
+                // POSITIVO: hija del visor pero por encima de todo su contenido. Los clones
+                // pueden quedar debajo de las cartas del visor (son cajas grandes, taparlas
+                // sería peor), pero una flecha es fina y debe verse entera o no se entiende
+                // de dónde sale: con z-index:-1 la tapaban tanto las cartas del visor como
+                // la propia carta a la que apunta (betasteo de Toto, 29-jul-2026). Es el mismo
+                // criterio del tablero, donde mod-arrows-layer (900) va sobre las cartas.
                 let svg = document.getElementById('viewer-lift-arrows');
-                if (!svg || !capa.contains(svg)) {
+                if (!svg || !visor.contains(svg)) {
+                    if (svg) svg.remove();
                     svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
                     svg.setAttribute('id', 'viewer-lift-arrows');
-                    // Se añade DESPUÉS de los clones para que las flechas se dibujen por encima
-                    // de ellos, igual que mod-arrows-layer (900) queda sobre las cartas del tablero.
-                    svg.setAttribute('style', 'position:absolute; inset:0; width:100%; height:100%; pointer-events:none;');
-                    capa.appendChild(svg);
+                    svg.setAttribute('style', 'position:fixed; inset:0; width:100%; height:100%; pointer-events:none; z-index:5;');
+                    visor.appendChild(svg);
                 }
                 return { capa, svg };
             }
 
             // Sube a la capa elevada una COPIA inerte de un elemento del tablero (carta, hueco
-            // de evento, montón de descartes...). cloneNode se lleva clases, badges, glows y
-            // overlays tal cual están, y NO copia listeners: la copia es puramente decorativa.
+            // de evento, montón de descartes...), colocada exactamente sobre el original.
             _elevarAlVisor(el) {
                 if (!el) return;
                 const visor = document.getElementById('discard-viewer');
@@ -7662,8 +7671,26 @@
                 if (this._visorClones.has(el)) return;
                 const r = el.getBoundingClientRect();
                 if (!r.width) return;
-                const { capa, svg } = this._capaVisorLift();
-                const clon = el.cloneNode(true);
+                const { capa } = this._capaVisorLift();
+                if (!capa) return;
+                // Si el elemento es una CARTA conocida, el clon se REGENERA con createCardEl en
+                // vez de copiarse con cloneNode. Motivo (betasteo de Toto, 29-jul-2026): los
+                // botones de una carta agotada pero aún usable (Spencer y su CAMBIO DE PAJARITA)
+                // no están dentro de la carta —_liftExhaustedBtn los tiene sacados a
+                // #btn-lift-layer para que el filtro gris no los alcance—, así que cloneNode no
+                // los alcanzaba y el clon salía sin botón. Regenerando, el botón nace DENTRO del
+                // clon y no depende de encontrar ese holder externo en el instante justo.
+                // _sinLiftBtn evita que el rAF de createCardEl vuelva a sacarlo fuera (además de
+                // que ese lift borra por instanceId, así que clon y original se pisarían).
+                const inst = (el.getAttribute && el.getAttribute('data-id')) || null;
+                const carta = inst && typeof this.findCard === 'function' ? this.findCard(inst) : null;
+                let clon = null;
+                if (carta) {
+                    this._sinLiftBtn = true;
+                    try { clon = this.createCardEl(carta, false, false); } catch (e) { clon = null; }
+                    this._sinLiftBtn = false;
+                }
+                if (!clon) clon = el.cloneNode(true); // huecos de evento, pilas de descartes...
                 clon.removeAttribute('data-id'); // solo visual: que no colisione en querySelector
                 clon.querySelectorAll('[data-id]').forEach(x => x.removeAttribute('data-id'));
                 clon.style.position = 'fixed';
@@ -7672,30 +7699,27 @@
                 clon.style.width = r.width + 'px';
                 clon.style.height = r.height + 'px';
                 clon.style.margin = '0';
-                clon.style.pointerEvents = 'none';
-                capa.insertBefore(clon, svg); // los clones, siempre por debajo del SVG de flechas
+                clon.style.pointerEvents = 'none'; // inerte: el clon no se cliquea ni hace hover
+                capa.appendChild(clon);
                 this._visorClones.set(el, clon);
-                // Los botones de una carta AGOTADA pero aún usable (Cambio de pajarita y
-                // compañía) no viven dentro de la carta: _liftExhaustedBtn los saca a
-                // #btn-lift-layer (z-index 3000) para que el filtro gris no los alcance, así
-                // que cloneNode no llega a ellos. Se clonan aparte; su holder ya trae posición
-                // y escala calculadas en su style inline, o sea que basta con copiarlo.
-                const inst = el.getAttribute && el.getAttribute('data-id');
-                if (inst) {
-                    const capaBtn = document.getElementById('btn-lift-layer');
-                    const hold = capaBtn && Array.from(capaBtn.children).find(h => h.dataset.inst === inst);
-                    if (hold) {
-                        const holdClon = hold.cloneNode(true);
-                        holdClon.style.pointerEvents = 'none';
-                        capa.insertBefore(holdClon, svg);
-                    }
-                }
             }
 
             _limpiarVisorLift() {
                 const capa = document.getElementById('viewer-lift');
                 if (capa) capa.remove();
+                const svg = document.getElementById('viewer-lift-arrows');
+                if (svg) svg.remove();
                 this._visorClones = null;
+            }
+
+            // Al cerrar un visor hay que VACIARLO, no solo ocultarlo: si no, sus cartas siguen
+            // en el DOM con su data-id y rect cero, y cualquier `querySelector('.card[data-id]')`
+            // del motor (flechas, flotantes, animaciones) puede engancharse a esa copia fantasma
+            // en vez de a la carta real del tablero. Se llama desde TODOS los cierres del visor.
+            _purgarVisor() {
+                const content = document.getElementById('discard-content');
+                if (content) content.innerHTML = '';
+                this._limpiarVisorLift();
             }
 
             clearModArrows() {
@@ -7708,7 +7732,19 @@
                 const conexiones = document.getElementById('connections-layer');
                 if (!conexiones || !card) return;
                 this._limpiarVisorLift(); // clones elevados de la pasada anterior (si los hubo)
-                const $el = iid => document.querySelector(`.card[data-id="${iid}"]`) || document.getElementById(`card-${iid}`);
+                // Prefiere SIEMPRE el nodo VISIBLE de entre los que comparten instanceId. Un
+                // visor cerrado conserva en el DOM las cartas de su última apertura (solo se
+                // vacía al abrirlo de nuevo), y #discard-viewer está antes que el tablero en el
+                // documento: sin este filtro, querySelector devolvía esa copia fantasma —con
+                // rect (0,0,0,0) por estar en un contenedor display:none— y la flecha nacía en
+                // la esquina superior izquierda del lienzo hasta recargar la página. Lo reportó
+                // Toto el 29-jul-2026: pasaba al mirar una pila de descartes y cerrarla, porque
+                // las fuentes de efecto suelen ser justo Ayudas ya consumidas que están ahí.
+                const $el = iid => {
+                    const nodos = document.querySelectorAll(`.card[data-id="${iid}"]`);
+                    for (const n of nodos) { if (n.getBoundingClientRect().width) return n; }
+                    return nodos[0] || document.getElementById(`card-${iid}`);
+                };
 
                 // destEl se resuelve ANTES de elegir la capa: si la carta inspeccionada está
                 // dentro de un visor (descartes/mano/mazo/retribución), todo el dibujo se va a
@@ -8258,7 +8294,10 @@
 
                 // Añadimos el contenedor de botones si existe
                 if (btnContainer) el.appendChild(btnContainer);
-                if (card.exhausted && btnContainer) {
+                // _sinLiftBtn: los clones elevados al visor (_elevarAlVisor) quieren el botón
+                // DENTRO de la carta, no sacado a #btn-lift-layer — ese lift borra por
+                // instanceId, así que el clon y la carta real se pisarían mutuamente.
+                if (card.exhausted && btnContainer && !this._sinLiftBtn) {
                     // El botón se ELEVA a una capa fija fuera de la carta: el filtro gris no puede alcanzarlo
                     requestAnimationFrame(() => this._liftExhaustedBtn(el, btnContainer, card.instanceId));
                 }

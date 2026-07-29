@@ -1,0 +1,288 @@
+// tests/capas_cliente.js — capas elevadas del cliente (NO es una suite viejo-vs-nuevo).
+//
+// Cubre lo que la batería de regresión no puede ver: el harness anula render() y su DOM
+// stub no tiene layout ni z-index, así que nada de esto es observable desde ahí. Aquí se
+// monta un mini-DOM propio (el proyecto no trae jsdom y no se quiso añadir dependencia)
+// con lo justo para ejercitar la construcción del árbol de capas y el rAF de seguimiento.
+//
+// Qué garantiza:
+//   · _capaVisorLift: dos capas hermanas dentro del visor — clones con z-index NEGATIVO
+//     (sobre el velo, sin tapar las cartas del visor) y flechas con z-index POSITIVO
+//     (sobre todo el contenido del visor, o las tapaban las propias cartas).
+//   · _elevarAlVisor: el clon queda exactamente sobre el original, inerte y sin data-id;
+//     y si es una carta conocida se REGENERA con createCardEl bajo _sinLiftBtn, para que
+//     el botón de una carta agotada-pero-usable (Spencer) nazca DENTRO del clon en vez de
+//     depender del holder externo de #btn-lift-layer, que cloneNode no alcanza.
+//   · _purgarVisor: cerrar un visor lo VACÍA. Si no, sus cartas siguen en el DOM con su
+//     data-id y rect cero, y querySelector se engancha a ese fantasma: era la causa de que
+//     la flecha naciera en la esquina (0,0) tras abrir y cerrar una pila de descartes.
+//   · _reaccionLiftTick: el resalte sobrevive a un render() (que reconstruye la mano
+//     entera) y se realinea; antes el bucle moría ahí y el resize descuadraba el clon.
+//
+// Lo puramente visual (que un z-index dé el efecto buscado) NO se puede afirmar desde
+// aquí: eso se valida en el navegador. Esto solo fija el contrato estructural para que
+// un refactor futuro no lo rompa en silencio.
+// Se ejecuta aparte de la batería: `node tests/capas_cliente.js` (no lo recorre el bucle
+// de regresion*.js, y no lo necesita: no toca cartas ni motor de juego).
+
+const fs = require('fs'), path = require('path'), vm = require('vm');
+const RAIZ = path.join(__dirname, '..');
+
+// ---------- mini-DOM ----------
+let _seq = 0;
+function Nodo(tag, ns) {
+    const n = {
+        __id: ++_seq, tagName: String(tag).toUpperCase(), __ns: ns || null,
+        id: '', className: '', children: [], parentNode: null, __html: '',
+        __attrs: {}, dataset: {}, __rect: { left: 0, top: 0, width: 0, height: 0 },
+        style: { cssText: '' },
+        classList: {
+            add(...c) { c.forEach(x => { if (!n.className.split(' ').includes(x)) n.className = (n.className + ' ' + x).trim(); }); },
+            remove(...c) { n.className = n.className.split(' ').filter(x => !c.includes(x)).join(' '); },
+            contains(c) { return n.className.split(' ').includes(c); },
+        },
+        appendChild(c) { if (c.parentNode) c.parentNode.removeChild(c); c.parentNode = n; n.children.push(c); return c; },
+        insertBefore(c, ref) {
+            if (c.parentNode) c.parentNode.removeChild(c);
+            c.parentNode = n;
+            const i = ref ? n.children.indexOf(ref) : -1;
+            if (i === -1) n.children.push(c); else n.children.splice(i, 0, c);
+            return c;
+        },
+        removeChild(c) { const i = n.children.indexOf(c); if (i !== -1) { n.children.splice(i, 1); c.parentNode = null; } return c; },
+        remove() { if (n.parentNode) n.parentNode.removeChild(n); },
+        contains(o) { if (o === n) return true; return n.children.some(c => c.contains(o)); },
+        getAttribute(k) { return k === 'data-id' ? (n.dataset.id === undefined ? null : n.dataset.id) : (n.__attrs[k] === undefined ? null : n.__attrs[k]); },
+        setAttribute(k, v) {
+            n.__attrs[k] = String(v);
+            if (k === 'data-id') n.dataset.id = String(v);
+            if (k === 'id') n.id = String(v);
+            if (k === 'style') n.style.cssText = String(v);
+            if (k === 'class') n.className = String(v);
+        },
+        removeAttribute(k) { delete n.__attrs[k]; if (k === 'data-id') delete n.dataset.id; },
+        getBoundingClientRect() { return Object.assign({}, n.__rect, { right: n.__rect.left + n.__rect.width, bottom: n.__rect.top + n.__rect.height }); },
+        matches() { return false; },
+        closest() { return null; },
+        get firstChild() { return n.children[0] || null; },
+        cloneNode(deep) {
+            const c = Nodo(n.tagName, n.__ns);
+            c.id = n.id; c.className = n.className;
+            c.__attrs = Object.assign({}, n.__attrs);
+            c.dataset = Object.assign({}, n.dataset);
+            c.__rect = Object.assign({}, n.__rect);
+            c.style = Object.assign({}, n.style); // el DOM real clona el atributo style entero
+            if (deep) n.children.forEach(h => c.appendChild(h.cloneNode(true)));
+            return c;
+        },
+        querySelectorAll(sel) {
+            const out = [];
+            const rec = (x) => { x.children.forEach(h => { if (coincide(h, sel)) out.push(h); rec(h); }); };
+            rec(n); return out;
+        },
+        querySelector(sel) { return n.querySelectorAll(sel)[0] || null; },
+    };
+    Object.defineProperty(n, 'innerHTML', {
+        get() { return n.__html; },
+        set(v) { n.__html = String(v); n.children.forEach(c => c.parentNode = null); n.children.length = 0; },
+    });
+    return n;
+}
+function coincide(nodo, sel) {
+    const m = sel.match(/^\.card\[data-id="([^"]+)"\]$/);
+    if (m) return nodo.classList.contains('card') && nodo.dataset.id === m[1];
+    if (sel === '[data-id]') return nodo.dataset.id !== undefined;
+    const h = sel.match(/^\[data-badge="([^"]+)"\]$/);
+    if (h) return nodo.dataset.badge === h[1];
+    return false;
+}
+const raiz = Nodo('body');
+const porId = new Map();
+const documento = {
+    getElementById_probe(id) { return documento.getElementById(id); },
+    body: raiz, documentElement: Nodo('html'),
+    createElement(t) { return Nodo(t); },
+    createElementNS(ns, t) { return Nodo(t, ns); },
+    createTextNode(t) { return Nodo('#text'); },
+    getElementById(id) {
+        const rec = (x) => { for (const h of x.children) { if (h.id === id) return h; const r = rec(h); if (r) return r; } return null; };
+        return rec(raiz) || porId.get(id) || null;
+    },
+    querySelector(sel) { return raiz.querySelector(sel); },
+    querySelectorAll(sel) { return raiz.querySelectorAll(sel); },
+    contains(o) { return raiz.contains(o); },
+    addEventListener() {}, removeEventListener() {}, styleSheets: [],
+};
+
+// ---------- carga del motor ----------
+const html = fs.readFileSync(path.join(RAIZ, 'public/index.html'), 'utf8');
+const a = html.lastIndexOf('<script>'), c = html.indexOf('</script>', a);
+const motor = html.slice(a + 8, c).split('window.game = new Game();').join('/*probe*/');
+
+function stubSimple() {
+    const el = () => ({ style: {}, dataset: {}, options: [], selectedIndex: -1, classList: { add(){}, remove(){}, toggle(){}, contains(){return false;} },
+        children: [], innerHTML: '', innerText: '', value: '', appendChild(x){return x;}, removeChild(x){return x;}, remove(){}, insertBefore(x){return x;},
+        querySelector(){return null;}, querySelectorAll(){return [];}, addEventListener(){}, removeEventListener(){},
+        getBoundingClientRect(){return {width:0,height:0,left:0,top:0};}, getAttribute(){return null;}, setAttribute(){}, removeAttribute(){},
+        closest(){return null;}, contains(){return false;}, focus(){}, blur(){}, click(){}, cloneNode(){return el();} });
+    const m = new Map();
+    return { getElementById(id){ if(!m.has(id)) m.set(id, el()); return m.get(id); }, createElement:el, createElementNS:el,
+        createTextNode:()=>({}), querySelector:()=>null, querySelectorAll:()=>[], body:el(), documentElement:el(),
+        addEventListener(){}, removeEventListener(){}, contains(){return false;} };
+}
+
+let rafCola = [];
+const sandbox = {
+    console: { log(){}, warn(){}, error(){}, info(){} },
+    document: stubSimple(),
+    localStorage: { getItem: () => null, setItem(){}, removeItem(){} },
+    window: {}, setTimeout: () => 0, clearTimeout(){},
+    requestAnimationFrame: (fn) => { rafCola.push(fn); return rafCola.length; },
+    navigator: {}, location: { href: '' }, getComputedStyle: () => ({}),
+    addEventListener(){}, removeEventListener(){}, dispatchEvent(){}, alert(){},
+};
+sandbox.window = sandbox;
+vm.createContext(sandbox);
+vm.runInContext(fs.readFileSync(path.join(RAIZ, 'public/reglas.js'), 'utf8'), sandbox);
+vm.runInContext(fs.readFileSync(path.join(RAIZ, 'public/cartas.js'), 'utf8'), sandbox);
+vm.runInContext(motor, sandbox);
+const game = vm.runInContext('new (class extends Game { async runInitialSetup() {} })()', sandbox);
+sandbox.document = documento; // a partir de aquí, el DOM rico
+
+// ---------- montaje del escenario ----------
+const visor = Nodo('div'); visor.setAttribute('id', 'discard-viewer'); visor.style.display = 'flex';
+const titulo = Nodo('div'); titulo.setAttribute('id', 'discard-title');
+const contenido = Nodo('div'); contenido.setAttribute('id', 'discard-content');
+visor.appendChild(titulo); visor.appendChild(contenido);
+raiz.appendChild(visor);
+
+// carta EN EL VISOR (la que se inspecciona: un Domador ya descartado)
+const cartaVisor = Nodo('div'); cartaVisor.classList.add('card'); cartaVisor.setAttribute('data-id', 'DOM1');
+cartaVisor.__rect = { left: 400, top: 300, width: 90, height: 120 };
+contenido.appendChild(cartaVisor);
+
+// carta EN EL TABLERO afectada por ella (agotada, con botón elevado aparte)
+const board = Nodo('div'); board.setAttribute('id', 'game-board'); raiz.appendChild(board);
+const cartaCampo = Nodo('div'); cartaCampo.classList.add('card'); cartaCampo.classList.add('exhausted');
+cartaCampo.setAttribute('data-id', 'TIG1');
+cartaCampo.__rect = { left: 120, top: 500, width: 90, height: 120 };
+const badge = Nodo('div'); badge.dataset.badge = 'atk'; badge.__rect = { left: 130, top: 505, width: 20, height: 20 };
+cartaCampo.appendChild(badge);
+board.appendChild(cartaCampo);
+
+// el botón "aún usable" de la carta agotada, ya sacado a btn-lift-layer
+const btnLayer = Nodo('div'); btnLayer.setAttribute('id', 'btn-lift-layer'); raiz.appendChild(btnLayer);
+const hold = Nodo('div'); hold.dataset.inst = 'TIG1'; hold.style.transform = 'scale(0.8)';
+const btn = Nodo('div'); btn.classList.add('action-btn-card'); btn.innerText = 'CAMBIO DE PAJARITA';
+hold.appendChild(btn); btnLayer.appendChild(hold);
+
+// ---------- pruebas ----------
+let fallos = 0, comprobaciones = 0;
+const check = (nombre, cond, extra) => { comprobaciones++; console.log((cond ? '  OK   ' : '  FALLO') + ' · ' + nombre + (cond ? '' : '  -> ' + extra)); if (!cond) fallos++; };
+
+const { capa, svg } = game._capaVisorLift();
+check('la capa se crea DENTRO del visor', visor.contains(capa), 'no está dentro');
+check('la capa es el PRIMER hijo del visor (sobre el velo, bajo las cartas)', visor.children[0] === capa, 'índice ' + visor.children.indexOf(capa));
+check('la capa lleva z-index negativo', /z-index:\s*-1/.test(capa.style.cssText), capa.style.cssText);
+check('el svg de flechas NO cuelga de la capa de clones', !capa.contains(svg), 'sigue dentro');
+check('el svg de flechas cuelga del VISOR', visor.contains(svg), 'no cuelga del visor');
+check('el svg lleva z-index positivo (sobre el contenido del visor)', /z-index:\s*5/.test(svg.style.cssText), svg.style.cssText);
+check('la capa de clones sigue con z-index negativo (no tapa el visor)', /z-index:\s*-1/.test(capa.style.cssText), capa.style.cssText);
+
+game._elevarAlVisor(cartaCampo);
+const clones = capa.children.slice();
+check('la carta del tablero se clona a la capa', clones.length >= 1, 'clones: ' + clones.length);
+const clonCarta = clones.find(x => x.classList.contains('card'));
+check('el clon conserva las clases (glows/estados)', !!clonCarta && clonCarta.classList.contains('exhausted'), 'clases: ' + (clonCarta && clonCarta.className));
+check('el clon conserva los badges internos', !!clonCarta && clonCarta.children.length === 1, 'hijos: ' + (clonCarta && clonCarta.children.length));
+check('el clon queda EXACTAMENTE sobre la original', !!clonCarta && clonCarta.style.left === '120px' && clonCarta.style.top === '500px', clonCarta && (clonCarta.style.left + ',' + clonCarta.style.top));
+check('el clon es inerte (sin data-id, sin puntero)', !!clonCarta && clonCarta.getAttribute('data-id') === null && clonCarta.style.pointerEvents === 'none', 'data-id=' + (clonCarta && clonCarta.getAttribute('data-id')));
+check('los badges del clon tambien pierden data-id', !!clonCarta && clonCarta.children.every(h => h.getAttribute('data-id') === null), 'quedó alguno');
+check('_sinLiftBtn queda desactivado tras elevar (no contamina renders futuros)', !game._sinLiftBtn, 'sigue activo: el tablero perderia sus botones elevados');
+check('el svg va DESPUES del contenido del visor en el DOM', visor.children.indexOf(svg) > visor.children.indexOf(contenido), 'idx svg ' + visor.children.indexOf(svg));
+
+game._elevarAlVisor(cartaCampo);
+check('no duplica si se eleva dos veces', capa.children.filter(x => x.classList.contains('card')).length === 1, 'duplicado');
+game._elevarAlVisor(cartaVisor);
+check('lo que YA esta en el visor no se eleva', capa.children.filter(x => x.classList.contains('card')).length === 1, 'elevó la del visor');
+
+game._limpiarVisorLift();
+check('al limpiar, la capa desaparece por completo', document_no(visor), 'sigue ahí');
+function document_no(v) { return !v.children.some(x => x.id === 'viewer-lift'); }
+check('limpiar NO toca el contenido del visor', visor.children.length === 2 && visor.contains(cartaVisor), 'hijos: ' + visor.children.length);
+check('limpiar NO toca la carta del tablero ni su boton', board.contains(cartaCampo) && btnLayer.contains(hold), 'se perdió algo del tablero');
+
+// ---------- fix del resalte de reacción ante repintados ----------
+console.log('\n--- _reaccionLiftTick: sobrevivir a render() (bug del resize) ---');
+const mano = Nodo('div'); mano.setAttribute('id', 'p1-hand'); raiz.appendChild(mano);
+let cartaMano = Nodo('div'); cartaMano.classList.add('card'); cartaMano.setAttribute('data-id', 'ESC1');
+cartaMano.__rect = { left: 500, top: 900, width: 90, height: 120 };
+mano.appendChild(cartaMano);
+const liftLayer = Nodo('div'); liftLayer.setAttribute('id', 'reaccion-lift'); raiz.appendChild(liftLayer);
+const clon = Nodo('div'); clon.classList.add('card'); liftLayer.appendChild(clon);
+
+cartaMano.style.visibility = 'hidden';
+game._reaccionManoOrig = cartaMano;
+game._reaccionManoId = 'ESC1';
+game._reaccionLiftClon = clon;
+rafCola = [];
+game._reaccionLiftTick();
+const tick = () => { const cola = rafCola; rafCola = []; cola.forEach(f => f()); };
+tick();
+check('el clon se coloca sobre la carta de la mano', clon.style.left === '500px', clon.style.left);
+
+// render(): la mano se vacía y se reconstruye -> la referencia vieja muere y la nueva nace visible
+mano.removeChild(cartaMano);
+cartaMano = Nodo('div'); cartaMano.classList.add('card'); cartaMano.setAttribute('data-id', 'ESC1');
+cartaMano.__rect = { left: 260, top: 900, width: 90, height: 120 }; // la ventana se estrechó: otra X
+mano.appendChild(cartaMano);
+tick();
+check('el bucle SIGUE vivo tras el repintado', rafCola.length > 0, 'el bucle murió (bug original)');
+check('el clon se re-alinea con la carta nueva', clon.style.left === '260px', 'quedó en ' + clon.style.left + ' (bug original: 500px)');
+check('la carta original se vuelve a ocultar', cartaMano.style.visibility === 'hidden', 'visible: se verían las dos (bug original)');
+
+game._limpiarResalteReaccion();
+check('al limpiar, la original recupera su visibilidad', cartaMano.style.visibility === '', 'quedó ' + cartaMano.style.visibility);
+rafCola = []; tick();
+check('al limpiar, el bucle se detiene', rafCola.length === 0, 'sigue corriendo');
+
+
+// ---------- boton de carta agotada-pero-usable dentro del clon (Spencer) ----------
+console.log('\n--- clon de carta REAL: el boton nace dentro (Spencer, agotado y con Furor) ---');
+const spId = vm.runInContext('CARD_DB.find(c => c.name === "Spencer").id', sandbox);
+const spencer = game.createCardInstance(spId, 'p1');
+spencer.location = 'vanguard'; spencer.exhausted = true; spencer.furor = 3;
+game.players.p1.vanguard.push(spencer);
+game.activePlayerId = 'p1'; game.phase = 'PRINCIPAL'; game.inputState = 'IDLE'; game.gameMode = 'local';
+check('Spencer puede usar su Activa estando agotado (abilityWhileExhausted)',
+      vm.runInContext(`!!getCardTemplate(${spId}).abilityWhileExhausted`, sandbox), 'no lo tiene');
+
+const elSpencer = Nodo('div'); elSpencer.classList.add('card'); elSpencer.classList.add('exhausted');
+elSpencer.setAttribute('data-id', spencer.instanceId);
+elSpencer.__rect = { left: 700, top: 480, width: 90, height: 120 };
+board.appendChild(elSpencer);
+
+rafCola = [];
+game._elevarAlVisor(elSpencer);
+const capa2 = documento.getElementById("viewer-lift");
+const clonSp = capa2 && capa2.children.find(x => x.classList.contains('card'));
+check('el clon de Spencer se genera', !!clonSp, 'no se generó');
+const btnCont = clonSp && clonSp.children.find(x => x.className.includes('action-btn-container'));
+check('el clon LLEVA el contenedor de botones DENTRO', !!btnCont, 'el clon salió sin botón (el bug que reportó Toto)');
+check('el boton dice el nombre de la Activa', !!btnCont && btnCont.children.some(b => (b.innerText || '').includes('PAJARITA')), 'texto: ' + (btnCont && btnCont.children.map(b=>b.innerText).join('|')));
+rafCola.forEach(f => { try { f(); } catch(e){} });
+check('el clon NO manda su boton a btn-lift-layer', !btnLayer.children.some(h => h.dataset.inst === spencer.instanceId), 'lo sacó fuera: se pisaria con la carta real');
+check('_sinLiftBtn vuelve a false', !game._sinLiftBtn, 'quedó activo');
+
+// ---------- carta fantasma del visor cerrado ----------
+console.log('\n--- purga del visor al cerrarlo (flecha desde la esquina 0,0) ---');
+check('antes de purgar, la carta del visor esta en el DOM con su data-id',
+      !!raiz.querySelector('.card[data-id="DOM1"]'), 'no está');
+game._purgarVisor();
+check('tras purgar, NO queda ninguna carta fantasma con ese data-id',
+      !raiz.querySelector('.card[data-id="DOM1"]'), 'sigue en el DOM: cualquier querySelector la cogeria con rect 0');
+check('tras purgar, el contenido del visor queda vacio', contenido.children.length === 0, 'hijos: ' + contenido.children.length);
+check('purgar NO toca las cartas del tablero', board.contains(cartaCampo) && board.contains(elSpencer), 'se perdió algo del tablero');
+
+console.log(fallos === 0 ? '\nSUITE capas_cliente: ' + comprobaciones + '/' + comprobaciones + ' comprobaciones — CAPAS CORRECTAS' : '\nSUITE capas_cliente: ' + fallos + ' FALLOS de ' + comprobaciones + ' comprobaciones');
+process.exit(fallos ? 1 : 0);
