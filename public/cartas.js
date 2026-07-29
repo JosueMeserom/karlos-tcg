@@ -1362,89 +1362,27 @@ const CARD_DB = [
     { 
         id: 20, name: "Guardia", hp: 2, def: 3, atk: 3, type: "Esbirro", subtype: "Ser vivo", tags: ["Traje protector"], gender: 'M', rarity: "C",
         text: "A: FUEGO A DISCRECIÓN (1F). 50% +2 Atq / 50% Fallo.", activeName: "FUEGO A DISCRECIÓN", series: 1, activeCost: 1,
-        
-        canActivateAbility: function(card, game) {
-            if (card.furor < 1) { game.logError("Falta Furor (1)."); return false; }
-            const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
-            
-            // --- FILTRO DE SIGILO: Como es un Ataque Normal, los Ocultos no cuentan ---
-            const validEnemies = game.players[enemyId].vanguard.filter(c => !c.stealth);
-            if (validEnemies.length === 0) {
-                game.logError("No hay enemigos válidos (sin Ocultarse) en la Vanguardia enemiga."); 
-                return false;
-            }
-            return true;
-        },
-        
-        onExecuteAbility: async function(card, game) {
-            game.modifyStat(card, 'furor', -1, 0, card);
-            showFloatingText(card.instanceId, card.activeName, "ft-ability", -30);
-
-            game.isActionLocked = true;
-            game.logMsg(`${game.getCardNameWithOwner(card)} activa ${card.activeName}.`, 'ability');
-
-            const results = await game.triggerCoinFlips(1, card.owner);
-            if (!results) {
-                game.isActionLocked = false;
-                game.cancelAction(); 
-                return;
-            }
-
-            if (results[0] === 'heads') {
-                game.logMsg("Moneda: CARA - ¡Ataque potenciado!", 'ability');
-                
-                // SISTEMA MODERNO DE HABILIDAD (Igual que Wolfgang)
-                game.selectedCard = card;
-                game.inputState = 'SELECT_ABILITY_TARGETS';
-                game.abilityContext = { 
-                    targets: [], 
-                    maxTargets: 1, 
-                    name: 'FUEGO A DISCRECIÓN', 
-                    targetType: 'enemy', 
-                    cannotCancel: true, // <--- CANDADO ACTIVADO
-                    isNormalAttack: true 
-                };
-            } else {
-                game.logMsg("Moneda: CRUZ - El ataque falla.", 'neutral');
-                card.exhausted = true;
-                game.isActionLocked = false; 
-                game.cancelAction();
-            }
-            game.render();
-        },
-        onValidateTarget: function(card, target, game, isSilent) {
-            if (target.owner === card.owner || target.location !== 'vanguard') return false;
-            if (target.stealth) {
-                if (!isSilent) game.logError("No puedes seleccionar a un objetivo Oculto.");
-                return false;
-            }
-            return true;
-        },
-        onTargetsReady: async function(card, game) {
-            const target = game.abilityContext.targets[0];
-            game.inputState = 'EXECUTING';
-            game.render();
-            await game.sleep(400);
-
-            if (card.currentHp <= 0 || (card.location !== 'vanguard' && card.location !== 'rearguard')) {
-                game.cancelAction();
-                return;
-            }
-            
-            const realTarget = game.findCard(target.instanceId);
-            if (realTarget && (realTarget.location === 'vanguard' || realTarget.location === 'rearguard') && realTarget.currentHp > 0) {
-                // Aplicamos el bufo, disparamos y le quitamos el bufo inmediatamente
-                card.currentAtk += 2; 
-                await game.performAttack(card, realTarget);
-                card.currentAtk -= 2; 
-            }
-            
-            card.exhausted = true;
-            game.isActionLocked = false;
-            game.cancelAction();
-            game.updatePassives();
-            game.render();
-        }
+        // Migrada (30-jul-2026): MONEDA envolviendo un ELEGIR+ATACAR, mismo esqueleto que
+        // Investigador demente. La vieja tenía el mismo bug latente que Hiposaurio/Hawke
+        // ("card.currentAtk += 2; performAttack; card.currentAtk -= 2") — performAttack ya
+        // llama a updatePassives() por dentro, así que el -=2 a mano restaba el bono DOS
+        // veces. El op ATACAR con bonoAtq usa updatePassives() para el recompute, así que la
+        // migración lo arregla de encima, igual que en aquellas dos. Se cae el log
+        // "activa FUEGO A DISCRECIÓN" previo a la moneda: redundante con el floater del
+        // nombre de la Activa, que ya sale (mismo criterio que Aniceto/Investigador demente).
+        abilities: [
+            { trigger: "ACTIVA", nombre: "FUEGO A DISCRECIÓN", coste: { furor: 1 }, ataqueNormal: true, sinObjetivo: true,
+              requisitos: [
+                { count: { quien: "ENEMIGO", zona: "vanguardia", filtros: [ { campo: "stealth", op: "falsy" } ] }, op: ">=", valor: 1, msg: "No hay enemigos válidos (sin Ocultarse) en la Vanguardia enemiga." } ],
+              efectos: [
+                { op: "MONEDA",
+                  logCara: { msg: "Moneda: CARA - ¡Ataque potenciado!", tipo: "ability" },
+                  logCruz: { msg: "Moneda: CRUZ - El ataque falla.", tipo: "neutral" },
+                  cara: [
+                    { op: "ELEGIR", de: "ENEMIGOS", zona: "VANGUARDIA", filtros: [ { campo: "stealth", op: "falsy" } ], cantidad: 1, cancelable: false,
+                      titulo: "FUEGO A DISCRECIÓN: elige objetivo",
+                      efectos: [ { op: "ATACAR", bonoAtq: 2 } ] } ] } ] }
+        ]
     },
     {
         id: 21, name: "K.I.N.O.", hp: 6, def: 7, atk: 6, type: "Personaje", subtype: "Máquina", tags: ['Con conciencia', 'De Mill'], rarity: "C", gender: "N/A",
@@ -6627,61 +6565,26 @@ const CARD_DB = [
         onBeforePlayAsync: async function(card, game, p) {
             return await DSL.tributoFuror(card, game, p, 1, { titulo: `${card.name}: ELIGE TRIBUTO (-1 FUROR)` });
         },
-        canActivateAbility: function(card, game) {
-            if (card.furor < 1) { game.logError("Falta Furor (1)."); return false; }
-            const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
-            const valid = game.players[enemyId].vanguard.filter(c => !getCardTemplate(c.id).isAvatar);
-            if (valid.length < 2) { game.logError("Necesitas al menos 2 enemigos en vanguardia para golpear a objetivos distintos."); return false; }
-            return true;
-        },
-        onExecuteAbility: function(card, game) {
-            game.selectedCard = card;
-            game.inputState = 'SELECT_ABILITY_TARGETS';
-            game.abilityContext = { targets: [], maxTargets: 2, name: 'FOSFORESCENCIA', targetType: 'enemy' };
-            game.logError("Elige al primer objetivo del impacto eléctrico.");
-            game.render();
-        },
-        onValidateTarget: function(card, target, game, isSilent) {
-            if (target.owner === card.owner || target.location !== 'vanguard' || getCardTemplate(target.id).isAvatar) return false;
-            if (game.abilityContext.targets.some(t => t.instanceId === target.instanceId)) {
-                if (!isSilent) game.logError("Deben ser enemigos distintos.");
-                return false;
-            }
-            return true;
-        },
-        onTargetsReady: async function(card, game) {
-            const targets = game.abilityContext.targets;
-            game.modifyStat(card, 'furor', -1);
-            showFloatingText(card.instanceId, card.activeName, "ft-ability", -30);
-            game.inputState = 'EXECUTING';
-            game.render();
-            await game.sleep(500);
-            
-            game.logMsg(`¡Raiju desata una tormenta eléctrica cegadora!`, 'ability');
-            
-            for (let target of targets) {
-                if (card.currentHp <= 0) break;
-                if (target.currentHp > 0) {
-                    let dmg = card.currentAtk - target.currentDef;
-                    if (dmg <= 0) dmg = (card.type === 'Esbirro' && target.type === 'Personaje') ? 0.5 : 1;
-                    
-                    await game.dealDamage(card, target, dmg, true); // true = Ataque especial (Fosforescencia)
-                    
-                    if (target.currentHp > 0) {
-                        game.applyStatus(target, 'ceguera', 2, card.name);
-                        game.logMsg(`El fogonazo ciega a ${target.name}.`, 'ability');
-                    }
-                    await game.sleep(400);
-                    await game.checkDeath(target);
-                }
-            }
-            
-            card.exhausted = true;
-            game.isActionLocked = false;
-            game.cancelAction();
-            game.updatePassives();
-            game.render();
-        }
+        // Migrada (30-jul-2026): mismo esqueleto que Gólem de tierra (ELEGIR de cantidad EXACTA
+        // 2 + ATACAR anidado), pero con especial:true en vez de especial ausente, y con
+        // APLICAR_ESTADO en siExito para la Ceguera. A diferencia de Gólem de tierra, la vieja
+        // NO excluye Ocultos aquí (ni en canActivateAbility ni en onValidateTarget) — se
+        // replica fiel, sin el filtro de stealth que sí lleva SEÍSMO. El tributo de colocación
+        // se queda imperativo (DSL.tributoFuror, sin op DSL para "elegir pagador genérico").
+        abilities: [
+            { trigger: "ACTIVA", nombre: "FOSFORESCENCIA", coste: { furor: 1 }, sinObjetivo: true,
+              // count/ELEGIR excluyen Avatares por defecto (Kami: intocable), igual que el
+              // `!getCardTemplate(c.id).isAvatar` a mano de la vieja — sin filtro adicional.
+              requisitos: [
+                { count: { quien: "ENEMIGO", zona: "vanguardia" }, op: ">=", valor: 2, msg: "Necesitas al menos 2 enemigos en vanguardia para golpear a objetivos distintos." } ],
+              log: "¡Raiju desata una tormenta eléctrica cegadora!",
+              efectos: [
+                { op: "ELEGIR", de: "ENEMIGOS", zona: "VANGUARDIA", cantidad: 2, cancelable: false,
+                  titulo: "FOSFORESCENCIA: elige 2 enemigos distintos",
+                  efectos: [
+                    { op: "ATACAR", especial: true,
+                      siExito: [ { op: "APLICAR_ESTADO", estado: "ceguera", duracion: 2, log: "El fogonazo ciega a {objetivo}." } ] } ] } ] }
+        ]
     },
     {
         name: "Muñeca del mal", hp: 2, def: 2, atk: 4, type: "Esbirro", subtype: "No-muerto", tags: ["Monstruo", "Creación artificial"], rarity: "B", cost: 1, series: 2,
