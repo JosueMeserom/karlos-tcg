@@ -2470,8 +2470,22 @@ const CARD_DB = [
             return true;
         },
         
-        onBeforeDefend: async function(defender, attacker, game, abilityName) {
-            if (!abilityName && defender.furor >= 1) {
+        // isSpecial (29-jul-2026): mismo bug hermano que tenía Águila (corregido 28-jul-2026) —
+        // el texto dice "Al recibir ataque normal" pero la heurística vieja (`!abilityName`) usaba
+        // si el ataque traía NOMBRE DE HABILIDAD como proxy de "es normal", lo cual falla en los
+        // dos sentidos: un ataque normal CON nombre (BOMBAZO, CABREO, SANGRE MALDITA, PUÑO DE
+        // NEUTRONES...) no activaba REPULSIÓN ABSOLUTA aunque debía, y cualquier ataque especial
+        // SIN nombre la activaría igual aunque no debía. El 5º parámetro ya lo pasan los 9 puntos
+        // del motor desde el fix de Águila. De paso, la misma exención de Aniceto (uncounterable,
+        // "sus ataques y Habilidades son imparables") que ya tiene Águila — Xanadu no la tenía.
+        onBeforeDefend: async function(defender, attacker, game, abilityName, isSpecial) {
+            if (isSpecial) return false; // REPULSIÓN ABSOLUTA solo repele ataques normales
+            const attackerTemplate = getCardTemplate(attacker.id);
+            if (attackerTemplate.uncounterable) {
+                game.logMsg(`${attacker.name} ignora las defensas evasivas gracias a su pasiva.`, 'system');
+                return false;
+            }
+            if (defender.furor >= 1) {
                 const pName = defender.owner === 'p1' ? 'JUGADOR 1' : 'JUGADOR 2';
                 const used = await new Promise(resolve => {
                     game.openChoiceModal(`REPULSIÓN ABSOLUTA (${pName})\n\n¿Gastar 1 Furor para repeler el ataque de ${attacker.name}?`, [
