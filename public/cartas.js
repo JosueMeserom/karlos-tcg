@@ -26,7 +26,7 @@ const CARD_DB = [
             // Filtramos a los enemigos ocultos para ver si quedan al menos 2
             const validTargets = enemyP.vanguard.filter(c => !c.stealth);
             if (validTargets.length < 2) {
-                game.logError("No hay suficientes enemigos válidos para Bi-choque.");
+                game.logError("No hay suficientes enemigos válidos en vanguardia para BI-CHOQUE.");
                 return false; 
             }
             return true; 
@@ -1173,7 +1173,7 @@ const CARD_DB = [
             const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
             const validTargets = game.players[enemyId].vanguard.filter(c => !c.stealth);
             if (validTargets.length < 2) {
-                game.logError("No hay suficientes enemigos válidos (mínimo 2) para Andanada Meteórica.");
+                game.logError("No hay suficientes enemigos válidos en vanguardia para ANDANADA METEÓRICA.");
                 return false; 
             }
             return true;
@@ -2456,7 +2456,7 @@ const CARD_DB = [
     },
     {
         name: "Xanadu", hp: 6, def: 4, atk: 7, type: "Personaje", subtype: "Ser vivo", tags: ["Poder heredado"], gender: "M", rarity: "S", series: 1,
-        text: "Requisito: 'Una buena razón' activo en cualquier campo. P: REPULSIÓN ABSOLUTA: Al recibir ataque normal, usa 1 Furor para esquivar el ataque y sus efectos. A: ESTORNUDO DEVASTADOR (2F): Intercambia un enemigo de vanguardia por uno de retaguardia (si respeta reglas). Si no hay retaguardia enemiga, lo devuelve a su mano.",
+        text: "Requisito: 'Una buena razón' activo en cualquier campo. P: REPULSIÓN ABSOLUTA: Al recibir ataque normal, puede usar 1 Furor para esquivar el ataque y sus efectos. A: ESTORNUDO DEVASTADOR (2F): Intercambia un enemigo de vanguardia por uno de retaguardia (si respeta reglas). Si no hay retaguardia enemiga, lo devuelve a su mano.",
         passiveName: "REPULSIÓN ABSOLUTA", activeName: "ESTORNUDO DEVASTADOR", activeCost: 2,
 
         onBeforePlayAsync: async function(card, game, p) {
@@ -2488,10 +2488,14 @@ const CARD_DB = [
             if (defender.furor >= 1) {
                 const pName = defender.owner === 'p1' ? 'JUGADOR 1' : 'JUGADOR 2';
                 const used = await new Promise(resolve => {
+                    // Bug real corregido (29-jul-2026, betasteo de Toto): sin chooserId explícito,
+                    // openChoiceModal usaba this.activePlayerId como respondedor por defecto — o sea
+                    // el ATACANTE, no el dueño de Xanadu, que es quien de verdad decide si gasta su
+                    // Furor. defender.owner es quien debe responder, gane o pierda el turno.
                     game.openChoiceModal(`REPULSIÓN ABSOLUTA (${pName})\n\n¿Gastar 1 Furor para repeler el ataque de ${attacker.name}?`, [
                         { label: 'SÍ (-1 FUROR)', action: () => resolve(true) },
                         { label: 'NO', action: () => resolve(false) }
-                    ]);
+                    ], defender.owner);
                 });
                 if (used) {
                     game.modifyStat(defender, 'furor', -1);
@@ -4913,7 +4917,7 @@ const CARD_DB = [
             { trigger: "ACTIVA", nombre: "SEÍSMO", coste: { furor: 1 }, sinObjetivo: true,
               requisitos: [
                 { count: { quien: "ENEMIGO", zona: "vanguardia", filtros: [ { campo: "isTaunt", op: "truthy", dePlantilla: true } ] }, op: "==", valor: 0, msg: "Hay un enemigo Provocando, no puedes atacar a objetivos múltiples." },
-                { count: { quien: "ENEMIGO", zona: "vanguardia", filtros: [ { campo: "stealth", op: "falsy" } ] }, op: ">=", valor: 2, msg: "No hay suficientes enemigos en vanguardia para Seísmo." } ],
+                { count: { quien: "ENEMIGO", zona: "vanguardia", filtros: [ { campo: "stealth", op: "falsy" } ] }, op: ">=", valor: 2, msg: "No hay suficientes enemigos válidos en vanguardia para SEÍSMO." } ],
               efectos: [
                 { op: "ELEGIR", de: "ENEMIGOS", zona: "VANGUARDIA", cantidad: 2, filtros: [ { campo: "stealth", op: "falsy" } ], cancelable: false,
                   titulo: "SEÍSMO: elige 2 enemigos distintos de la vanguardia",
@@ -4961,7 +4965,7 @@ const CARD_DB = [
             if (hasTaunt) { game.logError("Hay un enemigo Provocando, no puedes atacar a múltiples."); return false; }
             
             const valid = enemyP.vanguard.filter(c => !c.stealth);
-            if (valid.length < 2) { game.logError("No hay suficientes enemigos en vanguardia."); return false; }
+            if (valid.length < 2) { game.logError("No hay suficientes enemigos válidos en vanguardia para SANCIÓN."); return false; }
             return true;
         },
         onExecuteAbility: function(card, game) {
