@@ -6,13 +6,15 @@
 // con lo justo para ejercitar la construcción del árbol de capas y el rAF de seguimiento.
 //
 // Qué garantiza:
-//   · _capaVisorLift: dos capas hermanas dentro del visor — clones con z-index NEGATIVO
+//   · _capaVisorLift: clones con z-index NEGATIVO
 //     (sobre el velo, sin tapar las cartas del visor) y flechas con z-index POSITIVO
 //     (sobre todo el contenido del visor, o las tapaban las propias cartas).
 //   · _elevarAlVisor: el clon queda exactamente sobre el original, inerte y sin data-id;
-//     y si es una carta conocida se REGENERA con createCardEl bajo _sinLiftBtn, para que
-//     el botón de una carta agotada-pero-usable (Spencer) nazca DENTRO del clon en vez de
-//     depender del holder externo de #btn-lift-layer, que cloneNode no alcanza.
+//     y si es una carta conocida se REGENERA con createCardEl bajo _sinLiftBtn, para que el
+//     botón de una carta agotada-pero-usable (Spencer) exista sin depender del holder externo
+//     de #btn-lift-layer (que cloneNode no alcanza) — y acto seguido se EXTRAE del clon a la
+//     capa de botones, porque la regla descendiente `.card.exhausted .action-btn-card` lo
+//     pintaría gris con halo pulsante mientras siguiera dentro de la carta.
 //   · _purgarVisor: cerrar un visor lo VACÍA. Si no, sus cartas siguen en el DOM con su
 //     data-id y rect cero, y querySelector se engancha a ese fantasma: era la causa de que
 //     la flecha naciera en la esquina (0,0) tras abrir y cerrar una pila de descartes.
@@ -183,7 +185,7 @@ hold.appendChild(btn); btnLayer.appendChild(hold);
 let fallos = 0, comprobaciones = 0;
 const check = (nombre, cond, extra) => { comprobaciones++; console.log((cond ? '  OK   ' : '  FALLO') + ' · ' + nombre + (cond ? '' : '  -> ' + extra)); if (!cond) fallos++; };
 
-const { capa, svg } = game._capaVisorLift();
+const { capa, svg, btns } = game._capaVisorLift();
 check('la capa se crea DENTRO del visor', visor.contains(capa), 'no está dentro');
 check('la capa es el PRIMER hijo del visor (sobre el velo, bajo las cartas)', visor.children[0] === capa, 'índice ' + visor.children.indexOf(capa));
 check('la capa lleva z-index negativo', /z-index:\s*-1/.test(capa.style.cssText), capa.style.cssText);
@@ -191,6 +193,10 @@ check('el svg de flechas NO cuelga de la capa de clones', !capa.contains(svg), '
 check('el svg de flechas cuelga del VISOR', visor.contains(svg), 'no cuelga del visor');
 check('el svg gana a .card:hover (100), .selected (50) y .interactive (2000)', (parseInt((svg.style.cssText.match(/z-index:\s*(\d+)/)||[])[1],10)||0) > 2000, svg.style.cssText);
 check('la capa de clones sigue con z-index negativo (no tapa el visor)', /z-index:\s*-1/.test(capa.style.cssText), capa.style.cssText);
+check('hay una 3a capa para los botones, hija del visor', !!btns && visor.contains(btns), 'no existe');
+const _zb = parseInt((btns && btns.style.cssText.match(/z-index:\s*(\d+)/)||[])[1],10)||0;
+const _zs = parseInt((svg.style.cssText.match(/z-index:\s*(\d+)/)||[])[1],10)||0;
+check('los botones van en positivo (se ven) y por debajo de las flechas', _zb > 2000 && _zb < _zs, 'btns=' + _zb + ' svg=' + _zs);
 
 game._elevarAlVisor(cartaCampo);
 const clones = capa.children.slice();
@@ -211,6 +217,8 @@ check('lo que YA esta en el visor no se eleva', capa.children.filter(x => x.clas
 
 game._limpiarVisorLift();
 check('al limpiar, la capa desaparece por completo', document_no(visor), 'sigue ahí');
+check('al limpiar, tambien desaparecen las capas de flechas y botones',
+      !visor.children.some(x => x.id === 'viewer-lift-arrows' || x.id === 'viewer-lift-btns'), 'quedó alguna');
 function document_no(v) { return !v.children.some(x => x.id === 'viewer-lift'); }
 check('limpiar NO toca el contenido del visor', visor.children.length === 2 && visor.contains(cartaVisor), 'hijos: ' + visor.children.length);
 check('limpiar NO toca la carta del tablero ni su boton', board.contains(cartaCampo) && btnLayer.contains(hold), 'se perdió algo del tablero');
@@ -270,10 +278,12 @@ game._elevarAlVisor(elSpencer);
 const capa2 = documento.getElementById("viewer-lift");
 const clonSp = capa2 && capa2.children.find(x => x.classList.contains('card'));
 check('el clon de Spencer se genera', !!clonSp, 'no se generó');
-check('el boton NO queda dentro del clon (el filter de .exhausted lo teniria de gris)',
+check('el boton NO queda dentro del clon (.card.exhausted .action-btn-card lo pinta gris)',
       !clonSp.children.some(x => x.className.includes('action-btn-container')), 'sigue dentro del clon');
-const holdVl = capa2 && capa2.children.find(x => x.className.includes('vl-btn-hold'));
-check('el boton se eleva a su propio holder, hermano del clon', !!holdVl, 'no hay holder: el clon saldria sin boton');
+const capaBtns = documento.getElementById('viewer-lift-btns');
+const holdVl = capaBtns && capaBtns.children.find(x => x.className.includes('vl-btn-hold'));
+check('el boton se eleva a la capa de botones (no a la de clones, donde no se veia)', !!holdVl, 'no hay holder en viewer-lift-btns');
+check('el holder NO esta en la capa de clones', !capa2.children.some(x => x.className.includes('vl-btn-hold')), 'sigue en la capa z-index:-1');
 const btnCont = holdVl && holdVl.children.find(x => x.className.includes('action-btn-container'));
 check('el holder lleva el contenedor de botones', !!btnCont, 'holder vacio');
 check('el boton dice el nombre de la Activa', !!btnCont && btnCont.children.some(b => (b.innerText || '').includes('PAJARITA')), 'texto: ' + (btnCont && btnCont.children.map(b=>b.innerText).join('|')));

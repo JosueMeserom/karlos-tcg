@@ -7664,7 +7664,20 @@
                     svg.setAttribute('style', 'position:fixed; inset:0; width:100%; height:100%; pointer-events:none; z-index:2500;');
                     visor.appendChild(svg);
                 }
-                return { capa, svg };
+                // Tercera capa, para los BOTONES extraídos de los clones. No pueden ir en la capa
+                // de clones (z-index:-1): ahí el botón no llegaba a verse. Y tampoco DENTRO del
+                // clon (ver _elevarAlVisor). Como la flecha, un botón es un adorno pequeño que o
+                // se ve por encima o no sirve de nada, así que va en positivo — justo por debajo
+                // de las flechas para que una flecha nunca quede oculta tras un botón.
+                let btns = document.getElementById('viewer-lift-btns');
+                if (!btns || !visor.contains(btns)) {
+                    if (btns) btns.remove();
+                    btns = document.createElement('div');
+                    btns.id = 'viewer-lift-btns';
+                    btns.style.cssText = 'position:fixed; inset:0; pointer-events:none; z-index:2400;';
+                    visor.appendChild(btns);
+                }
+                return { capa, svg, btns };
             }
 
             // Sube a la capa elevada una COPIA inerte de un elemento del tablero (carta, hueco
@@ -7709,12 +7722,15 @@
                 capa.appendChild(clon);
                 this._visorClones.set(el, clon);
                 // El botón de una carta agotada-pero-usable tiene que quedar FUERA de la carta,
-                // igual que hace _liftExhaustedBtn con la carta real del tablero: `.card.exhausted`
-                // lleva `filter: grayscale(.8) brightness(.7)` y un filter tiñe TODO el subárbol,
-                // así que dentro del clon el botón salía gris y apagado en vez de azul y
-                // claramente disponible (betasteo de Toto, 30-jul-2026). Se le monta aquí su
-                // propio holder hermano, replicando la geometría de la caja INTERIOR al borde de
-                // la carta, que es respecto a la que el contenedor se posiciona por CSS.
+                // igual que hace _liftExhaustedBtn con la carta real del tablero. El motivo exacto
+                // es la regla DESCENDIENTE `.card.exhausted .action-btn-card` (arriba, en el <style>
+                // de este archivo): pinta el botón de gris oscuro `!important` y le mete el halo
+                // blanco pulsante de `usablePulse`, pensado para que resalte dentro de una carta ya
+                // atenuada. Fuera de la carta ese selector no aplica y el botón recupera su azul
+                // saturado, que es la señal de "esta Activa sigue disponible" — el look que Toto
+                // valida como correcto. (El `filter: grayscale` de `.card.exhausted` también teñiría
+                // el subárbol, así que sacarlo fuera resuelve las dos cosas de una vez.)
+                // Va a la capa de botones, NO a la de clones: en z-index:-1 no llegaba a verse.
                 const btnCont = clon.querySelector && clon.querySelector('.action-btn-container');
                 if (btnCont) {
                     let bl = 0, bt = 0, br = 0, bb = 0;
@@ -7728,8 +7744,8 @@
                     hold.style.cssText = `position:fixed; pointer-events:none; transform-origin: top left;` +
                         ` width:${r.width - bl - br}px; height:${r.height - bt - bb}px;` +
                         ` left:${r.left + bl}px; top:${r.top + bt}px;`;
-                    hold.appendChild(btnCont); // lo MUEVE fuera del clon, fuera del alcance del filter
-                    capa.appendChild(hold);
+                    hold.appendChild(btnCont); // lo MUEVE fuera del clon: el selector deja de aplicar
+                    (this._capaVisorLift().btns || capa).appendChild(hold);
                 }
             }
 
@@ -7738,6 +7754,8 @@
                 if (capa) capa.remove();
                 const svg = document.getElementById('viewer-lift-arrows');
                 if (svg) svg.remove();
+                const btns = document.getElementById('viewer-lift-btns');
+                if (btns) btns.remove();
                 this._visorClones = null;
             }
 
