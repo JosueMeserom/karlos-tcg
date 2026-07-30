@@ -6172,12 +6172,16 @@ const CARD_DB = [
         onBeforePlayAsync: async function(card, game, p) {
             return await DSL.tributoFuror(card, game, p, 2, { msgSinPagador: `Necesitas un aliado con al menos 2 de Furor para invocar al ${card.name}.`, titulo: `${card.name}: ELIGE TRIBUTO (-2 FUROR)` });
         },
-        // DEMONIO VIL migrada (31-jul-2026) con el trigger NUEVO ANTES_DE_DEFENDER. El `log`
-        // vive DENTRO del efecto (no en el nivel de la Habilidad) para que se calle igual que
-        // la vieja cuando el atacante no tiene Furor -`ifObjetivo` hace `continue` antes de
-        // llegar a _doEffect, así que ni el log ni el MODIFICAR_STAT llegan a correr-.
+        // DEMONIO VIL migrada (31-jul-2026) con el trigger NUEVO TRAS_DEFENDER (onAfterDefend):
+        // "pierde Furor" es una CONSECUENCIA de ser atacado, no una condición previa, así que
+        // corre DESPUÉS del golpe -incluida la animación completa-, no antes (betasteo de
+        // Toto: con un primer intento vía ANTES_DE_DEFENDER, el flotante "-1 FUR" salía nada
+        // más empezar la animación de ataque, en vez de al volver el atacante a su sitio). El
+        // `log` vive DENTRO del efecto (no en el nivel de la Habilidad) para que se calle
+        // igual que la vieja cuando el atacante no tiene Furor -`ifObjetivo` hace `continue`
+        // antes de llegar a _doEffect, así que ni el log ni el MODIFICAR_STAT llegan a correr-.
         abilities: [
-            { trigger: "ANTES_DE_DEFENDER", nombre: "DEMONIO VIL",
+            { trigger: "TRAS_DEFENDER", nombre: "DEMONIO VIL",
               efectos: [
                 { op: "MODIFICAR_STAT", stat: "furor", delta: -1,
                   ifObjetivo: { campo: "furor", op: ">", valor: 0 },
@@ -6925,7 +6929,7 @@ const KARLOS_RULES = {
 //  Valores: número | {COUNT:{...}} | {REF:"objetivo.furorMax"} (campos computados)
 // ===================================================================
 const DSL = {
-    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE', 'AURA', 'ANTES_DE_JUGAR', 'PUEDE_ATACAR', 'SOBRECURACION', 'REACCION', 'AL_MORIR', 'AL_MORIR_ALIADO', 'AL_DESTRUIR', 'ESPEJO', 'ANTES_DE_ATACAR', 'TRAS_ATACAR', 'ANTES_DE_DEFENDER'],
+    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE', 'AURA', 'ANTES_DE_JUGAR', 'PUEDE_ATACAR', 'SOBRECURACION', 'REACCION', 'AL_MORIR', 'AL_MORIR_ALIADO', 'AL_DESTRUIR', 'ESPEJO', 'ANTES_DE_ATACAR', 'TRAS_ATACAR', 'TRAS_DEFENDER'],
     // Los 5 últimos ops solo tienen sentido dentro de una REACCION (los interpreta
     // DSL._runReaccion, no _doEffect): controlan el resultado que la reacción
     // devuelve al motor de combate (redirigir el ataque, cancelarlo, drenar Furor
@@ -7805,9 +7809,9 @@ const DSL = {
             for (const t of targets) {
                 // ifObjetivo (Imp mayor, 31-jul-2026): condición evaluada sobre EL OBJETIVO en
                 // vez de la carta fuente -complementa a `e.if`, que mira la fuente-. Hacía falta
-                // para "drena 1 Furor SI el atacante tiene Furor" (ANTES_DE_DEFENDER: la fuente
-                // es quien defiende, el objetivo es quien ataca). `continue`, no abortar la
-                // lista: un objetivo sin cumplir la condición simplemente se salta.
+                // para "drena 1 Furor SI el atacante tiene Furor" (TRAS_DEFENDER: la fuente es
+                // quien defiende, el objetivo es quien ataca). `continue`, no abortar la lista:
+                // un objetivo sin cumplir la condición simplemente se salta.
                 if (e.ifObjetivo && !DSL._match(t, e.ifObjetivo)) continue;
                 const r = await DSL._doEffect(e, sourceCard, t, game, ownerId, habilidad);
                 if (r === false) return { ok: false, anyApplied };
@@ -8402,23 +8406,31 @@ const DSL = {
             };
         }
 
-        // ANTES_DE_DEFENDER -> onBeforeDefend: el gancho de la carta QUE DEFIENDE, para
-        // pasivas de esquiva o de reacción-al-ser-atacada (Imp mayor, 31-jul-2026: "cada vez
-        // que sea atacado, el atacante pierde 1 Furor" -no es esquiva, es un efecto lateral
-        // que corre ANTES del daño-). A propósito NO reutiliza GLOBAL_ANTES_DE_ATAQUE con un
-        // hipotético soloDefensor:"SELF": ese trigger solo se dispara vía
-        // collectAttackInterceptors, que SOLO llama performAttack (el ataque normal) -si Imp
-        // mayor se hubiera migrado así, un ataque ESPECIAL (que va por la ruta directa del op
-        // ATACAR, sin pasar por collectAttackInterceptors) no le habría drenado Furor al
-        // atacante, un hueco real de cobertura-. onBeforeDefend en cambio lo llaman TODOS los
-        // caminos de ataque (normal y especial, con 9 puntos de disparo en el motor), que es
-        // justo el "cada vez que sea atacado" que dice el texto de la carta.
-        const antesDefender = abs.find(a => a.trigger === 'ANTES_DE_DEFENDER');
-        if (antesDefender && typeof tmpl.onBeforeDefend !== 'function') {
-            tmpl.onBeforeDefend = async function (defender, attacker, game, abilityName, isSpecial) {
-                if (antesDefender.log) game.logMsg(DSL._fill(antesDefender.log, { carta: defender.name, objetivo: DSL._nombre(game, attacker) }), antesDefender.logTipo || 'ability');
-                await DSL._runEffectList(antesDefender.efectos || [], defender, game, defender.owner, [attacker], antesDefender.nombre || tmpl.passiveName || null);
-                return !!antesDefender.esquiva; // por defecto no esquiva: solo un efecto lateral
+        // TRAS_DEFENDER -> onAfterDefend: el gancho de la carta QUE DEFIENDE, para efectos
+        // que son CONSECUENCIA de haber sido atacada (Imp mayor, 31-jul-2026: "cada vez que
+        // sea atacado, el atacante pierde 1 Furor"). A propósito NO reutiliza
+        // GLOBAL_ANTES_DE_ATAQUE con un hipotético soloDefensor:"SELF": ese trigger solo se
+        // dispara vía collectAttackInterceptors, que SOLO llama performAttack (el ataque
+        // normal) -un ataque ESPECIAL, ruta directa del op ATACAR, no pasa por ahí, así que
+        // no habría drenado Furor, un hueco real de cobertura-. onAfterDefend en cambio lo
+        // llama dealDamage siempre que el golpe conecta (dmg>0, prácticamente garantizado por
+        // el suelo 0.5/1), sea cual sea la ruta (normal o especial).
+        //
+        // Timing (betasteo de Toto, 31-jul-2026): dealDamage llama a onAfterDefend DESPUÉS de
+        // animateAttack/animateSpecialAttack (la animación completa, atacante ya de vuelta en
+        // su sitio) Y después de aplicar el daño — es justo el momento en que un efecto "tras
+        // el ataque" debe manifestarse visualmente. El primer intento de esta carta usaba
+        // ANTES_DE_DEFENDER (onBeforeDefend), que corre ANTES de dealDamage por completo -de
+        // ahí que el flotante de "-1 FUR" saliera nada más empezar la animación, en vez de al
+        // volver el atacante a su sitio-. Regla general para el futuro: un efecto que la
+        // carta describe como consecuencia de ser atacada va en TRAS_DEFENDER, no en
+        // ANTES_DE_DEFENDER -ese último solo es para esquiva de verdad, que por definición
+        // debe decidirse ANTES del daño-.
+        const trasDefender = abs.find(a => a.trigger === 'TRAS_DEFENDER');
+        if (trasDefender && typeof tmpl.onAfterDefend !== 'function') {
+            tmpl.onAfterDefend = async function (defender, attacker, dmg, isSpecial, game) {
+                if (trasDefender.log) game.logMsg(DSL._fill(trasDefender.log, { carta: defender.name, objetivo: DSL._nombre(game, attacker) }), trasDefender.logTipo || 'ability');
+                await DSL._runEffectList(trasDefender.efectos || [], defender, game, defender.owner, [attacker], trasDefender.nombre || tmpl.passiveName || null);
             };
         }
 
