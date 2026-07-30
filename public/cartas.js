@@ -4335,73 +4335,33 @@ const CARD_DB = [
         passiveName: "YOLOLO", activeName: "PÉGAME, PERRA", activeCost: 2,
         
         isTaunt: true, // Propiedad mágica que lee el motor para obligar los ataques
-        
-        canAttackNormally: function() { 
-            return false; // Prohibido atacar
+
+        canAttackNormally: function() {
+            return false; // Prohibido atacar (una línea: no compensa arquitectura para esto)
         },
-        
-        onAfterDefend: async function(defender, attacker, dmg, isSpecial, game) {
-            if (!isSpecial) {
-                game.logMsg(`¡YOLOLO! ${attacker.name} se pincha con la barrera de Achmay.`, 'combat');
-                game.modifyStat(attacker, 'currentHp', -1);
-                showFloatingText(attacker.instanceId, "-1 VIDA (Espinas)", "ft-purple", -30);
-                await game.checkDeath(attacker);
-            }
-        },
-        
-        canActivateAbility: function(card, game) {
-            if (card.furor < 2) { game.logError("Falta Furor (2)."); return false; }
-            const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
-            if (game.players[enemyId].vanguard.length === 0 && game.players[enemyId].rearguard.length === 0) {
-                game.logError("No hay enemigos a los que provocar."); return false;
-            }
-            return true;
-        },
-        
-        onExecuteAbility: function(card, game) {
-            game.selectedCard = card;
-            game.inputState = 'SELECT_ABILITY_TARGETS';
-            game.abilityContext = { targets: [], maxTargets: 1, name: 'PÉGAME, PERRA', targetType: 'enemy' };
-            game.logError("Elige al enemigo que será provocado.");
-            game.render();
-        },
-        
-        onValidateTarget: function(card, target, game, isSilent) {
-            if (target.owner === card.owner || getCardTemplate(target.id).isAvatar) return false;
-            return true;
-        },
-        
-        onTargetsReady: async function(card, game) {
-            const target = game.abilityContext.targets[0];
-            game.modifyStat(card, 'furor', -2);
-            showFloatingText(card.instanceId, card.activeName, "ft-ability", -30);
-            
-            // Le metemos la semilla de la locura en su cerebro
-            if (!target.tempEffects) target.tempEffects = [];
-            target.tempEffects.push({ sourceId: card.id, ownerId: card.owner, achmayId: card.instanceId });
-            
-            game.logMsg(`¡Achmay insulta a ${target.name}! ¡Deberá atacarle en su próximo turno!`, 'ability');
-            showFloatingText(target.instanceId, "PROVOCADO", "ft-red-stat", -20);
-            
-            // CRÍTICO: NO agotamos la carta (NO ponemos card.exhausted = true)
-            game.isActionLocked = false;
-            game.cancelAction();
-            game.updatePassives();
-            game.render();
-        },
-        
-        onStartTurnTempEffect: function(target, effect, game, currentTurnPlayerId) {
-            // Cuando empiece el turno de la víctima, lo marcamos para que el motor ejecute el ataque
-            if (currentTurnPlayerId === target.owner) {
-                target.forcedAttackTarget = effect.achmayId;
-                return false; // Borra el efecto temporal para que solo lo haga 1 vez
-            }
-            return true;
-        },
-        
-        onGetPreviewEffects: function(card, game) {
-            return [];
-        }
+
+        // Migrada (31-jul-2026). YOLOLO usa el TRAS_DEFENDER de Imp mayor con la extensión
+        // `soloAtaqueNormal` (onAfterDefend ya recibe el isSpecial real de dealDamage, sin
+        // heurísticas). PÉGAME PERRA usa dos piezas nuevas: `sinAgotar` en ACTIVA (el cierre
+        // genérico agota SIEMPRE salvo que se pida lo contrario; el texto de la carta dice
+        // explícitamente que no gasta la acción) y `provocaAtaque` en MARCAR_TEMPORAL (deja
+        // forcedAttackTarget -campo YA genérico del motor, leído en la fase de inicio de
+        // turno- a la carta marcada cuando empieza SU turno, autoconsumiéndose).
+        abilities: [
+            { trigger: "TRAS_DEFENDER", nombre: "YOLOLO", soloAtaqueNormal: true,
+              efectos: [
+                { op: "MODIFICAR_STAT", stat: "currentHp", delta: -1, comprobarMuerte: true,
+                  log: "¡YOLOLO! {objetivo} se pincha con la barrera de Achmay.", logTipo: "combat",
+                  floating: { texto: "-1 VIDA (Espinas)", estilo: "ft-purple", offset: -30 } } ] },
+            { trigger: "ACTIVA", nombre: "PÉGAME, PERRA", coste: { furor: 2 }, sinAgotar: true,
+              target: { quien: "ENEMIGO", cantidad: 1 },
+              requisitos: [
+                { count: { quien: "ENEMIGO" }, op: ">=", valor: 1, msg: "No hay enemigos a los que provocar." } ],
+              efectos: [
+                { op: "MARCAR_TEMPORAL", conOwner: true, provocaAtaque: true,
+                  log: "¡{carta} insulta a {objetivo}! ¡Deberá atacarle en su próximo turno!",
+                  floating: { texto: "PROVOCADO", estilo: "ft-red-stat", offset: -20 } } ] }
+        ],
     },
     {
         name: "Rezo en grupo", type: "Ayuda", subtype: "Técnica", tags: ["Consumible"], rarity: "C", cost: 2, series: 2,
@@ -7195,7 +7155,7 @@ const DSL = {
             const antes = target[e.stat];
             game.modifyStat(target, e.stat, d, e.offsetY || 0, e.fuente !== undefined ? e.fuente : sourceCard);
             if (e.floating && typeof showFloatingText === 'function') showFloatingText(target.instanceId, String(e.floating.texto).split('{delta}').join(Math.abs(d)), e.floating.estilo || 'ft-green', e.floating.offset !== undefined ? e.floating.offset : -20);
-            if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: DSL._nombre(game, target), antes, despues: target[e.stat] }), 'ability');
+            if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: DSL._nombre(game, target), antes, despues: target[e.stat] }), e.logTipo || 'ability');
             // sinRetribucion (Cañón de positrones/Kami, 30-jul-2026): "destrucción" directa, no
             // muerte en combate — la vieja llamaba a checkDeath(target, false) a mano para que
             // la víctima NO diera Retribución. comprobarMuerte por defecto SÍ la da (checkDeath
@@ -7729,6 +7689,9 @@ const DSL = {
             // turno del rival. Distinto de `hastaFinDeTurnoPropio`, que mira al dueño de la
             // carta MARCADA y caduca al final de su turno.
             if (e.hastaInicioTurnoLanzador) marca.hastaInicioTurnoLanzador = true;
+            // provocaAtaque (Achmay, 31-jul-2026): ver el onStartTurnTempEffect genérico más
+            // abajo (guard "MARCAR_TEMPORAL" en JSON.stringify(abs)).
+            if (e.provocaAtaque) marca.provocaAtaque = true;
             target.tempEffects.push(marca);
             if (e.floating && typeof showFloatingText === 'function') showFloatingText(target.instanceId, e.floating.texto || e.floating, e.floating.estilo || e.floatingStyle || 'ft-ability', (e.floating.offset !== undefined ? e.floating.offset : (e.offsetFloating !== undefined ? e.offsetFloating : -40)));
             if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
@@ -8305,7 +8268,10 @@ const DSL = {
                 if (activa.log) game.logMsg(DSL._fill(activa.log, { carta: card.name }), activa.logTipo || 'ability');
                 await DSL._runEffectList(activa.efectos, card, game, card.owner, targets, activa.nombre || tmpl.activeName || null);
                 if (!card.exhausted) {
-                    card.exhausted = true;
+                    // sinAgotar (Achmay, PÉGAME PERRA, 31-jul-2026): "Esta habilidad no gasta
+                    // la acción de Achmay" — cierra la acción igual (candado, sync, render)
+                    // pero SIN marcar la carta como agotada.
+                    if (!activa.sinAgotar) card.exhausted = true;
                     game.isActionLocked = false;
                     game.cancelAction();
                     game.updatePassives();
@@ -8429,6 +8395,11 @@ const DSL = {
         const trasDefender = abs.find(a => a.trigger === 'TRAS_DEFENDER');
         if (trasDefender && typeof tmpl.onAfterDefend !== 'function') {
             tmpl.onAfterDefend = async function (defender, attacker, dmg, isSpecial, game) {
+                // soloAtaqueNormal (Achmay, YOLOLO, 31-jul-2026): a diferencia de
+                // ANTES_DE_ATACAR/TRAS_ATACAR (que infieren "normal" de abilityContext, sin
+                // acceso al isSpecial real), onAfterDefend YA recibe el isSpecial genuino de
+                // dealDamage -no hace falta ninguna heurística-.
+                if (trasDefender.soloAtaqueNormal && isSpecial) return;
                 if (trasDefender.log) game.logMsg(DSL._fill(trasDefender.log, { carta: defender.name, objetivo: DSL._nombre(game, attacker) }), trasDefender.logTipo || 'ability');
                 await DSL._runEffectList(trasDefender.efectos || [], defender, game, defender.owner, [attacker], trasDefender.nombre || tmpl.passiveName || null);
             };
@@ -8871,8 +8842,17 @@ const DSL = {
                 };
             }
             // hastaInicioTurnoLanzador: caduca al empezar el turno de quien puso la marca.
+            // provocaAtaque (Achmay, PÉGAME PERRA, 31-jul-2026): al empezar el turno de la
+            // CARTA MARCADA (no del lanzador), la marca los deja a mano forcedAttackTarget
+            // -campo genérico del motor, ya leído en la fase de inicio de turno bajo el
+            // comentario "ATAQUES FORZADOS"- apuntando a `sourceInstanceId` (la propia
+            // Achmay) y se autoconsume (return false, una sola vez).
             if (typeof tmpl.onStartTurnTempEffect !== 'function') {
                 tmpl.onStartTurnTempEffect = function (card, eff, game, activePid) {
+                    if (eff.provocaAtaque && card.owner === activePid) {
+                        card.forcedAttackTarget = eff.sourceInstanceId;
+                        return false;
+                    }
                     if (!(eff.hastaInicioTurnoLanzador && eff.ownerId === activePid)) return true;
                     if (tmpl.tempEffectExpiraLog) game.logMsg(DSL._fill(tmpl.tempEffectExpiraLog, { objetivo: DSL._nombre(game, card), genero: card.gender }), 'system');
                     return false;
