@@ -135,6 +135,37 @@ const escenarios = [
         flotantesSoloNueva: FLOTANTE_NUEVO,
         diferenciasEsperadas: COPYID_CONSUMIBLE,
     },
+    {
+        // Betasteo de Toto (31-jul-2026): tras elegir pagador, la elección del enemigo debía
+        // seguir siendo cancelable -nada irreversible ha pasado todavía, el aliado no se
+        // agota hasta DESPUÉS-. Solo se prueba en 'nueva' (soloEn): la elección del enemigo
+        // en la vieja es un clic crudo (SELECT_ATOM_ENEMY, sin pickBoardTargets), y el
+        // harness no registra ninguna interacción pendiente para ese estado -no hay forma
+        // guionizada de simular el clic en la [X] en ese punto concreto, mismo tipo de hueco
+        // que otros estados de clic crudo del motor-. Se comprobó SOLO por lectura de código
+        // (no por diff del harness) que el botón [X] de la vieja también estaría habilitado
+        // ahí (isActionLocked se queda a false durante todo SELECT_ATOM_ALLY/ENEMY, y
+        // cancelAction() no tiene ningún gate específico para ese inputState), así que el
+        // comportamiento real coincidiría — pero eso no se puede verificar aquí.
+        nombre: 'Atomización: cancelar la elección del enemigo devuelve todo intacto',
+        turno: 2, turnoDe: 'p1', empieza: 'p2',
+        p1: { mano: ['Atomización'], vanguardia: [{ carta: 'Karlos', furor: 0 }] },
+        p2: { vanguardia: [{ carta: 'Mini-tigre', vida: 6 }] },
+        // La vieja se queda parada justo tras confirmar (SELECT_ATOM_ALLY, sin elegir aliado
+        // todavía); la nueva sigue hasta elegir aliado y CANCELA ahí la elección del enemigo.
+        // exportGameState() no incluye inputState/selectedCard, así que ambos paran en un
+        // estado de juego observable IDÉNTICO (la Ayuda en mano, Karlos sin agotar, nada más
+        // tocado) aunque el punto exacto del flujo donde cada una se detiene sea distinto.
+        pasos: [
+            { jugar: 'Atomización' },
+            { confirmar: true, soloEn: 'vieja' },
+            { soloEn: 'nueva', elegir: ['Karlos'] },
+            { soloEn: 'nueva', cancelar: true },
+        ],
+        logsSoloVieja: [
+            { linea: 'Selecciona un aliado activo para gastar su acción.', motivo: 'ver primer escenario' },
+        ],
+    },
 ];
 
 correrSuite('regresion44', escenarios);

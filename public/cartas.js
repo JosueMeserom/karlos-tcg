@@ -1501,11 +1501,16 @@ const CARD_DB = [
                   cantidad: 1, guardaEn: "atomizador",
                   titulo: "Elige un aliado activo para gastar su acción",
                   efectos: [
-                    // Elección del enemigo: NO cancelable — al llegar aquí el jugador ya se ha
-                    // comprometido gastando la acción de un aliado (norma de cancelabilidad).
+                    // Elección del enemigo: SÍ cancelable (Toto, 31-jul-2026, betasteo). Nada
+                    // irreversible ha pasado todavía en este punto -el aliado NO se marca
+                    // agotado hasta el MARCAR de más abajo, que corre DESPUÉS de esta elección-,
+                    // así que no hay compromiso real que proteger. La vieja exigía un segundo
+                    // clic sin vuelta atrás aquí ("porque te has comprometido"), pero era una
+                    // limitación del motor anterior (sus dos inputState a medida no ofrecían
+                    // cancelación en ese paso), no una regla del juego — corregida al migrar.
                     { op: "ELEGIR", de: "ENEMIGOS",
                       filtros: [ { campo: "immuneToEnemyAids", op: "falsy" } ],
-                      cantidad: 1, cancelable: false,
+                      cantidad: 1,
                       titulo: "Elige al enemigo a atomizar",
                       logAntes: "{atomizador} usa Atomización contra {elegidos}.", logAntesTipo: "combat",
                       efectos: [
@@ -4422,23 +4427,17 @@ const CARD_DB = [
         onPlay: function(card, game) {
             game.logMsg(`¡La influencia de Dáedra inunda el campo!`, 'ability');
         },
-        // Aquí usa el nuevo Hook que añadimos a index.html
-        onGlobalBeforeGainFuror: function(eventCard, targetCard, amount, game) {
-            if (targetCard.owner === eventCard.owner && targetCard.tags) {
-                if (targetCard.tags.includes("Usuario de magia") || targetCard.tags.includes("Usuaria de magia") || targetCard.tags.includes("Monstruo")) {
-                    game.logMsg(`¡Dáedra potencia la recuperación de ${targetCard.name}! (+1 Furor extra)`, 'ability');
-                    return amount * 2;
-                }
-            }
-            return amount;
-        },
-        onGlobalGetPreviewEffects: function(eventCard, targetCard, game) {
-            if (targetCard.owner === eventCard.owner && targetCard.tags &&
-                (targetCard.tags.includes("Usuario de magia") || targetCard.tags.includes("Usuaria de magia") || targetCard.tags.includes("Monstruo"))) {
-                return [`Doble Furor al inicio del turno, fuente: ${typeof game.refCarta === 'function' ? game.refCarta(eventCard) : eventCard.name}`];
-            }
-            return [];
-        },
+        // Migrada (31-jul-2026) con la pieza que le faltaba a GLOBAL_MODIFICAR_FUROR:
+        // `accion.multiplicar`, hermana de `fijar`/`sumar`. El resto (si.objetivoDe,
+        // si.algunaEtiqueta, log con {objetivo}, preview) ya existía.
+        abilities: [
+            { trigger: "GLOBAL_MODIFICAR_FUROR", reglas: [
+                { si: { objetivoDe: "PROPIO", algunaEtiqueta: ["Usuario de magia", "Usuaria de magia", "Monstruo"] },
+                  log: { msg: "¡Dáedra potencia la recuperación de {objetivo}! (+1 Furor extra)", tipo: "ability" },
+                  preview: "Doble Furor al inicio del turno",
+                  accion: { multiplicar: 2 } }
+            ] }
+        ],
         onExpire: function(card, game, playerId) {
             game.logMsg("El evento Dáedra se desvanece.", 'system');
         }
@@ -6173,14 +6172,17 @@ const CARD_DB = [
         onBeforePlayAsync: async function(card, game, p) {
             return await DSL.tributoFuror(card, game, p, 2, { msgSinPagador: `Necesitas un aliado con al menos 2 de Furor para invocar al ${card.name}.`, titulo: `${card.name}: ELIGE TRIBUTO (-2 FUROR)` });
         },
-        onBeforeDefend: async function(defender, attacker, game, abilityName) {
-            if (attacker.furor > 0) {
-                game.logMsg(`¡${defender.passiveName}! El aura del Imp drena 1 de Furor de ${attacker.name}.`, 'ability');
-                game.modifyStat(attacker, 'furor', -1);
-                showFloatingText(attacker.instanceId, "-1 FUR", "ft-red-stat", -20);
-            }
-            return false; // No esquiva, se come el ataque
-        }
+        // DEMONIO VIL migrada (31-jul-2026) con el trigger NUEVO ANTES_DE_DEFENDER. El `log`
+        // vive DENTRO del efecto (no en el nivel de la Habilidad) para que se calle igual que
+        // la vieja cuando el atacante no tiene Furor -`ifObjetivo` hace `continue` antes de
+        // llegar a _doEffect, así que ni el log ni el MODIFICAR_STAT llegan a correr-.
+        abilities: [
+            { trigger: "ANTES_DE_DEFENDER", nombre: "DEMONIO VIL",
+              efectos: [
+                { op: "MODIFICAR_STAT", stat: "furor", delta: -1,
+                  ifObjetivo: { campo: "furor", op: ">", valor: 0 },
+                  log: "¡DEMONIO VIL! El aura del Imp drena 1 de Furor de {objetivo}." } ] }
+        ],
     },
     {
         name: "Gul guerrero", hp: 3, def: 2, atk: 5, type: "Esbirro", subtype: "No-muerto", tags: ["Monstruo", "Ninja"], rarity: "B", cost: 1, series: 2,
@@ -6923,7 +6925,7 @@ const KARLOS_RULES = {
 //  Valores: número | {COUNT:{...}} | {REF:"objetivo.furorMax"} (campos computados)
 // ===================================================================
 const DSL = {
-    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE', 'AURA', 'ANTES_DE_JUGAR', 'PUEDE_ATACAR', 'SOBRECURACION', 'REACCION', 'AL_MORIR', 'AL_MORIR_ALIADO', 'AL_DESTRUIR', 'ESPEJO', 'ANTES_DE_ATACAR', 'TRAS_ATACAR'],
+    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE', 'AURA', 'ANTES_DE_JUGAR', 'PUEDE_ATACAR', 'SOBRECURACION', 'REACCION', 'AL_MORIR', 'AL_MORIR_ALIADO', 'AL_DESTRUIR', 'ESPEJO', 'ANTES_DE_ATACAR', 'TRAS_ATACAR', 'ANTES_DE_DEFENDER'],
     // Los 5 últimos ops solo tienen sentido dentro de una REACCION (los interpreta
     // DSL._runReaccion, no _doEffect): controlan el resultado que la reacción
     // devuelve al motor de combate (redirigir el ataque, cancelarlo, drenar Furor
@@ -7801,6 +7803,12 @@ const DSL = {
                 await animateTrueDamage(DSL._lanzador(sourceCard), targets.map(t => t.instanceId));
             }
             for (const t of targets) {
+                // ifObjetivo (Imp mayor, 31-jul-2026): condición evaluada sobre EL OBJETIVO en
+                // vez de la carta fuente -complementa a `e.if`, que mira la fuente-. Hacía falta
+                // para "drena 1 Furor SI el atacante tiene Furor" (ANTES_DE_DEFENDER: la fuente
+                // es quien defiende, el objetivo es quien ataca). `continue`, no abortar la
+                // lista: un objetivo sin cumplir la condición simplemente se salta.
+                if (e.ifObjetivo && !DSL._match(t, e.ifObjetivo)) continue;
                 const r = await DSL._doEffect(e, sourceCard, t, game, ownerId, habilidad);
                 if (r === false) return { ok: false, anyApplied };
                 if (r === true) anyApplied = true;
@@ -8394,6 +8402,26 @@ const DSL = {
             };
         }
 
+        // ANTES_DE_DEFENDER -> onBeforeDefend: el gancho de la carta QUE DEFIENDE, para
+        // pasivas de esquiva o de reacción-al-ser-atacada (Imp mayor, 31-jul-2026: "cada vez
+        // que sea atacado, el atacante pierde 1 Furor" -no es esquiva, es un efecto lateral
+        // que corre ANTES del daño-). A propósito NO reutiliza GLOBAL_ANTES_DE_ATAQUE con un
+        // hipotético soloDefensor:"SELF": ese trigger solo se dispara vía
+        // collectAttackInterceptors, que SOLO llama performAttack (el ataque normal) -si Imp
+        // mayor se hubiera migrado así, un ataque ESPECIAL (que va por la ruta directa del op
+        // ATACAR, sin pasar por collectAttackInterceptors) no le habría drenado Furor al
+        // atacante, un hueco real de cobertura-. onBeforeDefend en cambio lo llaman TODOS los
+        // caminos de ataque (normal y especial, con 9 puntos de disparo en el motor), que es
+        // justo el "cada vez que sea atacado" que dice el texto de la carta.
+        const antesDefender = abs.find(a => a.trigger === 'ANTES_DE_DEFENDER');
+        if (antesDefender && typeof tmpl.onBeforeDefend !== 'function') {
+            tmpl.onBeforeDefend = async function (defender, attacker, game, abilityName, isSpecial) {
+                if (antesDefender.log) game.logMsg(DSL._fill(antesDefender.log, { carta: defender.name, objetivo: DSL._nombre(game, attacker) }), antesDefender.logTipo || 'ability');
+                await DSL._runEffectList(antesDefender.efectos || [], defender, game, defender.owner, [attacker], antesDefender.nombre || tmpl.passiveName || null);
+                return !!antesDefender.esquiva; // por defecto no esquiva: solo un efecto lateral
+            };
+        }
+
         // PUEDE_ATACAR -> canAttackNormally: consulta de veto de ataque normal por
         // condición (p. ej. Muro parlante: solo puede atacar con Atq > 0).
         const puedeAtacar = abs.find(a => a.trigger === 'PUEDE_ATACAR');
@@ -8584,6 +8612,7 @@ const DSL = {
                     if (r.floating && typeof showFloatingText === 'function') showFloatingText(targetCard.instanceId, r.floating.texto, r.floating.estilo || 'ft-red-stat', r.floating.offset !== undefined ? r.floating.offset : -30);
                     if (r.accion && typeof r.accion.fijar === 'number') return r.accion.fijar;
                     if (r.accion && typeof r.accion.sumar === 'number') return amount + r.accion.sumar;
+                    if (r.accion && typeof r.accion.multiplicar === 'number') return amount * r.accion.multiplicar; // Dáedra (31-jul-2026): doble Furor
                 }
                 return amount;
             };
