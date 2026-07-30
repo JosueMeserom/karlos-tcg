@@ -6929,7 +6929,7 @@ const KARLOS_RULES = {
 //  Valores: número | {COUNT:{...}} | {REF:"objetivo.furorMax"} (campos computados)
 // ===================================================================
 const DSL = {
-    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE', 'AURA', 'ANTES_DE_JUGAR', 'PUEDE_ATACAR', 'SOBRECURACION', 'REACCION', 'AL_MORIR', 'AL_MORIR_ALIADO', 'AL_DESTRUIR', 'ESPEJO', 'ANTES_DE_ATACAR', 'TRAS_ATACAR', 'TRAS_DEFENDER'],
+    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE', 'AURA', 'ANTES_DE_JUGAR', 'PUEDE_ATACAR', 'SOBRECURACION', 'REACCION', 'AL_MORIR', 'AL_MORIR_ALIADO', 'AL_DESTRUIR', 'ESPEJO', 'ANTES_DE_ATACAR', 'TRAS_ATACAR', 'TRAS_DEFENDER', 'ANTES_DE_DEFENDER'],
     // Los 5 últimos ops solo tienen sentido dentro de una REACCION (los interpreta
     // DSL._runReaccion, no _doEffect): controlan el resultado que la reacción
     // devuelve al motor de combate (redirigir el ataque, cancelarlo, drenar Furor
@@ -8431,6 +8431,21 @@ const DSL = {
             tmpl.onAfterDefend = async function (defender, attacker, dmg, isSpecial, game) {
                 if (trasDefender.log) game.logMsg(DSL._fill(trasDefender.log, { carta: defender.name, objetivo: DSL._nombre(game, attacker) }), trasDefender.logTipo || 'ability');
                 await DSL._runEffectList(trasDefender.efectos || [], defender, game, defender.owner, [attacker], trasDefender.nombre || tmpl.passiveName || null);
+            };
+        }
+
+        // ANTES_DE_DEFENDER -> onBeforeDefend: para ESQUIVA de verdad (a diferencia de
+        // TRAS_DEFENDER, esto SÍ debe decidirse antes del daño). Restaurada el 31-jul-2026
+        // (se había quitado por quedarse sin usuario tras mover Imp mayor a TRAS_DEFENDER,
+        // pero Toto pidió dejarla: Águila, PSEUDO-PREVASIÓN, sigue imperativa hoy -escribe
+        // onBeforeDefend a mano, sin pasar por ningún trigger DSL- y sería su usuario natural
+        // el día que se migre). `esquiva:true` en la Habilidad marca que devuelve true.
+        const antesDefender = abs.find(a => a.trigger === 'ANTES_DE_DEFENDER');
+        if (antesDefender && typeof tmpl.onBeforeDefend !== 'function') {
+            tmpl.onBeforeDefend = async function (defender, attacker, game, abilityName, isSpecial) {
+                if (antesDefender.log) game.logMsg(DSL._fill(antesDefender.log, { carta: defender.name, objetivo: DSL._nombre(game, attacker) }), antesDefender.logTipo || 'ability');
+                await DSL._runEffectList(antesDefender.efectos || [], defender, game, defender.owner, [attacker], antesDefender.nombre || tmpl.passiveName || null);
+                return !!antesDefender.esquiva;
             };
         }
 
