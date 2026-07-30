@@ -1476,56 +1476,45 @@ const CARD_DB = [
     },
     { 
         id: 27, name: "Atomización", type: "Ayuda", subtype: "Técnica", tags: ["Consumible"], rarity: "B", text: "Elige un aliado no agotado. Gasta su acción para quitar 2 de Vida a un enemigo (ignora Def). Si lo mata, vuelve a la mano.", cost: 0,
-        canPlayCard: function(card, game, p) {
-            const enemyId = game.activePlayerId === 'p1' ? 'p2' : 'p1';
-            const enemyP = game.players[enemyId];
-            
-            const hasAlly = [...p.vanguard, ...p.rearguard].some(c => !c.exhausted && (c.type === 'Personaje' || c.type === 'Esbirro'));
-            if (!hasAlly) {
-                game.logError("No tienes aliados activos para gastar su acción.");
-                return false;
-            }
-            
-            const hasEnemy = [...enemyP.vanguard, ...enemyP.rearguard].some(c => {
-                const template = getCardTemplate(c.id);
-                return !template.immuneToEnemyAids; 
-            });
-            if (!hasEnemy) {
-                game.logError("No hay enemigos válidos para Atomización.");
-                return false;
-            }
-            return true;
-        },
-        onPlay: function(card, game) {
-            game.validateAndConfirmAbility(card, () => {
-                game.inputState = 'SELECT_ATOM_ALLY';
-                game.logMsg(`Selecciona un aliado activo para gastar su acción.`, 'system');
-                game.isActionLocked = false; // <--- AÑADIDO: Te permite cancelar la carta con la [X] si cambias de idea
-                game.render();
-            });
-        },
-        onExecuteAyuda: async function(card, target, game) {
-            const ally = game.atomizationAlly;
-            ally.exhausted = true;
-            game.logMsg(`${game.getCardNameWithOwner(ally)} usa Atomización contra ${game.getCardNameWithOwner(target)}.`, 'combat');
-            
-            const el = document.querySelector(`.card[data-id="${target.instanceId}"]`);
-            if (el) el.classList.add('shaking');
-            await game.sleep(400);
-            if (el) el.classList.remove('shaking');
-
-            game.modifyStat(target, 'currentHp', -2);
-            
-            if (target.currentHp <= 0) {
-                game.logMsg("Enemigo destruido. Atomización vuelve a tu mano.", 'ability');
-                await game.checkDeath(target);
-                // No se descarta, vuelve a la mano (ya gestionado por el motor al devolver true aquí y no borrar de mano)
-                return false; // El motor no la descartará automáticamente
-            } else {
-                await game.checkDeath(target);
-                return true; // El motor la descartará
-            }
-        }
+        // Migrada (31-jul-2026). Se creía irreducible por sus dos inputState propios del motor
+        // (SELECT_ATOM_ALLY / SELECT_ATOM_ENEMY); leyéndola de cerca resultó ser el patrón de
+        // Granada de maná -pagador + objetivo- más un "si lo mata". Los dos estados a medida
+        // desaparecen: dos ELEGIR anidados hacen lo mismo con pickBoardTargets (los estados
+        // siguen en index.html porque el motor los define, pero esta carta ya no los usa).
+        // Piezas nuevas del intérprete: `siMuere` en MODIFICAR_STAT y el op `NO_CONSUMIR`.
+        // El aliado se marca agotado DESPUÉS del disparo, como la vieja (que lo hacía en
+        // onExecuteAyuda, ya con el enemigo elegido).
+        abilities: [
+            { trigger: "JUGAR", requisitos: [
+                { count: { filtros: [
+                    { campo: "exhausted", op: "falsy" },
+                    { o: [ [ { campo: "type", op: "==", valor: "Personaje" } ], [ { campo: "type", op: "==", valor: "Esbirro" } ] ] } ] },
+                  op: ">=", valor: 1, msg: "No tienes aliados activos para gastar su acción." },
+                { count: { de: "ENEMIGOS", filtros: [ { campo: "immuneToEnemyAids", op: "falsy" } ] },
+                  op: ">=", valor: 1, msg: "No hay enemigos válidos para Atomización." } ] },
+            { trigger: "AL_CONSUMIR",
+              efectos: [
+                { op: "ELEGIR", de: "ALIADOS",
+                  filtros: [
+                    { campo: "exhausted", op: "falsy" },
+                    { o: [ [ { campo: "type", op: "==", valor: "Personaje" } ], [ { campo: "type", op: "==", valor: "Esbirro" } ] ] } ],
+                  cantidad: 1, guardaEn: "atomizador",
+                  titulo: "Elige un aliado activo para gastar su acción",
+                  efectos: [
+                    // Elección del enemigo: NO cancelable — al llegar aquí el jugador ya se ha
+                    // comprometido gastando la acción de un aliado (norma de cancelabilidad).
+                    { op: "ELEGIR", de: "ENEMIGOS",
+                      filtros: [ { campo: "immuneToEnemyAids", op: "falsy" } ],
+                      cantidad: 1, cancelable: false,
+                      titulo: "Elige al enemigo a atomizar",
+                      logAntes: "{atomizador} usa Atomización contra {elegidos}.", logAntesTipo: "combat",
+                      efectos: [
+                        { op: "MODIFICAR_STAT", stat: "currentHp", delta: -2, comprobarMuerte: true,
+                          animacion: "DANO_VERDADERO",
+                          floating: { texto: "DAÑO VERDADERO", estilo: "ft-purple", offset: -30 },
+                          siMuere: [ { op: "NO_CONSUMIR", log: "Enemigo destruido. Atomización vuelve a tu mano." } ] } ] },
+                    { op: "MARCAR", campo: "exhausted", valor: true } ] } ] }
+        ],
     },
     {
         id: 28, name: "Líquido mortal", type: "Ayuda", subtype: "Ingerible", tags: ["Consumible"], rarity: "B",
@@ -6197,30 +6186,21 @@ const CARD_DB = [
         name: "Gul guerrero", hp: 3, def: 2, atk: 5, type: "Esbirro", subtype: "No-muerto", tags: ["Monstruo", "Ninja"], rarity: "B", cost: 1, series: 2,
         text: "Coste: 2 de Furor. P: DEMONIO BELICOSO: Al atacar con éxito, el enemigo pierde 1 de Furor. A: SANGRE MALDITA (1F): Ataque normal. Aplica Daño por tiempo al enemigo (3 turnos).",
         passiveName: "DEMONIO BELICOSO", activeName: "SANGRE MALDITA", activeCost: 1,
-        // El tributo y DEMONIO BELICOSO (reacciona a CUALQUIER ataque de esta carta, no solo su
-        // Activa) se quedan imperativos (27-jul-2026, tanda de volumen): DSL.tributoFuror ya usa
-        // selección en tablero, y no hay trigger DSL para "tras un ataque de ESTA carta en
-        // concreto" (GLOBAL_TRAS_ATAQUE es de ámbito Evento/todos-los-aliados). SANGRE MALDITA
-        // sí migra: ataque normal + éxito -> Daño por tiempo, mismo patrón que PUÑALADA.
+        // El tributo se queda imperativo (DSL.tributoFuror ya usa selección en tablero).
+        // DEMONIO BELICOSO migra el 31-jul-2026 con el trigger NUEVO `TRAS_ATACAR`: hasta
+        // ahora no existía ningún trigger para "tras un ataque de ESTA carta en concreto"
+        // (GLOBAL_TRAS_ATAQUE es de ámbito Evento), que era justo lo que la dejaba a medias.
+        // `soloSiDaño` hace por su cuenta la contabilidad de la Vida enemiga antes/después que
+        // la vieja llevaba a mano con _enemyHpBefore, y `siObjetivo` cubre el "solo si le queda
+        // Furor que quitar". SANGRE MALDITA ya estaba migrada.
         onBeforePlayAsync: async function(card, game, p) {
             return await DSL.tributoFuror(card, game, p, 2, { msgSinPagador: `Necesitas un aliado con 2 Furor para el tributo.` });
         },
-        onBeforeAttack: async function(attacker, defender, game) {
-            attacker._enemyHpBefore = defender.currentHp;
-            return true;
-        },
-        onAfterAttack: async function(attacker, defender, game) {
-            if (attacker._enemyHpBefore !== undefined) {
-                const dmgDealt = attacker._enemyHpBefore - defender.currentHp;
-                if (dmgDealt > 0 && defender.furor > 0) {
-                    game.logMsg(`¡${attacker.passiveName}! El Gul desgarra la energía de ${defender.name}.`, 'ability');
-                    game.modifyStat(defender, 'furor', -1);
-                    showFloatingText(defender.instanceId, "-1 FUR", "ft-red-stat", -20);
-                }
-                delete attacker._enemyHpBefore;
-            }
-        },
         abilities: [
+            { trigger: "TRAS_ATACAR", nombre: "DEMONIO BELICOSO", soloSiDaño: true,
+              siObjetivo: { campo: "furor", op: ">=", valor: 1 },
+              log: "¡DEMONIO BELICOSO! El Gul desgarra la energía de {objetivo}.",
+              efectos: [ { op: "MODIFICAR_STAT", stat: "furor", delta: -1 } ] },
             { trigger: "ACTIVA", nombre: "SANGRE MALDITA", coste: { furor: 1 },
               requisitos: [ { count: { quien: "ENEMIGO", zona: "vanguardia" }, op: ">=", valor: 1 } ],
               target: { quien: "ENEMIGO", cantidad: 1 },
@@ -6238,33 +6218,23 @@ const CARD_DB = [
         onBeforePlayAsync: async function(card, game, p) {
             return await DSL.tributoFuror(card, game, p, 2, { titulo: `${card.name}: ELIGE TRIBUTO (-2 FUROR)` });
         },
-        onBeforeAttack: async function(attacker, defender, game) {
-            const isNormal = !game.abilityContext || game.abilityContext.isNormalAttack;
-            if (isNormal) {
-                game.logMsg(`¡${attacker.passiveName}! La brutalidad del Oni lo vuelve impredecible...`, 'ability');
-                const results = await game.triggerCoinFlips(1, attacker.owner);
-                if (results) {
-                    if (results[0] === 'heads') {
-                        game.logMsg("Moneda: CARA - ¡Golpe brutal! (+1 ATQ)", 'combat');
-                        showFloatingText(attacker.instanceId, "+1 ATQ", "ft-green", -20);
-                        attacker.currentAtk += 1;
-                        attacker.oniModifier = 1;
-                    } else {
-                        game.logMsg("Moneda: CRUZ - El Oni tropieza ligeramente. (-1 ATQ)", 'neutral');
-                        showFloatingText(attacker.instanceId, "-1 ATQ", "ft-red-stat", -20);
-                        attacker.currentAtk -= 1;
-                        attacker.oniModifier = -1;
-                    }
-                }
-            }
-            return true;
-        },
-        onAfterAttack: async function(attacker, defender, game) {
-            if (attacker.oniModifier !== undefined) {
-                attacker.currentAtk -= attacker.oniModifier;
-                delete attacker.oniModifier;
-            }
-        }
+        // YŌKAI VIOLENTO migrada (31-jul-2026) con el trigger NUEVO `ANTES_DE_ATACAR` y el op
+        // `BONO_ATAQUE`. `soloAtaqueNormal` replica el `!game.abilityContext ||
+        // isNormalAttack` que la vieja hacía a mano. El bono lo deshace el propio compilador
+        // (recompute con updatePassives), así que la carta ya no lleva la contabilidad del
+        // oniModifier — que era, además, el patrón que en otras cartas acabó en el bug de
+        // doble resta. Aquí NO lo había: en Oni ancho el += y el -= viven DENTRO de
+        // performAttack, antes de su updatePassives final, así que se compensaban.
+        abilities: [
+            { trigger: "ANTES_DE_ATACAR", nombre: "YŌKAI VIOLENTO", soloAtaqueNormal: true,
+              log: "¡YŌKAI VIOLENTO! La brutalidad del Oni lo vuelve impredecible...",
+              efectos: [
+                { op: "MONEDA",
+                  logCara: { msg: "Moneda: CARA - ¡Golpe brutal! (+1 ATQ)", tipo: "combat" },
+                  logCruz: { msg: "Moneda: CRUZ - El Oni tropieza ligeramente. (-1 ATQ)", tipo: "neutral" },
+                  cara: [ { op: "BONO_ATAQUE", valor: 1, floating: { texto: "+1 ATQ", estilo: "ft-green", offset: -20 } } ],
+                  cruz: [ { op: "BONO_ATAQUE", valor: -1, floating: { texto: "-1 ATQ", estilo: "ft-red-stat", offset: -20 } } ] } ] }
+        ]
     },
     {
         name: "Tengu orgulloso", hp: 5, def: 2, atk: 5, type: "Esbirro", subtype: "Ser mágico", tags: ["Monstruo"], rarity: "B", cost: 1, series: 2,
@@ -6953,12 +6923,12 @@ const KARLOS_RULES = {
 //  Valores: número | {COUNT:{...}} | {REF:"objetivo.furorMax"} (campos computados)
 // ===================================================================
 const DSL = {
-    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE', 'AURA', 'ANTES_DE_JUGAR', 'PUEDE_ATACAR', 'SOBRECURACION', 'REACCION', 'AL_MORIR', 'AL_MORIR_ALIADO', 'AL_DESTRUIR', 'ESPEJO'],
+    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE', 'AURA', 'ANTES_DE_JUGAR', 'PUEDE_ATACAR', 'SOBRECURACION', 'REACCION', 'AL_MORIR', 'AL_MORIR_ALIADO', 'AL_DESTRUIR', 'ESPEJO', 'ANTES_DE_ATACAR', 'TRAS_ATACAR'],
     // Los 5 últimos ops solo tienen sentido dentro de una REACCION (los interpreta
     // DSL._runReaccion, no _doEffect): controlan el resultado que la reacción
     // devuelve al motor de combate (redirigir el ataque, cancelarlo, drenar Furor
     // tras él, fijar el daño, autoataque del atacante).
-    OPS_EFECTO: ['MODIFICAR_STAT', 'CURAR', 'DAÑO', 'APLICAR_ESTADO', 'MODIFICAR_CONTADORES', 'ATACAR', 'MONEDA', 'ROBAR', 'BUSCAR', 'MARCAR', 'VER_MANO', 'LIMPIAR_ESTADOS', 'ELEGIR', 'DESTRUIR_EVENTO', 'MARCAR_TEMPORAL', 'DESCARTAR', 'EQUIPAR', 'MARCAR_JUGADOR', 'FLOTANTE', 'FIJAR_STAT', 'REDIRIGIR', 'CANCELAR_ATAQUE', 'MARCAR_DRENAJE', 'FIJAR_DAÑO', 'ATACANTE_SE_AUTOATACA', 'VOLVER_A_MANO', 'RETRIBUCION', 'SUELO_STAT', 'TECHO_STAT'],
+    OPS_EFECTO: ['MODIFICAR_STAT', 'CURAR', 'DAÑO', 'APLICAR_ESTADO', 'MODIFICAR_CONTADORES', 'ATACAR', 'MONEDA', 'ROBAR', 'BUSCAR', 'MARCAR', 'VER_MANO', 'LIMPIAR_ESTADOS', 'ELEGIR', 'DESTRUIR_EVENTO', 'MARCAR_TEMPORAL', 'DESCARTAR', 'EQUIPAR', 'MARCAR_JUGADOR', 'FLOTANTE', 'FIJAR_STAT', 'REDIRIGIR', 'CANCELAR_ATAQUE', 'MARCAR_DRENAJE', 'FIJAR_DAÑO', 'ATACANTE_SE_AUTOATACA', 'VOLVER_A_MANO', 'RETRIBUCION', 'SUELO_STAT', 'TECHO_STAT', 'NO_CONSUMIR', 'BONO_ATAQUE'],
     OPS_CMP: ['==', '!=', '<=', '>=', '<', '>', 'includes', 'contieneTexto', 'includesCI', 'truthy', 'falsy'],
     QUIEN: ['SELF', 'ALIADO', 'ENEMIGO', 'TODOS', 'ATACANTE', 'DEFENSOR'], // ATACANTE/DEFENSOR: solo en GLOBAL_TRAS_ATAQUE y REACCION
 
@@ -7224,7 +7194,44 @@ const DSL = {
             // muerte en combate — la vieja llamaba a checkDeath(target, false) a mano para que
             // la víctima NO diera Retribución. comprobarMuerte por defecto SÍ la da (checkDeath
             // por defecto triggerRetribution=true); este flag replica el caso sin ella.
+            // siMuere (Atomización, 31-jul-2026): rama para "si este cambio lo mata", hermana
+            // del siExito de ATACAR. La condición se evalúa ANTES de checkDeath —igual que la
+            // Atomización vieja, que miraba currentHp<=0 antes de llamarlo— para que una carta
+            // capaz de burlar la muerte (Incluso En El KG, que vuelve a la mano con la Vida
+            // restaurada) no la borre a posteriori: el golpe FUE letal aunque no se consumara.
+            const _fueLetal = !!e.siMuere && e.stat === 'currentHp' && target[e.stat] <= 0;
             if (e.comprobarMuerte) await game.checkDeath(target, !e.sinRetribucion);
+            if (_fueLetal) {
+                const rm = await DSL._runEffectList(e.siMuere, sourceCard, game, ownerId, [target], habilidad);
+                if (rm && rm.ok === false) return false;
+            }
+            return true;
+        }
+        // NO_CONSUMIR (Atomización, 31-jul-2026): marca ESTA Ayuda para que el boilerplate de
+        // AL_CONSUMIR la deje en la mano en vez de mandarla al descarte. El motor ya soporta el
+        // caso (executeAyuda/onPlay solo la sacan de la mano si el flujo dice que se gastó); esto
+        // solo lo hace declarable. Ojo con el nombre: el texto de la carta dice "vuelve a la
+        // mano", pero mecánicamente NUNCA sale de ella — no hay nada que devolver.
+        // BONO_ATAQUE (Oni ancho, 31-jul-2026): modifica el Atq del atacante SOLO durante el
+        // ataque en curso. Solo tiene sentido dentro de ANTES_DE_ATACAR, que es quien lleva la
+        // contabilidad y lo deshace después (ver el compilador de ese trigger). Se lleva la
+        // cuenta en _dslBonoAtaque en vez de dejar que cada carta se lo reste a mano: ese
+        // "restar a mano" es justo el patrón que ya produjo el bug de doble resta en
+        // Hiposaurio/Hawke/Guardia/Megalimo.
+        if (e.op === 'BONO_ATAQUE') {
+            const v = DSL._value(ownerId, game, e.valor, sourceCard, ctx) || 0;
+            if (v) {
+                sourceCard.currentAtk += v;
+                sourceCard._dslBonoAtaque = (sourceCard._dslBonoAtaque || 0) + v;
+            }
+            if (e.floating && typeof showFloatingText === 'function') showFloatingText(sourceCard.instanceId, String(e.floating.texto).split('{delta}').join(Math.abs(v)), e.floating.estilo || 'ft-green', e.floating.offset !== undefined ? e.floating.offset : -20);
+            if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: target ? DSL._nombre(game, target) : '' }), e.logTipo || 'combat');
+            return true;
+        }
+        if (e.op === 'NO_CONSUMIR') {
+            DSL._vars = DSL._vars || {};
+            (DSL._vars[sourceCard.instanceId] = DSL._vars[sourceCard.instanceId] || {}).__noConsumir = true;
+            if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: target ? DSL._nombre(game, target) : '' }), e.logTipo || 'ability');
             return true;
         }
         if (e.op === 'CURAR') {
@@ -8152,12 +8159,22 @@ const DSL = {
         if (consumir && typeof tmpl.onPlay !== 'function') {
             tmpl.onPlay = async function (card, game) {
                 const p = game.players[card.owner];
+                // La marca de NO_CONSUMIR se limpia ANTES de correr: si esta misma copia se
+                // quedó en la mano en un uso anterior (Atomización tras un remate), su marca
+                // no puede sobrevivir a este uso y librarla del descarte por inercia.
+                DSL._vars = DSL._vars || {};
+                const _vc = (DSL._vars[card.instanceId] = DSL._vars[card.instanceId] || {});
+                delete _vc.__noConsumir;
                 if (consumir.log) game.logMsg(DSL._fill(consumir.log, { carta: card.name, jugador: (typeof game.getDisplayName === 'function' ? game.getDisplayName(card.owner) : card.owner) }), consumir.logTipo || 'ability');
                 const res = await DSL._runEffectList(consumir.efectos || [], card, game, card.owner, null);
                 if (res && res.ok === false) { game.cancelAction(); return; } // elección cancelada: la carta NO se consume
-                // Boilerplate del consumible: de la mano al descarte (lavada), cierre de acción y refresco
-                const handIdx = p.hand.findIndex(x => x.instanceId === card.instanceId);
-                if (handIdx !== -1) { p.hand.splice(handIdx, 1); if (typeof game.resetCard === 'function') game.resetCard(card); p.discard.push(card); card.location = 'discard'; }
+                // Boilerplate del consumible: de la mano al descarte (lavada), cierre de acción y
+                // refresco. Se salta entero si un NO_CONSUMIR pidió dejarla en la mano.
+                if (!_vc.__noConsumir) {
+                    const handIdx = p.hand.findIndex(x => x.instanceId === card.instanceId);
+                    if (handIdx !== -1) { p.hand.splice(handIdx, 1); if (typeof game.resetCard === 'function') game.resetCard(card); p.discard.push(card); card.location = 'discard'; }
+                }
+                delete _vc.__noConsumir;
                 game.cancelAction();
                 if (typeof game.render === 'function') game.render();
             };
@@ -8319,6 +8336,62 @@ const DSL = {
                     await _ejecutarActiva(card, game, game.abilityContext.targets);
                 };
             }
+        }
+
+        // ANTES_DE_ATACAR / TRAS_ATACAR -> onBeforeAttack / onAfterAttack: los ganchos de la
+        // carta QUE ATACA (no confundir con los GLOBAL_*, que son de ámbito Evento/tablero).
+        // Se compilan JUNTOS porque comparten los dos mismos ganchos del motor y porque
+        // TRAS_ATACAR con soloSiDaño necesita que el ANTES tome la foto de la Vida enemiga.
+        //
+        // Orden real dentro de performAttack (comprobado, importa): updatePassives ->
+        // onBeforeAttack -> dealDamage -> onAfterAttack -> updatePassives. O sea que un bono
+        // aplicado en el ANTES sí llega vivo al cálculo de daño, y el recompute final limpia
+        // solo. Aun así se deshace explícitamente, porque la ruta de ataque DIRECTO
+        // (ATACAR especial, sin performAttack) no garantiza ese recompute final.
+        const antesAtacar = abs.find(a => a.trigger === 'ANTES_DE_ATACAR');
+        const trasAtacar = abs.find(a => a.trigger === 'TRAS_ATACAR');
+        if ((antesAtacar || trasAtacar) && typeof tmpl.onBeforeAttack !== 'function' && typeof tmpl.onAfterAttack !== 'function') {
+            const _nombreHab = (a) => a.nombre || tmpl.passiveName || null;
+            // Misma heurística de "¿es un ataque normal?" que ya usaban a mano Oni ancho y
+            // Clarise: sin abilityContext es un ataque suelto; con él, solo cuenta si la
+            // Activa se declaró como ataque normal.
+            const _esNormal = (game) => !game.abilityContext || game.abilityContext.isNormalAttack;
+
+            tmpl.onBeforeAttack = async function (attacker, defender, game) {
+                attacker._dslBonoAtaque = 0;
+                if (trasAtacar && trasAtacar.soloSiDaño) attacker._dslHpEnemigoAntes = defender ? defender.currentHp : undefined;
+                if (!antesAtacar) return true;
+                if (antesAtacar.soloAtaqueNormal && !_esNormal(game)) return true;
+                if (antesAtacar.si && !DSL._cond(attacker, game, antesAtacar.si)) return true;
+                if (antesAtacar.log) game.logMsg(DSL._fill(antesAtacar.log, { carta: attacker.name, objetivo: defender ? DSL._nombre(game, defender) : '' }), antesAtacar.logTipo || 'ability');
+                const r = await DSL._runEffectList(antesAtacar.efectos || [], attacker, game, attacker.owner, [defender], _nombreHab(antesAtacar));
+                return !(r && r.ok === false); // ok:false -> el ataque NO procede (veto)
+            };
+
+            tmpl.onAfterAttack = async function (attacker, defender, game) {
+                if (attacker._dslBonoAtaque) {
+                    // Recompute completo en vez de restar a mano: mismo criterio que bonoAtq en
+                    // el op ATACAR, para no repetir el bug de doble resta.
+                    attacker._dslBonoAtaque = 0;
+                    if (typeof game.updatePassives === 'function') game.updatePassives();
+                    else attacker.currentAtk -= 0;
+                }
+                delete attacker._dslBonoAtaque;
+                const hpAntes = attacker._dslHpEnemigoAntes;
+                delete attacker._dslHpEnemigoAntes;
+                if (!trasAtacar) return;
+                if (trasAtacar.soloAtaqueNormal && !_esNormal(game)) return;
+                if (trasAtacar.soloSiDaño) {
+                    if (hpAntes === undefined || !defender || !(hpAntes - defender.currentHp > 0)) return;
+                }
+                // siObjetivo: condición sobre el DEFENSOR (el `if` genérico de los efectos se
+                // evalúa contra la carta FUENTE, que aquí es el atacante). Gul guerrero solo
+                // anuncia y drena si al enemigo le queda Furor que quitar.
+                if (trasAtacar.siObjetivo && !(defender && DSL._match(defender, trasAtacar.siObjetivo))) return;
+                if (trasAtacar.si && !DSL._cond(attacker, game, trasAtacar.si)) return;
+                if (trasAtacar.log) game.logMsg(DSL._fill(trasAtacar.log, { carta: attacker.name, objetivo: defender ? DSL._nombre(game, defender) : '' }), trasAtacar.logTipo || 'ability');
+                await DSL._runEffectList(trasAtacar.efectos || [], attacker, game, attacker.owner, [defender], _nombreHab(trasAtacar));
+            };
         }
 
         // PUEDE_ATACAR -> canAttackNormally: consulta de veto de ataque normal por
