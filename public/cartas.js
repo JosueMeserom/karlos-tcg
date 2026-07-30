@@ -1068,32 +1068,44 @@ const CARD_DB = [
         ]
     },
     { 
-        id: 11, name: "Garret", hp: 4, def: 8, atk: 9, type: "Personaje", subtype: "Ser vivo", tags: ['Usuario de magia'], gender: 'M', rarity: "S", 
-        text: "Coste: 4 de Furor de Sadame, Aniceto o Hawke. P: Al colocar: Busca Escudo mágico. Gana 2 Furor/turno. Inmune al daño especial. A: ANDANADA METEÓRICA (3F): Ataque especial a 2 enemigos.", 
+        id: 11, name: "Garret", hp: 4, def: 8, atk: 9, type: "Personaje", subtype: "Ser vivo", tags: ['Usuario de magia'], gender: 'M', rarity: "S",
+        text: "Coste: 4 de Furor de Sadame, Aniceto o Hawke. P: Al colocar: Busca Escudo mágico. Gana 2 Furor/turno. Inmune al daño especial. A: ANDANADA METEÓRICA (3F): Ataque especial a 2 enemigos.",
         passiveName: "DESBORDE DE MANÁ", activeName: "ANDANADA METEÓRICA", activeCost: 3, series: 1,
-
-        // HOOK 1: Tributo previo a la colocación (Ordenado y arreglado)
-        onBeforePlayAsync: async function(card, game, p) {
-            // Filtramos y ORDENAMOS por ID: Sadame, Aniceto, Hawke
-            const validTributes = [...p.vanguard, ...p.rearguard].filter(c => 
-                (c.name === 'Sadame' || c.name === 'Aniceto' || c.name === 'Hawke') && c.furor >= 4
-            ).sort((a, b) => {
-                const order = { 'Sadame': 1, 'Aniceto': 2, 'Hawke': 3 };
-                return order[a.name] - order[b.name];
-            });
-            
-            if (validTributes.length === 0) {
-                game.logError(`Necesitas a Sadame, Aniceto o Hawke con al menos 4 de Furor en el campo para colocar a ${card.name}.`);
-                return false;
-            }
-
-            const chosen = await game.pickBoardTargets(validTributes, 1, 'TRIBUTO PARA GARRET (-4 FUROR)', card, card.owner, true);
-            if (chosen && chosen.length > 0) {
-                card.tributeSourceId = chosen[0].instanceId;
-                return true;
-            }
-            return false;
-        },
+        // Migrado (30-jul-2026): el tributo NO es DSL.tributoFuror (ese helper elige entre
+        // CUALQUIER aliado con Furor suficiente) — aquí el pagador debe ser Sadame, Aniceto o
+        // Hawke por nombre, así que va por ANTES_DE_JUGAR + ELEGIR con un filtro `o` de 3
+        // nombres, mismo mecanismo que el deudor de Deuda con la mafia (cancelable: si
+        // declinas, la carta NO se coloca — `_runEffectList` devuelve ok:false y
+        // onBeforePlayAsync propaga false). La vieja delegaba el descuento de Furor y su log
+        // ("X entrega su Furor como tributo para Y") a un mecanismo genérico del motor
+        // (`card.tributeSourceId`, con -4 hardcodeado); aquí el MODIFICAR_STAT anidado hace
+        // lo mismo explícitamente. El orden de preferencia Sadame>Aniceto>Hawke de la vieja
+        // era solo para una lista ordenada de modal; ELEGIR usa selección en tablero (norma
+        // de targeting), donde el orden no aplica.
+        // Búsqueda de Escudo mágico (mazo O descartes, con opción de no buscar nada) se queda
+        // imperativa: BUSCAR no soporta elegir entre dos zonas distintas en una sola llamada.
+        // Los dos ganchos globales (+1 Furor extra en fase de Furor, inmune a daño especial)
+        // tampoco tienen trigger DSL.
+        abilities: [
+            { trigger: "JUGAR", requisitos: [
+                { count: { filtros: [ { o: [ [ { campo: "name", op: "==", valor: "Sadame" } ], [ { campo: "name", op: "==", valor: "Aniceto" } ], [ { campo: "name", op: "==", valor: "Hawke" } ] ] }, { campo: "furor", op: ">=", valor: 4 } ] }, op: ">=", valor: 1,
+                  msg: "Necesitas a Sadame, Aniceto o Hawke con al menos 4 de Furor en el campo para colocar a Garret." } ] },
+            { trigger: "ANTES_DE_JUGAR",
+              efectos: [
+                { op: "ELEGIR", de: "ALIADOS",
+                  filtros: [ { o: [ [ { campo: "name", op: "==", valor: "Sadame" } ], [ { campo: "name", op: "==", valor: "Aniceto" } ], [ { campo: "name", op: "==", valor: "Hawke" } ] ] }, { campo: "furor", op: ">=", valor: 4 } ],
+                  cantidad: 1, titulo: "TRIBUTO PARA GARRET (-4 FUROR)",
+                  efectos: [ { op: "MODIFICAR_STAT", stat: "furor", delta: -4,
+                               log: "{objetivo} entrega su Furor como tributo para Garret." } ] } ] },
+            { trigger: "ACTIVA", nombre: "ANDANADA METEÓRICA", coste: { furor: 3 }, sinObjetivo: true,
+              requisitos: [
+                { count: { quien: "ENEMIGO", zona: "vanguardia", filtros: [ { campo: "stealth", op: "falsy" } ] }, op: ">=", valor: 2,
+                  msg: "No hay suficientes enemigos válidos en vanguardia para ANDANADA METEÓRICA." } ],
+              efectos: [
+                { op: "ELEGIR", de: "ENEMIGOS", zona: "VANGUARDIA", filtros: [ { campo: "stealth", op: "falsy" } ], cantidad: 2, cancelable: false,
+                  titulo: "ANDANADA METEÓRICA: elige 2 enemigos distintos",
+                  efectos: [ { op: "ATACAR", especial: true } ] } ] }
+        ],
 
         // HOOK 2: Búsqueda del Escudo Mágico tras colocarse
         onAfterPlayAsync: async function(card, game, p) {
@@ -1167,18 +1179,6 @@ const CARD_DB = [
             return amount;
         },
 
-        // HOOK 4: Habilidad Activa (Andanada Meteórica)
-        canActivateAbility: function(card, game) {
-            if (card.furor < 3) { game.logMsg("Falta Furor (3).", 'system'); return false; }
-            const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
-            const validTargets = game.players[enemyId].vanguard.filter(c => !c.stealth);
-            if (validTargets.length < 2) {
-                game.logError("No hay suficientes enemigos válidos en vanguardia para ANDANADA METEÓRICA.");
-                return false; 
-            }
-            return true;
-        },
-
         // HOOK 5: Inmune al daño Especial
         onBeforeTakeDamage: async function(card, attacker, dmg, isSpecial, game) {
             if (isSpecial) {
@@ -1187,78 +1187,6 @@ const CARD_DB = [
             }
             return dmg;
         },
-
-        onExecuteAbility: function(card, game) {
-            game.selectedCard = card;
-            game.inputState = 'SELECT_ABILITY_TARGETS';
-            game.abilityContext = { targets: [], maxTargets: 2, name: 'ANDANADA METEÓRICA', targetType: 'enemy' };
-            game.logError("Elige al PRIMER enemigo.");
-            game.render();
-        },
-
-        onValidateTarget: function(card, target, game, isSilent = false) {
-            if (target.location !== 'vanguard') {
-                if (!isSilent) game.logError("El objetivo debe estar en la vanguardia.");
-                return false;
-            }
-            if (target.stealth) {
-                if (!isSilent) game.logError(`¡${target.name} está Oculto y no puede ser objetivo!`);
-                return false;
-            }
-            if (game.abilityContext.targets.some(t => t.instanceId === target.instanceId)) {
-                if (!isSilent) game.logError("No puedes atacar al mismo enemigo dos veces.");
-                return false;
-            }
-            return true;
-        },
-
-        onTargetsReady: async function(card, game) {
-            const attacker = card;
-            game.modifyStat(attacker, 'furor', -3);
-            showFloatingText(attacker.instanceId, attacker.activeName, "ft-ability", -30);
-            game.inputState = 'EXECUTING';
-            game.render();
-
-            await game.sleep(800);
-            const targets = game.abilityContext.targets;
-
-            const attackerEl = document.querySelector(`.card[data-id="${attacker.instanceId}"]`);
-            if (attackerEl) { attackerEl.removeAttribute('style'); void attackerEl.offsetWidth; }
-
-            for (let i = 0; i < targets.length; i++) {
-                const target = targets[i];
-                const canAttack = await game.checkAttackStatus(attacker, target);
-                if (!canAttack) {
-                    if (attacker.currentHp <= 0) break; 
-                    continue; 
-                }
-                if (attackerEl) { attackerEl.removeAttribute('style'); void attackerEl.offsetWidth; }
-
-                if (target.currentHp > 0) {
-                    let dodged = false;
-                    const defTemplate = getCardTemplate(target.id);
-                    if (typeof defTemplate.onBeforeDefend === 'function') {
-                        dodged = await defTemplate.onBeforeDefend(target, attacker, game, game.abilityContext.name, true);
-                    }
-                    if (dodged) continue;
-
-                    let dmg = attacker.currentAtk - target.currentDef;
-                    if (dmg <= 0) dmg = 1;
-
-                    // ¡Reutilizamos el nuevo sistema de daño!
-                    await game.dealDamage(attacker, target, dmg, true);
-
-                    await game.sleep(500);
-                    await game.checkDeath(target);
-                }
-            }
-
-            attacker.exhausted = true;
-            game.isActionLocked = false; 
-            game.cancelAction();
-            game.updatePassives();
-            game.render();
-        }
     },
     { 
         id: 12, name: "Manzanahoria", type: "Ayuda", subtype: "Ingerible", tags: ["Consumible"], rarity: "C", text: "Cura 2 de Vida a un aliado.", cost: 0,
@@ -1502,72 +1430,32 @@ const CARD_DB = [
         text: "P: Sus ataques normales cuestan 1 Furor. Inmune al daño de ataques especiales. A: DEVASTACIÓN AGAH (2F): 2 ataques normales al mismo enemigo.",
         passiveName: "ENERGÍA DEMONÍACA", activeName: "DEVASTACIÓN AGAH", activeCost: 2, series: 1,
 
-        canAttackNormally: function(card, game) { return card.furor >= 1; },
-        onBeforeAttack: async function(attacker, defender, game) {
-            if (!game.abilityContext) {
-                if (attacker.furor < 1) return false;
-                game.modifyStat(attacker, 'furor', -1);
-            }
-            return true;
-        },
+        // Migrada (30-jul-2026). "Sus ataques normales cuestan 1 Furor" se parte en dos triggers
+        // ya existentes: PUEDE_ATACAR (canAttackNormally, gatea el clic-y-atacar de siempre,
+        // igual que Muro parlante) + GLOBAL_ANTES_DE_ATAQUE con soloAtacante:"SELF" (descubierto
+        // el 30-jul-2026: ese trigger NO es solo para Eventos, collectAttackInterceptors —§11,
+        // index.html— recorre TODAS las cartas del tablero). soloAtaqueDirecto replica el
+        // `if (!game.abilityContext)` de la vieja: la Activa ya cuesta 2 Furor por su cuenta, no
+        // debe pagar ADEMÁS este coste por ataque. Como PUEDE_ATACAR ya garantiza furor>=1 antes
+        // de que este hook se dispare, el efecto solo necesita restar, no comprobar de nuevo.
+        abilities: [
+            { trigger: "PUEDE_ATACAR", si: { campo: "furor", op: ">=", valor: 1 } },
+            { trigger: "GLOBAL_ANTES_DE_ATAQUE", soloAtacante: "SELF", soloAtaqueDirecto: true,
+              efectos: [ { op: "MODIFICAR_STAT", stat: "furor", delta: -1 } ] },
+            { trigger: "ACTIVA", nombre: "DEVASTACIÓN AGAH", coste: { furor: 2 }, ataqueNormal: true,
+              target: { quien: "ENEMIGO", cantidad: 1 },
+              requisitos: [
+                { count: { quien: "ENEMIGO", zona: "vanguardia", filtros: [ { campo: "stealth", op: "falsy" } ] }, op: ">=", valor: 1,
+                  msg: "No hay enemigos válidos (sin Ocultarse) en la vanguardia para aplicar el ataque." } ],
+              efectos: [ { op: "ATACAR" }, { op: "ATACAR" } ] }
+        ],
         onBeforeTakeDamage: async function(card, attacker, dmg, isSpecial, game) {
             if (isSpecial) {
                 showFloatingText(card.instanceId, "INMUNE AL DAÑO", "ft-ability", -30);
-                return 0; 
+                return 0;
             }
             return dmg;
         },
-        canActivateAbility: function(card, game) {
-            if (card.furor < (card.activeCost || 1)) { game.logError(`Falta Furor.`); return false; }
-            const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
-            
-            // Verificamos que al menos haya un enemigo en vanguardia que NO esté en sigilo
-            const validEnemies = game.players[enemyId].vanguard.filter(c => !c.stealth);
-            
-            if (validEnemies.length === 0) { 
-                game.logError("No hay enemigos válidos (sin Ocultarse) en la vanguardia para aplicar el ataque."); 
-                return false; 
-            }
-            return true;
-        },
-        onExecuteAbility: function(card, game) {
-            game.selectedCard = card;
-            game.inputState = 'SELECT_ABILITY_TARGETS';
-            game.abilityContext = { targets: [], maxTargets: 1, name: 'DEVASTACIÓN AGAH', targetType: 'enemy', isNormalAttack: true };
-            game.render();
-        },
-        onTargetsReady: async function(card, game) {
-            const attacker = card;
-            const targetRef = game.abilityContext.targets[0];
-            game.modifyStat(attacker, 'furor', -2);
-            showFloatingText(attacker.instanceId, attacker.activeName, "ft-ability", -30);
-            game.inputState = 'EXECUTING';
-            game.render();
-            await game.sleep(800);
-
-            for (let i = 1; i <= 2; i++) {
-                // 1. ¿Sigue Agah vivo y en el campo antes del golpe?
-                if (attacker.currentHp <= 0 || (attacker.location !== 'vanguard' && attacker.location !== 'rearguard')) break; 
-                
-                // 2. Refrescamos el objetivo
-                const currentTarget = game.findCard(targetRef.instanceId);
-
-                // 3. ¿Sigue el objetivo vivo Y en el campo?
-                if (currentTarget && (currentTarget.location === 'vanguard' || currentTarget.location === 'rearguard') && currentTarget.currentHp > 0) {
-                    game.logMsg(`¡DEVASTACIÓN AGAH! Golpe ${i}...`, 'ability');
-                    
-                    await game.performAttack(attacker, currentTarget);
-                    await game.sleep(400);
-                } else {
-                    break; // El objetivo murió o desapareció, cancelamos el segundo
-                }
-            }
-            attacker.exhausted = true;
-            game.isActionLocked = false; 
-            game.cancelAction();
-            game.updatePassives();
-            game.render();
-        }
     },
     {
         id: 26, name: "Escudo mágico", type: "Ayuda", subtype: "Técnica", tags: ["Consumible"], rarity: "C",
@@ -2741,52 +2629,30 @@ const CARD_DB = [
     {
         name: "Cañón de positrones", type: "Ayuda", subtype: "Técnica", tags: ["Consumible"], rarity: "A", series: 2, cost: 0,
         text: "Coste: 2 de Furor de un Personaje 'Karlos'. Destruye a un enemigo de la vanguardia o retaguardia rival.",
-        canPlayCard: function(card, game, p) {
-            const hasKarlos = [...p.vanguard, ...p.rearguard].some(c => c.name.includes("Karlos") && c.furor >= 2);
-            if (!hasKarlos) { game.logError("Necesitas un 'Karlos' con al menos 2 de Furor."); return false; }
-            const enemyId = p.id === 'p1' ? 'p2' : 'p1';
-            if (game.players[enemyId].vanguard.length === 0 && game.players[enemyId].rearguard.length === 0) {
-                game.logError("No hay enemigos a los que destruir."); return false;
-            }
-            return true;
-        },
-        onPlay: async function(card, game) {
-            const p = game.players[card.owner];
-            const validKarlos = [...p.vanguard, ...p.rearguard].filter(c => c.name.includes("Karlos") && c.furor >= 2);
-            
-            const chosen = await game.openVisualSearchModal('¿QUIÉN DISPARA EL CAÑÓN? (-2 FUROR)', validKarlos, 1, true, card.owner);
-            if (!chosen || chosen.length === 0) { game.cancelAction(); return; }
-            const payer = chosen[0];
-
-            game.modifyStat(payer, 'furor', -2);
-            showFloatingText(payer.instanceId, "CAÑÓN DE POSITRONES", "ft-ability", -30);
-
-            game.selectedCard = card;
-            game.inputState = 'SELECT_ABILITY_TARGETS';
-            game.abilityContext = { targets: [], maxTargets: 1, name: 'CAÑÓN DE POSITRONES', targetType: 'enemy' };
-            game.isActionLocked = true; 
-            game.logError("Elige al enemigo que será aniquilado.");
-            game.render();
-        },
-        onTargetsReady: async function(card, game) {
-            const target = game.abilityContext.targets[0];
-            const p = game.players[card.owner];
-            
-            game.logMsg(`¡BZZZZT! El Cañón de positrones impacta de lleno en ${target.name}.`, 'ability');
-            const el = document.querySelector(`.card[data-id="${target.instanceId}"]`);
-            if (el) el.classList.add('shaking');
-            await game.sleep(500);
-            
-            target.currentHp = 0;
-            await game.checkDeath(target, false);
-
-            const handIdx = p.hand.findIndex(c => c.instanceId === card.instanceId);
-            if (handIdx !== -1) { p.hand.splice(handIdx, 1); p.discard.push(card); card.location = 'discard'; }
-            
-            game.isActionLocked = false;
-            game.cancelAction();
-            game.render();
-        }
+        // Migrada (30-jul-2026). El pagador (Karlos) pasa del modal genérico (violaba la norma
+        // de targeting en tablero) al objetivo de AL_USAR_AYUDA (reborde verde, como Espada V);
+        // el enemigo se elige con un ELEGIR anidado — SELECT_AYUDA_TARGET solo admite aliados
+        // como objetivo (comprobado en el motor), así que no puede ser al revés. "Destruye"
+        // usa MODIFICAR_STAT con vaciar+comprobarMuerte (el mismo canal de "daño verdadero" de
+        // Granada de maná) más el nuevo flag `sinRetribucion`: la vieja llamaba a
+        // checkDeath(target, false) a mano para NO dar Retribución por ser destrucción directa,
+        // no muerte en combate.
+        abilities: [
+            { trigger: "JUGAR", requisitos: [
+                { count: { filtros: [ { campo: "name", op: "contieneTexto", valor: "Karlos" }, { campo: "furor", op: ">=", valor: 2 } ] }, op: ">=", valor: 1, msg: "Necesitas un 'Karlos' con al menos 2 de Furor." },
+                { count: { de: "ENEMIGOS" }, op: ">=", valor: 1, msg: "No hay enemigos a los que destruir." } ] },
+            { trigger: "AL_USAR_AYUDA",
+              requisitosObjetivo: [
+                { campo: "name", op: "contieneTexto", valor: "Karlos", msg: "Solo un 'Karlos' puede disparar el Cañón de positrones." },
+                { campo: "furor", op: ">=", valor: 2, msg: "{objetivo} necesita al menos 2 de Furor." } ],
+              efectos: [
+                { op: "MODIFICAR_STAT", stat: "furor", delta: -2, floating: { texto: "CAÑÓN DE POSITRONES", estilo: "ft-ability", offset: -30 } },
+                { op: "ELEGIR", de: "ENEMIGOS", cantidad: 1, cancelable: false,
+                  titulo: "Elige al enemigo que será aniquilado",
+                  efectos: [
+                    { op: "MODIFICAR_STAT", stat: "currentHp", vaciar: true, sinRetribucion: true, comprobarMuerte: true,
+                      log: "¡BZZZZT! El Cañón de positrones impacta de lleno en {objetivo}." } ] } ] }
+        ],
     },
     {
         name: "Furia berserker", type: "Ayuda", subtype: "Técnica", tags: ["Equipable"], rarity: "B", series: 1, cost: 0,
@@ -3740,41 +3606,19 @@ const CARD_DB = [
             card.stealth = !card.edrielleExposed;
         },
 
-        canActivateAbility: function(card, game) {
-            if (card.furor < 4) { game.logError("Falta Furor (4)."); return false; }
-            const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
-            if (game.players[enemyId].vanguard.length === 0 && game.players[enemyId].rearguard.length === 0) {
-                game.logError("No hay enemigos en el campo."); return false;
-            }
-            return true;
-        },
-        
-        onExecuteAbility: async function(card, game) {
-            game.modifyStat(card, 'furor', -4);
-            showFloatingText(card.instanceId, card.activeName, "ft-ability", -30);
-            game.logMsg(`¡${card.name} desata una TORMENTA PERFECTA sobre todo el campo enemigo!`, 'ability');
-            
-            game.inputState = 'EXECUTING';
-            game.isActionLocked = true;
-            game.render();
-            await game.sleep(600);
-
-            const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
-            const enemies = [...game.players[enemyId].vanguard, ...game.players[enemyId].rearguard].filter(c => !getCardTemplate(c.id).isAvatar);
-            
-            for (let enemy of enemies) {
-                if (enemy.currentHp > 0) {
-                    game.modifyStat(enemy, 'currentHp', -2);
-                    showFloatingText(enemy.instanceId, "DAÑO VERDADERO", "ft-purple", -30);
-                    await game.checkDeath(enemy);
-                }
-            }
-            
-            card.exhausted = true;
-            game.isActionLocked = false;
-            game.cancelAction();
-            game.render();
-        }
+        // ACTIVA migrada (30-jul-2026): sin selección — daño verdadero a TODOS los enemigos
+        // (vanguardia+retaguardia) de una tacada, vía MODIFICAR_STAT con target:{quien:"ENEMIGO"}
+        // (sin zona = las dos filas) — _runEffectList itera automáticamente sobre TODO el pool
+        // resuelto, así que no hace falta ningún flag de "aplícalo a todos". Excluye Avatares
+        // por defecto (Kami: intocable), igual que el `!isAvatar` a mano de la vieja.
+        abilities: [
+            { trigger: "ACTIVA", nombre: "TORMENTA PERFECTA", coste: { furor: 4 }, sinObjetivo: true,
+              requisitos: [ { count: { quien: "ENEMIGO" }, op: ">=", valor: 1, msg: "No hay enemigos en el campo." } ],
+              log: "¡{carta} desata una TORMENTA PERFECTA sobre todo el campo enemigo!",
+              efectos: [
+                { op: "MODIFICAR_STAT", stat: "currentHp", delta: -2, target: { quien: "ENEMIGO" }, comprobarMuerte: true,
+                  floating: { texto: "DAÑO VERDADERO", estilo: "ft-purple", offset: -30 } } ] }
+        ],
     },
     {
         name: "Némesis", hp: 7, def: 7, atk: 8, type: "Personaje", subtype: "Ser vivo", tags: ["Diosa"], gender: "F", rarity: "S", cost: 2, series: 1,
@@ -6744,31 +6588,17 @@ const CARD_DB = [
             }
             return true; 
         },
-        canActivateAbility: function(card, game) {
-            if (card.furor < 2) { game.logError("Falta Furor (2)."); return false; }
-            const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
-            if (game.players[enemyId].vanguard.length === 0) return false;
-            return true;
-        },
-        onExecuteAbility: function(card, game) {
-            game.selectedCard = card;
-            game.inputState = 'SELECT_ABILITY_TARGETS';
-            game.abilityContext = { targets: [], maxTargets: 1, name: 'ABRAZO VISCOSO', targetType: 'enemy', isNormalAttack: true };
-            game.render();
-        },
-        onTargetsReady: async function(card, game) {
-            const target = game.abilityContext.targets[0];
-            game.modifyStat(card, 'furor', -2);
-            showFloatingText(card.instanceId, card.activeName, "ft-ability", -30);
-            
-            const startHp = target.currentHp;
-            await game.performAttack(card, target);
-            
-            if (target.currentHp < startHp && target.currentHp > 0) {
-                game.logMsg(`¡El líquido envuelve a ${target.name}!`, 'ability');
-                game.applyStatus(target, 'confusion', 2, card.name);
-            }
-        }
+        // ACTIVA migrada (30-jul-2026): ataque normal + Confusión en siExito, mismo esqueleto
+        // que Limo artificial (su propio ABRAZO PEGAJOSO) pero sin la moneda intermedia — aquí
+        // la Confusión se aplica directa si el golpe tiene éxito, sin lanzar nada.
+        abilities: [
+            { trigger: "ACTIVA", nombre: "ABRAZO VISCOSO", coste: { furor: 2 }, ataqueNormal: true,
+              target: { quien: "ENEMIGO", cantidad: 1 },
+              requisitos: [ { count: { quien: "ENEMIGO", zona: "vanguardia" }, op: ">=", valor: 1 } ],
+              efectos: [
+                { op: "ATACAR",
+                  siExito: [ { op: "APLICAR_ESTADO", estado: "confusion", duracion: 2, log: "¡El líquido envuelve a {objetivo}!" } ] } ] }
+        ],
     },
     {
         name: "Matón", hp: 3, def: 3, atk: 4, type: "Esbirro", subtype: "Ser vivo", tags: ["Maleante"], rarity: "C", cost: 1, series: 2,
@@ -6895,40 +6725,22 @@ const CARD_DB = [
             }
             return [];
         },
-        canActivateAbility: function(card, game) {
-            if (card.furor < 3) { game.logError("Falta Furor (3)."); return false; }
-            const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
-            
-            // Filtro Anti-Sigilo añadido
-            const validEnemies = game.players[enemyId].vanguard.filter(c => !c.stealth);
-            if (validEnemies.length === 0) {
-                game.logError("No hay enemigos válidos (sin Ocultarse) en la vanguardia."); 
-                return false;
-            }
-            return true;
-        },
-        onExecuteAbility: function(card, game) {
-            game.selectedCard = card;
-            game.inputState = 'SELECT_ABILITY_TARGETS';
-            game.abilityContext = { targets: [], maxTargets: 1, name: 'ABRAZO PERTURBADOR', targetType: 'enemy', isNormalAttack: true };
-            game.render();
-        },
-        onTargetsReady: async function(card, game) {
-            const target = game.abilityContext.targets[0];
-            game.modifyStat(card, 'furor', -3);
-            showFloatingText(card.instanceId, card.activeName, "ft-ability", -30);
-            showFloatingText(card.instanceId, "+4 ATQ", "ft-green", -10);
-            
-            const startHp = target.currentHp;
-            card.currentAtk += 4;
-            await game.performAttack(card, target);
-            card.currentAtk -= 4;
-            
-            if (target.currentHp < startHp && target.currentHp > 0) {
-                game.logMsg(`¡La inmensa viscosidad satura los sentidos de ${target.name}!`, 'ability');
-                game.applyStatus(target, 'confusion', 2, card.name);
-            }
-        }
+        // ACTIVA migrada (30-jul-2026): mismo esqueleto que Limo crecido/ABRAZO VISCOSO, con
+        // bonoAtq:4 (arregla de encima el mismo bug de doble resta de Hiposaurio/Hawke/Guardia:
+        // la vieja hacía "currentAtk += 4; performAttack; currentAtk -= 4" y performAttack ya
+        // llama a updatePassives() por dentro) y el filtro anti-sigilo que SÍ lleva esta carta
+        // (a diferencia de Limo crecido, que no lo tenía).
+        abilities: [
+            { trigger: "ACTIVA", nombre: "ABRAZO PERTURBADOR", coste: { furor: 3 }, ataqueNormal: true,
+              target: { quien: "ENEMIGO", cantidad: 1 },
+              requisitos: [
+                { count: { quien: "ENEMIGO", zona: "vanguardia", filtros: [ { campo: "stealth", op: "falsy" } ] }, op: ">=", valor: 1,
+                  msg: "No hay enemigos válidos (sin Ocultarse) en la vanguardia." } ],
+              floatingExtra: [ { texto: "+4 ATQ", estilo: "ft-green", offset: -10 } ],
+              efectos: [
+                { op: "ATACAR", bonoAtq: 4,
+                  siExito: [ { op: "APLICAR_ESTADO", estado: "confusion", duracion: 2, log: "¡La inmensa viscosidad satura los sentidos de {objetivo}!" } ] } ] }
+        ],
     },
     {
         name: "Gárgola", hp: 6, def: 4, atk: 4, type: "Esbirro", subtype: "Ser mágico", tags: ["Monstruo"], rarity: "A", cost: 1, series: 2,
@@ -7138,7 +6950,7 @@ const DSL = {
     // devuelve al motor de combate (redirigir el ataque, cancelarlo, drenar Furor
     // tras él, fijar el daño, autoataque del atacante).
     OPS_EFECTO: ['MODIFICAR_STAT', 'CURAR', 'DAÑO', 'APLICAR_ESTADO', 'MODIFICAR_CONTADORES', 'ATACAR', 'MONEDA', 'ROBAR', 'BUSCAR', 'MARCAR', 'VER_MANO', 'LIMPIAR_ESTADOS', 'ELEGIR', 'DESTRUIR_EVENTO', 'MARCAR_TEMPORAL', 'DESCARTAR', 'EQUIPAR', 'MARCAR_JUGADOR', 'FLOTANTE', 'FIJAR_STAT', 'REDIRIGIR', 'CANCELAR_ATAQUE', 'MARCAR_DRENAJE', 'FIJAR_DAÑO', 'ATACANTE_SE_AUTOATACA', 'VOLVER_A_MANO', 'RETRIBUCION', 'SUELO_STAT', 'TECHO_STAT'],
-    OPS_CMP: ['==', '!=', '<=', '>=', '<', '>', 'includes', 'truthy', 'falsy'],
+    OPS_CMP: ['==', '!=', '<=', '>=', '<', '>', 'includes', 'contieneTexto', 'includesCI', 'truthy', 'falsy'],
     QUIEN: ['SELF', 'ALIADO', 'ENEMIGO', 'TODOS', 'ATACANTE', 'DEFENSOR'], // ATACANTE/DEFENSOR: solo en GLOBAL_TRAS_ATAQUE y REACCION
 
     _tmpl(id) { return (typeof getCardTemplate === 'function') ? getCardTemplate(id) : CARD_DB.find(c => c.id === id); },
@@ -7399,7 +7211,11 @@ const DSL = {
             game.modifyStat(target, e.stat, d, e.offsetY || 0, e.fuente !== undefined ? e.fuente : sourceCard);
             if (e.floating && typeof showFloatingText === 'function') showFloatingText(target.instanceId, String(e.floating.texto).split('{delta}').join(Math.abs(d)), e.floating.estilo || 'ft-green', e.floating.offset !== undefined ? e.floating.offset : -20);
             if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: DSL._nombre(game, target), antes, despues: target[e.stat] }), 'ability');
-            if (e.comprobarMuerte) await game.checkDeath(target);
+            // sinRetribucion (Cañón de positrones/Kami, 30-jul-2026): "destrucción" directa, no
+            // muerte en combate — la vieja llamaba a checkDeath(target, false) a mano para que
+            // la víctima NO diera Retribución. comprobarMuerte por defecto SÍ la da (checkDeath
+            // por defecto triggerRetribution=true); este flag replica el caso sin ella.
+            if (e.comprobarMuerte) await game.checkDeath(target, !e.sinRetribucion);
             return true;
         }
         if (e.op === 'CURAR') {
@@ -7498,7 +7314,21 @@ const DSL = {
                     }
                 }
             } else {
+                // Bug real de motor encontrado y corregido, no replicado (Agah, 30-jul-2026):
+                // performAttack SIEMPRE pone game.abilityContext = null al terminar, asumiendo
+                // que es el ÚNICO ataque de la acción en curso — cierto para cualquier Activa de
+                // un solo golpe, falso para "N ataques normales" (Agah, Wolfgang, Kazuo, Zoe
+                // calcinante...) que llaman a ATACAR varias veces en la misma lista de efectos.
+                // Para Agah en concreto esto era observable: su propia Pasiva de coste-por-ataque
+                // mira game.abilityContext para saber si el golpe viene de su Activa (sin coste
+                // extra) o es un ataque suelto (cuesta 1 Furor); con el contexto ya a null tras
+                // el primer golpe, el 2º se trataba como suelto — bloqueado en seco si el Furor
+                // ya estaba a 0 tras pagar el coste de la Activa, o cobrado de más si sobraba
+                // Furor. Se restaura el contexto tras cada performAttack para que el RESTO de la
+                // lista de efectos (el 2º ATACAR) siga viendo la Activa en curso.
+                const _ctxPrevio = game.abilityContext;
                 await game.performAttack(sourceCard, target);
+                game.abilityContext = _ctxPrevio;
             }
             if (bono) { if (typeof game.updatePassives === 'function') game.updatePassives(); else sourceCard.currentAtk -= bono; }
             const exito = target.currentHp < startHp && target.currentHp > 0; // dañó y sigue vivo
@@ -8700,13 +8530,26 @@ const DSL = {
             };
         }
 
-        // GLOBAL_ANTES_DE_ATAQUE -> onGlobalBeforeAttack (eventos): intercepta cualquier ataque; devuelve permitir/bloquear.
+        // GLOBAL_ANTES_DE_ATAQUE -> onGlobalBeforeAttack: intercepta cualquier ataque; devuelve
+        // permitir/bloquear. NO es solo para Eventos: collectAttackInterceptors (§11, index.html)
+        // recorre TAMBIÉN las cartas del tablero, así que una Pasiva normal puede engancharse
+        // aquí igual que un Evento (descubierto el 30-jul-2026 al revisar Agah).
         const antesAtaque = abs.find(a => a.trigger === 'GLOBAL_ANTES_DE_ATAQUE');
         if (antesAtaque && typeof tmpl.onGlobalBeforeAttack !== 'function') {
             tmpl.onGlobalBeforeAttack = async function (ev, attacker, defender, game) {
                 if ((getCardTemplate(attacker.id) || {}).isAvatar || (defender && (getCardTemplate(defender.id) || {}).isAvatar)) return true; // Kami: ni monedas ni vetos de Eventos
                 if (antesAtaque.soloAtacante === 'PROPIO' && attacker.owner !== ev.owner) return true;
                 if (antesAtaque.soloAtacante === 'RIVAL' && attacker.owner === ev.owner) return true;
+                // SELF (Agah, 30-jul-2026): a diferencia de PROPIO/RIVAL (miran el DUEÑO), esto
+                // exige que la ATACANTE sea esta misma instancia — para una Pasiva de una carta
+                // normal que solo debe reaccionar a SUS PROPIOS ataques, no a los de cualquier
+                // aliado suyo.
+                if (antesAtaque.soloAtacante === 'SELF' && attacker.instanceId !== ev.instanceId) return true;
+                // soloAtaqueDirecto (Agah): la Pasiva de coste-por-ataque NO se aplica cuando el
+                // ataque viene de una Activa (game.abilityContext presente) — DEVASTACIÓN AGAH ya
+                // tiene su propio coste en Furor; replica el `if (!game.abilityContext)` a mano
+                // de la vieja.
+                if (antesAtaque.soloAtaqueDirecto && game.abilityContext) return true;
                 if (antesAtaque.exentoPlantilla) {
                     const at = DSL._tmpl(attacker.id);
                     if (at && at[antesAtaque.exentoPlantilla]) return true; // p. ej. Simon con immuneToApagon
