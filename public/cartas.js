@@ -3353,6 +3353,7 @@ const CARD_DB = [
                   logSiVacio: "¡{pagador} lanza la Granada de maná, pero no hay objetivos en vanguardia!",
                   logAntes: "¡{pagador} hace explotar la Granada de maná!",
                   efectos: [ { op: "MODIFICAR_STAT", stat: "currentHp", delta: -1, comprobarMuerte: true,
+                               animacion: "DANO_VERDADERO",
                                floating: { texto: "DAÑO VERDADERO", estilo: "ft-purple", offset: -30 } } ] } ] }
         ],
     },
@@ -3580,9 +3581,16 @@ const CARD_DB = [
                 const results = await game.triggerCoinFlips(1, card.owner);
                 
                 if (results && results[0] === 'tails') {
+                    card.edrielleExposed = true; // Marca que anula el sigilo
                     game.logMsg(`Moneda: CRUZ - ¡${card.name} queda expuesta a plena vista!`, 'ability');
                     showFloatingText(card.instanceId, "EXPUESTA", "ft-red-stat", -30);
-                    card.edrielleExposed = true; // Marca que anula el sigilo
+                    // Fix (betasteo de Toto, 30-jul-2026): el badge de Oculto lo pinta render() a
+                    // partir de card.stealth, y ese campo SOLO se recalcula en onUpdatePassive —
+                    // sin este refresco explícito el badge aguantaba puesto hasta la siguiente
+                    // pasada natural (Fase principal), o sea que el log y el flotante cantaban
+                    // "EXPUESTA" mientras la carta seguía marcada como Oculta en el tablero.
+                    game.updatePassives();
+                    game.render();
                 } else {
                     game.logMsg(`Moneda: CARA - ¡${card.name} logra mantenerse oculta en las sombras!`, 'neutral');
                     card.edrielleExposed = false;
@@ -3617,6 +3625,7 @@ const CARD_DB = [
               log: "¡{carta} desata una TORMENTA PERFECTA sobre todo el campo enemigo!",
               efectos: [
                 { op: "MODIFICAR_STAT", stat: "currentHp", delta: -2, target: { quien: "ENEMIGO" }, comprobarMuerte: true,
+                  animacion: "DANO_VERDADERO",
                   floating: { texto: "DAÑO VERDADERO", estilo: "ft-purple", offset: -30 } } ] }
         ],
     },
@@ -7617,8 +7626,9 @@ const DSL = {
                 if (e.guardaEn) { DSL._vars = DSL._vars || {}; const _vg = (DSL._vars[sourceCard.instanceId] = DSL._vars[sourceCard.instanceId] || {}); _vg[e.guardaEn] = DSL._nombre(game, pool[0]); _vg[e.guardaEn + 'G'] = pool[0].gender; }
                 _guarda(pool);
                 _logAntes(pool);
+                const _animA = await DSL._animarLote(e.efectos, sourceCard, game, pool);
                 for (const t of pool) {
-                    const r = await DSL._runEffectList(e.efectos || [], sourceCard, game, ownerId, [t], habilidad);
+                    const r = await DSL._runEffectList(e.efectos || [], sourceCard, game, ownerId, [t], habilidad, _animA ? { sinAnimacion: true } : null);
                     if (r && r.ok === false) return false;
                 }
                 if (e.logDespues) game.logMsg(F(e.logDespues), e.logDespuesTipo || 'ability');
@@ -7641,8 +7651,9 @@ const DSL = {
                 if (e.guardaEn && sel[0]) { DSL._vars = DSL._vars || {}; const _vg = (DSL._vars[sourceCard.instanceId] = DSL._vars[sourceCard.instanceId] || {}); _vg[e.guardaEn] = DSL._nombre(game, sel[0]); _vg[e.guardaEn + 'G'] = sel[0].gender; }
                 _guarda(sel);
                 _logAntes(sel);
+                const _animB = await DSL._animarLote(e.efectos, sourceCard, game, sel);
                 for (const t of sel) {
-                    const r = await DSL._runEffectList(e.efectos || [], sourceCard, game, ownerId, [t], habilidad);
+                    const r = await DSL._runEffectList(e.efectos || [], sourceCard, game, ownerId, [t], habilidad, _animB ? { sinAnimacion: true } : null);
                     if (r && r.ok === false) return false;
                 }
                 if (e.logDespues) game.logMsg(F(e.logDespues), e.logDespuesTipo || 'ability');
@@ -7662,8 +7673,9 @@ const DSL = {
             if (e.guardaEn && sel[0]) { DSL._vars = DSL._vars || {}; const _vg = (DSL._vars[sourceCard.instanceId] = DSL._vars[sourceCard.instanceId] || {}); _vg[e.guardaEn] = DSL._nombre(game, sel[0]); _vg[e.guardaEn + 'G'] = sel[0].gender; }
             _guarda(sel);
             _logAntes(sel);
+            const _animC = await DSL._animarLote(e.efectos, sourceCard, game, sel);
             for (const t of sel) {
-                const r = await DSL._runEffectList(e.efectos || [], sourceCard, game, ownerId, [t], habilidad);
+                const r = await DSL._runEffectList(e.efectos || [], sourceCard, game, ownerId, [t], habilidad, _animC ? { sinAnimacion: true } : null);
                 if (r && r.ok === false) return false;
             }
             if (e.logDespues) game.logMsg(F(e.logDespues), e.logDespuesTipo || 'ability');
@@ -7733,7 +7745,34 @@ const DSL = {
         return true;
     },
 
-    async _runEffectList(efectos, sourceCard, game, ownerId, fallbackTargets, habilidad) {
+    // ¿Sobre qué carta del TABLERO se ancla la animación de un efecto? La fuente, si está
+    // en juego (Habilidades: Edrielle y su TORMENTA PERFECTA). Si la fuente es una Ayuda,
+    // no sirve: se juega desde la mano y va directa al descarte, así que no tiene ninguna
+    // carta en el tablero que animar — ahí canaliza QUIEN PAGA el coste, que el compilador
+    // de AL_USAR_AYUDA deja anotado en __pagador. Devuelve null si no hay a qué anclarse
+    // (la animación se salta sola y el efecto sigue su curso).
+    _lanzador(sourceCard) {
+        if (!sourceCard) return null;
+        if (sourceCard.location === 'vanguard' || sourceCard.location === 'rearguard') return sourceCard.instanceId;
+        const v = (DSL._vars || {})[sourceCard.instanceId];
+        return (v && v.__pagador) || null;
+    },
+
+    // ELEGIR corre sus efectos UNA VEZ POR ELEGIDO (ver los tres bucles `for (const t of
+    // sel)`), así que una animación declarada ahí dentro se recanalizaría en cada objetivo
+    // — Granada de maná con 2 elegidos disparaba dos casteos seguidos. Esto la saca fuera
+    // del bucle: se anima el LOTE entero de una vez y luego se le dice a _runEffectList que
+    // no la repita. Devuelve el efecto animado (o null) para que la supresión sea PRECISA:
+    // si la animación vive más adentro (otro ELEGIR, un siExito), aquí no se encuentra, no
+    // se suprime nada y la anima quien corresponda.
+    async _animarLote(efectos, sourceCard, game, lista) {
+        const e = (efectos || []).find(x => x.animacion === 'DANO_VERDADERO');
+        if (!e || !lista || !lista.length || typeof animateTrueDamage !== 'function') return null;
+        await animateTrueDamage(DSL._lanzador(sourceCard), lista.map(t => t.instanceId));
+        return e;
+    },
+
+    async _runEffectList(efectos, sourceCard, game, ownerId, fallbackTargets, habilidad, opts) {
         let anyApplied = false;
         for (const e of (efectos || [])) {
             if (e.if && !DSL._cond(sourceCard, game, e.if)) continue; // condición evaluada sobre la carta fuente
@@ -7745,6 +7784,15 @@ const DSL = {
             const tspec = e.target;
             const targets = (!tspec || tspec === 'OBJETIVO') ? (Array.isArray(fallbackTargets) ? fallbackTargets : [fallbackTargets]) : DSL._pool(ownerId, game, tspec, sourceCard);
             if (!targets.length && e.logSiVacio) game.logMsg(DSL._fill(e.logSiVacio, Object.assign({}, (DSL._vars && DSL._vars[sourceCard.instanceId]) || {}, { carta: sourceCard.name })), e.logSiVacioTipo || 'system');
+            // Animación declarativa de efecto (Toto, 30-jul-2026). Va AQUÍ y no dentro de
+            // _doEffect a propósito: aquí la lista de objetivos ya está resuelta ENTERA, así
+            // que el "casteo" suena UNA sola vez y los impactos se reparten entre todos —
+            // TORMENTA PERFECTA golpea a todo el campo enemigo y con un enganche por objetivo
+            // se habría recanalizado en cada uno. Corre ANTES del daño para que los números
+            // salgan como consecuencia del impacto, no antes que él.
+            if (e.animacion === 'DANO_VERDADERO' && targets.length && !(opts && opts.sinAnimacion) && typeof animateTrueDamage === 'function') {
+                await animateTrueDamage(DSL._lanzador(sourceCard), targets.map(t => t.instanceId));
+            }
             for (const t of targets) {
                 const r = await DSL._doEffect(e, sourceCard, t, game, ownerId, habilidad);
                 if (r === false) return { ok: false, anyApplied };
@@ -8183,6 +8231,10 @@ const DSL = {
                         return false;
                     }
                 }
+                // Anotamos QUIÉN PAGA para que las animaciones de efecto puedan anclarse en
+                // una carta del tablero: la Ayuda en sí no tiene ninguna (ver DSL._lanzador).
+                DSL._vars = DSL._vars || {};
+                (DSL._vars[card.instanceId] = DSL._vars[card.instanceId] || {}).__pagador = target.instanceId;
                 const res = await DSL._runEffectList(usar.efectos, card, game, card.owner, [target]);
                 return res.ok;
             };

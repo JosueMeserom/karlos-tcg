@@ -325,6 +325,103 @@ body {
     animation: siBurst 0.55s ease-out forwards;
 }
 
+/* --- DAÑO VERDADERO (Toto, 30-jul-2026) -------------------------------------
+   Tercer lenguaje de combate, junto al ataque normal (embestida + hardShake) y al
+   especial (canalización + anillos que colapsan). El daño verdadero IGNORA LA DEF,
+   así que la metáfora es ATRAVESAR, no estallar: geometría AFILADA (una lanza que
+   cruza la carta, un corte recto) frente a los anillos redondos del especial. La
+   paleta es blanco incandescente con reborde magenta — emparentada con el flotante
+   ft-purple que ya rotula "DAÑO VERDADERO", pero mucho más blanca y dura que el
+   violeta/cian del ataque especial. Nunca roja: el rojo sigue siendo la señal de
+   daño físico recibido.
+   COMPACTO A PROPÓSITO: TORMENTA PERFECTA puede golpear a 9 cartas de una tacada,
+   así que cada impacto ocupa poco más que el ancho de una carta y dura poco. */
+
+/* Canalización de quien lo provoca: MISMOS valores de transform que castCharge (Toto
+   pidió "el mismo tambaleo"), cambiando solo la energía: blanco/magenta en vez de
+   violeta/cian. */
+@keyframes trueCharge {
+    0%   { transform: scale(1)    translate(0, 0);       filter: brightness(1); }
+    12%  { transform: scale(1.03) translate(-2px, 1px); }
+    24%  { transform: scale(1.05) translate(2px, -1px); }
+    36%  { transform: scale(1.07) translate(-2px, -1px); filter: brightness(1.3) drop-shadow(0 0 6px rgba(232, 121, 249, 0.75)); }
+    48%  { transform: scale(1.09) translate(2px, 1px); }
+    60%  { transform: scale(1.11) translate(-1px, -1px); filter: brightness(1.65) drop-shadow(0 0 11px rgba(240, 171, 252, 0.9)); }
+    74%  { transform: scale(1.13) translate(1px, 1px);   filter: brightness(2) drop-shadow(0 0 16px rgba(255, 255, 255, 0.98)); }
+    86%  { transform: scale(0.94) translate(0, 0);       filter: brightness(1.3) drop-shadow(0 0 8px rgba(232, 121, 249, 0.6)); } /* descarga */
+    100% { transform: scale(1)    translate(0, 0);       filter: brightness(1); }
+}
+
+.card-wrapper.channeling-true, .card.channeling-true {
+    animation: trueCharge 0.45s ease-in-out;
+    z-index: 900;
+}
+
+/* Columna de luz que sube de quien canaliza (ocupa el sitio de los anillos del especial) */
+@keyframes tcBeam {
+    0%   { transform: translate(-50%, -100%) scaleY(0)   scaleX(1);   opacity: 0; }
+    30%  { transform: translate(-50%, -100%) scaleY(1)   scaleX(1);   opacity: 0.95; }
+    70%  { transform: translate(-50%, -100%) scaleY(1.1) scaleX(0.55); opacity: 0.8; }
+    100% { transform: translate(-50%, -100%) scaleY(0.1) scaleX(0.2); opacity: 0; }
+}
+
+.true-cast { position: fixed; pointer-events: none; z-index: 1150; }
+.true-cast .tc-beam {
+    position: absolute; left: 0; top: 0;
+    width: 10px; height: 78px;
+    transform: translate(-50%, -100%);
+    transform-origin: 50% 100%;
+    background: linear-gradient(to top, rgba(255, 255, 255, 0.95), rgba(240, 171, 252, 0.75) 45%, rgba(232, 121, 249, 0) 100%);
+    box-shadow: 0 0 14px rgba(232, 121, 249, 0.9);
+    animation: tcBeam 0.45s ease-out forwards;
+}
+
+/* Lanza que atraviesa la carta golpeada de arriba abajo */
+@keyframes tiLance {
+    0%   { transform: translate(-50%, -170%) scaleY(0.35); opacity: 0; }
+    18%  { opacity: 1; }
+    55%  { transform: translate(-50%, -50%)  scaleY(1);    opacity: 1; }
+    100% { transform: translate(-50%, -20%)  scaleY(0.5);  opacity: 0; }
+}
+
+/* Corte horizontal: la Def partiéndose en el momento del impacto */
+@keyframes tiCrack {
+    0%, 40% { transform: translate(-50%, -50%) scaleX(0);    opacity: 0; }
+    55%     { transform: translate(-50%, -50%) scaleX(1);    opacity: 1; }
+    100%    { transform: translate(-50%, -50%) scaleX(1.25); opacity: 0; }
+}
+
+@keyframes tiFlash {
+    0%, 42% { transform: translate(-50%, -50%) scale(0);   opacity: 0; }
+    56%     { transform: translate(-50%, -50%) scale(1);   opacity: 0.95; }
+    100%    { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
+}
+
+.true-impact { position: fixed; pointer-events: none; z-index: 1200; }
+/* Mismo motivo que el transform base de .special-impact: que nazcan centrados desde
+   el frame 0 y no salten al arrancar el keyframe. */
+.true-impact > div { position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); }
+
+.true-impact .ti-lance {
+    width: 7px; height: 104px;
+    background: linear-gradient(to bottom, rgba(232, 121, 249, 0) 0%, rgba(255, 255, 255, 0.98) 35%, #ffffff 55%, rgba(240, 171, 252, 0.85) 78%, rgba(232, 121, 249, 0) 100%);
+    box-shadow: 0 0 16px rgba(232, 121, 249, 0.95);
+    animation: tiLance 0.42s cubic-bezier(0.3, 0, 0.2, 1) forwards;
+}
+
+.true-impact .ti-crack {
+    width: 92px; height: 3px;
+    background: linear-gradient(to right, rgba(232, 121, 249, 0) 0%, #ffffff 50%, rgba(232, 121, 249, 0) 100%);
+    box-shadow: 0 0 12px rgba(240, 171, 252, 0.9);
+    animation: tiCrack 0.45s ease-out forwards;
+}
+
+.true-impact .ti-flash {
+    width: 46px; height: 46px; border-radius: 50%;
+    background: radial-gradient(circle, #ffffff 0%, rgba(240, 171, 252, 0.8) 40%, rgba(232, 121, 249, 0) 72%);
+    animation: tiFlash 0.45s ease-out forwards;
+}
+
 @keyframes splitTop {
     0% { transform: translateY(0) rotate(0); opacity: 1; }
     100% { transform: translateY(-20px) translateX(-10px) rotate(-15deg); opacity: 0; }

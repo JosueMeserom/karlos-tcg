@@ -31,6 +31,32 @@ const escenarios = [
         p2: {},
         pasos: [ { habilidad: 'Edrielle' } ],
     },
+    {
+        // Control de NO-regresión del fix del badge de Oculto (betasteo de Toto,
+        // 30-jul-2026). El fix es puramente de REPINTADO: la vieja no refrescaba tras
+        // marcar edrielleExposed, así que el badge de Oculto aguantaba puesto hasta la
+        // pasada natural de Fase principal aunque el log y el flotante ya cantaran
+        // "EXPUESTA". El harness NO puede ver ese bug -solo captura estado final, y ahí
+        // ambas bases coinciden porque el updatePassives natural llega igualmente-;
+        // verificado aparte con un probe que instrumenta render() (vieja: 0 repintados
+        // durante onStartTurn, stealth sigue true al salir; nueva: 1 repintado con
+        // stealth ya false). Este escenario existe para garantizar lo que el harness SÍ
+        // puede garantizar: que el refresco extra no cambia NADA del estado de juego.
+        nombre: 'BELLEZA INCOMPARABLE, cruz: queda expuesta (control de que el fix del badge no toca el estado)',
+        turno: 2, turnoDe: 'p2', empieza: 'p1',
+        p1: { vanguardia: [ { carta: 'Edrielle', furor: 0 } ] },
+        p2: { vanguardia: ['Mini-tigre'] },
+        monedas: ['cruz'],
+        pasos: [ { finTurno: true } ],
+    },
+    {
+        nombre: 'BELLEZA INCOMPARABLE, cara: se mantiene Oculta',
+        turno: 2, turnoDe: 'p2', empieza: 'p1',
+        p1: { vanguardia: [ { carta: 'Edrielle', furor: 0 } ] },
+        p2: { vanguardia: ['Mini-tigre'] },
+        monedas: ['cara'],
+        pasos: [ { finTurno: true } ],
+    },
 ];
 
 correrSuite('regresion41', escenarios);

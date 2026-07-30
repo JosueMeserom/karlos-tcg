@@ -825,15 +825,12 @@
         //   3. Poco ANTES de que ese impacto termine, entra el tambaleo de recibir daño de
         //      siempre (hardShake + borde rojo), así que el golpe se lee como consecuencia.
         // De aquí en adelante todo es idéntico al ataque normal (daño, logs, muerte...).
-        // PENDIENTE (Toto, 28-jul-2026, corregido tras su primer betasteo): cuando se migre
-        // Atomización, dar a las Ayudas dirigidas a un enemigo (con coste de Furor de un aliado
-        // o la acción de un aliado) su propia variante — el "casteo" lo hace QUIEN PAGA (la
-        // carta en el tablero que suelta el Furor o la acción), no la Ayuda en sí (que ni
-        // siquiera tiene una carta en el tablero a la que anclar la animación: se juega desde la
-        // mano y va directa al descarte). El impacto sobre el objetivo debe evocar algo físico o
-        // algo mágico/elemental según la Ayuda concreta (Atomización sería del segundo tipo,
-        // reutilizable el mismo .special-impact de aquí). El tiempo 3 (tambaleo de daño) y todo
-        // lo posterior, igual que en el ataque especial.
+        // La variante para AYUDAS que quedó pendiente aquí el 28-jul-2026 existe desde el
+        // 30-jul-2026: es animateTrueDamage (más abajo), que ancla el "casteo" en QUIEN PAGA
+        // cuando la fuente es una Ayuda —la Ayuda se juega desde la mano y no tiene carta en
+        // el tablero a la que anclarse—. De momento la usan las cartas de DAÑO VERDADERO
+        // (Granada de maná, TORMENTA PERFECTA); Atomización, cuando se migre, puede reutilizar
+        // ese mismo anclaje aunque quiera otro impacto.
         async function animateSpecialAttack(attackerId, defenderId) {
             const attackerEl = getAnimEl(attackerId);
             const defenderEl = getAnimEl(defenderId);
@@ -875,6 +872,81 @@
             }
             attackerEl.style.transform = "";
             attackerEl.style.zIndex = "";
+        }
+
+        // Daño VERDADERO (Toto, 30-jul-2026). Tercer lenguaje de combate, junto al ataque
+        // normal (embestida) y al especial (canalización + anillos). Dos tiempos:
+        //   1. Quien lo provoca canaliza EN SU SITIO con el MISMO tambaleo del especial
+        //      (trueCharge copia los transform de castCharge, ver global.css), pero con
+        //      energía blanca/magenta y una columna de luz vertical en lugar de los anillos.
+        //      "Quien lo provoca" es la carta de la Habilidad (Edrielle) o, si es una Ayuda,
+        //      la carta que PAGA el coste — la Ayuda se juega desde la mano y no tiene nada
+        //      en el tablero a lo que anclar la animación. Esto cierra el PENDIENTE que
+        //      quedó anotado arriba en animateSpecialAttack sobre las Ayudas.
+        //   2. El impacto cae sobre CADA objetivo: lanza que atraviesa la carta, corte
+        //      horizontal y fogonazo pequeño. Afilado (atraviesa la Def), no redondo. Los
+        //      objetivos van escalonados ~70 ms para que una TORMENTA PERFECTA a tablero
+        //      lleno se lea como un barrido y no como un único borrón.
+        // El tambaleo de daño (hardShake + borde rojo) se mantiene IGUAL que en el resto de
+        // ataques: es la señal universal de "he recibido daño", compartida por el normal, el
+        // especial y el verdadero. Lo que cambia es el impacto, no la consecuencia.
+        // Sin DOM (harness) getAnimEl devuelve null y toda la función es inerte.
+        async function animateTrueDamage(casterId, targetIds) {
+            const ids = (Array.isArray(targetIds) ? targetIds : [targetIds]).filter(Boolean);
+
+            // 1. Canalización de quien lo provoca
+            const casterEl = casterId ? getAnimEl(casterId) : null;
+            if (casterEl) {
+                const cRect = (document.querySelector(`.card[data-id="${casterId}"]`) || casterEl).getBoundingClientRect();
+                casterEl.classList.add('channeling-true');
+                const cast = document.createElement('div');
+                cast.className = 'true-cast';
+                cast.style.left = `${cRect.left + cRect.width / 2}px`;
+                cast.style.top = `${cRect.top}px`;
+                cast.innerHTML = '<div class="tc-beam"></div>';
+                document.body.appendChild(cast);
+                await game.sleep(450);
+                casterEl.classList.remove('channeling-true');
+                cast.remove();
+            }
+
+            // 2. Impacto sobre cada objetivo, escalonado
+            const tocados = [];
+            for (const id of ids) {
+                const el = getAnimEl(id);
+                if (!el) continue;
+                const cardEl = document.querySelector(`.card[data-id="${id}"]`);
+                const rect = (cardEl || el).getBoundingClientRect();
+                const fx = document.createElement('div');
+                fx.className = 'true-impact';
+                fx.style.left = `${rect.left + rect.width / 2}px`;
+                fx.style.top = `${rect.top + rect.height / 2}px`;
+                fx.innerHTML = '<div class="ti-lance"></div><div class="ti-crack"></div><div class="ti-flash"></div>';
+                document.body.appendChild(fx);
+                tocados.push({ fx, el, cardEl });
+                if (ids.length > 1) await game.sleep(70);
+            }
+            if (!tocados.length) return;
+
+            // 3. Tambaleo de daño, igual que en cualquier otro ataque
+            await game.sleep(220);
+            tocados.forEach(({ el, cardEl }) => {
+                if (el) el.style.animation = "hardShake 0.3s ease-out";
+                if (cardEl) {
+                    cardEl.style.borderColor = "red";
+                    cardEl.style.boxShadow = "0 0 20px red inset";
+                }
+            });
+
+            await game.sleep(300);
+            tocados.forEach(({ fx, el, cardEl }) => {
+                fx.remove();
+                if (el) el.style.animation = "";
+                if (cardEl) {
+                    cardEl.style.borderColor = "";
+                    cardEl.style.boxShadow = "";
+                }
+            });
         }
 
         async function animateDodge(attackerId, defenderId) {
