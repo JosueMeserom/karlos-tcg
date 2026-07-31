@@ -3400,20 +3400,20 @@ const CARD_DB = [
             }
             return false;
         },
-        onBeforeAttack: async function(attacker, defender, game) {
-            attacker._enemyHpBefore = defender.currentHp;
-            return true;
-        },
-        onAfterAttack: async function(attacker, defender, game) {
-            if (attacker._enemyHpBefore !== undefined) {
-                const dmgDealt = attacker._enemyHpBefore - defender.currentHp;
-                if (dmgDealt >= 1 && attacker.currentHp < attacker.maxHp) {
-                    game.modifyStat(attacker, 'currentHp', 1, -20, 'chupaalmas');
-                    game.logMsg(`¡CHUPAALMAS! ${attacker.name} devora la energía vital y se cura 1 de Vida.`, 'healing');
-                }
-                delete attacker._enemyHpBefore;
-            }
-        },
+        // CHUPAALMAS migrada (31-jul-2026) con la extensión `siDanoMinimo` de TRAS_ATACAR
+        // (umbral EXACTO, no solo "dañó algo" — el suelo de daño de 0.5, Esbirro-vs-Personaje,
+        // no llega al ">= 1 Vida" que exige el texto) y `target:{quien:"SELF"}` (se cura a sí
+        // mismo, no al defensor, que es el objetivo implícito por defecto de TRAS_ATACAR).
+        // COMA se queda imperativa: usa `canStopEarly` (parar en 0/1/2 objetivos), el mismo
+        // patrón ya evaluado y descartado para SANCIÓN (Ángel) — no compensa arquitectura
+        // nueva para una carta suelta, decisión ya cerrada, no reabrir sin motivo nuevo.
+        abilities: [
+            { trigger: "TRAS_ATACAR", nombre: "CHUPAALMAS", soloAtaqueNormal: true, siDanoMinimo: 1,
+              efectos: [
+                { op: "MODIFICAR_STAT", stat: "currentHp", delta: 1, offsetY: -20, target: { quien: "SELF" },
+                  ifObjetivo: { campo: "currentHp", op: "<", valorCampo: "maxHp" },
+                  log: "¡CHUPAALMAS! {carta} devora la energía vital y se cura 1 de Vida.", logTipo: "healing" } ] }
+        ],
         canActivateAbility: function(card, game) {
             if (card.furor < 4) { game.logError("Falta Furor (4)."); return false; }
             const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
@@ -8341,7 +8341,7 @@ const DSL = {
 
             tmpl.onBeforeAttack = async function (attacker, defender, game) {
                 attacker._dslBonoAtaque = 0;
-                if (trasAtacar && trasAtacar.soloSiDaño) attacker._dslHpEnemigoAntes = defender ? defender.currentHp : undefined;
+                if (trasAtacar && (trasAtacar.soloSiDaño || typeof trasAtacar.siDanoMinimo === 'number')) attacker._dslHpEnemigoAntes = defender ? defender.currentHp : undefined;
                 if (!antesAtacar) return true;
                 if (antesAtacar.soloAtaqueNormal && !_esNormal(game)) return true;
                 if (antesAtacar.si && !DSL._cond(attacker, game, antesAtacar.si)) return true;
@@ -8365,6 +8365,12 @@ const DSL = {
                 if (trasAtacar.soloAtaqueNormal && !_esNormal(game)) return;
                 if (trasAtacar.soloSiDaño) {
                     if (hpAntes === undefined || !defender || !(hpAntes - defender.currentHp > 0)) return;
+                }
+                // siDanoMinimo (Valafar, CHUPAALMAS, 31-jul-2026): umbral EXACTO, no solo
+                // "dañó algo" -el suelo de daño (0.5 Esbirro-vs-Personaje) puede no llegar al
+                // mínimo que la carta exige ("...que quite >= 1 Vida")-.
+                if (typeof trasAtacar.siDanoMinimo === 'number') {
+                    if (hpAntes === undefined || !defender || !((hpAntes - defender.currentHp) >= trasAtacar.siDanoMinimo)) return;
                 }
                 // siObjetivo: condición sobre el DEFENSOR (el `if` genérico de los efectos se
                 // evalúa contra la carta FUENTE, que aquí es el atacante). Gul guerrero solo
