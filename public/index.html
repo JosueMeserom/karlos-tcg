@@ -2265,6 +2265,13 @@
                     card.currentDef += amount;
                     text = amount > 0 ? `+${amount} DEF` : `${amount} DEF`;
                     color = amount > 0 ? "ft-green" : "ft-yellow";
+                } else if (typeof card[stat] === 'number') {
+                    // Genérico (Gólem multielemental, 31-jul-2026): stats de BASE fuera de las
+                    // 4 rutas de arriba (p. ej. 'def' permanente -no 'currentDef', que se
+                    // resetea cada updatePassives-). Mismo texto/color que su variante 'current*'.
+                    card[stat] += amount;
+                    text = amount > 0 ? `+${amount} ${stat.toUpperCase()}` : `${amount} ${stat.toUpperCase()}`;
+                    color = amount > 0 ? "ft-green" : "ft-yellow";
                 }
 
                 showFloatingText(card.instanceId, text, color, offsetY);

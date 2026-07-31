@@ -1,26 +1,28 @@
-// tests/regresion49.js — COMA (Valafar) y SANCIÓN (Ángel) migradas al DSL (31-jul-2026).
+// tests/regresion49.js — COMA (Valafar), SANCIÓN (Ángel) y CASTIGO (Serafín) migradas al DSL
+// (31-jul-2026), las tres con el MISMO bug de diseño corregido de la misma forma.
 //
 // Corrección de diseño, no migración "fiel" (betasteo de Toto): el código imperativo
-// original de ambas exigía solo 1 enemigo en vanguardia para ACTIVARSE (`vanguard.length
-// === 0` bloquea, nada más) y luego dejaba `canStopEarly` resolver con 1 o 2 objetivos según
+// original de las tres exigía solo 1 enemigo en vanguardia para ACTIVARSE (`vanguard.length
+// === 0` bloquea, nada más) y luego dejaba `canStopEarly` resolver con 1..N objetivos según
 // lo clicado. Toto confirmó que eso es un bug del código original, no un requisito real de
-// la carta — el texto de ambas dice literalmente "a 2/dos enemigos", exactamente como
-// Bi-choque, que SÍ exige (bien) >=2 objetivos válidos ANTES de dejar activar la Habilidad.
+// la carta — el texto de las tres dice literalmente "a 2/dos/3 enemigos", exactamente como
+// Bi-choque, que SÍ exige (bien) >=N objetivos válidos ANTES de dejar activar la Habilidad.
 // Corregido en la migración: `requisitos` con `count:{quien:"ENEMIGO",zona:"vanguardia"},
-// op:">=", valor:2` gatea `canActivateAbility` (igual que Bi-choque), y con esa garantía la
-// selección de objetivos pasa a ser "exactamente 2, sin parada anticipada" — el camino RAW
-// de `target:{quien,cantidad:2}`, YA soportado sin cambios por el compilador de ACTIVA (el
+// op:">=", valor:N` gatea `canActivateAbility` (igual que Bi-choque), y con esa garantía la
+// selección de objetivos pasa a ser "exactamente N, sin parada anticipada" — el camino RAW
+// de `target:{quien,cantidad:N}`, YA soportado sin cambios por el compilador de ACTIVA (el
 // mismo mecanismo que ya usa DEVASTACIÓN AGAH con 2 ATACAR seguidos). No hace falta ninguna
 // arquitectura de canStopEarly: la supuesta necesidad de esa pieza (documentada en sesiones
-// anteriores junto a COMA/SANCIÓN) partía de la misma premisa equivocada.
+// anteriores junto a COMA/SANCIÓN, y repetida sin volver a comprobarlo para CASTIGO) partía
+// de la misma premisa equivocada las tres veces.
 //
-// Consecuencia: NO se prueba en este arnés el caso "1 enemigo presente" contra ambas bases a
-// la vez (la vieja seguiría adelante con 1 solo objetivo -el bug que se corrige-, la nueva lo
-// rechaza sin más). Reproducir fielmente ese camino de la vieja solo para descartarlo no
-// compensa; en su lugar, el escenario "rechazada: solo 1 enemigo" usa `soloEn:'nueva'` sobre
-// el propio paso `{habilidad}` — si `canActivateAbility` no rechazara correctamente, el motor
-// dejaría abierta una interacción `confirmar` sin responder y el arnés fallaría solo por eso
-// (fin de escenario con interacción pendiente), sin necesitar ninguna aserción adicional.
+// Consecuencia: NO se prueba en este arnés el caso "N-1 enemigos presentes" contra ambas
+// bases a la vez (la vieja seguiría adelante con menos objetivos -el bug que se corrige-, la
+// nueva lo rechaza sin más). Reproducir fielmente ese camino de la vieja solo para descartarlo
+// no compensa; en su lugar, cada escenario "rechazada: faltan enemigos" usa `soloEn:'nueva'`
+// sobre el propio paso `{habilidad}` — si `canActivateAbility` no rechazara correctamente, el
+// motor dejaría abierta una interacción `confirmar` sin responder y el arnés fallaría solo
+// por eso (fin de escenario con interacción pendiente), sin necesitar ninguna aserción más.
 //
 // Diferencias intencionadas (mismo canal shared que Gólem de tierra, regresion33): los avisos
 // de sistema "Objetivo N fijado..."/"Objetivos listos..." los emite handleAbilityTargetSelection
@@ -151,6 +153,42 @@ const escenarios = [
         p1: { vanguardia: [{ carta: 'Ángel', furor: 2 }] },
         p2: { vanguardia: ['Mini-tigre'] },
         pasos: [ { soloEn: 'nueva', habilidad: 'Ángel' } ],
+    },
+
+    // ---------------- CASTIGO (Serafín) ----------------
+    {
+        nombre: 'CASTIGO: ataque especial a 3 enemigos de vanguardia (sin efecto adicional, solo daño)',
+        turno: 2, turnoDe: 'p1', empieza: 'p2',
+        p1: { vanguardia: [{ carta: 'Serafín', furor: 4 }] },
+        p2: { vanguardia: ['Mini-tigre', 'Robot de seguridad SP', 'Oso con armadura'] },
+        pasos: [
+            { habilidad: 'Serafín' }, { confirmar: true },
+            { elegir: ['Mini-tigre', 'Robot de seguridad SP', 'Oso con armadura'] },
+        ],
+    },
+    {
+        nombre: 'CASTIGO rechazado: no hay enemigos en vanguardia',
+        turno: 2, turnoDe: 'p1', empieza: 'p2',
+        p1: { vanguardia: [{ carta: 'Serafín', furor: 4 }] },
+        p2: {},
+        pasos: [ { habilidad: 'Serafín' } ],
+    },
+    {
+        nombre: 'CASTIGO rechazado: solo hay 2 enemigos válidos en vanguardia (corrección del bug original, exige >=3)',
+        turno: 2, turnoDe: 'p1', empieza: 'p2',
+        p1: { vanguardia: [{ carta: 'Serafín', furor: 4 }] },
+        p2: { vanguardia: ['Mini-tigre', 'Robot de seguridad SP'] },
+        pasos: [ { soloEn: 'nueva', habilidad: 'Serafín' } ],
+    },
+    {
+        nombre: 'CASTIGO: con 4 enemigos válidos en vanguardia, se activa igual y se eligen exactamente 3',
+        turno: 2, turnoDe: 'p1', empieza: 'p2',
+        p1: { vanguardia: [{ carta: 'Serafín', furor: 4 }] },
+        p2: { vanguardia: ['Mini-tigre', 'Robot de seguridad SP', 'Oso con armadura', { carta: 'Achmay', vida: 20 }] },
+        pasos: [
+            { habilidad: 'Serafín' }, { confirmar: true },
+            { elegir: ['Mini-tigre', 'Robot de seguridad SP', 'Oso con armadura'] },
+        ],
     },
 ];
 

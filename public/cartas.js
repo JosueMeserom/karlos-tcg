@@ -1246,19 +1246,23 @@ const CARD_DB = [
             }
             return false;
         },
-        onBeforeDefend: async function(defender, attacker, game, abilityName) {
-            if (defender.defBoosts === undefined) defender.defBoosts = 0;
-            if (defender.defBoosts < 3) {
-                defender.defBoosts++;
-                defender.def += 1; 
-                game.logMsg(`¡${defender.passiveName} se activa! (+1 Defensa permanente, lleva ${defender.defBoosts}/3).`, 'ability');
-                showFloatingText(defender.instanceId, defender.passiveName, "ft-ability", -40);
-                showFloatingText(defender.instanceId, "+1 DEF BASE", "ft-green", -20);
-                game.render();
-                await game.sleep(400);
-            }
-            return false; 
-        }
+        // CAMBIO DE COLOR migrada (31-jul-2026): TRAS_DEFENDER, no ANTES_DE_DEFENDER, aunque la
+        // vieja usaba onBeforeDefend — el texto dice "al ser atacado" (consecuencia del ataque,
+        // sin "antes" explícito), la misma regla ya aplicada a Imp mayor/DEMONIO VIL. `stat:"def"`
+        // (BASE, no currentDef) para que el +1 sea permanente y no se resetee en cada
+        // updatePassives -requirió extender game.modifyStat con un fallback genérico, ver
+        // index.html-. `defBoosts` sigue siendo un campo propio de la carta (no el sistema de
+        // `counters` con badge visible: la vieja tampoco mostraba un contador en el tablero).
+        // `no:true` en la condición evita el problema de "undefined < 3" en la primera activación.
+        abilities: [
+            { trigger: "TRAS_DEFENDER", nombre: "CAMBIO DE COLOR",
+              si: { campo: "defBoosts", op: ">=", valor: 3, no: true },
+              log: "¡CAMBIO DE COLOR se activa! (+1 Defensa permanente).",
+              efectos: [
+                { op: "FLOTANTE", target: { quien: "SELF" }, texto: "CAMBIO DE COLOR", estilo: "ft-ability", offset: -40 },
+                { op: "MARCAR", target: { quien: "SELF" }, campo: "defBoosts", delta: 1 },
+                { op: "MODIFICAR_STAT", target: { quien: "SELF" }, stat: "def", delta: 1 } ] }
+        ],
     },
     { id: 18, name: "Robot de seguridad SP", hp: 4, def: 1, atk: 2, type: "Esbirro", subtype: "Máquina", tags: ["Controlable"], gender: 'N', rarity: "C", text: "-", series: 1 },
     {
@@ -3469,53 +3473,23 @@ const CARD_DB = [
             });
             if (healed) game.logMsg(`¡La MARAVILLA de Serafín purifica y cura 2 de Vida a la vanguardia!`, 'healing');
         },
-        canActivateAbility: function(card, game) {
-            if (card.furor < 4) { game.logError("Falta Furor (4)."); return false; }
-            const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
-            if (game.players[enemyId].vanguard.length === 0) {
-                game.logError("No hay enemigos en vanguardia."); return false;
-            }
-            return true;
-        },
-        onExecuteAbility: function(card, game) {
-            game.selectedCard = card;
-            game.inputState = 'SELECT_ABILITY_TARGETS';
-            game.abilityContext = { targets: [], maxTargets: 3, name: 'CASTIGO', targetType: 'enemy', canStopEarly: true };
-            game.isActionLocked = true;
-            game.logError("Selecciona hasta 3 enemigos de la vanguardia para el CASTIGO divino.");
-            game.render();
-        },
-        onValidateTarget: function(card, target, game, isSilent) {
-            const ctx = game.abilityContext;
-            if (target.owner === card.owner || target.location !== 'vanguard' || getCardTemplate(target.id).isAvatar) return false;
-            if (ctx.targets.some(t => t.instanceId === target.instanceId)) return false;
-            return true;
-        },
-        onTargetsReady: async function(card, game) {
-            const targets = game.abilityContext.targets;
-            if (targets.length === 0) { game.isActionLocked = false; game.cancelAction(); return; }
-            
-            game.modifyStat(card, 'furor', -4);
-            showFloatingText(card.instanceId, card.activeName, "ft-ability", -30);
-            game.logMsg(`¡Serafín imparte su CASTIGO divino!`, 'ability');
-            
-            for (let t of targets) {
-                const enemy = game.findCard(t.instanceId);
-                if (enemy && enemy.currentHp > 0) {
-                    let dmg = card.currentAtk - enemy.currentDef;
-                    if (dmg <= 0) dmg = (card.type === 'Esbirro' && enemy.type === 'Personaje') ? 0.5 : 1;
-                    
-                    await game.dealDamage(card, enemy, dmg, true); 
-                    await game.checkDeath(enemy);
-                }
-            }
-            
-            card.exhausted = true;
-            game.isActionLocked = false;
-            game.cancelAction();
-            game.updatePassives();
-            game.render();
-        }
+        // CASTIGO migrada (31-jul-2026, mismo fix que COMA/SANCIÓN): la vieja solo exigía 1
+        // enemigo en vanguardia para activarse y dejaba `canStopEarly` resolver con 1-3
+        // objetivos — el mismo bug de diseño, no un requisito real (el texto dice "a 3
+        // enemigos"). `requisitos` exige >=3 antes de activar; con esa garantía la selección
+        // es "exactamente 3, sin parada anticipada", camino RAW ya soportado por el
+        // compilador de ACTIVA. MARAVILLA (Pasiva: cura 2 a la vanguardia al colocarse, con
+        // límite de 1 Serafín en campo) se queda imperativa: el autodestruir-si-hay-otro-igual
+        // es un mecanismo propio sin precedente reutilizable, no compensa arquitectura nueva.
+        abilities: [
+            { trigger: "ACTIVA", nombre: "CASTIGO", coste: { furor: 4 },
+              target: { quien: "ENEMIGO", cantidad: 3 },
+              requisitos: [
+                { count: { quien: "ENEMIGO", zona: "vanguardia" }, op: ">=", valor: 3,
+                  msg: "No hay suficientes enemigos en vanguardia para CASTIGO." } ],
+              log: "¡{carta} imparte su CASTIGO divino!",
+              efectos: [ { op: "ATACAR", especial: true } ] }
+        ],
     },
     {
         name: "Edrielle", hp: 3, def: 3, atk: 5, type: "Personaje", subtype: "Ser mágico", tags: ["Invocación", "diosa"], gender: "F", rarity: "B", cost: 1, series: 1,
@@ -5697,30 +5671,20 @@ const CARD_DB = [
         name: "Ayudante perturbada", hp: 2, def: 2, atk: 3, type: "Esbirro", subtype: "Ser vivo", tags: ["Científica"], gender: "F", rarity: "C", cost: 1, series: 2,
         text: "P: MANO PARÁSITA: Cada vez que vaya a atacar, echa una moneda. Si sale cara, aumenta en 2 su Atq durante ese ataque.",
         passiveName: "MANO PARÁSITA",
-        onBeforeAttack: async function(attacker, defender, game) {
-            // --- Si es un ataque directo, no hay defensor. Saltamos la moneda. ---
-            if (!defender) return true;
-
-            game.logMsg(`¡${attacker.passiveName}! La mano parásita reacciona...`, 'ability');
-            const results = await game.triggerCoinFlips(1, attacker.owner);
-            if (!results) return false;
-
-            if (results[0] === 'heads') {
-                game.logMsg("Moneda: CARA - ¡La mano otorga fuerza sobrehumana! (+2 ATQ)", 'ability');
-                showFloatingText(attacker.instanceId, "+2 ATQ", "ft-green", -20);
-                attacker.currentAtk += 2;
-                attacker.ayudanteBuff = true;
-            } else {
-                game.logMsg("Moneda: CRUZ - La mano no coopera.", 'neutral');
-            }
-            return true;
-        },
-        onAfterAttack: async function(attacker, defender, game) {
-            if (attacker.ayudanteBuff) {
-                attacker.currentAtk -= 2;
-                attacker.ayudanteBuff = false;
-            }
-        }
+        // Migrada (31-jul-2026): mismo esqueleto que Oni ancho (YŌKAI VIOLENTO) — ANTES_DE_ATACAR
+        // + MONEDA + BONO_ATAQUE, que ya recompute vía updatePassives en vez de restar a mano
+        // (evita el bug de doble resta documentado en Hiposaurio/Hawke/Guardia/Megalimo/Oni ancho).
+        // `requiereObjetivo` (pieza nueva, ver el compilador) reproduce el "si es ataque directo,
+        // sin defensor, saltar la moneda" que la vieja comprobaba a mano.
+        abilities: [
+            { trigger: "ANTES_DE_ATACAR", nombre: "MANO PARÁSITA", requiereObjetivo: true,
+              log: "¡MANO PARÁSITA! La mano parásita reacciona...", logTipo: "ability",
+              efectos: [
+                { op: "MONEDA",
+                  logCara: { msg: "Moneda: CARA - ¡La mano otorga fuerza sobrehumana! (+2 ATQ)", tipo: "ability" },
+                  logCruz: { msg: "Moneda: CRUZ - La mano no coopera.", tipo: "neutral" },
+                  cara: [ { op: "BONO_ATAQUE", valor: 2, floating: { texto: "+2 ATQ", estilo: "ft-green", offset: -20 } } ] } ] }
+        ],
     },
     {
         name: "Feria del cómic", type: "Evento", rarity: "A", cost: 1, duration: 2, series: 2,
@@ -6519,23 +6483,25 @@ const CARD_DB = [
         name: "Matón", hp: 3, def: 3, atk: 4, type: "Esbirro", subtype: "Ser vivo", tags: ["Maleante"], rarity: "C", cost: 1, series: 2,
         text: "P: PANDILLA: Puedes colocar en tu campo durante el mismo turno hasta tres copias de esta carta, si las tienes en la mano.",
         passiveName: "PANDILLA",
-        onAfterPlayAsync: async function(card, game, p) {
-            if (!p.matonesPlayedThisTurn) p.matonesPlayedThisTurn = 0;
-            p.matonesPlayedThisTurn++;
-            
-            if (p.matonesPlayedThisTurn < 3) {
-                const moreMatones = p.hand.some(c => c.name === 'Matón');
-                if (moreMatones) {
-                    game.placedUnitThisTurn = false; // El motor levanta el candado de "unidad colocada por turno"
-                    game.logMsg(`¡PANDILLA! Aún puedes colocar más Matones este turno.`, 'ability');
-                }
-            }
-        },
-        onStartTurn: function(card, game) {
-            if (card.owner === game.activePlayerId) {
-                game.players[card.owner].matonesPlayedThisTurn = 0;
-            }
-        }
+        // Migrada (31-jul-2026). NOTA: `game.placedUnitThisTurn` (candado global de "1 unidad
+        // por turno") es del JUGADOR, no de esta carta -por eso la vieja lo tocaba directo-, así
+        // que aquí se toca vía MARCAR_JUGADOR igual que la vieja tocaba `game.placedUnitThisTurn`
+        // (sin `ownerId`: es un campo de `game`, no de `game.players[x]` -inconsistencia ya
+        // existente del motor, replicada tal cual). Piezas nuevas, pequeñas y reutilizables:
+        // `_zone` admite zona:"mano"; `_cond`/`if` admite array (AND) y `campoJugador` (condición
+        // sobre un campo del JUGADOR dueño, no de la carta); MARCAR_JUGADOR admite `delta` y `log`.
+        abilities: [
+            { trigger: "AL_JUGAR",
+              efectos: [
+                { op: "MARCAR_JUGADOR", campo: "matonesPlayedThisTurn", delta: 1 },
+                { if: [
+                    { campoJugador: "matonesPlayedThisTurn", op: "<", valor: 3 },
+                    { count: { quien: "ALIADO", zona: "mano", filtros: [ { campo: "name", op: "==", valor: "Matón" } ] }, op: ">=", valor: 1 } ],
+                  op: "MARCAR_PARTIDA", campo: "placedUnitThisTurn", valor: false,
+                  log: "¡PANDILLA! Aún puedes colocar más Matones este turno." } ] },
+            { trigger: "INICIO_TURNO",
+              efectos: [ { op: "MARCAR_JUGADOR", campo: "matonesPlayedThisTurn", valor: 0 } ] }
+        ],
     },
     {
         name: "Droide antidisturbios", hp: 2, def: 4, atk: 5, type: "Esbirro", subtype: "Máquina", tags: ["Controlable"], rarity: "C", cost: 1, series: 2,
@@ -6828,7 +6794,7 @@ const DSL = {
     // DSL._runReaccion, no _doEffect): controlan el resultado que la reacción
     // devuelve al motor de combate (redirigir el ataque, cancelarlo, drenar Furor
     // tras él, fijar el daño, autoataque del atacante).
-    OPS_EFECTO: ['MODIFICAR_STAT', 'CURAR', 'DAÑO', 'APLICAR_ESTADO', 'MODIFICAR_CONTADORES', 'ATACAR', 'MONEDA', 'ROBAR', 'BUSCAR', 'MARCAR', 'VER_MANO', 'LIMPIAR_ESTADOS', 'ELEGIR', 'DESTRUIR_EVENTO', 'MARCAR_TEMPORAL', 'DESCARTAR', 'EQUIPAR', 'MARCAR_JUGADOR', 'FLOTANTE', 'FIJAR_STAT', 'REDIRIGIR', 'CANCELAR_ATAQUE', 'MARCAR_DRENAJE', 'FIJAR_DAÑO', 'ATACANTE_SE_AUTOATACA', 'VOLVER_A_MANO', 'RETRIBUCION', 'SUELO_STAT', 'TECHO_STAT', 'NO_CONSUMIR', 'BONO_ATAQUE'],
+    OPS_EFECTO: ['MODIFICAR_STAT', 'CURAR', 'DAÑO', 'APLICAR_ESTADO', 'MODIFICAR_CONTADORES', 'ATACAR', 'MONEDA', 'ROBAR', 'BUSCAR', 'MARCAR', 'VER_MANO', 'LIMPIAR_ESTADOS', 'ELEGIR', 'DESTRUIR_EVENTO', 'MARCAR_TEMPORAL', 'DESCARTAR', 'EQUIPAR', 'MARCAR_JUGADOR', 'FLOTANTE', 'FIJAR_STAT', 'REDIRIGIR', 'CANCELAR_ATAQUE', 'MARCAR_DRENAJE', 'FIJAR_DAÑO', 'ATACANTE_SE_AUTOATACA', 'VOLVER_A_MANO', 'RETRIBUCION', 'SUELO_STAT', 'TECHO_STAT', 'NO_CONSUMIR', 'BONO_ATAQUE', 'MARCAR_PARTIDA'],
     OPS_CMP: ['==', '!=', '<=', '>=', '<', '>', 'includes', 'contieneTexto', 'includesCI', 'truthy', 'falsy'],
     QUIEN: ['SELF', 'ALIADO', 'ENEMIGO', 'TODOS', 'ATACANTE', 'DEFENSOR'], // ATACANTE/DEFENSOR: solo en GLOBAL_TRAS_ATAQUE y REACCION
 
@@ -6893,6 +6859,7 @@ const DSL = {
         const z = String(zona || '').toLowerCase(); // acepta 'VANGUARDIA' y 'vanguardia'
         if (z === 'vanguardia') return [...p.vanguard];
         if (z === 'retaguardia') return [...p.rearguard];
+        if (z === 'mano') return [...p.hand]; // Matón, 31-jul-2026: "¿tengo más copias en la mano?"
         return [...p.vanguard, ...p.rearguard];
     },
     _pool(ownerId, game, spec, selfCard) {
@@ -6938,8 +6905,24 @@ const DSL = {
     },
     _cond(card, game, c) {
         if (!c) return true;
+        // Array de condiciones (Matón, 31-jul-2026): TODAS deben cumplirse (AND). Extensión
+        // mínima, genérica — hasta ahora `if` solo admitía una condición suelta.
+        if (Array.isArray(c)) return c.every(x => DSL._cond(card, game, x));
         if (c.anexoValido !== undefined) return DSL._anexoValido(card, game) === c.anexoValido;
-        return DSL._cmp(DSL._field(card, c.campo), c.op, DSL._value(card.owner, game, c.valor, card, { self: card }));
+        let r;
+        // campoJugador (Matón, 31-jul-2026): condición sobre un campo del JUGADOR dueño de la
+        // carta (game.players[owner][campo]), no de la carta — necesario para contadores por
+        // turno que no viven en ninguna carta concreta (p. ej. "cuántos Matones coloqué ya").
+        if (c.campoJugador !== undefined) r = DSL._cmp(game.players[card.owner][c.campoJugador], c.op, c.valor);
+        // count (Matón, 31-jul-2026): condición sobre un recuento de cartas (mismo `count` que
+        // ya usan `requisitos`), directamente en un `if` de efecto.
+        else if (c.count) r = DSL._cmp(DSL._count(card.owner, game, c.count, card), c.op, c.valor);
+        else r = DSL._cmp(DSL._field(card, c.campo), c.op, DSL._value(card.owner, game, c.valor, card, { self: card }));
+        // no (Gólem multielemental, 31-jul-2026): niega el resultado — mismo flag que `_match`
+        // ya admite por filtro, aquí para `if` de efecto/ability. Sirve para comparar contra un
+        // contador propio que puede empezar `undefined` (p. ej. "defBoosts < 3" fallaría con
+        // undefined<3===false; "NO defBoosts>=3" da el resultado correcto también sin inicializar).
+        return c.no ? !r : r;
     },
     // Un anexo (Kazuo/Gladiador) es válido si la carta tiene un aliado anexado
     // (attachments[0]) que sigue vivo, en mesa, y cuyo attachedTo aún apunta de
@@ -7403,7 +7386,10 @@ const DSL = {
             return true;
         }
         if (e.op === 'MARCAR') {
-            target[e.campo] = e.valor;
+            // delta (Gólem multielemental, 31-jul-2026): incrementa un campo propio de la
+            // carta en vez de fijarlo — mismo criterio que el `delta` ya añadido a MARCAR_JUGADOR.
+            if (typeof e.delta === 'number') target[e.campo] = (target[e.campo] || 0) + e.delta;
+            else target[e.campo] = e.valor;
             if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
             return true;
         }
@@ -7421,7 +7407,19 @@ const DSL = {
             return true;
         }
         if (e.op === 'MARCAR_JUGADOR') {
-            game.players[ownerId][e.campo] = e.valor !== undefined ? e.valor : true;
+            // delta (Matón, 31-jul-2026): incrementa un contador propio del jugador en vez de
+            // fijar un valor — para contadores "por turno" que no viven en ninguna carta.
+            if (typeof e.delta === 'number') game.players[ownerId][e.campo] = (game.players[ownerId][e.campo] || 0) + e.delta;
+            else game.players[ownerId][e.campo] = e.valor !== undefined ? e.valor : true;
+            if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name }), e.logTipo || 'ability');
+            return true;
+        }
+        if (e.op === 'MARCAR_PARTIDA') {
+            // Hermano de MARCAR_JUGADOR pero para campos de LA PARTIDA (game), no de un
+            // jugador ni de una carta -p. ej. game.placedUnitThisTurn, el candado de "1 unidad
+            // colocada por turno", que es global y no vive en players[x] (Matón, 31-jul-2026).
+            game[e.campo] = e.valor !== undefined ? e.valor : true;
+            if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name }), e.logTipo || 'ability');
             return true;
         }
         if (e.op === 'FLOTANTE') {
@@ -8273,6 +8271,12 @@ const DSL = {
                 attacker._dslBonoAtaque = 0;
                 if (trasAtacar && (trasAtacar.soloSiDaño || typeof trasAtacar.siDanoMinimo === 'number')) attacker._dslHpEnemigoAntes = defender ? defender.currentHp : undefined;
                 if (!antesAtacar) return true;
+                // requiereObjetivo (Ayudante perturbada, 31-jul-2026): performDirectAttack
+                // llama a onBeforeAttack con defender=null (ataque directo al jugador rival,
+                // sin carta objetivo) — cartas cuya habilidad necesita un objetivo real (p. ej.
+                // una moneda ligada a "durante ESE ataque") deben saltarse sin más, dejando que
+                // el ataque directo proceda normal (return true, no un veto).
+                if (antesAtacar.requiereObjetivo && !defender) return true;
                 if (antesAtacar.soloAtaqueNormal && !_esNormal(game)) return true;
                 if (antesAtacar.si && !DSL._cond(attacker, game, antesAtacar.si)) return true;
                 if (antesAtacar.log) game.logMsg(DSL._fill(antesAtacar.log, { carta: attacker.name, objetivo: defender ? DSL._nombre(game, defender) : '' }), antesAtacar.logTipo || 'ability');
@@ -8340,6 +8344,9 @@ const DSL = {
                 // acceso al isSpecial real), onAfterDefend YA recibe el isSpecial genuino de
                 // dealDamage -no hace falta ninguna heurística-.
                 if (trasDefender.soloAtaqueNormal && isSpecial) return;
+                // si (Gólem multielemental, 31-jul-2026): condición sobre el DEFENSOR (mismo
+                // campo que ya soportan ANTES_DE_ATACAR/TRAS_ATACAR) — faltaba aquí.
+                if (trasDefender.si && !DSL._cond(defender, game, trasDefender.si)) return;
                 if (trasDefender.log) game.logMsg(DSL._fill(trasDefender.log, { carta: defender.name, objetivo: DSL._nombre(game, attacker) }), trasDefender.logTipo || 'ability');
                 await DSL._runEffectList(trasDefender.efectos || [], defender, game, defender.owner, [attacker], trasDefender.nombre || tmpl.passiveName || null);
             };
@@ -8354,6 +8361,9 @@ const DSL = {
         const antesDefender = abs.find(a => a.trigger === 'ANTES_DE_DEFENDER');
         if (antesDefender && typeof tmpl.onBeforeDefend !== 'function') {
             tmpl.onBeforeDefend = async function (defender, attacker, game, abilityName, isSpecial) {
+                // si (31-jul-2026): mismo campo que ya soportan los otros tres triggers
+                // hermanos (ANTES_DE_ATACAR/TRAS_ATACAR/TRAS_DEFENDER); faltaba aquí también.
+                if (antesDefender.si && !DSL._cond(defender, game, antesDefender.si)) return false;
                 if (antesDefender.log) game.logMsg(DSL._fill(antesDefender.log, { carta: defender.name, objetivo: DSL._nombre(game, attacker) }), antesDefender.logTipo || 'ability');
                 await DSL._runEffectList(antesDefender.efectos || [], defender, game, defender.owner, [attacker], antesDefender.nombre || tmpl.passiveName || null);
                 return !!antesDefender.esquiva;

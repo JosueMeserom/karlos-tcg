@@ -689,6 +689,10 @@ function esDiffInerte(ruta, a, b) {
     // `attachments`/anexoValido en la nueva (Toto, 27-jul-2026, trigger de anexo).
     if (ruta.endsWith('.reverseArrow') && a === false && b === undefined) return true;
     if (ruta.endsWith('.gladiadorBuffActive') && typeof a === 'boolean' && b === undefined) return true;
+    // ayudanteBuff (Ayudante perturbada, 31-jul-2026): bookkeeping propio de la vieja para
+    // saber si debía restar el +2 Atq al final del ataque; la nueva usa BONO_ATAQUE, que
+    // deshace el bono vía updatePassives (recompute) y no necesita recordar nada.
+    if (ruta.endsWith('.ayudanteBuff') && typeof a === 'boolean' && b === undefined) return true;
     if (a !== undefined) return false;
     if (ruta.endsWith('.counters') && b && typeof b === 'object' && Object.keys(b).length === 0) return true;
     if (ruta.endsWith('.hasAttackedThisTurn') && b === false) return true;
