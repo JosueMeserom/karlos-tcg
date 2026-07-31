@@ -4347,12 +4347,16 @@ const CARD_DB = [
         // explícitamente que no gasta la acción) y `provocaAtaque` en MARCAR_TEMPORAL (deja
         // forcedAttackTarget -campo YA genérico del motor, leído en la fase de inicio de
         // turno- a la carta marcada cuando empieza SU turno, autoconsumiéndose).
+        // Betasteo de Toto (31-jul-2026): la vieja pintaba "-1 VIDA (Espinas)" a mano ADEMÁS
+        // del "-1 VIDA" automático de modifyStat (dos flotantes seguidos por el mismo golpe).
+        // Sin `floating` aquí, la nueva se queda solo con el automático — a la espera de un
+        // sistema general (pendiente, valorado para Opus) que añada "(fuente)" al flotante
+        // automático cuando la pérdida no venga de un ataque/Habilidad/Ayuda obvios.
         abilities: [
             { trigger: "TRAS_DEFENDER", nombre: "YOLOLO", soloAtaqueNormal: true,
               efectos: [
                 { op: "MODIFICAR_STAT", stat: "currentHp", delta: -1, comprobarMuerte: true,
-                  log: "¡YOLOLO! {objetivo} se pincha con la barrera de Achmay.", logTipo: "combat",
-                  floating: { texto: "-1 VIDA (Espinas)", estilo: "ft-purple", offset: -30 } } ] },
+                  log: "¡YOLOLO! {objetivo} se pincha con la barrera de Achmay.", logTipo: "combat" } ] },
             { trigger: "ACTIVA", nombre: "PÉGAME, PERRA", coste: { furor: 2 }, sinAgotar: true,
               target: { quien: "ENEMIGO", cantidad: 1 },
               requisitos: [

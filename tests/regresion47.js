@@ -37,6 +37,12 @@ const escenarios = [
               a: '¡YOLOLO! Mini-tigre [1] de J1 (Jugador 1) se pincha con la barrera de Achmay.',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba attacker.name a secas; la nueva rellena {objetivo} con DSL._nombre' },
         ],
+        // Betasteo de Toto (31-jul-2026): la vieja pintaba "-1 VIDA (Espinas)" a mano ADEMÁS
+        // del "-1 VIDA" automático de modifyStat -dos flotantes seguidos por el mismo golpe-.
+        // La nueva se queda solo con el automático (sin `floating` en el MODIFICAR_STAT).
+        flotantesSoloVieja: [
+            { linea: '-1 VIDA (Espinas)', motivo: 'flotante manual redundante con el automático de modifyStat, quitado a petición de Toto' },
+        ],
     },
     {
         // Ataque ESPECIAL contra Achmay: YOLOLO NO debe dispararse (soloAtaqueNormal).
@@ -89,6 +95,9 @@ const escenarios = [
             { de: '¡YOLOLO! Mini-tigre se pincha con la barrera de Achmay.',
               a: '¡YOLOLO! Mini-tigre [1] de J2 (Jugador 2) se pincha con la barrera de Achmay.',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño)' },
+        ],
+        flotantesSoloVieja: [
+            { linea: '-1 VIDA (Espinas)', motivo: 'ver primer escenario' },
         ],
     },
     {
