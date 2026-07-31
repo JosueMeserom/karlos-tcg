@@ -1,10 +1,12 @@
 // tests/regresion33.js — Gólem de tierra (SEÍSMO): ataque normal a dos enemigos
 // distintos elegidos en tablero. Migración vía ELEGIR (cantidad exacta 2, sin
 // hastaCantidad) + ATACAR sin `especial` (performAttack íntegro, igual que la
-// vieja). Ángel (SANCIÓN) queda fuera de esta tanda: ya se decidió (27-jul-2026,
-// comentario en cartas.js junto a la carta) dejarla imperativa porque admite
-// parar en 1 objetivo (canStopEarly), arquitectura que ELEGIR no cubre y que no
-// compensaba construir para una sola carta.
+// vieja).
+//
+// Nota (31-jul-2026): Ángel (SANCIÓN) se migró después, en regresion49.js — la
+// decisión de dejarla imperativa (mencionada más abajo en su momento) resultó
+// estar basada en una premisa equivocada (que la carta necesitaba parar en 1
+// objetivo); ver el comentario junto a SANCIÓN en cartas.js.
 //
 // Diferencias intencionadas, ambas por el CAMBIO DE MECANISMO de selección (no por
 // nada del efecto en sí): la vieja usa el abilityContext.targets genérico

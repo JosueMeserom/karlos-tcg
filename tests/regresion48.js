@@ -13,8 +13,9 @@
 // escribir esta suite): ni logsIntencionados ni diferenciasEsperadas hacen falta.
 //
 // Se queda imperativo: el tributo de colocación (modal genérico, ya aceptado como imperativo
-// en Ángel/Domador/Raiju) y COMA (Activa con `canStopEarly`, mismo patrón ya evaluado y
-// descartado para SANCIÓN — no compensa arquitectura nueva para una carta suelta).
+// en Ángel/Domador/Raiju). COMA se migra aparte en regresion49.js (junto con SANCIÓN de
+// Ángel): la premisa de "necesita canStopEarly" era un bug del código original, no un
+// requisito real de la carta — ver el comentario en cartas.js junto a COMA.
 
 'use strict';
 const { correrSuite } = require('./harness');

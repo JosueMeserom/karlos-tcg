@@ -3404,67 +3404,33 @@ const CARD_DB = [
         // (umbral EXACTO, no solo "dañó algo" — el suelo de daño de 0.5, Esbirro-vs-Personaje,
         // no llega al ">= 1 Vida" que exige el texto) y `target:{quien:"SELF"}` (se cura a sí
         // mismo, no al defensor, que es el objetivo implícito por defecto de TRAS_ATACAR).
-        // COMA se queda imperativa: usa `canStopEarly` (parar en 0/1/2 objetivos), el mismo
-        // patrón ya evaluado y descartado para SANCIÓN (Ángel) — no compensa arquitectura
-        // nueva para una carta suelta, decisión ya cerrada, no reabrir sin motivo nuevo.
+        // COMA migrada (31-jul-2026, betasteo de Toto): la vieja solo exigía 1 enemigo en
+        // vanguardia para activarse y luego dejaba `canStopEarly` resolver con 1 o 2 según
+        // lo clicado — un bug del código imperativo original, no un requisito real de la
+        // carta (su propio texto dice "a 2 enemigos", como Bi-choque). Corregido a exigir
+        // >=2 enemigos válidos ANTES de activar (mismo patrón que Bi-choque, `requisitos`
+        // con `count`), con lo que la selección pasa a ser "exactamente 2, sin parada
+        // anticipada" — el camino RAW de `target:{cantidad:2}` ya soportado por el
+        // compilador de ACTIVA (ver DEVASTACIÓN AGAH, 2 ATACAR ya migrada), sin necesitar
+        // ninguna arquitectura de canStopEarly.
         abilities: [
             { trigger: "TRAS_ATACAR", nombre: "CHUPAALMAS", soloAtaqueNormal: true, siDanoMinimo: 1,
               efectos: [
                 { op: "MODIFICAR_STAT", stat: "currentHp", delta: 1, offsetY: -20, target: { quien: "SELF" },
                   ifObjetivo: { campo: "currentHp", op: "<", valorCampo: "maxHp" },
-                  log: "¡CHUPAALMAS! {carta} devora la energía vital y se cura 1 de Vida.", logTipo: "healing" } ] }
+                  log: "¡CHUPAALMAS! {carta} devora la energía vital y se cura 1 de Vida.", logTipo: "healing" } ] },
+            { trigger: "ACTIVA", nombre: "COMA", coste: { furor: 4 },
+              target: { quien: "ENEMIGO", cantidad: 2 },
+              requisitos: [
+                { count: { quien: "ENEMIGO", zona: "vanguardia" }, op: ">=", valor: 2,
+                  msg: "No hay suficientes enemigos en vanguardia para COMA." } ],
+              log: "¡{carta} desata COMA sobre los enemigos!",
+              efectos: [
+                { op: "ATACAR", especial: true,
+                  siExito: [
+                    { op: "APLICAR_ESTADO", estado: "sueno", duracion: 2,
+                      log: "{objetivo} cae en un profundo Sueño." } ] } ] }
         ],
-        canActivateAbility: function(card, game) {
-            if (card.furor < 4) { game.logError("Falta Furor (4)."); return false; }
-            const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
-            if (game.players[enemyId].vanguard.length === 0) {
-                game.logError("No hay enemigos en vanguardia."); return false;
-            }
-            return true;
-        },
-        onExecuteAbility: function(card, game) {
-            game.selectedCard = card;
-            game.inputState = 'SELECT_ABILITY_TARGETS';
-            game.abilityContext = { targets: [], maxTargets: 2, name: 'COMA', targetType: 'enemy', canStopEarly: true };
-            game.isActionLocked = true;
-            game.logError("Selecciona hasta 2 enemigos de la vanguardia para inducirles el COMA.");
-            game.render();
-        },
-        onValidateTarget: function(card, target, game, isSilent) {
-            const ctx = game.abilityContext;
-            if (target.owner === card.owner || target.location !== 'vanguard' || getCardTemplate(target.id).isAvatar) return false;
-            if (ctx.targets.some(t => t.instanceId === target.instanceId)) return false;
-            return true;
-        },
-        onTargetsReady: async function(card, game) {
-            const targets = game.abilityContext.targets;
-            if (targets.length === 0) { game.isActionLocked = false; game.cancelAction(); return; }
-            
-            game.modifyStat(card, 'furor', -4);
-            showFloatingText(card.instanceId, card.activeName, "ft-ability", -30);
-            game.logMsg(`¡Valafar desata COMA sobre los enemigos!`, 'ability');
-            
-            for (let t of targets) {
-                const enemy = game.findCard(t.instanceId);
-                if (enemy && enemy.currentHp > 0) {
-                    let dmg = card.currentAtk - enemy.currentDef;
-                    if (dmg <= 0) dmg = (card.type === 'Esbirro' && enemy.type === 'Personaje') ? 0.5 : 1;
-                    
-                    await game.dealDamage(card, enemy, dmg, true); // true = isSpecial
-                    if (enemy.currentHp > 0) {
-                        game.applyStatus(enemy, 'sueno', 2, card.name);
-                        game.logMsg(`${enemy.name} cae en un profundo Sueño.`, 'ability');
-                    }
-                    await game.checkDeath(enemy);
-                }
-            }
-            
-            card.exhausted = true;
-            game.isActionLocked = false;
-            game.cancelAction();
-            game.updatePassives();
-            game.render();
-        }
     },
     {
         name: "Serafín", hp: 5, def: 4, atk: 8, type: "Esbirro", subtype: "Ser mágico", rarity: "S", cost: 1, series: 1,
@@ -6749,11 +6715,15 @@ const CARD_DB = [
         name: "Ángel", hp: 4, def: 4, atk: 4, type: "Esbirro", subtype: "Ser mágico", tags: ["Monstruo"], rarity: "A", cost: 1, series: 2,
         text: "Coste: 2 de Furor. P: PRODIGIO: Al colocarla, cura 1 de Vida a tu vanguardia. A: SANCIÓN (2F): Ataque especial a dos enemigos de la vanguardia rival.",
         passiveName: "PRODIGIO", activeName: "SANCIÓN", activeCost: 2,
-        // El tributo y SANCIÓN (ataque especial a DOS objetivos, con canStopEarly) se quedan
-        // imperativos (27-jul-2026, tanda de volumen): el multi-objetivo con parada anticipada
-        // es más arquitectura de la que compensa para esta tanda. PRODIGIO sí migra: curar 1 a
-        // toda la vanguardia dañada, mismo patrón ya usado por Escape con bomba de humo
-        // (CURAR soloSiHerido en grupo) — ahora también en AL_JUGAR gracias a logSiAplicado.
+        // PRODIGIO migrada (27-jul-2026, tanda de volumen): curar 1 a toda la vanguardia
+        // dañada, mismo patrón ya usado por Escape con bomba de humo (CURAR soloSiHerido en
+        // grupo). SANCIÓN migrada (31-jul-2026, betasteo de Toto): la vieja solo exigía 1
+        // enemigo en vanguardia para activarse y dejaba `canStopEarly` resolver con 1 o 2
+        // objetivos — bug del código imperativo original, no un requisito real de la carta
+        // (su texto dice "a dos enemigos", como Bi-choque/COMA). Corregido a exigir >=2
+        // enemigos válidos antes de activar, con lo que la selección pasa a ser "exactamente
+        // 2, sin parada anticipada" — el camino RAW de `target:{cantidad:2}` ya soportado por
+        // el compilador de ACTIVA (ver DEVASTACIÓN AGAH / COMA), sin canStopEarly.
         onBeforePlayAsync: async function(card, game, p) {
             return await DSL.tributoFuror(card, game, p, 2, { msgSinPagador: "Necesitas un aliado con 2 Furor para el tributo.", titulo: `TRIBUTO PARA ÁNGEL (-2 FUROR)` });
         },
@@ -6762,54 +6732,14 @@ const CARD_DB = [
               efectos: [ { op: "CURAR", valor: 1, conBeforeHealed: false, soloSiHerido: true,
                            floating: "+1 VIDA", floatingStyle: "ft-green", offsetY: -20, fuente: "healing",
                            target: { quien: "ALIADO", zona: "VANGUARDIA" } } ],
-              logSiAplicado: { msg: "¡La luz del Ángel sana a la vanguardia!", tipo: "healing" } }
+              logSiAplicado: { msg: "¡La luz del Ángel sana a la vanguardia!", tipo: "healing" } },
+            { trigger: "ACTIVA", nombre: "SANCIÓN", coste: { furor: 2 },
+              target: { quien: "ENEMIGO", cantidad: 2 },
+              requisitos: [
+                { count: { quien: "ENEMIGO", zona: "vanguardia" }, op: ">=", valor: 2,
+                  msg: "No hay suficientes enemigos en vanguardia para SANCIÓN." } ],
+              efectos: [ { op: "ATACAR", especial: true } ] }
         ],
-        canActivateAbility: function(card, game) {
-            if (card.furor < 2) { game.logError("Falta Furor (2)."); return false; }
-            const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
-            if (game.players[enemyId].vanguard.length === 0) return false;
-            return true;
-        },
-        onExecuteAbility: function(card, game) {
-            game.selectedCard = card;
-            game.inputState = 'SELECT_ABILITY_TARGETS';
-            game.abilityContext = { targets: [], maxTargets: 2, name: 'SANCIÓN', targetType: 'enemy', canStopEarly: true };
-            game.render();
-        },
-        onValidateTarget: function(card, target, game, isSilent) {
-            const ctx = game.abilityContext;
-            if (target.owner === card.owner || target.location !== 'vanguard' || getCardTemplate(target.id).isAvatar) return false;
-            if (ctx.targets.some(t => t.instanceId === target.instanceId)) return false;
-            return true;
-        },
-        onTargetsReady: async function(card, game) {
-            const targets = game.abilityContext.targets;
-            if (targets.length === 0) { game.cancelAction(); return; }
-            
-            game.modifyStat(card, 'furor', -2);
-            showFloatingText(card.instanceId, card.activeName, "ft-ability", -30);
-            game.inputState = 'EXECUTING';
-            game.render();
-            await game.sleep(500);
-            
-            for (let t of targets) {
-                if (card.currentHp <= 0 || (card.location !== 'vanguard' && card.location !== 'rearguard')) break;
-                const realTarget = game.findCard(t.instanceId);
-                
-                if (realTarget && realTarget.location === 'vanguard' && realTarget.currentHp > 0) {
-                    let dmg = card.currentAtk - realTarget.currentDef;
-                    if (dmg <= 0) dmg = (card.type === 'Esbirro' && realTarget.type === 'Personaje') ? 0.5 : 1;
-                    
-                    await game.dealDamage(card, realTarget, dmg, true); 
-                    await game.checkDeath(realTarget);
-                }
-            }
-            
-            card.exhausted = true;
-            game.isActionLocked = false;
-            game.cancelAction();
-            game.render();
-        }
     },
     // ===== CARTAS DECLARATIVAS DE PRUEBA (motor híbrido / DSL) =====
     {
