@@ -5511,52 +5511,26 @@ const CARD_DB = [
         name: "Frikazo", hp: 3, def: 2, atk: 2, type: "Esbirro", subtype: "Ser vivo", tags: ["Estudioso", "Otaku"], rarity: "C", cost: 1, series: 2,
         text: "A: FIJACIÓN (1F): Anexa a un Personaje aliado. Mientras esté activo, Frikazo recibe en su lugar los ataques que vayan dirigidos a ese Personaje. Reusable.",
         activeName: "FIJACIÓN", activeCost: 1,
-        canActivateAbility: function(card, game) {
-            if (card.furor < 1) { game.logError("Falta Furor (1)."); return false; }
-            const valid = [...game.players[card.owner].vanguard, ...game.players[card.owner].rearguard].filter(c => c.type === 'Personaje' && c.instanceId !== card.instanceId);
-            if (valid.length === 0) { game.logError("No hay Personajes aliados a los que proteger."); return false; }
-            return true;
-        },
-        onExecuteAbility: function(card, game) {
-            game.selectedCard = card;
-            game.inputState = 'SELECT_ABILITY_TARGETS';
-            game.abilityContext = { targets: [], maxTargets: 1, name: 'FIJACIÓN', targetType: 'ally' };
-            game.render();
-        },
-        onValidateTarget: function(card, target, game, isSilent) {
-            if (target.owner !== card.owner || target.type !== 'Personaje' || target.instanceId === card.instanceId) return false;
-            return true;
-        },
-        onTargetsReady: async function(card, game) {
-            const target = game.abilityContext.targets[0];
-            game.modifyStat(card, 'furor', -1);
-            showFloatingText(card.instanceId, "FIJACIÓN", "ft-ability", -30);
-            
-            if (card.attachedTo) {
-                const oldHost = game.findCard(card.attachedTo);
-                if (oldHost && oldHost.attachments) {
-                    oldHost.attachments = oldHost.attachments.filter(id => id !== card.instanceId);
-                }
-            }
-
-            card.attachedTo = target.instanceId;
-            card.reverseArrow = true; 
-            if (!target.attachments) target.attachments = [];
-            target.attachments.push(card.instanceId);
-
-            game.logMsg(`¡${card.name} se vuelve el fan número 1 de ${target.name} y lo protegerá con su vida!`, 'ability');
-
-            card.exhausted = true;
-            game.isActionLocked = false;
-            game.cancelAction();
-            game.updatePassives();
-            game.render();
-        },
-        onInterceptAttack: function(interceptorCard, attacker, defender, game) {
-            game.logMsg(`¡FIJACIÓN! ${interceptorCard.name} se lanza cual guardaespaldas a recibir el golpe en lugar de ${defender.name}.`, 'ability');
-            showFloatingText(interceptorCard.instanceId, "¡CUIDADO!", "ft-purple", -30);
-            return interceptorCard; // Cambiamos la víctima antes del golpe
-        }
+        // Migrada (31-jul-2026). FIJACIÓN ancla AL REVÉS que Gladiador/Kazuo (ver la nota junto
+        // a `reverse` en el op ANEXAR): el Personaje protegido guarda `attachments` (el bucle
+        // de interceptores de index.html recorre `currentDefender.attachments`), Frikazo guarda
+        // `attachedTo`. `INTERCEPTOR_ATAQUE` (trigger nuevo) compila a `onInterceptAttack`, un
+        // hook YA genérico en el motor (el bucle soporta cualquier carta anexada que lo
+        // implemente, hoy solo Frikazo) — sin prompt/moneda, siempre redirige mientras el
+        // vínculo esté activo.
+        abilities: [
+            { trigger: "ACTIVA", nombre: "FIJACIÓN", coste: { furor: 1 }, sinObjetivo: true,
+              requisitos: [
+                { count: { quien: "ALIADO", filtros: [ { campo: "type", op: "==", valor: "Personaje" } ] }, op: ">=", valor: 1,
+                  msg: "No hay Personajes aliados a los que proteger." } ],
+              efectos: [
+                { op: "ELEGIR", de: "ALIADOS", filtros: [ { campo: "type", op: "==", valor: "Personaje" } ], cantidad: 1, cancelable: false,
+                  guardaEn: "objetivo", logDespues: "¡{carta} se vuelve el fan número 1 de {objetivo} y lo protegerá con su vida!",
+                  efectos: [ { op: "ANEXAR", reverse: true } ] } ] },
+            { trigger: "INTERCEPTOR_ATAQUE", nombre: "FIJACIÓN",
+              log: "¡FIJACIÓN! {carta} se lanza cual guardaespaldas a recibir el golpe en lugar de {defensor}.",
+              floating: { texto: "¡CUIDADO!", estilo: "ft-purple", offset: -30 } }
+        ],
     },
     {
         name: "Gladiador", hp: 5, def: 4, atk: 5, type: "Personaje", subtype: "Ser vivo", tags: ["Mercenario", "Draconiano", "Maleante"], rarity: "C", cost: 1, series: 2,
@@ -6616,55 +6590,38 @@ const CARD_DB = [
         name: "Gárgola", hp: 6, def: 4, atk: 4, type: "Esbirro", subtype: "Ser mágico", tags: ["Monstruo"], rarity: "A", cost: 1, series: 2,
         text: "P: PRUEBA DE CARÁCTER: Al colocar esta carta, echa dos monedas. 1ª Cara: elige enemigo y quítale 2 Furor. 2ª Cruz: tributa 2 Furor de un aliado o Gárgola se destruye.",
         passiveName: "PRUEBA DE CARÁCTER",
-        onAfterPlayAsync: async function(card, game, p) {
-            game.logMsg(`¡${card.passiveName}! Gárgola te juzga y lanza dos monedas.`, 'ability');
-            game.isActionLocked = true;
-            
-            let results = await game.triggerCoinFlips(1, card.owner);
-            if (results && results[0] === 'heads') {
-                game.logMsg(`Moneda 1: CARA - ¡Drenaje de Furor enemigo!`, 'ability');
-                const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
-                const validEnemies = [...game.players[enemyId].vanguard, ...game.players[enemyId].rearguard].filter(c => !getCardTemplate(c.id).isAvatar);
-                
-                if (validEnemies.length > 0) {
-                    const chosen = await game.openVisualSearchModal(`GÁRGOLA: ELIGE ENEMIGO PARA QUITARLE 2 FUROR`, validEnemies, 1, true, card.owner);
-                    if (chosen && chosen.length > 0) {
-                        game.modifyStat(chosen[0], 'furor', -2);
-                        showFloatingText(chosen[0].instanceId, "-2 FUR", "ft-red-stat", -20);
-                    }
-                } else {
-                    game.logMsg(`No hay enemigos para drenar.`, 'system');
-                }
-            } else {
-                game.logMsg(`Moneda 1: CRUZ - Sin efecto.`, 'neutral');
-            }
-            
-            results = await game.triggerCoinFlips(1, card.owner);
-            if (results && results[0] === 'tails') {
-                game.logMsg(`Moneda 2: CRUZ - ¡Gárgola exige un tributo de 2 Furor!`, 'ability');
-                const validAllies = [...p.vanguard, ...p.rearguard].filter(c => c.furor >= 2 && c.instanceId !== card.instanceId && !getCardTemplate(c.id).isAvatar);
-                
-                if (validAllies.length > 0) {
-                    const chosen = await game.pickBoardTargets(validAllies, 1, `GÁRGOLA: ELIGE TRIBUTO O SE DESTRUYE (-2 FUROR)`, card, card.owner, true);
-                    if (chosen && chosen.length > 0) {
-                        game.modifyStat(chosen[0], 'furor', -2);
-                    } else {
-                        game.logMsg(`¡Nadie pagó el tributo! Gárgola se hace pedazos.`, 'combat');
-                        card.currentHp = 0;
-                        await game.checkDeath(card, false);
-                    }
-                } else {
-                    game.logMsg(`¡No hay aliados con suficiente Furor! Gárgola se hace pedazos.`, 'combat');
-                    card.currentHp = 0;
-                    await game.checkDeath(card, false);
-                }
-            } else {
-                game.logMsg(`Moneda 2: CARA - Gárgola está satisfecha.`, 'neutral');
-            }
-            
-            game.isActionLocked = false;
-            game.render();
-        }
+        // Migrada (31-jul-2026). El elegir enemigo pasa del modal genérico (violaba la norma de
+        // targeting en tablero) a ELEGIR/pickBoardTargets, como toda migración previa de este
+        // tipo. Pieza nueva: `siNoElegido` en ELEGIR (rama "de lo contrario", corre si el pool
+        // está vacío O si el jugador declina) — hacía falta para "tributa O se destruye", que
+        // ni pool vacío ni decline tenían forma de disparar un efecto real hasta ahora.
+        // Simplificación de log aceptada: la vieja distingue dos mensajes de fallo ("Nadie pagó
+        // el tributo" si declinas habiendo pagadores válidos, "No hay aliados con suficiente
+        // Furor" si no los hay); `siNoElegido` no puede distinguir la causa (mismo camino para
+        // las dos), así que la nueva usa un único texto para ambos casos.
+        abilities: [
+            { trigger: "AL_JUGAR",
+              log: "¡PRUEBA DE CARÁCTER! Gárgola te juzga y lanza dos monedas.",
+              efectos: [
+                { op: "MONEDA",
+                  logCara: { msg: "Moneda 1: CARA - ¡Drenaje de Furor enemigo!", tipo: "ability" },
+                  logCruz: { msg: "Moneda 1: CRUZ - Sin efecto.", tipo: "neutral" },
+                  cara: [
+                    { op: "ELEGIR", de: "ENEMIGOS", cantidad: 1, opcional: true,
+                      titulo: "GÁRGOLA: ELIGE ENEMIGO PARA QUITARLE 2 FUROR",
+                      logSiVacio: "No hay enemigos para drenar.", logSiVacioTipo: "system",
+                      efectos: [ { op: "MODIFICAR_STAT", stat: "furor", delta: -2 } ] } ] },
+                { op: "MONEDA",
+                  logCara: { msg: "Moneda 2: CARA - Gárgola está satisfecha.", tipo: "neutral" },
+                  logCruz: { msg: "Moneda 2: CRUZ - ¡Gárgola exige un tributo de 2 Furor!", tipo: "ability" },
+                  cruz: [
+                    { op: "ELEGIR", de: "ALIADOS", excluirSelf: true, filtros: [ { campo: "furor", op: ">=", valor: 2 } ], cantidad: 1,
+                      titulo: "GÁRGOLA: ELIGE TRIBUTO O SE DESTRUYE (-2 FUROR)",
+                      siNoElegido: [
+                        { op: "MODIFICAR_STAT", target: { quien: "SELF" }, stat: "currentHp", vaciar: true, sinRetribucion: true, comprobarMuerte: true,
+                          log: "¡Nadie paga el tributo! Gárgola se hace pedazos.", logTipo: "combat" } ],
+                      efectos: [ { op: "MODIFICAR_STAT", stat: "furor", delta: -2 } ] } ] } ] }
+        ],
     },
     {
         name: "Ángel", hp: 4, def: 4, atk: 4, type: "Esbirro", subtype: "Ser mágico", tags: ["Monstruo"], rarity: "A", cost: 1, series: 2,
@@ -6778,7 +6735,7 @@ const KARLOS_RULES = {
 //  Valores: número | {COUNT:{...}} | {REF:"objetivo.furorMax"} (campos computados)
 // ===================================================================
 const DSL = {
-    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE', 'AURA', 'ANTES_DE_JUGAR', 'PUEDE_ATACAR', 'SOBRECURACION', 'REACCION', 'AL_MORIR', 'AL_MORIR_ALIADO', 'AL_DESTRUIR', 'ESPEJO', 'ANTES_DE_ATACAR', 'TRAS_ATACAR', 'TRAS_DEFENDER', 'ANTES_DE_DEFENDER'],
+    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE', 'AURA', 'ANTES_DE_JUGAR', 'PUEDE_ATACAR', 'SOBRECURACION', 'REACCION', 'AL_MORIR', 'AL_MORIR_ALIADO', 'AL_DESTRUIR', 'ESPEJO', 'ANTES_DE_ATACAR', 'TRAS_ATACAR', 'TRAS_DEFENDER', 'ANTES_DE_DEFENDER', 'INTERCEPTOR_ATAQUE'],
     // Los 5 últimos ops solo tienen sentido dentro de una REACCION (los interpreta
     // DSL._runReaccion, no _doEffect): controlan el resultado que la reacción
     // devuelve al motor de combate (redirigir el ataque, cancelarlo, drenar Furor
@@ -7456,9 +7413,29 @@ const DSL = {
             // dibujada por el motor) y sin tocar hand/location de nadie. La validez del vínculo
             // y el bono continuo mientras dure viven en la condición `anexoValido` de
             // PASIVA_CONTINUA (Toto, 27-jul-2026).
-            if (!sourceCard.attachments) sourceCard.attachments = [];
-            sourceCard.attachments.push(target.instanceId);
-            target.attachedTo = sourceCard.instanceId;
+            //
+            // reverse (Frikazo, 31-jul-2026): FIJACIÓN ancla al REVÉS que Gladiador/Kazuo — el
+            // objetivo (el Personaje protegido) es quien guarda `attachments` (así lo encuentra
+            // el bucle de interceptores de index.html, que recorre `currentDefender.attachments`),
+            // y self (Frikazo) guarda `attachedTo` + `reverseArrow` (solo visual: qué punta de
+            // la flecha nace en cuál carta, no afecta a la lógica). También limpia el anexo
+            // ANTERIOR de self si lo hubiera (FIJACIÓN es "Reusable": re-anexar a otro Personaje
+            // debe soltar el vínculo viejo primero) — Gladiador/Kazuo nunca lo necesitaron por
+            // ser de un solo uso (al colocarse), así que el op no lo hacía hasta ahora.
+            if (e.reverse) {
+                if (sourceCard.attachedTo) {
+                    const oldHost = game.findCard(sourceCard.attachedTo);
+                    if (oldHost && oldHost.attachments) oldHost.attachments = oldHost.attachments.filter(id => id !== sourceCard.instanceId);
+                }
+                if (!target.attachments) target.attachments = [];
+                target.attachments.push(sourceCard.instanceId);
+                sourceCard.attachedTo = target.instanceId;
+                sourceCard.reverseArrow = true;
+            } else {
+                if (!sourceCard.attachments) sourceCard.attachments = [];
+                sourceCard.attachments.push(target.instanceId);
+                target.attachedTo = sourceCard.instanceId;
+            }
             if (e.floating && typeof showFloatingText === 'function') showFloatingText(sourceCard.instanceId, e.floating.texto, e.floating.estilo || 'ft-green', e.floating.offset !== undefined ? e.floating.offset : -30);
             return true;
         }
@@ -7481,8 +7458,14 @@ const DSL = {
             else if (e.zona === 'RETAGUARDIA') pool = pool.filter(x => x.location === 'rearguard');
             let n = e.cantidad || 1;
             if (e.hastaCantidad && pool.length < n) n = pool.length;
-            if (!pool.length && e.logSiVacio) {
-                game.logMsg(DSL._fill(e.logSiVacio, Object.assign({}, (DSL._vars && DSL._vars[sourceCard.instanceId]) || {}, { carta: sourceCard.name })), e.logSiVacioTipo || 'ability');
+            // siNoElegido (Gárgola, 31-jul-2026): rama de efectos "de lo contrario" — corre si
+            // NO hay pool válido O si el jugador declina la elección (en vez de abortar la
+            // carta en silencio con opcional:true, o abortarla del todo sin opcional). Hacía
+            // falta para "tributa 2 Furor de un aliado O Gárgola se destruye": ni pool vacío ni
+            // decline tenían hasta ahora forma de disparar un efecto de verdad.
+            if (!pool.length) {
+                if (e.logSiVacio) game.logMsg(DSL._fill(e.logSiVacio, Object.assign({}, (DSL._vars && DSL._vars[sourceCard.instanceId]) || {}, { carta: sourceCard.name })), e.logSiVacioTipo || 'ability');
+                if (e.siNoElegido) { const r = await DSL._runEffectList(e.siNoElegido, sourceCard, game, ownerId, null, habilidad); return !(r && r.ok === false); }
                 return 'skip';
             }
             const _logAntes = (lista) => {
@@ -7518,7 +7501,10 @@ const DSL = {
             // DUEÑO (de:"ENEMIGOS" = el rival, elija quien elija); solo cambia el
             // destinatario del modal/banner de "esperando a...".
             const chooserId = e.elegidoPor === 'RIVAL' ? (ownerId === 'p1' ? 'p2' : 'p1') : ownerId;
-            if (pool.length < n) return e.opcional ? 'skip' : false;
+            if (pool.length < n) {
+                if (e.siNoElegido) { const r = await DSL._runEffectList(e.siNoElegido, sourceCard, game, ownerId, null, habilidad); return !(r && r.ok === false); }
+                return e.opcional ? 'skip' : false;
+            }
             if (e.autoSiUnica && pool.length === n) {
                 // Única opción posible: se toma sola, sin preguntar (como el pagador único del Té)
                 if (e.guardaEn) { DSL._vars = DSL._vars || {}; const _vg = (DSL._vars[sourceCard.instanceId] = DSL._vars[sourceCard.instanceId] || {}); _vg[e.guardaEn] = DSL._nombre(game, pool[0]); _vg[e.guardaEn + 'G'] = pool[0].gender; }
@@ -7545,7 +7531,11 @@ const DSL = {
             if (e.de !== 'MANO' && !e.forzarModal && typeof game.pickBoardTargets === 'function') {
                 const _texto = e.cancelable === false ? '' : ' (clic en el tablero; X para cancelar)';
                 const sel = await game.pickBoardTargets(pool, n, DSL._fill(e.titulo || 'Elige objetivo', { carta: sourceCard.name }) + _texto, sourceCard, chooserId, e.cancelable !== false);
-                if (!sel) { if (e.logCancela && !e.opcional) game.logError(F(e.logCancela)); return e.opcional ? 'skip' : false; }
+                if (!sel) {
+                    if (e.logCancela && !e.opcional) game.logError(F(e.logCancela));
+                    if (e.siNoElegido) { const r = await DSL._runEffectList(e.siNoElegido, sourceCard, game, ownerId, null, habilidad); return !(r && r.ok === false); }
+                    return e.opcional ? 'skip' : false;
+                }
                 if (e.guardaEn && sel[0]) { DSL._vars = DSL._vars || {}; const _vg = (DSL._vars[sourceCard.instanceId] = DSL._vars[sourceCard.instanceId] || {}); _vg[e.guardaEn] = DSL._nombre(game, sel[0]); _vg[e.guardaEn + 'G'] = sel[0].gender; }
                 _guarda(sel);
                 _logAntes(sel);
@@ -7567,7 +7557,11 @@ const DSL = {
                 if (!quiere) return e.opcional ? 'skip' : false;
             }
             const sel = await game.openVisualSearchModal(F(e.titulo || 'ELIGE'), pool, n, e.autoSeleccion !== false, chooserId);
-            if (!sel || sel.length < n) { if (e.logCancela && !e.opcional) game.logError(F(e.logCancela)); return e.opcional ? 'skip' : false; }
+            if (!sel || sel.length < n) {
+                if (e.logCancela && !e.opcional) game.logError(F(e.logCancela));
+                if (e.siNoElegido) { const r = await DSL._runEffectList(e.siNoElegido, sourceCard, game, ownerId, null, habilidad); return !(r && r.ok === false); }
+                return e.opcional ? 'skip' : false;
+            }
             if (e.guardaEn && sel[0]) { DSL._vars = DSL._vars || {}; const _vg = (DSL._vars[sourceCard.instanceId] = DSL._vars[sourceCard.instanceId] || {}); _vg[e.guardaEn] = DSL._nombre(game, sel[0]); _vg[e.guardaEn + 'G'] = sel[0].gender; }
             _guarda(sel);
             _logAntes(sel);
@@ -8360,6 +8354,21 @@ const DSL = {
                 if (antesDefender.log) game.logMsg(DSL._fill(antesDefender.log, { carta: defender.name, objetivo: DSL._nombre(game, attacker) }), antesDefender.logTipo || 'ability');
                 await DSL._runEffectList(antesDefender.efectos || [], defender, game, defender.owner, [attacker], antesDefender.nombre || tmpl.passiveName || null);
                 return !!antesDefender.esquiva;
+            };
+        }
+
+        // INTERCEPTOR_ATAQUE -> onInterceptAttack (Frikazo, 31-jul-2026): el motor ya recorre
+        // GENÉRICAMENTE currentDefender.attachments buscando esta función (index.html,
+        // "Interceptores de Daño Pasivos") — hoy solo Frikazo la usa, pero el bucle ya soporta
+        // varias. Sin prompt/moneda/condición: si la carta está anexada (con `reverse` en
+        // ANEXAR), SIEMPRE intercepta el golpe en lugar de su anfitrión. Función SÍNCRONA
+        // (el motor no espera una Promise aquí).
+        const interceptor = abs.find(a => a.trigger === 'INTERCEPTOR_ATAQUE');
+        if (interceptor && typeof tmpl.onInterceptAttack !== 'function') {
+            tmpl.onInterceptAttack = function (interceptorCard, attacker, defender, game) {
+                if (interceptor.log) game.logMsg(DSL._fill(interceptor.log, { carta: interceptorCard.name, defensor: DSL._nombre(game, defender) }), interceptor.logTipo || 'ability');
+                if (interceptor.floating && typeof showFloatingText === 'function') showFloatingText(interceptorCard.instanceId, interceptor.floating.texto, interceptor.floating.estilo || 'ft-purple', interceptor.floating.offset !== undefined ? interceptor.floating.offset : -30);
+                return interceptorCard;
             };
         }
 
