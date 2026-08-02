@@ -1498,7 +1498,7 @@
                 this.lastSeqByRole = { p1: 0, p2: 0 }; // último nº de orden aplicado por cada jugador
                 this.awaitingHardSync = false;         // true mientras esperamos un resync por hueco detectado
                 // 0b: acciones que YA usan vía única (no se ejecutan en optimista; se aplican al volver del servidor)
-                this.CONVERTED_ACTIONS = new Set(['END_TURN', 'PLAY_CARD', 'ACTIVATE_ABILITY', 'DIRECT_ATTACK', 'CONFIRM_ACTION', 'TYPE_SELECTION', 'FINISH_EARLY_TARGETS', 'OPPONENT_DISCARD', 'DEBUG_RETRIBUTION']);
+                this.CONVERTED_ACTIONS = new Set(['END_TURN', 'PLAY_CARD', 'ACTIVATE_ABILITY', 'DIRECT_ATTACK', 'CONFIRM_ACTION', 'TYPE_SELECTION', 'FINISH_EARLY_TARGETS', 'OPPONENT_DISCARD', 'DEBUG_RETRIBUTION', 'DEBUG_COIN_MODE']);
 
                 // --- INICIALIZACIÓN DE RED O LOCAL Y NOMBRES ---
                 this.gameMode = localStorage.getItem('karlos_game_mode') || 'local';
@@ -1916,6 +1916,7 @@
                     }
                     else if (data.action === 'CLOSE_VIEWER') this.closeDiscardViewer(true);
                     else if (data.action === 'DEBUG_RETRIBUTION') await this.debugTakeRetribution(data.playerId, true);
+                    else if (data.action === 'DEBUG_COIN_MODE') this.debugCoinMode = data.mode;
                     
                     // --- SYNC AHORA ESTÁ ENCOLADO PARA QUE CAPTURE ESTADOS ESTABLES ---
                     // (Salvo cuando hay una interacción en curso: entonces se atiende FUERA de
@@ -2193,7 +2194,7 @@
                 return false;
             }
 
-            modifyStat(card, stat, amount, offsetY = 0, source = null) {
+            modifyStat(card, stat, amount, offsetY = 0, source = null, opts = null) {
                 if (amount === 0) return;
 
                 if (getCardTemplate(card.id).isAvatar && amount < 0 && source !== 'avatar_passive') {
@@ -2274,7 +2275,10 @@
                     color = amount > 0 ? "ft-green" : "ft-yellow";
                 }
 
-                showFloatingText(card.instanceId, text, color, offsetY);
+                // silent (DESTRUIDO/A, 31-jul-2026): el llamador va a mostrar su propio
+                // flotante en su lugar (p. ej. "destrucción" sin Retribución) — el resto de la
+                // función (interceptores, oculto revelado, el cambio de stat en sí) sigue igual.
+                if (!(opts && opts.silent)) showFloatingText(card.instanceId, text, color, offsetY);
             }
 
             modifyCounters(card, counterId, amount, name, source, icon = '⚙️') {
@@ -2997,6 +3001,12 @@
 
             setDebugCoin(mode) {
                 this.debugCoinMode = mode;
+                // La trucaba solo el cliente que la puso (isMyCoin resuelve la moneda de CADA
+                // jugador en SU PROPIO cliente) — sin esto, forzar la moneda desde la vista de
+                // J1 no afectaba a las tiradas de J2 en online (Toto, 31-jul-2026).
+                if (this.gameMode === 'online') {
+                    this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'DEBUG_COIN_MODE', mode });
+                }
             }
 
             debugRemoveSelected() {

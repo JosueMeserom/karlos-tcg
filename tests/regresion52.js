@@ -134,7 +134,7 @@ const escenarios = [
               motivo: 'simplificación aceptada (ver nota de cabecera): siNoElegido no distingue "sin pagadores válidos" de "declinas la elección", un único texto para ambos casos' },
         ],
         flotantesSoloNueva: [
-            { linea: 'VIDA', motivo: 'la nueva pasa por game.modifyStat (floater automático); la vieja pone currentHp=0 a mano sin pasar por ese canal (ver regresion40/51)' },
+            { linea: 'DESTRUIDO', motivo: 'destrucción directa sin Retribución: la nueva anuncia "DESTRUIDO" en vez de "-N VIDA"; la vieja no anunciaba nada (ver regresion40/51). Gárgola no tiene `gender` propio en su ficha -> masculino por defecto, aunque el nombre sea gramaticalmente femenino; posible dato de carta a completar, no algo que decidir aquí' },
         ],
     },
     {
@@ -150,7 +150,7 @@ const escenarios = [
               motivo: 'simplificación aceptada (ver nota de cabecera): mismo texto único de siNoElegido' },
         ],
         flotantesSoloNueva: [
-            { linea: 'VIDA', motivo: 'la nueva pasa por game.modifyStat (floater automático); la vieja pone currentHp=0 a mano sin pasar por ese canal (ver regresion40/51)' },
+            { linea: 'DESTRUIDO', motivo: 'destrucción directa sin Retribución: la nueva anuncia "DESTRUIDO" en vez de "-N VIDA"; la vieja no anunciaba nada (ver regresion40/51). Gárgola no tiene `gender` propio en su ficha -> masculino por defecto, aunque el nombre sea gramaticalmente femenino; posible dato de carta a completar, no algo que decidir aquí' },
         ],
     },
 ];

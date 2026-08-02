@@ -37,15 +37,14 @@ const escenarios = [
               a: '¡BZZZZT! El Cañón de positrones impacta de lleno en Mini-tigre [1] de J2 (Jugador 2).',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba target.name a secas; la nueva rellena {objetivo} con DSL._nombre' },
         ],
-        // La vieja pone target.currentHp = 0 directamente (bypass total de modifyStat) y
-        // llama a checkDeath(target,false) a mano: nunca pasa por el canal que genera el
-        // floater automático de Vida. La nueva usa MODIFICAR_STAT (vaciar:true), que SÍ
-        // pasa por game.modifyStat -> floater automático "-N VIDA", igual que cualquier
-        // otro cambio de currentHp del DSL (mismo canal que el "DAÑO VERDADERO" extra de
-        // Granada de maná, que sí se muestra en ambas). No es un regresión: es la vieja
-        // saltándose el canal común por ser código ad hoc, no una feature que se pierda.
+        // La vieja pone target.currentHp = 0 directamente (bypass total de modifyStat), sin
+        // ningún flotante de esa pérdida. La nueva pasa por MODIFICAR_STAT (vaciar+
+        // sinRetribucion), que desde el betasteo de Toto (31-jul-2026) muestra "DESTRUIDO/A"
+        // en vez del "-N VIDA" genérico -precisamente porque esta destrucción NO da Retribución,
+        // y ese "-N VIDA" induciría a pensar que sí la dio-. No es una regresión: la vieja no
+        // anunciaba nada de esto.
         flotantesSoloNueva: [
-            { linea: 'VIDA', motivo: 'la nueva pasa por game.modifyStat (floater automático de Vida); la vieja pone currentHp=0 a mano sin pasar por ese canal' },
+            { linea: 'DESTRUIDO', motivo: 'destrucción directa sin Retribución (vaciar+sinRetribucion): la nueva anuncia "DESTRUIDO" en vez de "-N VIDA"; la vieja no anunciaba nada' },
         ],
         diferenciasEsperadas: [
             { contiene: 'estado.p1.discard.0.copyId',

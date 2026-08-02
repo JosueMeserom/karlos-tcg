@@ -61,6 +61,12 @@ const escenarios = [
             { de: '¡Oso con armadura hace explotar', a: '¡Oso con armadura [1] de J1 (Jugador 1) hace explotar',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño/jugador): la vieja usaba nombres a secas o 2ª persona; la nueva usa DSL._nombre / {jugador}' },
         ],
+        // Reordenamiento de flotantes (betasteo de Toto, 31-jul-2026): el flotante "razón"
+        // (DAÑO VERDADERO) ahora sale ANTES del flotante del cambio de Vida en sí, no después
+        // -mismo criterio aplicado a MALDITO (Muñeca del mal, regresion51)-. Mismo texto en
+        // ambas bases para los 2 objetivos, solo cambia el orden: se retira como PAR completo.
+        flotantesSoloVieja: [ { linea: '-1 VIDA', motivo: 'orden vieja: -1 VIDA antes de DAÑO VERDADERO (2 objetivos)' } ],
+        flotantesSoloNueva: [ { linea: '-1 VIDA', motivo: 'orden nueva: DAÑO VERDADERO antes de -1 VIDA (2 objetivos)' } ],
     },
     {
         nombre: 'Hexagrama: tributa 1 Furor, busca la Invocación y baraja',

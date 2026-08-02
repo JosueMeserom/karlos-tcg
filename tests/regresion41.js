@@ -18,6 +18,12 @@ const escenarios = [
         p1: { vanguardia: [ { carta: 'Edrielle', furor: 4 } ] },
         p2: { vanguardia: [ { carta: 'Mini-tigre', vida: 1 } ], retaguardia: [ { carta: 'Robot de seguridad SP', vida: 10 } ] },
         pasos: [ { habilidad: 'Edrielle' }, { confirmar: true } ],
+        // Reordenamiento de flotantes (betasteo de Toto, 31-jul-2026): el flotante "razón"
+        // (DAÑO VERDADERO) ahora sale ANTES del flotante del cambio de Vida en sí, no después
+        // -mismo criterio aplicado a MALDITO (Muñeca del mal, regresion51)-. Mismo texto en
+        // ambas bases para los 2 objetivos, solo cambia el orden: se retira como PAR completo.
+        flotantesSoloVieja: [ { linea: '-2 VIDA', motivo: 'orden vieja: -2 VIDA antes de DAÑO VERDADERO (2 objetivos)' } ],
+        flotantesSoloNueva: [ { linea: '-2 VIDA', motivo: 'orden nueva: DAÑO VERDADERO antes de -2 VIDA (2 objetivos)' } ],
     },
     {
         nombre: 'TORMENTA PERFECTA rechazada: falta Furor',

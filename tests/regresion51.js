@@ -28,17 +28,19 @@
 // lanzar, distinto de logCara/logCruz que anuncian el resultado) y `objetivo` en el fill de
 // logCara/logCruz (faltaba).
 //
-// Todas comparten la MISMA diferencia de floater ya documentada en Cañón de positrones
-// (regresion40): la vieja hace `card.currentHp = 0` a mano (bypass total de modifyStat, sin
-// floater); la nueva pasa por MODIFICAR_STAT -> game.modifyStat -> floater automático "-N
-// VIDA". No es una regresión, es la vieja saltándose el canal común por ser código ad hoc.
+// Kami y Némesis comparten la MISMA diferencia de floater ya documentada en Cañón de
+// positrones (regresion40): la vieja hace `card.currentHp = 0` a mano (bypass total de
+// modifyStat, sin floater); la nueva pasa por MODIFICAR_STAT (vaciar+sinRetribucion), que
+// desde el betasteo de Toto (31-jul-2026) muestra "DESTRUIDO/A" en vez de "-N VIDA" -esta
+// destrucción no da Retribución, y "-N VIDA" induciría a pensar que sí-. No es una regresión,
+// la vieja no anunciaba nada de esto.
 
 'use strict';
 const { correrSuite } = require('./harness');
 
-const FLOTANTE_VIDA_AUTOMATICO = {
+const FLOTANTE_DESTRUIDO = {
     flotantesSoloNueva: [
-        { linea: 'VIDA', motivo: 'la nueva pasa por game.modifyStat (floater automático); la vieja pone currentHp=0 a mano sin pasar por ese canal (ver regresion40)' },
+        { linea: 'DESTRUIDO', motivo: 'destrucción directa sin Retribución: la nueva anuncia "DESTRUIDO" en vez de "-N VIDA"; la vieja no anunciaba nada (ver regresion40)' },
     ],
 };
 
@@ -73,7 +75,7 @@ const escenarios = [
         p1: { vanguardia: ['Mini-tigre', 'Robot de seguridad SP', 'Oso con armadura', 'Achmay'], mano: ['Némesis'] },
         p2: {},
         pasos: [ { jugar: 'Némesis' } ],
-        ...FLOTANTE_VIDA_AUTOMATICO,
+        ...FLOTANTE_DESTRUIDO,
     },
     {
         nombre: 'Némesis rechazada: la vanguardia no está llena',

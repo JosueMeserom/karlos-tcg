@@ -6607,7 +6607,12 @@ const CARD_DB = [
                   logCara: { msg: "Moneda 1: CARA - ¡Drenaje de Furor enemigo!", tipo: "ability" },
                   logCruz: { msg: "Moneda 1: CRUZ - Sin efecto.", tipo: "neutral" },
                   cara: [
-                    { op: "ELEGIR", de: "ENEMIGOS", cantidad: 1, opcional: true,
+                    { op: "ELEGIR", de: "ENEMIGOS", cantidad: 1, opcional: true, cancelable: false,
+                      // cancelable:false (Toto, 31-jul-2026): la moneda ya salió CARA -acción
+                      // comprometida-, así que si hay enemigos elegibles no se puede declinar
+                      // (mismo criterio que ACERTIJO/PEM tras pagar/lanzar). `opcional` se queda
+                      // para el caso de pool VACÍO (nadie elegible), que ni siquiera llega a
+                      // mostrar el picker.
                       titulo: "GÁRGOLA: ELIGE ENEMIGO PARA QUITARLE 2 FUROR",
                       logSiVacio: "No hay enemigos para drenar.", logSiVacioTipo: "system",
                       efectos: [ { op: "MODIFICAR_STAT", stat: "furor", delta: -2 } ] } ] },
@@ -7016,8 +7021,28 @@ const DSL = {
             if (e.deltaCondicional) for (const dc of e.deltaCondicional) if (DSL._match(target, dc.filtro)) { d = dc.delta; break; }
             if (e.vaciar) d = -(target[e.stat] || 0); // "vacía este stat a 0" (Cortarrollos: todo el Furor del atacante)
             const antes = target[e.stat];
-            game.modifyStat(target, e.stat, d, e.offsetY || 0, e.fuente !== undefined ? e.fuente : sourceCard);
-            if (e.floating && typeof showFloatingText === 'function') showFloatingText(target.instanceId, String(e.floating.texto).split('{delta}').join(Math.abs(d)), e.floating.estilo || 'ft-green', e.floating.offset !== undefined ? e.floating.offset : -20);
+            // Orden de flotantes (betasteo de Toto, 31-jul-2026): en cambios ligados a
+            // comprobarMuerte (daño/destrucción — MALDITO de Muñeca del mal, DAÑO VERDADERO...)
+            // el flotante CUSTOM ("razón") sale ANTES del flotante del cambio de stat en sí:
+            // antes salía después, lo que en combate leía "muere -> luego se dice por qué", al
+            // revés de lo natural. Acotado a comprobarMuerte a propósito: los MODIFICAR_STAT de
+            // Furor (Apuesta, Infundir desesperación...) no tienen ese problema y no se tocan.
+            if (e.floating && e.comprobarMuerte && typeof showFloatingText === 'function') showFloatingText(target.instanceId, String(e.floating.texto).split('{delta}').join(Math.abs(d)), e.floating.estilo || 'ft-green', e.floating.offset !== undefined ? e.floating.offset : -20);
+            // "DESTRUIDO/A" (Toto, 31-jul-2026): cuando el cambio es una destrucción directa sin
+            // Retribución (vaciar+sinRetribucion sobre currentHp — Cañón de positrones, Kami,
+            // Némesis, Gárgola), el flotante de "-N VIDA" es engañoso: la Retribución se da
+            // precisamente cuando la Vida llega a 0, y aquí se está saltando ese cauce a
+            // propósito. En su lugar, "DESTRUIDO"/"DESTRUIDA" (según target.gender, mismo
+            // criterio que generoTexto en el cliente) — silent:true en modifyStat para que NO
+            // muestre su "-N VIDA" automático, pero SÍ corra el resto (interceptores, oculto
+            // revelado...). Muñeca del mal NO entra aquí: su víctima SÍ da Retribución
+            // (comprobarMuerte sin sinRetribucion), así que sigue siendo una muerte normal.
+            const _esDestruccion = e.vaciar && e.sinRetribucion && e.stat === 'currentHp';
+            game.modifyStat(target, e.stat, d, e.offsetY || 0, e.fuente !== undefined ? e.fuente : sourceCard, _esDestruccion ? { silent: true } : null);
+            if (_esDestruccion && typeof showFloatingText === 'function') showFloatingText(target.instanceId, target.gender === 'F' ? 'DESTRUIDA' : 'DESTRUIDO', 'ft-red', e.offsetY || 0);
+            // Furor y demás cambios sin comprobarMuerte: el flotante custom se queda en su
+            // posición ORIGINAL (después del cambio de stat) — sin reordenar (ver nota arriba).
+            if (e.floating && !e.comprobarMuerte && typeof showFloatingText === 'function') showFloatingText(target.instanceId, String(e.floating.texto).split('{delta}').join(Math.abs(d)), e.floating.estilo || 'ft-green', e.floating.offset !== undefined ? e.floating.offset : -20);
             if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: DSL._nombre(game, target), antes, despues: target[e.stat] }), e.logTipo || 'ability');
             // sinRetribucion (Cañón de positrones/Kami, 30-jul-2026): "destrucción" directa, no
             // muerte en combate — la vieja llamaba a checkDeath(target, false) a mano para que
