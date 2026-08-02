@@ -2882,67 +2882,47 @@ const CARD_DB = [
                 await game.checkDeath(card); // <--- ELIMINADO EL 'false' AQUÍ
             }
         },
-        canActivateAbility: function(card, game) {
-            if (card.furor < 1) { game.logMsg("Falta Furor (1).", 'system'); return false; }
-            const p = game.players[card.owner];
-            const otherVanguard = p.vanguard.filter(c => c.instanceId !== card.instanceId);
-            if (otherVanguard.length === 0) { game.logError("Necesitas otro aliado en la vanguardia para el sacrificio."); return false; }
-            
-            const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
-            const enemyP = game.players[enemyId];
-            const validEnemies = [...enemyP.vanguard, ...enemyP.rearguard].filter(c => !getCardTemplate(c.id).isAvatar);
-            if (validEnemies.length === 0) { game.logError("No hay enemigos a los que aniquilar."); return false; }
-            return true;
-        },
-        onExecuteAbility: function(card, game) {
-            game.selectedCard = card;
-            game.inputState = 'SELECT_ABILITY_TARGETS';
-            game.abilityContext = { targets: [], maxTargets: 2, name: 'SACRIFICIO EQUIVALENTE', targetType: 'ally' };
-            game.isActionLocked = true;
-            game.logMsg("PASO 1: Elige un aliado de TU vanguardia para sacrificar.", 'system');
-            game.render();
-        },
-        onValidateTarget: function(card, target, game, isSilent) {
-            const ctx = game.abilityContext;
-            if (ctx.targets.length === 0) {
-                if (target.owner !== card.owner) return false;
-                if (target.location !== 'vanguard') { if (!isSilent) game.logMsg("Debe ser de la vanguardia."); return false; }
-                if (target.instanceId === card.instanceId) { if (!isSilent) game.logMsg("Kami no se puede sacrificar a sí misma."); return false; }
-                return true;
-            } else if (ctx.targets.length === 1) {
-                if (target.owner === card.owner) { if (!isSilent) game.logMsg("Ahora debes elegir a un ENEMIGO."); return false; }
-                if (getCardTemplate(target.id).isAvatar) return false; 
-                return true;
-            }
-            return false;
-        },
-        onTargetsReady: async function(card, game) {
-            const ally = game.abilityContext.targets[0];
-            const enemy = game.abilityContext.targets[1];
-            game.modifyStat(card, 'furor', -1);
-            
-            showFloatingText(card.instanceId, card.activeName, "ft-ability", -30);
-            game.logMsg(`¡Kami sacrifica a ${ally.name} para aniquilar por completo a ${enemy.name}!`, 'ability');
-            
-            const el1 = document.querySelector(`.card[data-id="${ally.instanceId}"]`);
-            const el2 = document.querySelector(`.card[data-id="${enemy.instanceId}"]`);
-            if (el1) el1.classList.add('shaking');
-            if (el2) el2.classList.add('shaking');
-            
-            await game.sleep(600);
-            ally.currentHp = 0;
-            enemy.currentHp = 0;
-            
-            // Como es "Destrucción" directa y no daño, evitamos que roben retribución poniendo false
-            await game.checkDeath(ally, false);
-            await game.checkDeath(enemy, false);
-            
-            card.exhausted = true;
-            game.isActionLocked = false;
-            game.cancelAction();
-            game.updatePassives();
-            game.render();
-        }
+        // BUG REAL PREEXISTENTE encontrado en el betasteo de esta migración (31-jul-2026, no
+        // introducido por ella): la vieja (código imperativo original, todavía vivo en
+        // cartas_antes_de_dsl.js) NUNCA podía completar SACRIFICIO EQUIVALENTE. Su
+        // onExecuteAbility fija `ctx.targetType:'ally'` para TODA la selección, pero la
+        // Habilidad necesita un aliado en el 1er clic y un ENEMIGO en el 2º; el gate genérico
+        // de seguridad en index.html (handleCardClick, "if (isValid && ctx.targetType==='ally'
+        // && card.owner !== this.selectedCard.owner) isValid=false;") ignora lo que el propio
+        // onValidateTarget de Kami ya validaba bien, y bloquea el 2º clic sin más — la
+        // Habilidad se queda atascada para siempre tras el primer objetivo. Esta migración lo
+        // arregla DE ENCIMA: al usar ELEGIR/pickBoardTargets (dos llamadas independientes, cada
+        // una con su propio pool ALIADOS/ENEMIGOS) en vez del flujo RAW de abilityContext, ese
+        // gate genérico ni se toca. No se ha tocado el gate en sí (arreglarlo ahí afectaría a
+        // CUALQUIER carta que dependa de esa red de seguridad; fuera de alcance de esta tanda,
+        // y ya no hace falta para Kami). La vieja (congelada, nunca se edita) sigue con el bug
+        // para siempre — es la base de comparación histórica, no el juego en vivo.
+        // SACRIFICIO EQUIVALENTE migrada (31-jul-2026): dos ELEGIR secuenciales (1º aliado de
+        // vanguardia propia excluyéndose a sí misma, 2º enemigo), cada uno con su propio
+        // MODIFICAR_STAT `vaciar+sinRetribucion+comprobarMuerte` — el mismo canal de
+        // "destrucción directa" que ya usa Cañón de positrones, sin op nuevo. `excluirSelf`
+        // (el que reconoce ELEGIR, no `excludeSelf` de `_pool`/COUNT) evita que Kami se elija a
+        // sí misma en el primer paso. Diferencia de log aceptada: la vieja anuncia AMBOS
+        // sacrificios en una sola línea ("sacrifica a X para aniquilar a Y"); la nueva, con dos
+        // efectos independientes, anuncia cada uno por separado.
+        // OJO: el requisito de "otro aliado" pide >=1, no >=2 — `count:{quien:"ALIADO"}`
+        // EXCLUYE Avatares por defecto (Kami: intocable, `_pool`), así que Kami misma NUNCA
+        // cuenta en este recuento; >=1 ya significa "hay otro aliado además de mí".
+        abilities: [
+            { trigger: "ACTIVA", nombre: "SACRIFICIO EQUIVALENTE", coste: { furor: 1 }, sinObjetivo: true,
+              requisitos: [
+                { count: { quien: "ALIADO", zona: "vanguardia" }, op: ">=", valor: 1, msg: "Necesitas otro aliado en la vanguardia para el sacrificio." },
+                { count: { quien: "ENEMIGO" }, op: ">=", valor: 1, msg: "No hay enemigos a los que aniquilar." } ],
+              efectos: [
+                { op: "ELEGIR", de: "ALIADOS", zona: "VANGUARDIA", excluirSelf: true, cantidad: 1, cancelable: false,
+                  titulo: "PASO 1: Elige un aliado de TU vanguardia para sacrificar.",
+                  efectos: [ { op: "MODIFICAR_STAT", stat: "currentHp", vaciar: true, sinRetribucion: true, comprobarMuerte: true,
+                                log: "¡SACRIFICIO EQUIVALENTE! Kami sacrifica a {objetivo}." } ] },
+                { op: "ELEGIR", de: "ENEMIGOS", cantidad: 1, cancelable: false,
+                  titulo: "PASO 2: Elige un enemigo para aniquilar.",
+                  efectos: [ { op: "MODIFICAR_STAT", stat: "currentHp", vaciar: true, sinRetribucion: true, comprobarMuerte: true,
+                                log: "¡SACRIFICIO EQUIVALENTE aniquila por completo a {objetivo}!" } ] } ] }
+        ],
     },
     {
         name: "Apagón", type: "Evento", rarity: "C", cost: 1, duration: 2, series: 1, 
@@ -3567,33 +3547,40 @@ const CARD_DB = [
         name: "Némesis", hp: 7, def: 7, atk: 8, type: "Personaje", subtype: "Ser vivo", tags: ["Diosa"], gender: "F", rarity: "S", cost: 2, series: 1,
         text: "Coste: Tu vanguardia llena, que se destruye al colocarla. P: NACIMIENTO DE DIVINIDAD: Una vez por turno, puedes destruir un aliado para curarla 1 Vida. A: OBLITERACIÓN (3F): Ataque especial que ignora completamente la Def del enemigo.",
         passiveName: "NACIMIENTO DE DIVINIDAD", activeName: "OBLITERACIÓN", activeCost: 3,
-        
-        onBeforePlayAsync: async function(card, game, p) {
-            if (p.vanguard.length < 4) {
-                game.logError("Necesitas tener la vanguardia llena (4 aliados) para colocar a Némesis.");
-                return false;
-            }
-            game.logMsg(`¡Némesis desciende y aniquila a toda su propia vanguardia como tributo!`, 'ability');
-            
-            const toDestroy = [...p.vanguard].filter(c => !getCardTemplate(c.id).isAvatar);
-            const idsToAnimate = toDestroy.map(c => c.instanceId);
-            
-            if (typeof animateMassiveSacrifice === 'function') {
-                await animateMassiveSacrifice(idsToAnimate);
-            }
-            
-            await Promise.all(toDestroy.map(async (ally) => {
-                ally.currentHp = 0;
-                await game.checkDeath(ally, false, true); 
-            }));
-            
-            return true;
-        },
-        
+        // Coste de colocación migrado (31-jul-2026). Usa JUGAR requisitos (vanguardia llena) +
+        // ANTES_DE_JUGAR (corre ANTES de colocar a Némesis, así que su propia vanguardia-
+        // objetivo son solo las 4 cartas YA en el campo, ella misma no cuenta todavía) con
+        // MODIFICAR_STAT `vaciar+sinRetribucion+comprobarMuerte` — el MISMO canal de
+        // "destrucción directa" que ya usa Cañón de positrones, sin necesitar ningún op
+        // "DESTRUIR" nuevo. `_pool` ya excluye Avatares por defecto (Kami intocable), así que
+        // no hace falta filtrar isAvatar a mano. `log` en ANTES_DE_JUGAR era una pieza que
+        // faltaba (sus hermanos AL_JUGAR/INICIO_TURNO/FIN_TURNO ya la tenían), añadida aquí.
+        // Simplificación aceptada: la vieja pasaba `skipAnim:true` a checkDeath para que las 4
+        // muertes no animen individualmente encima de animateMassiveSacrifice (coreografía
+        // visual, invisible al harness); la nueva anima cada una por separado.
+        //
+        // OBLITERACIÓN y NACIMIENTO DE DIVINIDAD se quedan imperativas JUNTAS, a propósito:
+        // comparten los mismos onValidateTarget/onTargetsReady (bifurcan por
+        // ctx.name==='SACRIFICIO_NEMESIS'), y NACIMIENTO DE DIVINIDAD depende de
+        // getCustomActions (botón extra fuera del flujo estándar) — migrar solo OBLITERACIÓN
+        // dejaría el compilador sin poder generar su propio onExecuteAbility/onTargetsReady
+        // (el guard genérico es "si ya existe la función, no la toques", y aquí YA existe por
+        // culpa del sacrificio compartido) — la declaración quedaría muerta, sin ejecutarse
+        // nunca. No compensa reescribir a mano el multiplexado solo para esta carta.
+        abilities: [
+            { trigger: "JUGAR", requisitos: [
+                { count: { quien: "ALIADO", zona: "vanguardia" }, op: ">=", valor: 4,
+                  msg: "Necesitas tener la vanguardia llena (4 aliados) para colocar a Némesis." } ] },
+            { trigger: "ANTES_DE_JUGAR",
+              log: "¡Némesis desciende y aniquila a toda su propia vanguardia como tributo!",
+              efectos: [
+                { op: "MODIFICAR_STAT", target: { quien: "ALIADO", zona: "VANGUARDIA" }, stat: "currentHp",
+                  vaciar: true, sinRetribucion: true, comprobarMuerte: true } ] }
+        ],
         onStartTurn: function(card, game) {
             card.nemesisHealUsed = false; // Reseteamos la habilidad pasiva
         },
-        
+
         // --- EL NUEVO SISTEMA DE BOTONES EXTRA ---
         getCustomActions: function(card, game) {
             const alliesCount = [...game.players[card.owner].vanguard, ...game.players[card.owner].rearguard].length;
@@ -6313,24 +6300,26 @@ const CARD_DB = [
         name: "Muñeca del mal", hp: 2, def: 2, atk: 4, type: "Esbirro", subtype: "No-muerto", tags: ["Monstruo", "Creación artificial"], rarity: "B", cost: 1, series: 2,
         text: "P: IMPRECACIÓN: Cuando su Vida llegue a 0 debido a un ataque, echa una moneda. Si sale cara, destruye la carta que realizó ese ataque.",
         passiveName: "IMPRECACIÓN",
-        onAfterDefend: async function(defender, attacker, dmg, isSpecial, game) {
-            if (defender.currentHp <= 0 && attacker && attacker.currentHp > 0) {
-                game.logMsg(`¡${defender.passiveName}! La muñeca lanza una maldición final antes de expirar...`, 'ability');
-                
-                game.isActionLocked = true;
-                const results = await game.triggerCoinFlips(1, defender.owner);
-                
-                if (results && results[0] === 'heads') {
-                    game.logMsg(`Moneda: CARA - ¡La maldición atrapa a ${attacker.name} y lo destruye!`, 'combat');
-                    showFloatingText(attacker.instanceId, "MALDITO", "ft-purple", -30);
-                    attacker.currentHp = 0;
-                    await game.checkDeath(attacker, true); 
-                } else {
-                    game.logMsg(`Moneda: CRUZ - La maldición se disipa en el aire.`, 'neutral');
-                }
-                game.isActionLocked = false;
-            }
-        }
+        // Migrada (31-jul-2026): TRAS_DEFENDER (mismo trigger de Imp mayor/Gólem multielemental)
+        // con `si:{campo:"self.hp"}` para "cuando su Vida llegue a 0" e `ifObjetivo` para "SI el
+        // atacante sigue vivo" (evita procesar la maldición si el golpe mató a ambos a la vez).
+        // "Destruye" usa MODIFICAR_STAT vaciar+comprobarMuerte SIN `sinRetribucion` -a
+        // diferencia de Kami/Cañón de positrones/Némesis, la vieja aquí SÍ pasaba
+        // checkDeath(attacker, true): esto da retribución, es una maldición, no una anulación
+        // limpia-. Piezas nuevas en MONEDA: `log` (anuncio ANTES de lanzar, distinto de
+        // logCara/logCruz que anuncian el resultado) y `objetivo` en el fill de logCara/logCruz
+        // (faltaba).
+        abilities: [
+            { trigger: "TRAS_DEFENDER", nombre: "IMPRECACIÓN",
+              si: { campo: "self.hp", op: "<=", valor: 0 },
+              efectos: [
+                { op: "MONEDA", ifObjetivo: { campo: "hp", op: ">", valor: 0 },
+                  log: "¡IMPRECACIÓN! La muñeca lanza una maldición final antes de expirar...",
+                  logCara: { msg: "Moneda: CARA - ¡La maldición atrapa a {objetivo} y lo destruye!", tipo: "combat" },
+                  logCruz: { msg: "Moneda: CRUZ - La maldición se disipa en el aire.", tipo: "neutral" },
+                  cara: [ { op: "MODIFICAR_STAT", stat: "currentHp", vaciar: true, comprobarMuerte: true,
+                            floating: { texto: "MALDITO", estilo: "ft-purple", offset: -30 } } ] } ] }
+        ],
     },
     {
         name: "Experimento fallido", hp: 4, def: 3, atk: 5, type: "Esbirro", subtype: "No-muerto", tags: ["Monstruo", "Creación artificial"], rarity: "B", cost: 1, series: 2,
@@ -7235,10 +7224,14 @@ const DSL = {
             return true;
         }
         if (e.op === 'MONEDA') {
+            // log (Muñeca del mal, 31-jul-2026): anuncio ANTES de lanzar la moneda (p. ej. "lanza
+            // una maldición final..."), distinto de logCara/logCruz (que anuncian el resultado).
+            if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: target ? DSL._nombre(game, target) : '' }), e.logTipo || 'ability');
             const res = await game.triggerCoinFlips(e.cantidad || 1, ownerId);
             const cruz = res && res[0] === 'tails'; // sin resultado (cancelado) => rama de cara, como las cartas originales
             const dnM = typeof game.getDisplayName === 'function' ? game.getDisplayName(ownerId) : ownerId;
-            const FM = (t) => DSL._fill(t, { carta: sourceCard.name, jugador: dnM });
+            // objetivo (Muñeca del mal, 31-jul-2026): faltaba en el fill de logCara/logCruz.
+            const FM = (t) => DSL._fill(t, { carta: sourceCard.name, jugador: dnM, objetivo: target ? DSL._nombre(game, target) : '' });
             if (cruz) {
                 if (e.logCruz) game.logMsg(FM(e.logCruz.msg), e.logCruz.tipo || 'combat');
                 if (Array.isArray(e.cruz)) await DSL._runEffectList(e.cruz, sourceCard, game, ownerId, [target], habilidad);
@@ -8826,6 +8819,10 @@ const DSL = {
         const antesJugar = abs.find(a => a.trigger === 'ANTES_DE_JUGAR');
         if (antesJugar && typeof tmpl.onBeforePlayAsync !== 'function') {
             tmpl.onBeforePlayAsync = async function (card, game, p) {
+                // log (Némesis, 31-jul-2026): faltaba, a diferencia de AL_JUGAR/INICIO_TURNO/
+                // FIN_TURNO, que ya lo tienen — necesario para anunciar un coste de colocación
+                // ANTES de que la carta se coloque (p. ej. "aniquila su propia vanguardia").
+                if (antesJugar.log) game.logMsg(DSL._fill(antesJugar.log, { carta: card.name }), antesJugar.logTipo || 'ability');
                 const res = await DSL._runEffectList(antesJugar.efectos || [], card, game, card.owner, null);
                 return !(res && res.ok === false);
             };

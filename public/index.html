@@ -5267,7 +5267,16 @@
                     const vanguardFull = p.vanguard.length >= 4;
                     if (!template.isEvolution && !vanguardFull && card.type === 'Personaje' && vanguardChars >= 2) {
                         if (!isRemote) this.logError("Límite de Personajes en Vanguardia alcanzado (máx. 2). No puedes jugar otro hasta llenarla con Esbirros.");
-                        return; 
+                        return;
+                    }
+                    // JUGAR requisitos (Némesis, 31-jul-2026): a diferencia de Ayuda/Evento (arriba),
+                    // esta rama nunca llamaba a canPlayCard -las cartas de Personaje/Esbirro con
+                    // requisito de colocación lo comprobaban a mano dentro de onBeforePlayAsync,
+                    // devolviendo false-. El compilador SÍ genera canPlayCard desde `JUGAR
+                    // requisitos` para cualquier tipo, pero el motor nunca lo invocaba aquí: gap
+                    // real, no específico de esta carta.
+                    if (typeof template.canPlayCard === 'function') {
+                        if (!template.canPlayCard(card, this, p)) return;
                     }
                 }
 
