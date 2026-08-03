@@ -4562,80 +4562,43 @@ const CARD_DB = [
     {
         name: "Poder Legado", type: "Ayuda", subtype: "Técnica", tags: ["Equipable"], rarity: "S", cost: 1, series: 2,
         text: "Anexa a Vanguardia con 'Karlos' y exactamente 1 de Vida. Sus stats pasan a ser 9 (inamovible). Quien le ataque pierde 1 de Furor. Al inicio de tu próximo turno, destruye este equipo y devuelve el personaje a tu mano.",
-        canPlayCard: function(card, game, p) {
-            const valid = p.vanguard.filter(c => c.name.includes("Karlos") && c.currentHp === 1);
-            if (valid.length === 0) { game.logError("Necesitas un Karlos en vanguardia con exactamente 1 de Vida."); return false; }
-            return true;
-        },
-        onPlay: async function(card, game) {
-            const p = game.players[card.owner];
-            const valid = p.vanguard.filter(c => c.name.includes("Karlos") && c.currentHp === 1);
-            const chosen = await game.openVisualSearchModal('¿QUIÉN DESPIERTA EL PODER LEGADO?', valid, 1, true, card.owner);
-            if (!chosen || chosen.length === 0) { game.cancelAction(); return; }
-
-            const target = chosen[0];
-            
-            if (!target.equippedCards) target.equippedCards = [];
-            target.equippedCards.push(card);
-            
-            const handIdx = p.hand.findIndex(c => c.instanceId === card.instanceId);
-            if (handIdx !== -1) p.hand.splice(handIdx, 1);
-            
-            card.location = 'equipped';
-            card.equippedTo = target.instanceId;
-
-            // Escudo temporal para devolver a la mano en el sig. turno
-            if (!target.tempEffects) target.tempEffects = [];
-            target.tempEffects.push({ sourceId: card.id, ownerId: card.owner, turnApplied: game.turn, isLegado: true, cardRef: card });
-
-            showFloatingText(target.instanceId, "PODER LEGADO", "ft-purple", -40);
-            game.logMsg(`¡${target.name} despierta su verdadero poder!`, 'ability');
-
-            game.updatePassives();
-            game.cancelAction();
-            game.render();
-        },
-        onEquipUpdate: function(equipCard, target, game) {
-            // Bloquea los stats al máximo
-            target.currentAtk = 9;
-            target.currentDef = 9;
-            target.maxHp = 9;
-            target.currentHp = 9;
-            target.ignoreStatCaps = true; // Para que el motor no baje cosas
-        },
-        // Aquí usa el nuevo Hook que añadimos a index.html (reacciona al ser atacado)
-        onEquipBeforeDefend: async function(equipCard, defender, attacker, game) {
-            game.logMsg(`El aura del Poder Legado drena la energía de ${attacker.name}. (-1 Furor)`, 'ability');
-            game.modifyStat(attacker, 'furor', -1);
-            showFloatingText(attacker.instanceId, "-1 FUR (Aura)", "ft-red-stat", -20);
-        },
-        onStartTurnTempEffect: async function(target, effect, game, currentTurnPlayerId) {
-            if (effect.turnApplied === game.turn) return true; // El mismo turno que se jugó se salva
-            
-            if (currentTurnPlayerId === effect.ownerId && effect.isLegado) {
-                game.logMsg(`El Poder Legado ha consumido la energía de ${target.name}. Regresa a la mano.`, 'ability');
-                
-                const p = game.players[target.owner];
-                p.vanguard = p.vanguard.filter(c => c.instanceId !== target.instanceId);
-                
-                // Lo lavamos antes de devolverlo a la mano
-                if (typeof game.resetCard === 'function') game.resetCard(target);
-                target.location = 'hand';
-                p.hand.push(target);
-                
-                try { await window.animateSpinToHand(target.instanceId, target.owner); } catch(e){}
-                
-                game.render();
-                return false; // Borra el efecto
-            }
-            return true;
-        },
-        // Equipo: el 3er parámetro es la propia carta equipada (el motor la pasa así).
-        onGetPreviewEffects: function(card, game, eq) {
-            if (card.type !== 'Personaje' && card.type !== 'Esbirro') return [];
-            const ref = eq && typeof game.refCarta === 'function' ? game.refCarta(eq) : 'Poder Legado';
-            return [`Stats bloqueados a 9; vuelve a la mano al inicio de tu próximo turno, fuente: ${ref}`];
-        }
+        // Migrada (31-jul-2026), segunda de la tanda de equipos con vida propia. Reutiliza
+        // `cuentaAtras` de Súper Evolución (aquí de UN solo turno) y estrena dos piezas:
+        //   · `mientrasEquipado: {fijar:{...}, ignorarTopes:true}` — stats BLOQUEADOS a un valor
+        //     en vez de sumados, con el ignoreStatCaps del motor para que ningún techo los baje
+        //     ("inamovible", dice el texto). Hermano del `superStats` de Súper Evolución.
+        //   · Trigger `EQUIPO_ANTES_DE_DEFENDER` -> onEquipBeforeDefend: el interceptor que corre
+        //     cuando atacan a quien lleva el equipo. Es el hermano de ANTES_DE_DEFENDER, pero
+        //     declarado desde el equipo y no desde la carta que defiende.
+        // Al caducar basta con VOLVER_A_MANO con `reset`: resetCard llama a unequipAll, así que
+        // el propio equipo se va a la basura solo -sin él, el Karlos volvería a la mano con los
+        // stats aún bloqueados a 9 y el equipo encima-.
+        tempEffectText: "Stats bloqueados a 9; vuelve a la mano al inicio de tu próximo turno",
+        abilities: [
+            { trigger: "JUGAR", requisitos: [
+                { count: { quien: "ALIADO", zona: "vanguardia", filtros: [ { campo: "name", op: "contieneTexto", valor: "Karlos" }, { campo: "currentHp", op: "==", valor: 1 } ] },
+                  op: ">=", valor: 1, msg: "Necesitas un Karlos en vanguardia con exactamente 1 de Vida." } ] },
+            { trigger: "AL_EQUIPAR",
+              mientrasEquipado: { fijar: { atk: 9, def: 9, hp: 9 }, ignorarTopes: true },
+              efectos: [
+                { op: "ELEGIR", de: "ALIADOS", zona: "VANGUARDIA", cantidad: 1,
+                  filtros: [ { campo: "name", op: "contieneTexto", valor: "Karlos" }, { campo: "currentHp", op: "==", valor: 1 } ],
+                  titulo: "¿QUIÉN DESPIERTA EL PODER LEGADO?",
+                  efectos: [
+                    { op: "EQUIPAR",
+                      floats: [ { texto: "PODER LEGADO", estilo: "ft-purple", offset: -40 } ],
+                      log: "¡{objetivo} despierta su verdadero poder!" },
+                    { op: "MARCAR_TEMPORAL", conOwner: true, duracion: 1,
+                      cuentaAtras: {
+                        log: "El Poder Legado ha consumido la energía de {objetivo}. Regresa a la mano.",
+                        logTipo: "ability",
+                        alCaducar: [ { op: "VOLVER_A_MANO", reset: true } ] } } ] } ] },
+            { trigger: "EQUIPO_ANTES_DE_DEFENDER",
+              log: "El aura del Poder Legado drena la energía de {objetivo}. (-1 Furor)",
+              efectos: [
+                { op: "MODIFICAR_STAT", stat: "furor", delta: -1,
+                  floating: { texto: "-1 FUR (Aura)", estilo: "ft-red-stat", offset: -20 } } ] }
+        ],
     },
     {
         name: "Igniz", hp: 3, def: 2, atk: 4, type: "Personaje", subtype: "Ser vivo", tags: ["Mercenario", "Procedencia virtual", "Energía Adán"], gender: "M", rarity: "A", cost: 4, series: 2,
@@ -6631,7 +6594,7 @@ const KARLOS_RULES = {
 //  Valores: número | {COUNT:{...}} | {REF:"objetivo.furorMax"} (campos computados)
 // ===================================================================
 const DSL = {
-    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE', 'AURA', 'ANTES_DE_JUGAR', 'PUEDE_ATACAR', 'SOBRECURACION', 'REACCION', 'AL_MORIR', 'AL_MORIR_ALIADO', 'AL_DESTRUIR', 'ESPEJO', 'ANTES_DE_ATACAR', 'TRAS_ATACAR', 'TRAS_DEFENDER', 'ANTES_DE_DEFENDER', 'INTERCEPTOR_ATAQUE'],
+    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE', 'AURA', 'ANTES_DE_JUGAR', 'PUEDE_ATACAR', 'SOBRECURACION', 'REACCION', 'AL_MORIR', 'AL_MORIR_ALIADO', 'AL_DESTRUIR', 'ESPEJO', 'ANTES_DE_ATACAR', 'TRAS_ATACAR', 'TRAS_DEFENDER', 'ANTES_DE_DEFENDER', 'INTERCEPTOR_ATAQUE', 'EQUIPO_ANTES_DE_DEFENDER'],
     // Los 5 últimos ops solo tienen sentido dentro de una REACCION (los interpreta
     // DSL._runReaccion, no _doEffect): controlan el resultado que la reacción
     // devuelve al motor de combate (redirigir el ataque, cancelarlo, drenar Furor
@@ -7427,7 +7390,12 @@ const DSL = {
             pl.vanguard = pl.vanguard.filter(c => c.instanceId !== target.instanceId);
             pl.rearguard = pl.rearguard.filter(c => c.instanceId !== target.instanceId);
             target.location = 'hand';
-            target.currentHp = getCardTemplate(target.id).hp;
+            // reset (Poder Legado, 31-jul-2026): lavado completo con resetCard en vez de solo
+            // restaurar la Vida. Importa aquí porque el portador vuelve a la mano CON un equipo
+            // encima y con los stats bloqueados a 9: resetCard deshace ambas cosas (llama a
+            // unequipAll, que manda el equipo a la basura). Sin él volvería a la mano evolucionado.
+            if (e.reset && typeof game.resetCard === 'function') game.resetCard(target);
+            else target.currentHp = getCardTemplate(target.id).hp;
             pl.hand.push(target);
             if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
             return true;
@@ -8235,6 +8203,16 @@ const DSL = {
                     }
                     return;
                 }
+                // fijar (Poder Legado, 31-jul-2026): stats BLOQUEADOS a un valor, no sumados.
+                // `ignorarTopes` levanta el ignoreStatCaps del motor para que ningún techo los
+                // baje después (la carta dice "inamovible").
+                if (m.fijar) {
+                    if (m.fijar.atk !== undefined) hostCard.currentAtk = m.fijar.atk;
+                    if (m.fijar.def !== undefined) hostCard.currentDef = m.fijar.def;
+                    if (m.fijar.hp !== undefined) { hostCard.maxHp = m.fijar.hp; hostCard.currentHp = m.fijar.hp; }
+                    if (m.ignorarTopes) hostCard.ignoreStatCaps = true;
+                    return;
+                }
                 if (m.atk) hostCard.currentAtk += m.atk;
                 if (m.def) hostCard.currentDef += m.def;
             };
@@ -8571,6 +8549,20 @@ const DSL = {
                     return false;
                 }
                 return true;
+            };
+        }
+
+        // EQUIPO_ANTES_DE_DEFENDER -> onEquipBeforeDefend: interceptor que corre cuando atacan a
+        // QUIEN LLEVA este equipo (Poder Legado drena Furor al agresor). Es el hermano de
+        // ANTES_DE_DEFENDER, pero el hook del motor es otro: aquel lo declara la carta que
+        // defiende, y este el equipo que lleva puesto. `sourceCard` es el EQUIPO, `target` el
+        // atacante, y el portador queda accesible como {defensor} en los textos.
+        const eqDefender = abs.find(a => a.trigger === 'EQUIPO_ANTES_DE_DEFENDER');
+        if (eqDefender && typeof tmpl.onEquipBeforeDefend !== 'function') {
+            tmpl.onEquipBeforeDefend = async function (equipCard, defender, attacker, game) {
+                if (eqDefender.si && !DSL._cond(defender, game, eqDefender.si)) return;
+                if (eqDefender.log) game.logMsg(DSL._fill(eqDefender.log, { carta: equipCard.name, defensor: DSL._nombre(game, defender), objetivo: DSL._nombre(game, attacker) }), eqDefender.logTipo || 'ability');
+                await DSL._runEffectList(eqDefender.efectos || [], equipCard, game, equipCard.owner, [attacker], eqDefender.nombre || null);
             };
         }
 
