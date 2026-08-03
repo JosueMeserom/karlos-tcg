@@ -441,12 +441,15 @@ function buscarInstancia(ctx, inst, ref, zonas, jugador, indice) {
             mano: p.hand, vanguardia: p.vanguard, retaguardia: p.rearguard,
             mazo: p.deck, descartes: p.discard, retribucion: p.retribution,
         };
+        // Se admite el ID NUMÉRICO además del nombre y del instanceId (igual que ya hacía el paso
+        // {busqueda}): es la única forma de referirse a una carta que se llama distinto en cada
+        // base, como Súper Evolución (id 1049), renombrada en la nueva y congelada en la vieja.
         for (const z of zonas) {
             for (const c of (listas[z] || [])) {
-                if (c.instanceId === ref || c.name === ref) encontradas.push(c);
+                if (c.instanceId === ref || c.name === ref || c.id === ref) encontradas.push(c);
             }
         }
-        if (zonas.includes('evento') && p.activeEvent && (p.activeEvent.instanceId === ref || p.activeEvent.name === ref)) {
+        if (zonas.includes('evento') && p.activeEvent && (p.activeEvent.instanceId === ref || p.activeEvent.name === ref || p.activeEvent.id === ref)) {
             encontradas.push(p.activeEvent);
         }
     }

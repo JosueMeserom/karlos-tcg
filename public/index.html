@@ -7568,6 +7568,14 @@
                     const all = [...p.hand, ...p.vanguard, ...p.rearguard, ...p.deck, ...(p.discard || [])];
                     const found = all.find(c => c.instanceId === instanceId);
                     if (found) return found;
+                    // Los EQUIPOS no están en ninguna de esas zonas: cuelgan de equippedCards de
+                    // su portador. Sin esto, buscar por instanceId una Ayuda equipada devolvía
+                    // null -y con ella cualquier efecto que necesitara recuperarla, como el
+                    // temporizador de los equipos con cuenta atrás- (31-jul-2026).
+                    for (const c of [...p.vanguard, ...p.rearguard]) {
+                        const eq = (c.equippedCards || []).find(x => x.instanceId === instanceId);
+                        if (eq) return eq;
+                    }
                 }
                 return null;
             }
