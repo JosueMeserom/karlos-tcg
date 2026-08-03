@@ -3195,18 +3195,23 @@
                     add(cfg.mano || cfg.hand, 'hand', p.hand);
                     [...(cfg.mazo || cfg.deck || [])].reverse().forEach(s => p.deck.push(this._scenarioCard(s, pid, 'deck')));
                     add(cfg.descartes || cfg.discard, 'discard', p.discard);
-                    // Retribución: si el escenario NO la especifica, se rellena con 6 cartas (lo
-                    // que reparte la preparación normal). Sin esto quedaba VACÍA, y como esa pila
-                    // ES la vida del jugador, la primera muerte terminaba la partida al instante
+                    // Retribución: si el escenario NO la especifica, se rellena con 6 cartas de
+                    // relleno (Mini-tigre). Sin esto quedaba VACÍA, y como esa pila ES la vida
+                    // del jugador, la primera muerte terminaba la partida al instante
                     // (processRetribution: sin cartas que coger -> hp 0 -> gameOver). Betasteo de
                     // Toto, 27-jul-2026: creía que era por los mazos vacíos, pero era esto.
-                    // Se toman del mazo si lo hay; si no, se generan como relleno (nunca se ven
-                    // salvo que se roben, y para entonces ya son cartas normales y corrientes).
+                    // SIEMPRE generadas, nunca robadas del `mazo` del escenario (betasteo de
+                    // Toto, 31-jul-2026): antes tiraba de p.deck.pop() cuando había mazo, así que
+                    // un escenario con 8 cartas en el mazo se quedaba con solo 2 -las otras 6 se
+                    // habían ido en silencio a la pila de retribución-, rompiendo cualquier
+                    // prueba que dependiera de la profundidad real del mazo (p. ej. Karlitos:
+                    // PRÁCTICA CONSTANTE necesita que el mazo aguante varios robos). Nunca se ven
+                    // salvo que se roben, y para entonces ya son cartas normales y corrientes.
                     if (cfg.retribucion || cfg.retribution) {
                         add(cfg.retribucion || cfg.retribution, 'retribution', p.retribution);
                     } else {
                         for (let i = 0; i < 6; i++) {
-                            const c = p.deck.length ? p.deck.pop() : this._scenarioCard('Mini-tigre', pid, 'retribution');
+                            const c = this._scenarioCard('Mini-tigre', pid, 'retribution');
                             c.location = 'retribution';
                             p.retribution.push(c);
                         }
