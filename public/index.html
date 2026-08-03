@@ -4066,9 +4066,12 @@
                         // No-elector: si estoy en modo espejo (el elector reconectó y mi corrutina
                         // dirige), le empujo la interacción para que re-monte el picker en su tablero.
                         if (this._espejandoReaccion) this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'PENDING_INTERACTION', pi: this.pendingInteraction });
-                        const banner = document.getElementById('action-banner');
-                        banner.innerText = `Esperando a que ${this.getDisplayName(chooserId)} elija...`;
-                        banner.style.display = 'block';
+                        // SIN cartel de espera (Toto, 31-jul-2026): elegir un objetivo del campo
+                        // tras jugar una carta de la mano debe ser INVISIBLE para el rival hasta
+                        // que la jugada se resuelva, igual que lo es con Manzanahoria y cualquier
+                        // otra Ayuda dirigida (esas van por SELECT_AYUDA_TARGET y nunca han
+                        // enseñado nada). El cartel sí se mantiene en las REACCIONES, donde el
+                        // rival está legítimamente parado esperando tu decisión.
                         return; // sin picker local: lo resuelve el replay remoto (VISUAL_SEARCH_CONFIRM)
                     }
 
@@ -5396,6 +5399,18 @@
                         }
                         this.selectedCard = card;
                         this.inputState = 'SELECT_AYUDA_TARGET';
+                        // Descriptor SERIALIZABLE de "Ayuda dirigida esperando objetivo" (Toto,
+                        // 31-jul-2026). `inputState`/`selectedCard` son estado LOCAL y no viajan en
+                        // exportGameState, así que quien reconectaba aquí los perdía: el elector se
+                        // quedaba sin rebordes verdes, y -peor- el NO elector se quedaba en IDLE, con
+                        // lo que el replay del clic (SELECT_CARD, que llega por la cola) ya no
+                        // encajaba en la rama SELECT_AYUDA_TARGET y NO ejecutaba la Ayuda: la jugada
+                        // se aplicaba en un cliente y en el otro no. Desincronización permanente y
+                        // sin red de seguridad (a diferencia del pick del DSL, que al menos tenía el
+                        // volcado de estado posterior). Con esto, importGameState lo re-monta en LOS
+                        // DOS clientes y el replay de siempre vuelve a encajar.
+                        this.pendingInteraction = { tipo: 'ayudaTarget', chooserId: this.activePlayerId, sourceId: card.instanceId };
+                        this._interaccionChooser = this.activePlayerId;
                         if (!isRemote) this.logError(`Selecciona objetivo para ${card.name}.`);
                         this.render();
                     }
@@ -5510,6 +5525,12 @@
                 const card = this.selectedCard;
                 const p = this.players[this.activePlayerId];
                 const template = getCardTemplate(card.id);
+                // El objetivo ya está elegido: se retira el descriptor de "esperando objetivo"
+                // (ver playCard) para que un sync posterior no re-monte un targeting ya resuelto.
+                if (this.pendingInteraction && this.pendingInteraction.tipo === 'ayudaTarget') {
+                    this.pendingInteraction = null;
+                    this._interaccionChooser = null;
+                }
 
                 this.inputState = 'EXECUTING';
                 this.isActionLocked = true; 
@@ -5538,12 +5559,17 @@
                     }
                 }
                 
-                this.isActionLocked = false; 
+                this.isActionLocked = false;
                 this.cancelAction();
                 this.updatePassives();
                 this.render();
-                
+
                 this.forceSync();
+                // Red de seguridad: si un rival reconectó mientras yo elegía objetivo, le vuelco el
+                // estado final. Con el re-montaje de `ayudaTarget` el replay ya debería haberlo
+                // dejado igual, pero esto además CONSUME el flag -si no, se quedaría encendido y
+                // dispararía un volcado en una elección posterior que no lo necesita-.
+                this._reSyncTrasEleccionSiHaceFalta();
             }
 
         async selectCard(cardInstanceId, isRemote = false) {
@@ -7321,6 +7347,13 @@
                     this.pendingPlayCard = null;
                 }
 
+                // Targeting de Ayuda dirigida abortado: se retira su descriptor serializable
+                // (ver playCard), o un sync posterior lo re-montaría ya cancelado.
+                if (this.pendingInteraction && this.pendingInteraction.tipo === 'ayudaTarget') {
+                    this.pendingInteraction = null;
+                    this._interaccionChooser = null;
+                }
+
                 this.selectedCard = null;
                 this.inputState = 'IDLE';
                 this.abilityContext = null;
@@ -8968,13 +9001,28 @@
                 // reacción (ya lo cubre pendingReaction arriba, que puede llevar además esto).
                 const pi = state.pendingInteraction;
                 const yaTengoUI = this.currentChoices || this.dslPick || this._deckSearchActivo;
-                if (pi && pi.chooserId === this.myPlayerId && !yaTengoUI) {
+                if (pi && pi.tipo === 'ayudaTarget') {
+                    // Ayuda dirigida esperando objetivo (Manzanahoria y compañía). Se restaura en
+                    // LOS DOS clientes, no solo en el elector, y esa es justo la diferencia con el
+                    // resto de interacciones: aquí la elección NO se resuelve con una Promise viva,
+                    // sino con el replay del clic (SELECT_CARD) que la cola entrega a AMBOS. El no
+                    // elector necesita el mismo inputState/selectedCard para que ese replay vuelva
+                    // a encajar en la rama SELECT_AYUDA_TARGET de selectCard; sin ello ejecutaba la
+                    // Ayuda solo el elector. Silencioso a propósito: ningún cartel de espera.
+                    const _src = this.findCard(pi.sourceId);
+                    if (_src && !yaTengoUI) {
+                        this.selectedCard = _src;
+                        this.inputState = 'SELECT_AYUDA_TARGET';
+                        this.pendingInteraction = pi;
+                        this._interaccionChooser = pi.chooserId;
+                        this.render();
+                    }
+                } else if (pi && pi.chooserId === this.myPlayerId && !yaTengoUI) {
                     this._reMostrarInteraccionPendiente(pi);
-                } else if (pi && pi.chooserId !== this.myPlayerId && !state.pendingReaction && this.myPlayerId !== 'spectator' && this.activePlayerId !== 'setup') {
-                    const banner = document.getElementById('action-banner');
-                    banner.innerText = `Esperando a que ${this.getDisplayName(pi.chooserId)} elija...`;
-                    banner.style.display = 'block';
                 }
+                // Sin cartel para el NO elector (Toto, 31-jul-2026): ver la nota de
+                // pickBoardTargets. Elegir objetivo en el campo tras jugar una carta debe ser
+                // invisible para el rival; el cartel se queda solo en las reacciones (arriba).
             }
 
             _reMostrarReaccionPendiente(pr) {
@@ -9126,7 +9174,16 @@
                 const tengoInteraccion = this.currentChoices || this.currentVisualResolve || this.dslPick || this.pendingInteraction;
                 const esperandoRival = tengoInteraccion && this._interaccionChooser && this._interaccionChooser !== this.myPlayerId;
                 this._dbgRx('atenderRequestSync', { esperandoRival, chooser: this._interaccionChooser, currentChoices: !!this.currentChoices, pendingReaction: !!this.pendingReaction, pendingInteraction: this.pendingInteraction && this.pendingInteraction.tipo, inputState: this.inputState });
-                if (esperandoRival && ((this.currentChoices && this.pendingReaction) || this.pendingInteraction)) {
+                // Ayuda dirigida esperando objetivo: NO hace falta modo espejo. Ahí no hay ninguna
+                // corrutina viva que dirigir -la elección se resuelve con el replay del clic
+                // (SELECT_CARD) que la cola entrega a los dos clientes-, y el reconectado recupera
+                // su targeting solo con el estado, porque `pendingInteraction` lo describe entero.
+                // Entrar en espejo dejaría el flag encendido sin nadie que lo apague.
+                const _soloEstado = this.pendingInteraction && this.pendingInteraction.tipo === 'ayudaTarget';
+                if (esperandoRival && _soloEstado) {
+                    this._dbgRx('-> ayudaTarget: solo estado, sin modo espejo');
+                    this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'HARD_SYNC', state: this.exportGameState(), targetId: target });
+                } else if (esperandoRival && ((this.currentChoices && this.pendingReaction) || this.pendingInteraction)) {
                     // REACCIÓN o interacción visual (tablero/mazo/moneda) del rival: reanudar
                     // perfecto. Entro en modo espejo y le mando el estado TAL CUAL (incluye
                     // pendingReaction/pendingInteraction): el reconectado re-mostrará su UI y
