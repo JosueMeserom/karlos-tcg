@@ -450,33 +450,33 @@ const CARD_DB = [
         text: "P: PSEUDO-PREVASIÓN: Cada vez que Águila es atacado por un ataque normal, echa una moneda. Si es cara, evita dicho ataque y sus efectos. A: ESPÍA (2F): Elige un tipo de carta (Personaje, Esbirro, Ayuda o Evento), luego, echa un vistazo a la mano de tu rival; elimina Furor de un enemigo equivalente a la cantidad de cartas del tipo que elegiste que haya en la mano del rival.",
         passiveName: "PSEUDO-PREVASIÓN", activeName: "ESPÍA", activeCost: 2, series: 1,
 
-        // HOOK 1: Defensa ante ataques o habilidades (La Esquiva)
-        // isSpecial (28-jul-2026): PSEUDO-PREVASIÓN solo esquiva "ante ataques normales" (así lo
-        // dice su propio texto) — hasta ahora onBeforeDefend no distinguía el tipo de ataque y
-        // Águila esquivaba TAMBIÉN los especiales (Karolina, Raiju, y ahora Hechicero/Lolita/
-        // Eris). Bug real preexistente, no introducido por la migración de esta sesión: ya
-        // afectaba a Karolina/Raiju antes de tocar nada. El 5º parámetro llega ahora desde los 9
-        // puntos del motor que llaman a onBeforeDefend.
-        onBeforeDefend: async function(defender, attacker, game, abilityName, isSpecial) {
-            if (isSpecial) return false; // Los ataques especiales ni se intentan esquivar
-
-            const attackerTemplate = getCardTemplate(attacker.id);
-            if (attackerTemplate.uncounterable) {
-                game.logMsg(`${attacker.name} ignora las defensas evasivas gracias a su pasiva.`, 'system');
-                return false; // El ataque no se puede contrarrestar/esquivar
-            }
-
-            game.logMsg(`¡Habilidad pasiva de ${game.getCardNameWithOwner(defender)}: ${defender.passiveName} tiene lugar! (Esquiva)`, 'ability');
-            showFloatingText(defender.instanceId, defender.passiveName, "ft-ability", -30);
-
-            const results = await game.triggerCoinFlips(1, defender.owner);
-            if (results && results[0] === 'heads') {
-                await animateDodge(attacker.instanceId, defender.instanceId);
-                game.logMsg(`¡${game.getCardNameWithOwner(defender)} ESQUIVÓ el ataque de ${attacker.name}!`, 'combat');
-                return true; // True = esquivó con éxito
-            }
-            return false; // False = se come el golpe
-        },
+        // PSEUDO-PREVASIÓN migrada (31-jul-2026): estrena el op `ESQUIVAR`, que convierte la
+        // esquiva de ANTES_DE_DEFENDER en CONDICIONAL — hasta ahora el trigger solo sabía
+        // esquivar siempre (`esquiva:true`), y esta carta necesita que dependa de una moneda.
+        // El op se limita a levantar el flag que el compilador lee al final, así que puede
+        // colgar de una MONEDA, un `if` o lo que haga falta; además lanza `animateDodge` y su
+        // propio log, que es donde la vieja los tenía.
+        //
+        // `soloAtaqueNormal` y `salvoIncontrarrestable` son los dos gates que la vieja hacía a
+        // mano (esquiva solo ataques normales -así lo dice su texto- y Aniceto la atraviesa con
+        // SAPIENCIA MÁGICA); ahora son campos del trigger, reutilizables por cualquier otra
+        // carta de esquiva futura.
+        //
+        // ESPÍA se queda imperativa: encadena un modal propio de elección de TIPO de carta
+        // (inputState 'SELECT_CARD_TYPE' + onTypeSelected), el visor de la mano rival
+        // (onHandViewClosed) y solo entonces una selección de objetivo, contando cartas de ese
+        // tipo en la mano del rival. Son tres pantallas encadenadas con estado propio, no un
+        // patrón que hoy exista ni que compense construir para una sola carta.
+        abilities: [
+            { trigger: "ANTES_DE_DEFENDER", nombre: "PSEUDO-PREVASIÓN",
+              soloAtaqueNormal: true, salvoIncontrarrestable: true,
+              logIncontrarrestable: "{objetivo} ignora las defensas evasivas gracias a su pasiva.",
+              log: "¡Habilidad pasiva de {defensor}: PSEUDO-PREVASIÓN tiene lugar! (Esquiva)",
+              efectos: [
+                { op: "FLOTANTE", target: { quien: "SELF" }, texto: "PSEUDO-PREVASIÓN", estilo: "ft-ability", offset: -30 },
+                { op: "MONEDA",
+                  cara: [ { op: "ESQUIVAR", log: "¡{defensor} ESQUIVÓ el ataque de {objetivo}!", logTipo: "combat" } ] } ] }
+        ],
 
         // HOOK 2: Coste personalizado (2 Furor en lugar de 1)
         canActivateAbility: function(card, game) {
@@ -3016,53 +3016,37 @@ const CARD_DB = [
         name: "Cogorza", type: "Evento", cost: 1, rarity: "C", series: 1,
         text: "2 turnos. Al colocarla, aumenta en 2 la Def de cada aliado de tu vanguardia mientras dure, y echa una moneda por cada uno: con cruz, ese aliado queda Confuso 2 turnos. Al expirar, cura 1 de Vida a cada aliado de tu vanguardia afectado por esta carta.",
         duration: 2,
-        onPlay: async function(card, game) {
-            const p = game.players[card.owner];
-            card.affectedAllies = []; // Guardamos a quién le hemos dado de beber
-            
-            // Usamos un bucle for clásico para respetar los tiempos de la moneda
-            for (let i = 0; i < p.vanguard.length; i++) {
-                const ally = p.vanguard[i];
-                if (getCardTemplate(ally.id).isAvatar) continue; // Los dioses no beben
-                
-                card.affectedAllies.push(ally.instanceId);
-                showFloatingText(ally.instanceId, "+2 DEF", "ft-green", -20);
-                
-                game.logMsg(`Echando moneda de la Cogorza para ${ally.name}...`, 'system');
-                const flip = await game.triggerCoinFlips(1, card.owner);
-                
-                if (flip[0] === 'tails') {
-                    game.logMsg(`¡CRUZ! ${ally.name} se emborracha y queda Confuso.`, 'ability');
-                    game.applyStatus(ally, 'confusion', 2, card.name);
-                } else {
-                    game.logMsg(`¡CARA! ${ally.name} aguanta bien la bebida.`, 'neutral');
-                }
-            }
-            game.updatePassives();
-        },
-        onUpdatePassive: function(card, game, p) {
-            if (!card.affectedAllies) return;
-            // El buff de +2 DEF solo se aplica mientras el evento siga vivo y a los afectados originales
-            p.vanguard.forEach(ally => {
-                if (card.affectedAllies.includes(ally.instanceId)) {
-                    ally.currentDef += 2;
-                }
-            });
-        },
-        onExpire: async function(card, game, playerId) {
-            const p = game.players[playerId];
-            if (!card.affectedAllies) return;
-            
-            for (const ally of p.vanguard) {
-                if (card.affectedAllies.includes(ally.instanceId)) {
-                    const template = getCardTemplate(ally.id);
-                    if (ally.currentHp < template.hp) {
-                        game.modifyStat(ally, 'currentHp', 1, -20, card.name);
-                        game.logMsg(`${ally.name} se recupera de la resaca y cura 1 de Vida.`, 'healing');
-                    }
-                }
-            }
-        }
+        // Migrada (31-jul-2026). La auditoría la había marcado como "necesita pieza nueva" por
+        // creer que el DSL no sabía lanzar UNA MONEDA POR MIEMBRO de un grupo. Falso: al leer
+        // `_runEffectList` de cerca, ya itera el pool y llama a `_doEffect` una vez por objetivo,
+        // así que un `MONEDA` con `target` de grupo tira una moneda por cada uno y sus ramas
+        // reciben ESE objetivo. Solo faltaban dos piezas, ambas pequeñas y reutilizables:
+        //   · `guardaIdsEnSelf` en un efecto normal (ELEGIR ya lo tenía): apunta a quién alcanzó
+        //     el pool, para que el +2 DEF y la curación al expirar vayan a "los que bebieron" y
+        //     no a "quien esté en vanguardia en ese momento".
+        //   · `stats` en AURA: bono continuo de Atq/Def, además de los campos que ya marcaba.
+        // La curación al expirar usa MODIFICAR_STAT y no CURAR a propósito: CURAR siempre pinta
+        // su propio flotante ('CURADO') y la vieja no lo hacía — con MODIFICAR_STAT sale solo el
+        // "+1 VIDA" automático, igual que antes. `ifObjetivo` cubre el "solo si está herido"
+        // (mismo patrón que CHUPAALMAS de Valafar).
+        abilities: [
+            { trigger: "AL_JUGAR",
+              efectos: [
+                { op: "FLOTANTE", target: { quien: "ALIADO", zona: "VANGUARDIA" }, guardaIdsEnSelf: "affectedAllies",
+                  texto: "+2 DEF", estilo: "ft-green", offset: -20 },
+                { op: "MONEDA", target: { selfLista: "affectedAllies" },
+                  log: "Echando moneda de la Cogorza para {objetivo}...", logTipo: "system",
+                  logCara: { msg: "¡CARA! {objetivo} aguanta bien la bebida.", tipo: "neutral" },
+                  logCruz: { msg: "¡CRUZ! {objetivo} se emborracha y queda {objetivoG?Confuso|Confusa}.", tipo: "ability" },
+                  cruz: [ { op: "APLICAR_ESTADO", estado: "confusion", duracion: 2, fuente: "Cogorza" } ] } ] },
+            { trigger: "AURA", quien: "ALIADO", soloSelfLista: "affectedAllies", stats: { def: 2 } },
+            { trigger: "AL_CADUCAR",
+              efectos: [
+                { op: "MODIFICAR_STAT", stat: "currentHp", delta: 1, offsetY: -20, fuente: "Cogorza",
+                  target: { selfLista: "affectedAllies" },
+                  ifObjetivo: { campo: "currentHp", op: "<", valorCampo: "maxHp" },
+                  log: "{objetivo} se recupera de la resaca y cura 1 de Vida.", logTipo: "healing" } ] }
+        ],
     },
     {
         name: "Infusión de maná", type: "Ayuda", subtype: "Técnica", cost: 1, rarity: "B", series: 1,
@@ -6770,7 +6754,7 @@ const DSL = {
     // DSL._runReaccion, no _doEffect): controlan el resultado que la reacción
     // devuelve al motor de combate (redirigir el ataque, cancelarlo, drenar Furor
     // tras él, fijar el daño, autoataque del atacante).
-    OPS_EFECTO: ['MODIFICAR_STAT', 'CURAR', 'DAÑO', 'APLICAR_ESTADO', 'MODIFICAR_CONTADORES', 'ATACAR', 'MONEDA', 'ROBAR', 'BUSCAR', 'MARCAR', 'VER_MANO', 'LIMPIAR_ESTADOS', 'ELEGIR', 'DESTRUIR_EVENTO', 'MARCAR_TEMPORAL', 'DESCARTAR', 'EQUIPAR', 'MARCAR_JUGADOR', 'FLOTANTE', 'FIJAR_STAT', 'REDIRIGIR', 'CANCELAR_ATAQUE', 'MARCAR_DRENAJE', 'FIJAR_DAÑO', 'ATACANTE_SE_AUTOATACA', 'VOLVER_A_MANO', 'RETRIBUCION', 'SUELO_STAT', 'TECHO_STAT', 'NO_CONSUMIR', 'BONO_ATAQUE', 'MARCAR_PARTIDA'],
+    OPS_EFECTO: ['MODIFICAR_STAT', 'CURAR', 'DAÑO', 'APLICAR_ESTADO', 'MODIFICAR_CONTADORES', 'ATACAR', 'MONEDA', 'ROBAR', 'BUSCAR', 'MARCAR', 'VER_MANO', 'LIMPIAR_ESTADOS', 'ELEGIR', 'DESTRUIR_EVENTO', 'MARCAR_TEMPORAL', 'DESCARTAR', 'EQUIPAR', 'MARCAR_JUGADOR', 'FLOTANTE', 'FIJAR_STAT', 'REDIRIGIR', 'CANCELAR_ATAQUE', 'MARCAR_DRENAJE', 'FIJAR_DAÑO', 'ATACANTE_SE_AUTOATACA', 'VOLVER_A_MANO', 'RETRIBUCION', 'SUELO_STAT', 'TECHO_STAT', 'NO_CONSUMIR', 'BONO_ATAQUE', 'MARCAR_PARTIDA', 'ESQUIVAR'],
     OPS_CMP: ['==', '!=', '<=', '>=', '<', '>', 'includes', 'contieneTexto', 'includesCI', 'truthy', 'falsy'],
     QUIEN: ['SELF', 'ALIADO', 'ENEMIGO', 'TODOS', 'ATACANTE', 'DEFENSOR'], // ATACANTE/DEFENSOR: solo en GLOBAL_TRAS_ATAQUE y REACCION
 
@@ -7238,7 +7222,8 @@ const DSL = {
             const cruz = res && res[0] === 'tails'; // sin resultado (cancelado) => rama de cara, como las cartas originales
             const dnM = typeof game.getDisplayName === 'function' ? game.getDisplayName(ownerId) : ownerId;
             // objetivo (Muñeca del mal, 31-jul-2026): faltaba en el fill de logCara/logCruz.
-            const FM = (t) => DSL._fill(t, { carta: sourceCard.name, jugador: dnM, objetivo: target ? DSL._nombre(game, target) : '' });
+            // objetivoG (Cogorza, 31-jul-2026): su código de género, para {objetivoG?masc|fem}.
+            const FM = (t) => DSL._fill(t, { carta: sourceCard.name, jugador: dnM, objetivo: target ? DSL._nombre(game, target) : '', objetivoG: target ? target.gender : undefined });
             if (cruz) {
                 if (e.logCruz) game.logMsg(FM(e.logCruz.msg), e.logCruz.tipo || 'combat');
                 if (Array.isArray(e.cruz)) await DSL._runEffectList(e.cruz, sourceCard, game, ownerId, [target], habilidad);
@@ -7412,6 +7397,18 @@ const DSL = {
             if (typeof e.delta === 'number') game.players[ownerId][e.campo] = (game.players[ownerId][e.campo] || 0) + e.delta;
             else game.players[ownerId][e.campo] = e.valor !== undefined ? e.valor : true;
             if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name }), e.logTipo || 'ability');
+            return true;
+        }
+        if (e.op === 'ESQUIVAR') {
+            // Solo tiene sentido dentro de ANTES_DE_DEFENDER, que es quien lee el flag y lo
+            // convierte en el `return true` que el motor entiende como "esquivado" (Águila,
+            // PSEUDO-PREVASIÓN, 31-jul-2026). Vive en `game` y no en la carta a propósito: es
+            // transitorio de UNA resolución y exportGameState no serializa campos sueltos de
+            // game, así que no ensucia el estado que compara el arnés.
+            // sourceCard = quien defiende/esquiva · target = quien ataca.
+            game._dslEsquiva = true;
+            if (typeof animateDodge === 'function') { try { await animateDodge(target.instanceId, sourceCard.instanceId); } catch (err) {} }
+            if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, defensor: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target) }), e.logTipo || 'combat');
             return true;
         }
         if (e.op === 'MARCAR_PARTIDA') {
@@ -7729,6 +7726,18 @@ const DSL = {
             const tspec = e.target;
             const targets = (!tspec || tspec === 'OBJETIVO') ? (Array.isArray(fallbackTargets) ? fallbackTargets : [fallbackTargets]) : DSL._pool(ownerId, game, tspec, sourceCard);
             if (!targets.length && e.logSiVacio) game.logMsg(DSL._fill(e.logSiVacio, Object.assign({}, (DSL._vars && DSL._vars[sourceCard.instanceId]) || {}, { carta: sourceCard.name })), e.logSiVacioTipo || 'system');
+            // guardaIdsEnSelf (Cogorza, 31-jul-2026): deja en la carta fuente los instanceId del
+            // pool que este efecto ha resuelto, para que efectos POSTERIORES puedan volver a
+            // alcanzar EXACTAMENTE a esos mismos (target:{selfLista} / AURA soloSelfLista) aunque
+            // el campo cambie luego. Mismo nombre y semántica que el `guardaIdsEnSelf` que ELEGIR
+            // ya tenía; aquí sirve para pools automáticos, sin elección del jugador. Cogorza lo
+            // necesita porque su +2 DEF y su curación al expirar son "para los que bebieron", no
+            // "para quien esté en vanguardia en ese momento".
+            // Se EXCLUYE ELEGIR: ese op guarda los suyos por su cuenta (los ELEGIDOS, no el pool
+            // ofrecido) y además suele correr sin `target`, así que aquí sus "targets" serían los
+            // fallback -null en Eventos-, machacando el campo con basura (rompía Esfuerzo
+            // dividido: chosenAllies). El filter(Boolean) protege ese mismo caso en general.
+            if (e.guardaIdsEnSelf && e.op !== 'ELEGIR') sourceCard[e.guardaIdsEnSelf] = targets.filter(Boolean).map(t => t.instanceId);
             // Animación declarativa de efecto (Toto, 30-jul-2026). Va AQUÍ y no dentro de
             // _doEffect a propósito: aquí la lista de objetivos ya está resuelta ENTERA, así
             // que el "casteo" suena UNA sola vez y los impactos se reparten entre todos —
@@ -8417,20 +8426,44 @@ const DSL = {
         }
 
         // ANTES_DE_DEFENDER -> onBeforeDefend: para ESQUIVA de verdad (a diferencia de
-        // TRAS_DEFENDER, esto SÍ debe decidirse antes del daño). Restaurada el 31-jul-2026
-        // (se había quitado por quedarse sin usuario tras mover Imp mayor a TRAS_DEFENDER,
-        // pero Toto pidió dejarla: Águila, PSEUDO-PREVASIÓN, sigue imperativa hoy -escribe
-        // onBeforeDefend a mano, sin pasar por ningún trigger DSL- y sería su usuario natural
-        // el día que se migre). `esquiva:true` en la Habilidad marca que devuelve true.
+        // TRAS_DEFENDER, esto SÍ debe decidirse antes del daño). Restaurada el 31-jul-2026 por
+        // petición de Toto cuando se quedó sin usuario, precisamente porque Águila
+        // (PSEUDO-PREVASIÓN) era su usuario natural — migrada ya (31-jul-2026), que es lo que
+        // trajo las tres piezas de abajo.
+        //
+        // Dos formas de decidir la esquiva:
+        //   · `esquiva: true` en la Habilidad -> esquiva SIEMPRE (incondicional).
+        //   · el op `ESQUIVAR` dentro de los efectos -> esquiva solo si ese op llega a correr,
+        //     así que puede colgar de una MONEDA, un `if`, lo que sea (Águila: 50%).
         const antesDefender = abs.find(a => a.trigger === 'ANTES_DE_DEFENDER');
         if (antesDefender && typeof tmpl.onBeforeDefend !== 'function') {
             tmpl.onBeforeDefend = async function (defender, attacker, game, abilityName, isSpecial) {
+                // soloAtaqueNormal: igual que en TRAS_DEFENDER, aquí el isSpecial que llega es el
+                // GENUINO (lo pasan los 9 puntos del motor que llaman a onBeforeDefend), sin
+                // heurística de abilityContext.
+                if (antesDefender.soloAtaqueNormal && isSpecial) return false;
+                // salvoIncontrarrestable: el atacante con `uncounterable` (Aniceto, SAPIENCIA
+                // MÁGICA: "no se pueden contrarrestar sus ataques...") atraviesa la esquiva. Se
+                // comprueba `uncounterable` directamente y no DSL._vetoAtaqueAplica, que además
+                // exime a `treatAttacksAsSpecial`: ese caso ya lo cubre soloAtaqueNormal (esos
+                // ataques llegan con isSpecial=true) y colaría un log equivocado.
+                // `defensor` = nombre COMPLETO de quien defiende (norma de 3ª persona con
+                // dueño); `carta` se queda como el nombre a secas, por coherencia con el resto
+                // de triggers.
+                const _fillD = { carta: defender.name, defensor: DSL._nombre(game, defender), objetivo: DSL._nombre(game, attacker) };
+                if (antesDefender.salvoIncontrarrestable && (DSL._tmpl(attacker.id) || {}).uncounterable) {
+                    if (antesDefender.logIncontrarrestable) game.logMsg(DSL._fill(antesDefender.logIncontrarrestable, _fillD), 'system');
+                    return false;
+                }
                 // si (31-jul-2026): mismo campo que ya soportan los otros tres triggers
                 // hermanos (ANTES_DE_ATACAR/TRAS_ATACAR/TRAS_DEFENDER); faltaba aquí también.
                 if (antesDefender.si && !DSL._cond(defender, game, antesDefender.si)) return false;
-                if (antesDefender.log) game.logMsg(DSL._fill(antesDefender.log, { carta: defender.name, objetivo: DSL._nombre(game, attacker) }), antesDefender.logTipo || 'ability');
+                if (antesDefender.log) game.logMsg(DSL._fill(antesDefender.log, _fillD), antesDefender.logTipo || 'ability');
+                game._dslEsquiva = false; // lo levanta el op ESQUIVAR si llega a correr
                 await DSL._runEffectList(antesDefender.efectos || [], defender, game, defender.owner, [attacker], antesDefender.nombre || tmpl.passiveName || null);
-                return !!antesDefender.esquiva;
+                const _esq = !!game._dslEsquiva;
+                delete game._dslEsquiva; // transitorio: no vive en exportGameState, no ensucia el arnés
+                return _esq || !!antesDefender.esquiva;
             };
         }
 
@@ -8954,6 +8987,15 @@ const DSL = {
                             if (a.sinAlgunaEtiqueta && c.tags && a.sinAlgunaEtiqueta.some(t => c.tags.includes(t))) return;
                             if (a.filtros && !a.filtros.every(f => DSL._match(c, f))) return;
                             (Array.isArray(a.marcar) ? a.marcar : (a.marcar ? [a.marcar] : [])).forEach(m => { c[m.campo] = m.valor !== undefined ? m.valor : true; });
+                            // stats (Cogorza, 31-jul-2026): bono continuo de Atq/Def a las cartas
+                            // que el aura alcanza, además de los campos que marca. Seguro e
+                            // idempotente porque updatePassives resetea currentAtk/currentDef a la
+                            // base de plantilla en CADA pasada antes de llamar aquí (mismo motivo
+                            // por el que `stats` de MARCAR_TEMPORAL puede sumar a pelo).
+                            if (a.stats) {
+                                if (a.stats.atk) c.currentAtk += a.stats.atk;
+                                if (a.stats.def) c.currentDef += a.stats.def;
+                            }
                         });
                     }
                 }

@@ -20,6 +20,14 @@
 'use strict';
 const { correrSuite } = require('./harness');
 
+// Águila (PSEUDO-PREVASIÓN) migrada al DSL el 31-jul-2026 (ver regresion53): su log de esquiva
+// nombraba al ATACANTE a secas (`attacker.name`); ahora usa DSL._nombre, como manda la norma de
+// logs en 3ª persona con dueño. Afecta a toda suite donde alguien ataca a Águila y falla.
+const ESQUIVA_NOMBRE_ATACANTE = (plano, conDueno) => ({
+    de: `ESQUIVÓ el ataque de ${plano}!`, a: `ESQUIVÓ el ataque de ${conDueno}!`,
+    motivo: 'norma del proyecto (logs en 3ª persona con dueño): la Águila vieja usaba attacker.name a secas; la migrada rellena {objetivo} con DSL._nombre',
+});
+
 const escenarios = [
     {
         nombre: 'CHUPAALMAS: ataque normal con éxito cura 1 de Vida a Valafar',
@@ -41,6 +49,7 @@ const escenarios = [
         p1: { vanguardia: [{ carta: 'Valafar', vida: 2, furor: 0 }] },
         p2: { vanguardia: ['Águila'] },
         monedas: ['cara'], // esquiva de PSEUDO-PREVASIÓN
+        logsIntencionados: [ ESQUIVA_NOMBRE_ATACANTE('Valafar', 'Valafar de J1 (Jugador 1)') ],
         pasos: [ { atacar: 'Valafar', objetivo: 'Águila' } ],
     },
 ];

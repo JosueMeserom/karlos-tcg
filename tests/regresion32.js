@@ -28,6 +28,14 @@ const { correrSuite } = require('./harness');
 
 const PROMPT_LIMO = { linea: 'Elige objetivo para ABRAZO PEGAJOSO.', motivo: 'prompt público de la vieja al entrar en modo selección; se estandariza a "sin prompt"' };
 
+// Águila (PSEUDO-PREVASIÓN) migrada al DSL el 31-jul-2026 (ver regresion53): su log de esquiva
+// nombraba al ATACANTE a secas (`attacker.name`); ahora usa DSL._nombre, como manda la norma de
+// logs en 3ª persona con dueño. Afecta a toda suite donde alguien ataca a Águila y falla.
+const ESQUIVA_NOMBRE_ATACANTE = (plano, conDueno) => ({
+    de: `ESQUIVÓ el ataque de ${plano}!`, a: `ESQUIVÓ el ataque de ${conDueno}!`,
+    motivo: 'norma del proyecto (logs en 3ª persona con dueño): la Águila vieja usaba attacker.name a secas; la migrada rellena {objetivo} con DSL._nombre',
+});
+
 const escenarios = [
     // --- Limo artificial: ABRAZO PEGAJOSO ---
     {
@@ -61,6 +69,7 @@ const escenarios = [
         pasos: [ { habilidad: 'Limo artificial' }, { confirmar: true }, { elegir: ['Águila'] } ],
         monedas: ['cara'], // única moneda del escenario: la esquiva de PSEUDO-PREVASIÓN
         logsSoloVieja: [ PROMPT_LIMO ],
+        logsIntencionados: [ ESQUIVA_NOMBRE_ATACANTE('Limo artificial', 'Limo artificial [1] de J1 (Jugador 1)') ],
     },
     {
         nombre: 'Limo artificial: ABRAZO PEGAJOSO letal (BUG corregido: la vieja no mataba de verdad)',
@@ -103,6 +112,7 @@ const escenarios = [
         p2: { vanguardia: ['Águila'] },
         pasos: [ { habilidad: 'Investigador demente' }, { confirmar: true }, { elegir: ['Águila'] } ],
         monedas: ['cara', 'cara'], // 1ª: INYECCIÓN sale cara; 2ª: PSEUDO-PREVASIÓN esquiva
+        logsIntencionados: [ ESQUIVA_NOMBRE_ATACANTE('Investigador demente', 'Investigador demente [1] de J1 (Jugador 1)') ],
     },
     {
         nombre: 'Investigador demente: INYECCIÓN cara pero Confundido — pierde el ataque por checkAttackStatus',

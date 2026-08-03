@@ -43,6 +43,14 @@ const FLOTANTE_FUR_DUPLICADO = {
     ],
 };
 
+// Águila (PSEUDO-PREVASIÓN) migrada al DSL el 31-jul-2026 (ver regresion53): su log de esquiva
+// nombraba al ATACANTE a secas (`attacker.name`); ahora usa DSL._nombre, como manda la norma de
+// logs en 3ª persona con dueño. Afecta a toda suite donde alguien ataca a Águila y falla.
+const ESQUIVA_NOMBRE_ATACANTE = (plano, conDueno) => ({
+    de: `ESQUIVÓ el ataque de ${plano}!`, a: `ESQUIVÓ el ataque de ${conDueno}!`,
+    motivo: 'norma del proyecto (logs en 3ª persona con dueño): la Águila vieja usaba attacker.name a secas; la migrada rellena {objetivo} con DSL._nombre',
+});
+
 const escenarios = [
     // ---------------- Gul guerrero: DEMONIO BELICOSO (TRAS_ATACAR) ----------------
     {
@@ -73,6 +81,7 @@ const escenarios = [
         p1: { vanguardia: [{ carta: 'Gul guerrero', furor: 0 }] },
         p2: { vanguardia: [{ carta: 'Águila', furor: 3 }] },
         monedas: ['cara'], // la esquiva de PSEUDO-PREVASIÓN
+        logsIntencionados: [ ESQUIVA_NOMBRE_ATACANTE('Gul guerrero', 'Gul guerrero [1] de J1 (Jugador 1)') ],
         pasos: [ { atacar: 'Gul guerrero', objetivo: 'Águila' } ],
     },
     {
