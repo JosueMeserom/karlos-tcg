@@ -3908,12 +3908,22 @@ const CARD_DB = [
                   log: "¡{carta} ha completado su entrenamiento!" },
                 { if: { campo: "counters.karlitos_entrenamiento.count", op: ">=", valor: 3 },
                   op: "MARCAR", target: { quien: "SELF" }, campo: "karlitosEntrenado", valor: true },
+                // confirmarPorZona (31-jul-2026, betasteo de Toto): antes mazo+descartes caían
+                // en el modal genérico MEZCLADOS, y aceptar barajaba el mazo aunque la carta
+                // encontrada viniera de los descartes (el jugador aprendía implícitamente que
+                // tenía una copia en el mazo sin haber elegido mirarlo). Ahora la pregunta es
+                // "¿en qué zona buscas?": MAZO abre el visor completo (y baraja, porque ya se ha
+                // inspeccionado); DESCARTES coge la primera coincidencia sin modal y sin tocar
+                // el mazo para nada (el orden de los descartes da igual).
                 { if: { campo: "counters.karlitos_entrenamiento.count", op: ">=", valor: 3 },
                   op: "BUSCAR", en: ["MAZO", "DESCARTES"], filtros: [ { campo: "name", op: "==", valor: "Super Evolución" } ],
                   titulo: "BUSCAR SÚPER EVOLUCIÓN",
-                  confirmar: { titulo: "PRÁCTICA COMPLETADA", si: "BUSCAR SÚPER EVOLUCIÓN", no: "NO BUSCAR" },
+                  confirmarPorZona: true,
+                  confirmar: { titulo: "PRÁCTICA COMPLETADA", no: "NO BUSCAR",
+                               porZona: { MAZO: "BUSCAR EN EL MAZO", DESCARTES: "BUSCAR EN LOS DESCARTES" } },
                   log: "Añades {objetivo} a tu mano.",
                   logNoValidas: "No quedan cartas de Súper Evolución en el mazo ni en los descartes.",
+                  logNoEncontrada: "No hay ninguna Súper Evolución ahí.",
                   barajarDespues: { log: "Barajando el mazo de {jugador}..." } },
                 // El contador se retira DESPUÉS de la búsqueda: si se limpiara antes, las
                 // condiciones de los efectos siguientes (que lo consultan) dejarían de cumplirse.
@@ -3941,6 +3951,11 @@ const CARD_DB = [
     },
     {
         name: "Super Evolución", type: "Ayuda", subtype: "Técnica", tags: ["Equipable"], rarity: "B", cost: 4, series: 1,
+        // tempEffectSinLinea (31-jul-2026, betasteo de Toto): sin esto, "Efectos actuales" de
+        // Super Evolución mostraba una segunda línea "Super Evolución, objetivo: X" además de los
+        // +ATQ/+DEF ya calculados (vía onEquipUpdate/_statMods) -redundante y sin info real, ya
+        // que el tempEffect a mano no lleva `duration`-.
+        tempEffectSinLinea: true,
         text: "Equipa a un 'Usuario de Súper Evolución' en vanguardia. Sus stats cambian a las de Súper Evolución (restaurando Vida) y elimina estados alterados. Tras 3 turnos tuyos, se destruye y restaura sus stats originales (restaurando Vida) eliminando estados.",
         canPlayCard: function(card, game, p) {
             const valid = p.vanguard.filter(c => c.tags.includes("Usuario de Súper Evolución"));
@@ -3951,7 +3966,11 @@ const CARD_DB = [
             const p = game.players[card.owner];
             const valid = p.vanguard.filter(c => c.tags.includes("Usuario de Súper Evolución"));
             
-            const chosen = await game.openVisualSearchModal('¿A QUIÉN APLICAR SÚPER EVOLUCIÓN?', valid, 1, true, card.owner);
+            // pickBoardTargets, no openVisualSearchModal (31-jul-2026, betasteo de Toto): elegir
+            // una carta YA EN EL CAMPO va con reborde verde en el propio tablero (norma de
+            // targeting en tablero), no con el modal genérico de búsqueda visual -ese es solo
+            // para mano/mazo/descartes-.
+            const chosen = await game.pickBoardTargets(valid, 1, '¿A QUIÉN APLICAR SÚPER EVOLUCIÓN?', card, card.owner, true);
             if (!chosen || chosen.length === 0) { game.cancelAction(); return; }
             
             const target = chosen[0];
@@ -7250,6 +7269,57 @@ const DSL = {
                     if (typeof animateShuffle === 'function') await animateShuffle(pid);
                     game.shuffle(p.deck);
                 };
+                // confirmarPorZona (Karlitos, 31-jul-2026): variante multi-zona que NUNCA mezcla
+                // el mazo con otras zonas en un mismo modal, y nunca revela ni toca el mazo si el
+                // jugador no elige mirarlo explícitamente. El flujo genérico de más abajo (una
+                // sola pregunta sí/no + lista combinada) tiene dos problemas para este caso: (1)
+                // mostraba las coincidencias de mazo Y descartes MEZCLADAS en el mismo modal
+                // genérico, y (2) elegir "buscar" ya barajaba el mazo aunque la carta se hubiera
+                // cogido de los descartes -el jugador aprendía implícitamente que tenía una copia
+                // en el mazo sin haber decidido mirarlo-. Con este flag, la pregunta se convierte
+                // en "¿en qué zona buscas?" (una opción por zona + "no buscar"); MAZO abre el
+                // visor de mazo completo (y SÍ baraja, mire lo que mire, porque ya lo ha
+                // inspeccionado); cualquier otra zona (descartes: el orden no importa) coge la
+                // PRIMERA coincidencia sin modal y no toca el mazo para nada.
+                if (e.confirmarPorZona && e.confirmar) {
+                    if (lista.length === 0) {
+                        if (e.logNoValidas) game.logMsg(F(e.logNoValidas), 'system');
+                        continue;
+                    }
+                    const _labels = e.confirmar.porZona || {};
+                    const elegida = await new Promise(resolve => {
+                        game.openChoiceModal(F(e.confirmar.titulo), [
+                            ..._zonasNombre.map(zn => ({ label: _labels[zn] || `BUSCAR EN ${zn}`, action: () => resolve(zn) })),
+                            { label: e.confirmar.no || 'NO BUSCAR', action: () => resolve(null) },
+                        ], pid);
+                    });
+                    if (!elegida) { if (e.confirmar.logNo) game.logMsg(F(e.confirmar.logNo), 'system'); continue; }
+                    const zIdx = _zonasNombre.indexOf(elegida);
+                    const poolZona = zonas[zIdx].filter(x => (e.filtros || []).every(f => DSL._match(x, f)) &&
+                                                             (!e.algunFiltro || e.algunFiltro.some(f => DSL._match(x, f))));
+                    if (e.logIntro) game.logMsg(F(e.logIntro), e.logIntroTipo || 'ability');
+                    if (elegida === 'MAZO' && typeof game.openDeckSearchViewer === 'function') {
+                        const r = await game.openDeckSearchViewer(pid, poolZona, F(e.titulo || 'ELIGE UNA CARTA'), null, e.cantidad || 1);
+                        const elegidas = Array.isArray(r) ? r : (r ? [r] : []);
+                        if (elegidas.length > 0) { for (const t of elegidas) await aMano(t); algunExito = true; }
+                        else if (e.logSinEleccion) game.logMsg(F(e.logSinEleccion), 'system');
+                        // Baraja SIEMPRE que se mire el mazo, haya coincidencia o no (fidelidad:
+                        // ya se ha revuelto al inspeccionarlo) — a diferencia de `soloSiDelMazo`,
+                        // que mira si la carta ESCOGIDA vino del mazo; aquí lo que importa es que
+                        // el jugador ELIGIÓ mirar el mazo, coja algo o no.
+                        if (e.barajarDespues) {
+                            if (e.barajarDespues.log) game.logMsg(F(e.barajarDespues.log), 'system');
+                            if (typeof animateShuffle === 'function') await animateShuffle(pid);
+                            game.shuffle(p.deck);
+                        }
+                    } else {
+                        // Zona sin orden relevante: la PRIMERA coincidencia, sin modal, sin tocar
+                        // el mazo -ni para barajarlo ni para que el jugador aprenda nada de él-.
+                        if (poolZona.length > 0) { await aMano(poolZona[0]); algunExito = true; }
+                        else if (e.logNoEncontrada) game.logMsg(F(e.logNoEncontrada), 'system');
+                    }
+                    continue;
+                }
                 if (e.seleccion === 'PRIMERA') {
                     // Automática: la primera coincidencia por orden de la zona; sin modales
                     if (zona.length === 0) continue;

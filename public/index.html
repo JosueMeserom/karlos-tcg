@@ -3857,6 +3857,7 @@
                         });
                         [...(otra.tempEffects || []), ...(otra.activeEffects || [])].forEach(eff => {
                             const t = getCardTemplate(eff.sourceId);
+                            if (t && t.tempEffectSinLinea) return; // p. ej. Super Evolución: los +ATQ/+DEF ya salen vía _statMods, esta línea era redundante y sin info (sin duración real)
                             if (eff.sourceInstanceId ? eff.sourceInstanceId === card.instanceId : (t && t.name === card.name)) {
                                 _salientes.push(this.lineaEfecto(t ? t.name : 'Efecto', { turnos: eff.duration, ref: _obj, comoObjetivo: true }));
                             }

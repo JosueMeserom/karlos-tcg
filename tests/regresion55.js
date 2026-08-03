@@ -105,7 +105,15 @@ const escenarios = [
         turno: 2, turnoDe: 'p1', empieza: 'p2',
         p1: { vanguardia: [{ carta: 'Karlitos', furor: 0 }], mazo: MAZO_LARGO },
         p2: {},
-        pasos: [ ...SEIS_TURNOS, { opcion: 'BUSCAR' }, { busqueda: ['Super Evolución'] } ],
+        // confirmarPorZona (31-jul-2026, betasteo de Toto): la vieja combina mazo+descartes en
+        // UN modal ("BUSCAR"/"NO BUSCAR"); la nueva pregunta primero EN QUÉ ZONA, y como aquí la
+        // carta está en el mazo, la zona MAZO abre el visor de mazo completo (elegir con {elegir},
+        // que responde a "visorMazo") en vez del modal genérico de {busqueda}.
+        pasos: [
+            ...SEIS_TURNOS,
+            { soloEn: 'vieja', opcion: 'BUSCAR' }, { soloEn: 'vieja', busqueda: ['Super Evolución'] },
+            { soloEn: 'nueva', opcion: 'BUSCAR EN EL MAZO' }, { soloEn: 'nueva', elegir: ['Super Evolución'] },
+        ],
         logsIntencionados: [
             { de: 'Añades Super Evolución a tu mano.', a: 'Añades Super Evolución de J1 (Jugador 1) a tu mano.',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba target.name a secas' },
@@ -129,12 +137,25 @@ const escenarios = [
         turno: 2, turnoDe: 'p1', empieza: 'p2',
         p1: { vanguardia: [{ carta: 'Karlitos', furor: 0 }], mazo: ['Longaniza', 'Longaniza', 'Longaniza', 'Longaniza'], descartes: ['Super Evolución'] },
         p2: {},
-        pasos: [ ...SEIS_TURNOS, { opcion: 'BUSCAR' }, { busqueda: ['Super Evolución'] } ],
+        // confirmarPorZona: eligiendo la zona DESCARTES, la nueva coge la PRIMERA coincidencia
+        // sin modal (el orden de los descartes da igual) y sin abrir ni barajar el mazo -motivo
+        // exacto del fix pedido por Toto: antes, aceptar "BUSCAR" barajaba el mazo aunque la
+        // carta viniera de los descartes, revelando implícitamente que había una copia en el mazo-.
+        pasos: [
+            ...SEIS_TURNOS,
+            { soloEn: 'vieja', opcion: 'BUSCAR' }, { soloEn: 'vieja', busqueda: ['Super Evolución'] },
+            { soloEn: 'nueva', opcion: 'BUSCAR EN LOS DESCARTES' },
+        ],
         logsIntencionados: [
             { de: 'Añades Super Evolución a tu mano.', a: 'Añades Super Evolución de J1 (Jugador 1) a tu mano.',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño)' },
-            { de: 'Barajando el mazo...', a: 'Barajando el mazo de J1 (Jugador 1)...',
-              motivo: 'norma del proyecto (logs en 3ª persona con jugador)' },
+        ],
+        // CAMBIO DE COMPORTAMIENTO, no cosmético (betasteo de Toto, 31-jul-2026): la vieja (y la
+        // nueva antes de este fix) barajaban el mazo tras CUALQUIER búsqueda con éxito, aunque la
+        // carta encontrada viniera de los descartes. Ahora la nueva solo baraja si el jugador
+        // elige mirar el MAZO; eligiendo DESCARTES, el mazo no se toca ni se revela nada de él.
+        logsSoloVieja: [
+            { linea: 'Barajando el mazo...', motivo: 'la vieja siempre barajaba tras encontrar, sin importar la zona; la nueva ya no lo hace si la carta vino de los descartes (fix pedido por Toto)' },
         ],
         flotantesSoloNueva: [ FLOTANTE_PRACTICA ],
     },
