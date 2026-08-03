@@ -3871,117 +3871,61 @@ const CARD_DB = [
         passiveName: "PRÁCTICA CONSTANTE", activeName: "APRENDIZ DE ARMAS", activeCost: 1,
         superStats: { hp: 4, def: 7, atk: 7 }, 
         
-        onAfterPlayAsync: async function(card, game, p) {
-            card.karlitosEntrenado = false; 
-        },
-        
-        onStartTurn: async function(card, game) {
-            if (card.owner === game.activePlayerId && (card.location === 'vanguard' || card.location === 'rearguard')) {
-                if (card.karlitosEntrenado) return; 
-
-                game.modifyCounters(card, 'karlitos_entrenamiento', 1, 'Práctica', 'PRÁCTICA CONSTANTE', '🏋️');
-                
-                if (card.counters['karlitos_entrenamiento'] && card.counters['karlitos_entrenamiento'].count >= 3) {
-                    game.logMsg(`¡${card.name} ha completado su entrenamiento!`, 'ability');
-                    showFloatingText(card.instanceId, "¡PRÁCTICA COMPLETADA!", "ft-ability", -40);
-                    delete card.counters['karlitos_entrenamiento']; 
-                    card.karlitosEntrenado = true; 
-                    
-                    const p = game.players[card.owner];
-                    const inDeck = p.deck.filter(c => c.name === "Super Evolución");
-                    const inDiscard = p.discard.filter(c => c.name === "Super Evolución");
-                    const allValid = [...inDeck, ...inDiscard];
-                    
-                    if (allValid.length > 0) {
-                        const wantSearch = await new Promise(resolve => {
-                            game.openChoiceModal('PRÁCTICA COMPLETADA', [
-                                { label: 'BUSCAR SÚPER EVOLUCIÓN', action: () => resolve(true) },
-                                { label: 'NO BUSCAR', action: () => resolve(false) }
-                            ], card.owner);
-                        });
-
-                        if (wantSearch) {
-                            const chosen = await game.openVisualSearchModal('BUSCAR SÚPER EVOLUCIÓN', allValid, 1, false, card.owner);
-                            if (chosen && chosen.length > 0) {
-                                const target = chosen[0];
-                                
-                                let idx = p.deck.findIndex(c => c.instanceId === target.instanceId);
-                                if (idx !== -1) {
-                                    p.deck.splice(idx, 1);
-                                    await animateStackToHand(`${p.id}-deck-stack`, p.id, target.id);
-                                } else {
-                                    idx = p.discard.findIndex(c => c.instanceId === target.instanceId);
-                                    p.discard.splice(idx, 1);
-                                    await animateStackToHand(`${p.id}-discard-stack`, p.id, target.id);
-                                }
-                                
-                                target.location = 'hand';
-                                p.hand.push(target);
-                                game.logMsg(`Añades ${target.name} a tu mano.`, 'ability');
-                            }
-                            
-                            game.logMsg(`Barajando el mazo de ${game.getDisplayName(p.id)}...`, 'system');
-                            if (typeof animateShuffle === 'function') await animateShuffle(p.id);
-                            game.shuffle(p.deck);
-                            game.render();
-                        }
-                    } else {
-                        game.logMsg("No quedan cartas de Súper Evolución en el mazo ni en los descartes.", 'system');
-                    }
-                }
-            }
-        },
-        canActivateAbility: function(card, game) {
-            if (card.furor < 1) { game.logError("Falta Furor (1)."); return false; }
-            const p = game.players[card.owner];
-            const validWeapons = p.hand.filter(c => c.subtype === 'Arma' || c.subtype === 'Arma legendaria');
-            if (validWeapons.length === 0) { game.logError("No tienes armas en la mano."); return false; }
-            const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
-            if (game.players[enemyId].vanguard.length === 0) { game.logError("No hay enemigos para atacar."); return false; }
-            return true;
-        },
-        onExecuteAbility: async function(card, game) {
-            const p = game.players[card.owner];
-            const validWeapons = p.hand.filter(c => c.subtype === 'Arma' || c.subtype === 'Arma legendaria');
-            
-            const chosenWeapon = await game.openVisualSearchModal('APRENDIZ: ELIGE ARMA PARA EQUIPAR', validWeapons, 1, true, card.owner);
-            if (!chosenWeapon || chosenWeapon.length === 0) { game.cancelAction(); return; }
-            
-            const weapon = chosenWeapon[0];
-            const handIdx = p.hand.findIndex(c => c.instanceId === weapon.instanceId);
-            p.hand.splice(handIdx, 1);
-            
-            if (!card.equippedCards) card.equippedCards = [];
-            card.equippedCards.push(weapon);
-            weapon.location = 'equipped';
-            weapon.equippedTo = card.instanceId;
-            
-            game.modifyStat(card, 'furor', -1);
-            showFloatingText(card.instanceId, "APRENDIZ DE ARMAS", "ft-ability", -40);
-            game.logMsg(`¡Karlitos se equipa velozmente con ${weapon.name} y se prepara para atacar!`, 'ability');
-            
-            game.updatePassives();
-            game.render();
-            await game.sleep(500);
-
-            game.selectedCard = card;
-            game.inputState = 'SELECT_ABILITY_TARGETS';
-            game.abilityContext = { targets: [], maxTargets: 1, name: 'APRENDIZ DE ARMAS', targetType: 'enemy', isNormalAttack: true };
-            game.isActionLocked = true; 
-            game.logError("Elige un enemigo de la vanguardia para atacarlo.");
-            game.render();
-        },
-        onValidateTarget: function(card, target, game, isSilent) {
-            if (target.owner === card.owner || target.location !== 'vanguard' || getCardTemplate(target.id).isAvatar) return false;
-            return true;
-        },
-        onTargetsReady: async function(card, game) {
-            const target = game.abilityContext.targets[0];
-            game.logMsg(`¡Karlitos ataca a ${target.name} con su nueva arma!`, 'ability');
-            
-            game.selectedCard = card; 
-            await game.performAttack(card, target); 
-        }
+        // Migrada por completo (31-jul-2026). Tres piezas nuevas, las tres reutilizables:
+        //   · `_field` admite RUTAS CON PUNTOS ("counters.karlitos_entrenamiento.count"): los
+        //     contadores viven anidados, así que hasta ahora no se podía condicionar por su valor.
+        //   · `BUSCAR` admite un ARRAY en `en` (aquí mazo Y descartes a la vez): cada carta sale
+        //     de la zona en la que estuviera de verdad y solo se baraja si el MAZO iba incluido.
+        //     Multi-zona cae al modal visual, que es justo lo que usaba la vieja.
+        //   · `EQUIPAR` gana `invertido`: al revés del caso normal -aquí el OBJETIVO es el arma y
+        //     la carta FUENTE quien la lleva-. Sin pasar por requisitos, como dice el texto.
+        // El encadenado "equipa y luego ataca" NO necesitó nada: son dos ELEGIR seguidos (uno de
+        // MANO, otro de ENEMIGOS) con ATACAR al final, el patrón de Gólem de tierra/Raiju.
+        //
+        // `karlitosEntrenado` se queda como campo propio (la vieja lo inicializaba en
+        // onAfterPlayAsync; aquí basta con que empiece indefinido: `truthy`+`no` lo trata igual).
+        abilities: [
+            { trigger: "INICIO_TURNO", soloTurnoPropio: true,
+              si: [ { campo: "karlitosEntrenado", op: "truthy", no: true } ],
+              efectos: [
+                { op: "MODIFICAR_CONTADORES", target: { quien: "SELF" }, contador: "karlitos_entrenamiento",
+                  delta: 1, nombreContador: "Práctica", fuente: "PRÁCTICA CONSTANTE", icono: "🏋️" },
+                // A partir de aquí, solo al llegar a 3 (ruta con puntos sobre el contador).
+                { if: { campo: "counters.karlitos_entrenamiento.count", op: ">=", valor: 3 },
+                  op: "FLOTANTE", target: { quien: "SELF" }, texto: "¡PRÁCTICA COMPLETADA!", estilo: "ft-ability", offset: -40,
+                  log: "¡{carta} ha completado su entrenamiento!" },
+                { if: { campo: "counters.karlitos_entrenamiento.count", op: ">=", valor: 3 },
+                  op: "MARCAR", target: { quien: "SELF" }, campo: "karlitosEntrenado", valor: true },
+                { if: { campo: "counters.karlitos_entrenamiento.count", op: ">=", valor: 3 },
+                  op: "BUSCAR", en: ["MAZO", "DESCARTES"], filtros: [ { campo: "name", op: "==", valor: "Super Evolución" } ],
+                  titulo: "BUSCAR SÚPER EVOLUCIÓN",
+                  confirmar: { titulo: "PRÁCTICA COMPLETADA", si: "BUSCAR SÚPER EVOLUCIÓN", no: "NO BUSCAR" },
+                  log: "Añades {objetivo} a tu mano.",
+                  logNoValidas: "No quedan cartas de Súper Evolución en el mazo ni en los descartes.",
+                  barajarDespues: { log: "Barajando el mazo de {jugador}..." } },
+                // El contador se retira DESPUÉS de la búsqueda: si se limpiara antes, las
+                // condiciones de los efectos siguientes (que lo consultan) dejarían de cumplirse.
+                { if: { campo: "counters.karlitos_entrenamiento.count", op: ">=", valor: 3 },
+                  op: "MODIFICAR_CONTADORES", target: { quien: "SELF" }, contador: "karlitos_entrenamiento", delta: -3 } ] },
+            { trigger: "ACTIVA", nombre: "APRENDIZ DE ARMAS", coste: { furor: 1 }, sinObjetivo: true, ataqueNormal: true,
+              requisitos: [
+                { count: { quien: "ALIADO", zona: "mano", algunFiltro: [ { campo: "subtype", op: "==", valor: "Arma" }, { campo: "subtype", op: "==", valor: "Arma legendaria" } ] },
+                  op: ">=", valor: 1, msg: "No tienes armas en la mano." },
+                { count: { quien: "ENEMIGO", zona: "vanguardia" }, op: ">=", valor: 1, msg: "No hay enemigos para atacar." } ],
+              efectos: [
+                { op: "ELEGIR", de: "MANO", cantidad: 1, autoSeleccion: true,
+                  titulo: "APRENDIZ: ELIGE ARMA PARA EQUIPAR",
+                  algunFiltro: [ { campo: "subtype", op: "==", valor: "Arma" }, { campo: "subtype", op: "==", valor: "Arma legendaria" } ],
+                  efectos: [
+                    // Sin `floats`: el cierre genérico de ACTIVA ya pinta el nombre de la
+                    // Habilidad sobre la carta, y declararlo aquí lo duplicaba.
+                    { op: "EQUIPAR", invertido: true,
+                      log: "¡{carta} se equipa velozmente con {objetivo} y se prepara para atacar!" } ] },
+                { op: "ELEGIR", de: "ENEMIGOS", zona: "VANGUARDIA", cantidad: 1, cancelable: false,
+                  titulo: "Elige un enemigo de la vanguardia para atacarlo",
+                  logAntes: "¡{carta} ataca a {elegidos} con su nueva arma!",
+                  efectos: [ { op: "ATACAR" } ] } ] }
+        ],
     },
     {
         name: "Super Evolución", type: "Ayuda", subtype: "Técnica", tags: ["Equipable"], rarity: "B", cost: 4, series: 1,
@@ -4483,70 +4427,34 @@ const CARD_DB = [
         name: "Honsow", hp: 4, def: 4, atk: 3, type: "Personaje", subtype: "Ser vivo", tags: ["Usuario de VP"], gender: "M", rarity: "B", cost: 3, series: 2,
         text: "P: MAESTRO DE ARMAS: Puedes equipar a Honsow cualquier Arma ignorando condiciones. A: GENERACIÓN DE ARMAMENTO MELÉ (1F): Busca Arma (no legendaria) con 'melé' en mano o mazo, equípala, baraja y realiza un ataque normal.",
         passiveName: "MAESTRO DE ARMAS", activeName: "GENERACIÓN DE ARMAMENTO MELÉ", activeCost: 1,
-        canActivateAbility: function(card, game) {
-            if (card.furor < 1) { game.logError("Falta Furor (1)."); return false; }
-            const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
-            if (game.players[enemyId].vanguard.length === 0) { game.logError("No hay enemigos para atacar."); return false; }
-            return true;
-        },
-        onExecuteAbility: async function(card, game) {
-            const p = game.players[card.owner];
-            // Armas melé y NO legendarias en mano y mazo
-            const validWeapons = [...p.hand, ...p.deck].filter(c => c.subtype === 'Arma' && c.tags && c.tags.includes('melé'));
-
-            if (validWeapons.length === 0) {
-                game.logError("No hay armas 'melé' válidas en tu mano ni en tu mazo.");
-                game.cancelAction();
-                return;
-            }
-
-            const chosen = await game.openVisualSearchModal('GENERACIÓN: BUSCAR ARMA MELÉ', validWeapons, 1, false, card.owner);
-            if (!chosen || chosen.length === 0) { game.cancelAction(); return; }
-
-            const weapon = chosen[0];
-            game.modifyStat(card, 'furor', -1);
-
-            let fromDeck = false;
-            let idx = p.hand.findIndex(c => c.instanceId === weapon.instanceId);
-            if (idx !== -1) {
-                p.hand.splice(idx, 1);
-            } else {
-                idx = p.deck.findIndex(c => c.instanceId === weapon.instanceId);
-                p.deck.splice(idx, 1);
-                fromDeck = true;
-            }
-
-            if (!card.equippedCards) card.equippedCards = [];
-            card.equippedCards.push(weapon);
-            weapon.location = 'equipped';
-            weapon.equippedTo = card.instanceId;
-
-            showFloatingText(card.instanceId, "ARMAMENTO MELÉ", "ft-ability", -40);
-            game.logMsg(`¡Honsow genera y se equipa con ${weapon.name} ignorando sus condiciones!`, 'ability');
-
-            if (fromDeck) {
-                game.logError("Barajando el mazo...");
-                if (typeof animateShuffle === 'function') await animateShuffle(p.id);
-                game.shuffle(p.deck);
-            }
-
-            game.updatePassives();
-            game.render();
-            await game.sleep(500);
-
-            // Prepara el ataque físico encadenado
-            game.selectedCard = card;
-            game.inputState = 'SELECT_ABILITY_TARGETS';
-            game.abilityContext = { targets: [], maxTargets: 1, name: 'ATAQUE MAESTRO', targetType: 'enemy', isNormalAttack: true };
-            game.isActionLocked = true;
-            game.logError("Elige un enemigo para atacarlo con tu nueva arma.");
-            game.render();
-        },
-        onTargetsReady: async function(card, game) {
-            const target = game.abilityContext.targets[0];
-            game.selectedCard = card;
-            await game.performAttack(card, target);
-        }
+        // Migrada (31-jul-2026), reutilizando las piezas de Karlitos (`BUSCAR` multi-zona) más
+        // dos añadidos suyos: `destino:"EQUIPADO"` (lo encontrado se equipa a la carta fuente en
+        // vez de ir a la mano) y `barajarDespues.soloSiDelMazo` (su arma puede venir de la MANO,
+        // y entonces el mazo ni se toca — la vieja lo distinguía con un flag `fromDeck`).
+        // `costeDiferido` reproduce que el Furor se cobre DESPUÉS de elegir el arma: si cancelas
+        // el modal, la vieja tampoco cobraba nada (por eso el `abortaSiCancelas`).
+        // El ataque encadenado no necesitó nada: un ELEGIR de ENEMIGOS + ATACAR.
+        //
+        // MAESTRO DE ARMAS (la Pasiva) se queda como está porque NO TIENE IMPLEMENTACIÓN: solo
+        // existe en el texto de la carta, ni la vieja ni ninguna otra parte del motor la cablean.
+        // No es algo que esta migración haya perdido; queda anotado por si algún día se codifica.
+        abilities: [
+            { trigger: "ACTIVA", nombre: "GENERACIÓN DE ARMAMENTO MELÉ", coste: { furor: 1 },
+              sinObjetivo: true, ataqueNormal: true, costeDiferido: true,
+              requisitos: [
+                { count: { quien: "ENEMIGO", zona: "vanguardia" }, op: ">=", valor: 1, msg: "No hay enemigos para atacar." } ],
+              efectos: [
+                { op: "BUSCAR", en: ["MANO", "MAZO"], destino: "EQUIPADO", abortaSiCancelas: true, abortaSiVacio: true,
+                  filtros: [ { campo: "subtype", op: "==", valor: "Arma" }, { campo: "tags", op: "includes", valor: "melé" } ],
+                  titulo: "GENERACIÓN: BUSCAR ARMA MELÉ",
+                  logNoValidas: "No hay armas 'melé' válidas en tu mano ni en tu mazo.",
+                  log: "¡{carta} genera y se equipa con {objetivo} ignorando sus condiciones!",
+                  barajarDespues: { log: "Barajando el mazo...", soloSiDelMazo: true } },
+                { op: "FLOTANTE", target: { quien: "SELF" }, texto: "ARMAMENTO MELÉ", estilo: "ft-ability", offset: -40 },
+                { op: "ELEGIR", de: "ENEMIGOS", zona: "VANGUARDIA", cantidad: 1, cancelable: false,
+                  titulo: "Elige un enemigo para atacarlo con tu nueva arma",
+                  efectos: [ { op: "ATACAR" } ] } ] }
+        ],
     },
     {
         name: "Domador", type: "Ayuda", subtype: "Ser vivo", tags: ["Consumible"], rarity: "C", cost: 1, series: 2,
@@ -6784,6 +6692,10 @@ const DSL = {
         if (k === 'def') return c.currentDef;
         if (k === 'furorMax') return KARLOS_RULES.getFurorMax(c); // campo computado (capa de reglas)
         if (k === 'dotActivo') return !!(c.status && c.status.dot && c.status.dot.duration > 0); // campo computado: ¿tiene Daño por Tiempo activo?
+        // Ruta con puntos (Karlitos, 31-jul-2026): "counters.karlitos_entrenamiento.count".
+        // Los contadores viven anidados, así que sin esto no se podía condicionar por su valor.
+        // Devuelve undefined en cuanto un tramo falta, en vez de reventar.
+        if (k.indexOf('.') !== -1) return k.split('.').reduce((o, kk) => (o === undefined || o === null) ? undefined : o[kk], c);
         return c[k];
     },
     _ref(path, ctx) { // "objetivo.furorMax" | "self.atk" | "vars.sumaAtq" (guardado por ELEGIR)
@@ -6838,6 +6750,10 @@ const DSL = {
         if (!spec.permitirAvatar) pool = pool.filter(c => !((getCardTemplate(c.id) || {}).isAvatar)); // Kami: intocable por defecto
         if (spec.algunEstado) pool = pool.filter(c => c.status && spec.algunEstado.some(k => c.status[k])); // mismo criterio que canPlayCard (JUGAR)
         (spec.filtros || []).forEach(f => { pool = pool.filter(c => DSL._match(c, f)); });
+        // algunFiltro (Karlitos, 31-jul-2026): OR de filtros, como ya aceptaban ELEGIR y BUSCAR.
+        // Faltaba aquí, así que un `count` con `algunFiltro` NO filtraba nada y contaba de más
+        // (el requisito "tienes un Arma en la mano" daba por bueno cualquier carta).
+        if (spec.algunFiltro) pool = pool.filter(c => spec.algunFiltro.some(f => DSL._match(c, f)));
         return pool;
     },
     _count(ownerId, game, spec, selfCard) {
@@ -7254,20 +7170,45 @@ const DSL = {
             let algunExito = false;
             for (const pid of pids) {
                 const p = game.players[pid];
-                const zona = e.en === 'MAZO' ? p.deck : p.discard;
+                // `en` admite una zona ('MAZO' / 'DESCARTES' / 'MANO') o un ARRAY de varias
+                // (Karlitos: mazo Y descartes a la vez; Honsow: mano Y mazo). Con varias, cada
+                // carta se saca de la zona en la que estuviera de verdad y solo se baraja si el
+                // MAZO estaba entre ellas — que es justo lo que hacían a mano las imperativas.
+                const _nz = (z) => z === 'MAZO' ? p.deck : z === 'MANO' ? p.hand : p.discard;
+                const _stackDe = (z) => z === 'MAZO' ? `${pid}-deck-stack` : z === 'MANO' ? null : `${pid}-discard-stack`;
+                const _zonasNombre = Array.isArray(e.en) ? e.en : [e.en || 'DESCARTES'];
+                const zonas = _zonasNombre.map(_nz);
+                const zona = zonas[0]; // zona "principal": la que se baraja y la que ve el visor de mazo
                 const dn = typeof game.getDisplayName === 'function' ? game.getDisplayName(pid) : pid;
                 const F = (txt) => DSL._fill(txt, { carta: sourceCard.name, jugador: dn });
-                let lista = zona.filter(x => (e.filtros || []).every(f => DSL._match(x, f)) &&
+                const _todas = zonas.reduce((acc, z) => acc.concat(z), []);
+                let lista = _todas.filter(x => (e.filtros || []).every(f => DSL._match(x, f)) &&
                                              (!e.algunFiltro || e.algunFiltro.some(f => DSL._match(x, f))));
                 if (e.plantillaSin) lista = lista.filter(x => { const t = getCardTemplate(x.id); return t && !e.plantillaSin.some(hk => typeof t[hk] === 'function'); });
+                let _sacadaDelMazo = false; // para barajarDespues.soloSiDelMazo
                 const aMano = async (t) => {
-                    const idx = zona.findIndex(x => x.instanceId === t.instanceId);
-                    if (idx !== -1) zona.splice(idx, 1);
+                    // Se saca de la zona REAL en la que estuviera (con una sola zona esto es
+                    // exactamente lo de antes).
+                    let _zIdx = zonas.findIndex(z => z.some(x => x.instanceId === t.instanceId));
+                    if (_zIdx === -1) _zIdx = 0;
+                    if (_zonasNombre[_zIdx] === 'MAZO') _sacadaDelMazo = true;
+                    const _zona = zonas[_zIdx];
+                    const idx = _zona.findIndex(x => x.instanceId === t.instanceId);
+                    if (idx !== -1) _zona.splice(idx, 1);
                     if (!e.destino || e.destino === 'MANO') {
-                        const stack = e.en === 'MAZO' ? `${pid}-deck-stack` : `${pid}-discard-stack`;
+                        const stack = _stackDe(_zonasNombre[_zIdx]);
                         if (!e.sinAnimacion && typeof animateStackToHand === 'function') await animateStackToHand(stack, pid, t.id);
                         t.location = 'hand';
                         p.hand.push(t);
+                    } else if (e.destino === 'EQUIPADO') {
+                        // La carta encontrada se EQUIPA a la carta fuente (Honsow: "busca un arma
+                        // y equípala"). Mismo vínculo que el op EQUIPAR con `invertido`, aquí
+                        // aplicado a lo que acaba de salir del mazo/la mano.
+                        if (!sourceCard.equippedCards) sourceCard.equippedCards = [];
+                        sourceCard.equippedCards.push(t);
+                        t.location = 'equipped';
+                        t.equippedTo = sourceCard.instanceId;
+                        if (typeof game.updatePassives === 'function') game.updatePassives();
                     } else if (e.destino === 'RETAGUARDIA') {
                         const tpl = getCardTemplate(t.id);
                         t.currentHp = tpl.hp; t.currentDef = tpl.def; t.currentAtk = tpl.atk;
@@ -7283,9 +7224,15 @@ const DSL = {
                 };
                 const baraja = async () => {
                     if (!e.barajarDespues) return;
+                    // Solo se baraja el MAZO: si la búsqueda no lo tocaba (descartes/mano) no hay
+                    // nada que revolver.
+                    if (!_zonasNombre.includes('MAZO')) return;
+                    // soloSiDelMazo (Honsow, 31-jul-2026): además, solo si la carta cogida SALIÓ
+                    // del mazo. Su arma puede venir de la mano, y en ese caso el mazo ni se toca.
+                    if (e.barajarDespues.soloSiDelMazo && !_sacadaDelMazo) return;
                     if (e.barajarDespues.log) game.logMsg(F(e.barajarDespues.log), 'system');
                     if (typeof animateShuffle === 'function') await animateShuffle(pid);
-                    game.shuffle(zona);
+                    game.shuffle(p.deck);
                 };
                 if (e.seleccion === 'PRIMERA') {
                     // Automática: la primera coincidencia por orden de la zona; sin modales
@@ -7305,6 +7252,9 @@ const DSL = {
                 // Las búsquedas CON ELECCIÓN sobre el MAZO usan el visor de mazo completo
                 // (pedido por Toto): se ve todo el mazo y solo las elegibles llevan el
                 // reborde verde. Las de otras zonas (o multi-elección) siguen con modal.
+                // El visor de mazo completo solo tiene sentido con UNA zona y que sea el mazo
+                // (enseña el mazo entero con las elegibles resaltadas). Una búsqueda multi-zona
+                // cae al modal visual, que es justo lo que usaban Karlitos y Honsow a mano.
                 const esVisorMazo = e.en === 'MAZO' && typeof game.openDeckSearchViewer === 'function';
                 const visorVacio = async (barajara) => {
                     if (!esVisorMazo) return;
@@ -7336,6 +7286,12 @@ const DSL = {
                     if (!e.confirmar) await visorVacio(!!(e.barajarDespues && e.barajarDespues.inclusoSinValidas));
                     if (e.logNoValidas) game.logMsg(F(e.logNoValidas), 'system');
                     if (e.barajarDespues && e.barajarDespues.inclusoSinValidas) await baraja();
+                    // abortaSiVacio (Honsow, 31-jul-2026): sin nada que encontrar, ABORTA la lista
+                    // de efectos entera en vez de seguir. Sin esto, una Habilidad que encadena
+                    // "busca un arma -> equípala -> ataca" seguiría atacando sin arma (la vieja
+                    // hacía cancelAction y se iba). Hermano de `abortaSiCancelas`, que cubre el
+                    // otro camino: había cartas válidas pero el jugador cerró el modal.
+                    if (e.abortaSiVacio) return false;
                     continue;
                 }
                 if (e.logIntro) game.logMsg(F(e.logIntro), e.logIntroTipo || 'ability');
@@ -7421,6 +7377,10 @@ const DSL = {
         }
         if (e.op === 'FLOTANTE') {
             if (typeof showFloatingText === 'function') showFloatingText(target.instanceId, e.texto, e.estilo || 'ft-green', e.offset !== undefined ? e.offset : -20);
+            // log (Karlitos, 31-jul-2026): le faltaba, a diferencia de casi todos los demás ops.
+            // Un flotante suele venir acompañado de su línea de log, y sin esto había que meter
+            // un efecto aparte solo para eso.
+            if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
             return true;
         }
         if (e.op === 'VOLVER_A_MANO') {
@@ -7440,6 +7400,23 @@ const DSL = {
         if (e.op === 'EQUIPAR') {
             // Anexa la PROPIA carta fuente al objetivo. soloAnexar: la mano/location los gestiona el motor de Ayudas (p. ej. Infusión)
             const p = game.players[sourceCard.owner];
+            // invertido (Karlitos, APRENDIZ DE ARMAS, 31-jul-2026): al revés que el caso normal
+            // -aquí el OBJETIVO es el equipo (un Arma elegida) y la carta FUENTE quien lo lleva-.
+            // El caso de siempre es una Ayuda equipándose a sí misma a un aliado; este es un
+            // Personaje que se calza un arma. No pasa por canEquip/requisitos a propósito: las
+            // cartas que lo usan dicen literalmente "ignorando requisitos/condiciones".
+            if (e.invertido) {
+                if (!sourceCard.equippedCards) sourceCard.equippedCards = [];
+                sourceCard.equippedCards.push(target);
+                const hi = p.hand.findIndex(x => x.instanceId === target.instanceId);
+                if (hi !== -1) p.hand.splice(hi, 1);
+                target.location = 'equipped';
+                target.equippedTo = sourceCard.instanceId;
+                if (typeof showFloatingText === 'function') (e.floats || []).forEach(f => showFloatingText(sourceCard.instanceId, f.texto, f.estilo || 'ft-green', f.offset !== undefined ? f.offset : -20));
+                if (e.log) game.logMsg(DSL._fill(e.log, Object.assign({}, (DSL._vars && DSL._vars[sourceCard.instanceId]) || {}, { carta: sourceCard.name, objetivo: DSL._nombre(game, target) })), e.logTipo || 'ability');
+                if (typeof game.updatePassives === 'function') game.updatePassives();
+                return true;
+            }
             if (!target.equippedCards) target.equippedCards = [];
             target.equippedCards.push(sourceCard);
             if (!e.soloAnexar) {
@@ -9029,6 +9006,10 @@ const DSL = {
         if (inicioTurnoCarta && typeof tmpl.onStartTurn !== 'function') {
             tmpl.onStartTurn = async function (card, game) {
                 if (inicioTurnoCarta.soloTurnoPropio !== false && card.owner !== game.activePlayerId) return;
+                // si (Karlitos, 31-jul-2026): condición sobre la propia carta, igual que en los
+                // triggers de ataque/defensa. Faltaba aquí, así que una Pasiva de inicio de turno
+                // no podía apagarse a sí misma (Karlitos: dejar de entrenar una vez entrenado).
+                if (inicioTurnoCarta.si && !DSL._cond(card, game, inicioTurnoCarta.si)) return;
                 const pid = card.owner;
                 if (inicioTurnoCarta.log) game.logMsg(DSL._fill(inicioTurnoCarta.log, { carta: card.name, jugador: (typeof game.getDisplayName === 'function' ? game.getDisplayName(pid) : pid) }), inicioTurnoCarta.logTipo || 'ability');
                 await DSL._runEffectList(inicioTurnoCarta.efectos, card, game, pid, null);
