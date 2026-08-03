@@ -2147,6 +2147,40 @@
                 return `${pref}${this.nCarta(c)} de ${this.getDisplayName(c.owner)}${enDescarte}`;
             }
 
+            // Resuelve el "fuente:" de una afección a partir del instanceId que guardó quien la
+            // aplicó (estados, contadores...). Tres casos, en este orden: la propia carta
+            // inspeccionada -> 'esta carta'; una carta localizable -> refCarta() con su formato
+            // completo; y si no -> el nombre suelto que se guardara, como último recurso.
+            // Vive aquí y no repetido en cada bloque del detalle porque los tres sitios que lo
+            // necesitaban (estados, contadores, flechas) tenían tres versiones distintas y solo
+            // la de estados estaba completa (Toto, 31-jul-2026: el contador de Súper Evolución
+            // decía "fuente: Súper Evolución", sin dueño ni copyId).
+            // El pool incluye los EQUIPOS: una Ayuda equipada no está en vanguardia ni en
+            // descartes, así que sin esto un contador puesto por un equipo no se resolvía nunca.
+            _cartasLocalizables() {
+                const out = [];
+                for (const pid of ['p1', 'p2']) {
+                    const p = this.players[pid];
+                    [...p.vanguard, ...p.rearguard].forEach(c => {
+                        out.push(c);
+                        (c.equippedCards || []).forEach(eq => out.push(eq));
+                    });
+                    (p.discard || []).forEach(c => out.push(c));
+                    if (p.activeEvent) out.push(p.activeEvent);
+                }
+                return out;
+            }
+
+            refFuente(srcInstanceId, srcNombre, cartaInspeccionada) {
+                if (srcInstanceId && cartaInspeccionada && srcInstanceId === cartaInspeccionada.instanceId) return 'esta carta';
+                const c = srcInstanceId ? this._cartasLocalizables().find(x => x.instanceId === srcInstanceId) : null;
+                if (c) return this.refCarta(c);
+                // Sin instanceId (afecciones antiguas o puestas con un string a mano): si el nombre
+                // coincide con el de la carta inspeccionada, sigue siendo "esta carta".
+                if (srcNombre && cartaInspeccionada && srcNombre === cartaInspeccionada.name) return 'esta carta';
+                return srcNombre || 'desconocida';
+            }
+
             // Monta una línea completa con la sintaxis estándar:
             //     <afección> [(N turnos)] [por HABILIDAD], fuente|objetivo: <ref>
             // · turnos: se omite si no procede (auras, efectos permanentes).
@@ -2291,12 +2325,20 @@
                 if (!(opts && opts.silent)) showFloatingText(card.instanceId, text, color, offsetY);
             }
 
+            // `source` admite la CARTA origen (objeto) además del nombre suelto de siempre: con la
+            // carta se guarda también su instanceId, que es lo único que permite reconstruir el
+            // "fuente: <Nombre> [n] de JX (Nick)" completo en el detalle (mismo criterio que
+            // applyStatus). Los llamantes que pasan un string siguen funcionando igual.
             modifyCounters(card, counterId, amount, name, source, icon = '⚙️') {
                 if (!card.counters || typeof card.counters !== 'object') card.counters = {};
-                
+                const _srcObj = source && typeof source === 'object';
+                const _srcNombre = _srcObj ? source.name : source;
+                const _srcInst = _srcObj ? source.instanceId : null;
+
                 if (!card.counters[counterId]) {
-                    if (amount <= 0) return; 
-                    card.counters[counterId] = { name, count: 0, source, icon };
+                    if (amount <= 0) return;
+                    card.counters[counterId] = { name, count: 0, source: _srcNombre, icon };
+                    if (_srcInst) card.counters[counterId].sourceInstanceId = _srcInst;
                 }
                 
                 card.counters[counterId].count += amount;
@@ -3626,9 +3668,7 @@
                                 else if (key === 'confusion') name = 'Confusión';
                                 else if (key === 'ceguera') name = 'Ceguera';
                                 else if (key === 'sueno') name = 'Sueño';
-                                const _todo = [...this.players.p1.vanguard, ...this.players.p1.rearguard, ...this.players.p2.vanguard, ...this.players.p2.rearguard, ...(this.players.p1.discard || []), ...(this.players.p2.discard || [])];
-                                const _srcC = val.sourceInstanceId ? _todo.find(x => x.instanceId === val.sourceInstanceId) : null;
-                                const _fu = (val.sourceInstanceId && val.sourceInstanceId === card.instanceId) ? 'esta carta' : (_srcC ? this.refCarta(_srcC) : (val.source || val.sourceName || 'desconocida'));
+                                const _fu = this.refFuente(val.sourceInstanceId, val.source || val.sourceName, card);
                                 effects.push(this.lineaEfecto(name, { turnos: val.duration, habilidad: val.sourceAbility, ref: _fu }));
                             }
                         }
@@ -3705,7 +3745,7 @@
                     if (card.counters) {
                         for (const [k, d] of Object.entries(card.counters)) {
                             if (d && d.count > 0) {
-                                const _fc = d.source === card.name ? 'esta carta' : (d.source || 'desconocida');
+                                const _fc = this.refFuente(d.sourceInstanceId, d.source, card);
                                 effects.push(this.lineaEfecto(`${d.icon ? d.icon + ' ' : ''}${d.name || k} x${d.count}`, { ref: _fc }));
                             }
                         }
@@ -3832,7 +3872,10 @@
                             }
                         }
                         if (otra.counters) for (const [k, d] of Object.entries(otra.counters)) {
-                            if (d && d.count > 0 && d.source === card.name) _salientes.push(this.lineaEfecto(`${d.icon ? d.icon + ' ' : ''}${d.name || k} x${d.count}`, { ref: _obj, comoObjetivo: true }));
+                            // Por instanceId cuando lo haya (dos copias de la misma carta ya no se
+                            // atribuyen los contadores la una a la otra); por nombre, como antes,
+                            // para los contadores que se pusieron con un string suelto.
+                            if (d && d.count > 0 && (d.sourceInstanceId ? d.sourceInstanceId === card.instanceId : d.source === card.name)) _salientes.push(this.lineaEfecto(`${d.icon ? d.icon + ' ' : ''}${d.name || k} x${d.count}`, { ref: _obj, comoObjetivo: true }));
                         }
                         // Los stats que vienen del MISMO efecto (misma fuente + misma habilidad)
                         // comparten UNA línea, igual que en la vista "Afectado por" (Toto,
@@ -3857,7 +3900,7 @@
                         });
                         [...(otra.tempEffects || []), ...(otra.activeEffects || [])].forEach(eff => {
                             const t = getCardTemplate(eff.sourceId);
-                            if (t && t.tempEffectSinLinea) return; // p. ej. Super Evolución: los +ATQ/+DEF ya salen vía _statMods, esta línea era redundante y sin info (sin duración real)
+                            if (t && t.tempEffectSinLinea) return; // p. ej. Súper Evolución: los +ATQ/+DEF ya salen vía _statMods, esta línea era redundante y sin info (sin duración real)
                             if (eff.sourceInstanceId ? eff.sourceInstanceId === card.instanceId : (t && t.name === card.name)) {
                                 _salientes.push(this.lineaEfecto(t ? t.name : 'Efecto', { turnos: eff.duration, ref: _obj, comoObjetivo: true }));
                             }
@@ -7982,7 +8025,7 @@
                     const out = [];
                     ((this._statMods && this._statMods[c.instanceId]) || []).forEach(m => out.push({ srcId: m.srcId, srcAltId: m.srcAltId, srcZone: m.srcZone, badgeKey: m.badgeKey }));
                     if (c.status) for (const [k, v] of Object.entries(c.status)) { if (v && v.duration > 0 && v.source) out.push({ srcId: v.sourceInstanceId || null, srcName: v.sourceName || v.source, badgeKey: k }); }
-                    if (c.counters) for (const [k, d] of Object.entries(c.counters)) { if (d && d.count > 0 && d.source) out.push({ srcName: d.source, badgeKey: 'counter-' + k }); }
+                    if (c.counters) for (const [k, d] of Object.entries(c.counters)) { if (d && d.count > 0 && d.source) out.push({ srcId: d.sourceInstanceId || null, srcName: d.source, badgeKey: 'counter-' + k }); }
                     [...(c.tempEffects || []), ...(c.activeEffects || [])].forEach(eff => {
                         const t = getCardTemplate(eff.sourceId);
                         out.push({ srcId: eff.sourceInstanceId || null, srcName: t ? t.name : null });

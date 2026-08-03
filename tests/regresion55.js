@@ -30,7 +30,18 @@
 'use strict';
 const { correrSuite } = require('./harness');
 
-const MAZO_LARGO = ['Longaniza', 'Longaniza', 'Longaniza', 'Longaniza', 'Super Evolución', 'Longaniza'];
+// La carta se referencia por ID (1049), no por nombre: en la base VIEJA se llama "Super
+// Evolución" y en la NUEVA "Súper Evolución" (Toto la renombró el 31-jul-2026 para que
+// concuerde con la etiqueta "Usuario de Súper Evolución" y con sus propios textos, que ya
+// iban acentuados). `cartas_antes_de_dsl.js` no se toca NUNCA, así que el nombre viejo se
+// queda ahí para siempre y un escenario por nombre solo resolvería en una de las dos bases.
+const SUPER_EVO = 1049;
+const MAZO_LARGO = ['Longaniza', 'Longaniza', 'Longaniza', 'Longaniza', SUPER_EVO, 'Longaniza'];
+
+// Nombre de la carta en cada base, para los pasos que la eligen por nombre y para los mapas
+// de logs. Toda diferencia de esta suite que sea solo "Super" vs "Súper" viene de aquí.
+const NOM_VIEJO = 'Super Evolución';
+const NOM_NUEVO = 'Súper Evolución';
 
 // El entrenamiento sube 1 por turno PROPIO, así que hacen falta 6 finTurno para llegar a 3.
 const SEIS_TURNOS = [
@@ -101,7 +112,7 @@ const escenarios = [
 
     // ---------------- PRÁCTICA CONSTANTE (Pasiva) ----------------
     {
-        nombre: 'PRÁCTICA CONSTANTE: al 3er turno propio busca Super Evolución en mazo o descartes',
+        nombre: 'PRÁCTICA CONSTANTE: al 3er turno propio busca Súper Evolución en mazo o descartes',
         turno: 2, turnoDe: 'p1', empieza: 'p2',
         p1: { vanguardia: [{ carta: 'Karlitos', furor: 0 }], mazo: MAZO_LARGO },
         p2: {},
@@ -111,12 +122,12 @@ const escenarios = [
         // que responde a "visorMazo") en vez del modal genérico de {busqueda}.
         pasos: [
             ...SEIS_TURNOS,
-            { soloEn: 'vieja', opcion: 'BUSCAR' }, { soloEn: 'vieja', busqueda: ['Super Evolución'] },
-            { soloEn: 'nueva', opcion: 'BUSCAR EN EL MAZO' }, { soloEn: 'nueva', elegir: ['Super Evolución'] },
+            { soloEn: 'vieja', opcion: 'BUSCAR' }, { soloEn: 'vieja', busqueda: [NOM_VIEJO] },
+            { soloEn: 'nueva', opcion: 'BUSCAR EN EL MAZO' }, { soloEn: 'nueva', elegir: [NOM_NUEVO] },
         ],
         logsIntencionados: [
-            { de: 'Añades Super Evolución a tu mano.', a: 'Añades Super Evolución de J1 (Jugador 1) a tu mano.',
-              motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba target.name a secas' },
+            { de: `Añades ${NOM_VIEJO} a tu mano.`, a: `Añades ${NOM_NUEVO} de J1 (Jugador 1) a tu mano.`,
+              motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba target.name a secas; el acento de "Súper" es el renombrado de Toto (ver cabecera)' },
             { de: 'Barajando el mazo...', a: 'Barajando el mazo de J1 (Jugador 1)...',
               motivo: 'norma del proyecto (logs en 3ª persona con jugador), igual que el resto de búsquedas ya migradas (Rezo en grupo, Hexagrama...)' },
         ],
@@ -135,7 +146,7 @@ const escenarios = [
         // la razón de que BUSCAR necesitara aceptar varias zonas.
         nombre: 'PRÁCTICA CONSTANTE: la encuentra también en los descartes',
         turno: 2, turnoDe: 'p1', empieza: 'p2',
-        p1: { vanguardia: [{ carta: 'Karlitos', furor: 0 }], mazo: ['Longaniza', 'Longaniza', 'Longaniza', 'Longaniza'], descartes: ['Super Evolución'] },
+        p1: { vanguardia: [{ carta: 'Karlitos', furor: 0 }], mazo: ['Longaniza', 'Longaniza', 'Longaniza', 'Longaniza'], descartes: [SUPER_EVO] },
         p2: {},
         // confirmarPorZona: eligiendo la zona DESCARTES, la nueva coge la PRIMERA coincidencia
         // sin modal (el orden de los descartes da igual) y sin abrir ni barajar el mazo -motivo
@@ -143,12 +154,12 @@ const escenarios = [
         // carta viniera de los descartes, revelando implícitamente que había una copia en el mazo-.
         pasos: [
             ...SEIS_TURNOS,
-            { soloEn: 'vieja', opcion: 'BUSCAR' }, { soloEn: 'vieja', busqueda: ['Super Evolución'] },
+            { soloEn: 'vieja', opcion: 'BUSCAR' }, { soloEn: 'vieja', busqueda: [NOM_VIEJO] },
             { soloEn: 'nueva', opcion: 'BUSCAR EN LOS DESCARTES' },
         ],
         logsIntencionados: [
-            { de: 'Añades Super Evolución a tu mano.', a: 'Añades Super Evolución de J1 (Jugador 1) a tu mano.',
-              motivo: 'norma del proyecto (logs en 3ª persona con dueño)' },
+            { de: `Añades ${NOM_VIEJO} a tu mano.`, a: `Añades ${NOM_NUEVO} de J1 (Jugador 1) a tu mano.`,
+              motivo: 'norma del proyecto (logs en 3ª persona con dueño); el acento de "Súper" es el renombrado de Toto (ver cabecera)' },
         ],
         // CAMBIO DE COMPORTAMIENTO, no cosmético (betasteo de Toto, 31-jul-2026): la vieja (y la
         // nueva antes de este fix) barajaban el mazo tras CUALQUIER búsqueda con éxito, aunque la
@@ -160,7 +171,7 @@ const escenarios = [
         flotantesSoloNueva: [ FLOTANTE_PRACTICA ],
     },
     {
-        nombre: 'PRÁCTICA CONSTANTE: sin Super Evolución en ninguna zona, ni pregunta',
+        nombre: 'PRÁCTICA CONSTANTE: sin Súper Evolución en ninguna zona, ni pregunta',
         turno: 2, turnoDe: 'p1', empieza: 'p2',
         p1: { vanguardia: [{ carta: 'Karlitos', furor: 0 }], mazo: ['Longaniza', 'Longaniza', 'Longaniza', 'Longaniza'] },
         p2: {},

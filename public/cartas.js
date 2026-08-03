@@ -3872,7 +3872,7 @@ const CARD_DB = [
     },
     {
         name: "Karlitos", hp: 3, def: 2, atk: 3, type: "Personaje", subtype: "Ser vivo", tags: ["Usuario de Súper Evolución"], gender: "M", rarity: "A", cost: 4, series: 1,
-        text: "P: PRÁCTICA CONSTANTE: Inicio de tu turno: +1 contador. A los 3, busca 'Super Evolución' en mazo o descarte. A: APRENDIZ DE ARMAS (1F): Equipa un Arma de tu mano ignorando requisitos, luego ataca normal.",
+        text: "P: PRÁCTICA CONSTANTE: Inicio de tu turno: +1 contador. A los 3, busca 'Súper Evolución' en mazo o descarte. A: APRENDIZ DE ARMAS (1F): Equipa un Arma de tu mano ignorando requisitos, luego ataca normal.",
         passiveName: "PRÁCTICA CONSTANTE", activeName: "APRENDIZ DE ARMAS", activeCost: 1,
         superStats: { hp: 4, def: 7, atk: 7 }, 
         
@@ -3916,7 +3916,7 @@ const CARD_DB = [
                 // inspeccionado); DESCARTES coge la primera coincidencia sin modal y sin tocar
                 // el mazo para nada (el orden de los descartes da igual).
                 { if: { campo: "counters.karlitos_entrenamiento.count", op: ">=", valor: 3 },
-                  op: "BUSCAR", en: ["MAZO", "DESCARTES"], filtros: [ { campo: "name", op: "==", valor: "Super Evolución" } ],
+                  op: "BUSCAR", en: ["MAZO", "DESCARTES"], filtros: [ { campo: "name", op: "==", valor: "Súper Evolución" } ],
                   titulo: "BUSCAR SÚPER EVOLUCIÓN",
                   confirmarPorZona: true,
                   confirmar: { titulo: "PRÁCTICA COMPLETADA", no: "NO BUSCAR",
@@ -3950,9 +3950,9 @@ const CARD_DB = [
         ],
     },
     {
-        name: "Super Evolución", type: "Ayuda", subtype: "Técnica", tags: ["Equipable"], rarity: "B", cost: 4, series: 1,
+        name: "Súper Evolución", type: "Ayuda", subtype: "Técnica", tags: ["Equipable"], rarity: "B", cost: 4, series: 1,
         // tempEffectSinLinea (31-jul-2026, betasteo de Toto): sin esto, "Efectos actuales" de
-        // Super Evolución mostraba una segunda línea "Super Evolución, objetivo: X" además de los
+        // Súper Evolución mostraba una segunda línea "Súper Evolución, objetivo: X" además de los
         // +ATQ/+DEF ya calculados (vía onEquipUpdate/_statMods) -redundante y sin info real, ya
         // que el tempEffect a mano no lleva `duration`-.
         tempEffectSinLinea: true,
@@ -4017,8 +4017,12 @@ const CARD_DB = [
                 effect.count++;
                 showFloatingText(target.instanceId, `SÚPER EVO: ${effect.count}/3`, "ft-ability", -20);
                 
-                // Añadimos el contador visual de rayo ⚡ a la carta
-                game.modifyCounters(target, 'super_evo_timer', 1, 'Turnos Evo', 'Súper Evolución', '⚡');
+                // Añadimos el contador visual de rayo ⚡ a la carta. Se pasa la CARTA equipada, no
+                // su nombre suelto (Toto, 31-jul-2026): con el nombre, "Afectado por:" decía
+                // "fuente: Súper Evolución" sin dueño ni copyId; con la carta, modifyCounters
+                // guarda su instanceId y sale la referencia completa.
+                const _equipo = (target.equippedCards || []).find(c => c.instanceId === effect.instanceId);
+                game.modifyCounters(target, 'super_evo_timer', 1, 'Turnos Evo', _equipo || 'Súper Evolución', '⚡');
                 
                 if (effect.count >= 3) {
                     game.logMsg(`¡La Súper Evolución de ${target.name} se ha agotado!`, 'system');
