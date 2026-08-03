@@ -4561,7 +4561,7 @@ const CARD_DB = [
     },
     {
         name: "Poder Legado", type: "Ayuda", subtype: "Técnica", tags: ["Equipable"], rarity: "S", cost: 1, series: 2,
-        text: "Anexa a Vanguardia con 'Karlos' y exactamente 1 de Vida. Sus stats pasan a ser 9 (inamovible). Quien le ataque pierde 1 de Furor. Al inicio de tu próximo turno, destruye este equipo y devuelve el personaje a tu mano.",
+        text: "Anexa a Vanguardia con 'Karlos' y 1 de Vida o menos. Sus stats pasan a ser 9 (inamovible). Quien le ataque pierde 1 de Furor. Al inicio de tu próximo turno, destruye este equipo y devuelve el personaje a tu mano.",
         // Migrada (31-jul-2026), segunda de la tanda de equipos con vida propia. Reutiliza
         // `cuentaAtras` de Súper Evolución (aquí de UN solo turno) y estrena dos piezas:
         //   · `mientrasEquipado: {fijar:{...}, ignorarTopes:true}` — stats BLOQUEADOS a un valor
@@ -4576,13 +4576,13 @@ const CARD_DB = [
         tempEffectText: "Stats bloqueados a 9; vuelve a la mano al inicio de tu próximo turno",
         abilities: [
             { trigger: "JUGAR", requisitos: [
-                { count: { quien: "ALIADO", zona: "vanguardia", filtros: [ { campo: "name", op: "contieneTexto", valor: "Karlos" }, { campo: "currentHp", op: "==", valor: 1 } ] },
-                  op: ">=", valor: 1, msg: "Necesitas un Karlos en vanguardia con exactamente 1 de Vida." } ] },
+                { count: { quien: "ALIADO", zona: "vanguardia", filtros: [ { campo: "name", op: "contieneTexto", valor: "Karlos" }, { campo: "currentHp", op: "<=", valor: 1 } ] },
+                  op: ">=", valor: 1, msg: "Necesitas un Karlos en vanguardia con 1 de Vida o menos." } ] },
             { trigger: "AL_EQUIPAR",
               mientrasEquipado: { fijar: { atk: 9, def: 9, hp: 9 }, ignorarTopes: true },
               efectos: [
                 { op: "ELEGIR", de: "ALIADOS", zona: "VANGUARDIA", cantidad: 1,
-                  filtros: [ { campo: "name", op: "contieneTexto", valor: "Karlos" }, { campo: "currentHp", op: "==", valor: 1 } ],
+                  filtros: [ { campo: "name", op: "contieneTexto", valor: "Karlos" }, { campo: "currentHp", op: "<=", valor: 1 } ],
                   titulo: "¿QUIÉN DESPIERTA EL PODER LEGADO?",
                   efectos: [
                     { op: "EQUIPAR",

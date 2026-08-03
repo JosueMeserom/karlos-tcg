@@ -36,7 +36,7 @@ const COPY_ID_NACE = [
     { contiene: 'cardCounts', motivo: 'consecuencia de lo mismo: el contador por el que assignCopyId reparte los números' },
 ];
 
-// El requisito es EXACTAMENTE 1 de Vida, así que todos los escenarios parten de ahí.
+// El requisito era EXACTAMENTE 1 de Vida; casi todos los escenarios parten de ahí.
 const KARLOS_A_1 = { carta: 'Karlos', vida: 1 };
 
 // Diferencias de MECANISMO (no de efecto), comunes a todos los escenarios que llegan a equipar.
@@ -73,6 +73,45 @@ const escenarios = [
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba target.name a secas' },
         ],
         diferenciasEsperadas: [...MECANISMO_MARCA, ...COPY_ID_NACE],
+    },
+    {
+        // CAMBIO DE COMPORTAMIENTO, no cosmético (pedido por Toto, 31-jul-2026): el requisito
+        // pasa de "exactamente 1 de Vida" (==) a "1 de Vida o menos" (<=), por si Karlos llega a
+        // 0.5 -el suelo de daño Esbirro-vs-Personaje, que el motor sí permite hoy-. La vieja está
+        // congelada y sigue comprobando `currentHp === 1`, así que en ESTE escenario diverge de
+        // verdad: rechaza donde la nueva acepta. `soloEn` separa los dos flujos completos.
+        nombre: 'Poder Legado: con la norma relajada, también acepta a un Karlos con 0.5 de Vida',
+        turno: 2, turnoDe: 'p1', empieza: 'p2',
+        p1: { vanguardia: [{ carta: 'Karlos', vida: 0.5 }], mano: [PODER_LEGADO] },
+        p2: {},
+        pasos: [
+            { soloEn: 'nueva', jugar: PODER_LEGADO }, { soloEn: 'nueva', elegir: ['Karlos'] },
+        ],
+        // La vieja rechaza silenciosamente (canPlayCard, logError privado): no llega a jugar la
+        // carta ni a emitir NADA de su log habitual. logsSoloNueva, no logsIntencionados (que es
+        // para renombrar una línea que SÍ existe en ambas, no para una ausente del todo).
+        logsSoloNueva: [
+            { linea: '¡Karlos de J1 (Jugador 1) despierta su verdadero poder!',
+              motivo: 'solo la nueva llega a jugar la carta; la vieja la rechaza antes de emitir nada' },
+        ],
+        flotantesSoloNueva: [
+            { linea: 'PODER LEGADO', motivo: 'solo la nueva llega a equipar; la vieja nunca dispara el flotante' },
+        ],
+        // No es MECANISMO_MARCA/COPY_ID_NACE (esas comparan dos mecanismos DEL MISMO efecto): aquí
+        // el efecto entero solo ocurre en la nueva. Vieja se queda con Karlos a 0.5, sin equipar,
+        // y la carta todavía en la mano; nueva completa el ciclo entero -verificado a mano con
+        // un probe sobre el estado exportado, campo por campo, no adivinado-.
+        diferenciasEsperadas: [
+            { contiene: 'estado.p1.hand.0', motivo: 'la vieja rechaza: Poder Legado se queda en la mano; la nueva la consume al equipar' },
+            { contiene: '.currentHp', motivo: 'la vieja deja a Karlos en 0.5; la nueva lo cura a 9 (superStats/fijar del equipo)' },
+            { contiene: '.maxHp', motivo: 'la vieja no toca la Vida máxima; la nueva la fija a 9' },
+            { contiene: '.currentDef', motivo: 'la vieja no toca la Def; la nueva la fija a 9' },
+            { contiene: '.currentAtk', motivo: 'la vieja no toca el Atq; la nueva lo fija a 9' },
+            { contiene: 'tempEffects.0', motivo: 'la vieja no llega a crear la marca de cuenta atrás' },
+            { contiene: 'ignoreStatCaps', motivo: 'la vieja no llega a fijar el bloqueo de stats' },
+            { contiene: 'equippedCards', motivo: 'la vieja no llega a anexar el equipo' },
+            { contiene: 'cardCounts', motivo: 'la vieja no llega a jugar la carta, así que nunca reparte copyId' },
+        ],
     },
     {
         nombre: 'Poder Legado rechazado: el Karlos tiene más de 1 de Vida',
