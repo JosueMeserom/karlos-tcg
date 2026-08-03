@@ -132,9 +132,15 @@ const escenarios = [
             { de: '¡No hay aliados con suficiente Furor! Gárgola se hace pedazos.',
               a: '¡Nadie paga el tributo! Gárgola se hace pedazos.',
               motivo: 'simplificación aceptada (ver nota de cabecera): siNoElegido no distingue "sin pagadores válidos" de "declinas la elección", un único texto para ambos casos' },
+            // Diferencia de DATO de carta, no de migración: Toto añadió `gender:"F"` a Gárgola
+            // en cartas.js tras el betasteo (la base vieja está congelada y no lo tiene), así
+            // que el log genérico de muerte del motor concuerda en femenino solo en la nueva.
+            { de: 'Gárgola [1] de J1 (Jugador 1) ha sido destruido.',
+              a: 'Gárgola [1] de J1 (Jugador 1) ha sido destruida.',
+              motivo: 'gender:"F" añadido a la ficha de Gárgola en la base nueva; la vieja (congelada) no lo tiene' },
         ],
         flotantesSoloNueva: [
-            { linea: 'DESTRUIDO', motivo: 'destrucción directa sin Retribución: la nueva anuncia "DESTRUIDO" en vez de "-N VIDA"; la vieja no anunciaba nada (ver regresion40/51). Gárgola no tiene `gender` propio en su ficha -> masculino por defecto, aunque el nombre sea gramaticalmente femenino; posible dato de carta a completar, no algo que decidir aquí' },
+            { linea: 'DESTRUIDA', motivo: 'destrucción directa sin Retribución: la nueva anuncia "DESTRUIDO/A" en vez de "-N VIDA"; la vieja no anunciaba nada (ver regresion40/51)' },
         ],
     },
     {
@@ -148,9 +154,12 @@ const escenarios = [
             { de: '¡Nadie pagó el tributo! Gárgola se hace pedazos.',
               a: '¡Nadie paga el tributo! Gárgola se hace pedazos.',
               motivo: 'simplificación aceptada (ver nota de cabecera): mismo texto único de siNoElegido' },
+            { de: 'Gárgola [1] de J1 (Jugador 1) ha sido destruido.',
+              a: 'Gárgola [1] de J1 (Jugador 1) ha sido destruida.',
+              motivo: 'gender:"F" añadido a la ficha de Gárgola en la base nueva; la vieja (congelada) no lo tiene' },
         ],
         flotantesSoloNueva: [
-            { linea: 'DESTRUIDO', motivo: 'destrucción directa sin Retribución: la nueva anuncia "DESTRUIDO" en vez de "-N VIDA"; la vieja no anunciaba nada (ver regresion40/51). Gárgola no tiene `gender` propio en su ficha -> masculino por defecto, aunque el nombre sea gramaticalmente femenino; posible dato de carta a completar, no algo que decidir aquí' },
+            { linea: 'DESTRUIDA', motivo: 'destrucción directa sin Retribución: la nueva anuncia "DESTRUIDO/A" en vez de "-N VIDA"; la vieja no anunciaba nada (ver regresion40/51)' },
         ],
     },
 ];

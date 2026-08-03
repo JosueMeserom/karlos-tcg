@@ -2898,30 +2898,42 @@ const CARD_DB = [
         // y ya no hace falta para Kami). La vieja (congelada, nunca se edita) sigue con el bug
         // para siempre — es la base de comparación histórica, no el juego en vivo.
         // SACRIFICIO EQUIVALENTE migrada (31-jul-2026): dos ELEGIR secuenciales (1º aliado de
-        // vanguardia propia excluyéndose a sí misma, 2º enemigo), cada uno con su propio
-        // MODIFICAR_STAT `vaciar+sinRetribucion+comprobarMuerte` — el mismo canal de
-        // "destrucción directa" que ya usa Cañón de positrones, sin op nuevo. `excluirSelf`
-        // (el que reconoce ELEGIR, no `excludeSelf` de `_pool`/COUNT) evita que Kami se elija a
-        // sí misma en el primer paso. Diferencia de log aceptada: la vieja anuncia AMBOS
-        // sacrificios en una sola línea ("sacrifica a X para aniquilar a Y"); la nueva, con dos
-        // efectos independientes, anuncia cada uno por separado.
+        // vanguardia propia, 2º enemigo), destruyendo con `vaciar+sinRetribucion+comprobarMuerte`
+        // — el mismo canal de "destrucción directa" que ya usa Cañón de positrones, sin op nuevo.
         // OJO: el requisito de "otro aliado" pide >=1, no >=2 — `count:{quien:"ALIADO"}`
         // EXCLUYE Avatares por defecto (Kami: intocable, `_pool`), así que Kami misma NUNCA
         // cuenta en este recuento; >=1 ya significa "hay otro aliado además de mí".
+        //
+        // EJECUCIÓN DIFERIDA (betasteo de Toto, 31-jul-2026). El primer intento destruía al
+        // aliado nada más elegirlo, ANTES de elegir al enemigo: si cancelabas en el 2º paso el
+        // aliado ya estaba muerto sin remedio, así que ese paso tuvo que marcarse
+        // `cancelable:false`. Mal: la norma del proyecto es que mientras siga una cadena de
+        // elecciones y NADA haya cambiado aún en el tablero, se pueda cancelar en cualquier
+        // punto y no ocurra nada. Ahora el PASO 1 solo ANOTA a quién se sacrificará
+        // (`guardaIdsEnSelf`, sin efectos), y TODO se ejecuta dentro del PASO 2, ya con los dos
+        // objetivos en mano. Con `costeDiferido` el Furor tampoco se cobra hasta entonces, así
+        // que cancelar en cualquiera de los dos pasos deja la partida intacta (ni Furor, ni
+        // acción gastada). No hizo falta tocar el compilador de ELEGIR: un ELEGIR con
+        // `cantidad:N` YA recoge los N objetivos antes de ejecutar nada; lo que rompía la regla
+        // era encadenar DOS ELEGIR con efectos en el primero, no el mecanismo en sí.
         abilities: [
-            { trigger: "ACTIVA", nombre: "SACRIFICIO EQUIVALENTE", coste: { furor: 1 }, sinObjetivo: true,
+            { trigger: "ACTIVA", nombre: "SACRIFICIO EQUIVALENTE", coste: { furor: 1 }, sinObjetivo: true, costeDiferido: true,
               requisitos: [
                 { count: { quien: "ALIADO", zona: "vanguardia" }, op: ">=", valor: 1, msg: "Necesitas otro aliado en la vanguardia para el sacrificio." },
                 { count: { quien: "ENEMIGO" }, op: ">=", valor: 1, msg: "No hay enemigos a los que aniquilar." } ],
               efectos: [
-                { op: "ELEGIR", de: "ALIADOS", zona: "VANGUARDIA", excluirSelf: true, cantidad: 1, cancelable: false,
-                  titulo: "PASO 1: Elige un aliado de TU vanguardia para sacrificar.",
-                  efectos: [ { op: "MODIFICAR_STAT", stat: "currentHp", vaciar: true, sinRetribucion: true, comprobarMuerte: true,
-                                log: "¡SACRIFICIO EQUIVALENTE! Kami sacrifica a {objetivo}." } ] },
-                { op: "ELEGIR", de: "ENEMIGOS", cantidad: 1, cancelable: false,
-                  titulo: "PASO 2: Elige un enemigo para aniquilar.",
-                  efectos: [ { op: "MODIFICAR_STAT", stat: "currentHp", vaciar: true, sinRetribucion: true, comprobarMuerte: true,
-                                log: "¡SACRIFICIO EQUIVALENTE aniquila por completo a {objetivo}!" } ] } ] }
+                { op: "ELEGIR", de: "ALIADOS", zona: "VANGUARDIA", cantidad: 1,
+                  titulo: "PASO 1: Elige un aliado de TU vanguardia para sacrificar",
+                  guardaIdsEnSelf: "kamiSacrificio" },
+                { op: "ELEGIR", de: "ENEMIGOS", cantidad: 1,
+                  titulo: "PASO 2: Elige un enemigo para aniquilar",
+                  efectos: [
+                    { op: "FLOTANTE", target: { quien: "SELF" }, texto: "SACRIFICIO EQUIVALENTE", estilo: "ft-ability", offset: -30 },
+                    { op: "MODIFICAR_STAT", target: { selfLista: "kamiSacrificio" }, stat: "currentHp",
+                      vaciar: true, sinRetribucion: true, comprobarMuerte: true,
+                      log: "¡SACRIFICIO EQUIVALENTE! Kami sacrifica a {objetivo}." },
+                    { op: "MODIFICAR_STAT", stat: "currentHp", vaciar: true, sinRetribucion: true, comprobarMuerte: true,
+                      log: "¡SACRIFICIO EQUIVALENTE aniquila por completo a {objetivo}!" } ] } ] }
         ],
     },
     {
@@ -3639,6 +3651,12 @@ const CARD_DB = [
 
             if (ctx.name === 'SACRIFICIO_NEMESIS') {
                 game.logMsg(`¡Némesis consume a ${target.name} para curarse!`, 'ability');
+                // Flotantes (betasteo de Toto, 31-jul-2026): "razón" (el nombre de la Pasiva que
+                // lo provoca) sobre Némesis y DESTRUIDO/A sobre el aliado consumido — mismo
+                // criterio y mismo orden que Kami. Ya no daba NINGÚN flotante: ponía currentHp=0
+                // a mano, saltándose modifyStat por completo.
+                showFloatingText(card.instanceId, card.passiveName, "ft-ability", -30);
+                game.floatingDestruido(target);
                 target.currentHp = 0;
                 await game.checkDeath(target, false);
                 
@@ -6277,12 +6295,19 @@ const CARD_DB = [
         // Migrada (31-jul-2026): TRAS_DEFENDER (mismo trigger de Imp mayor/Gólem multielemental)
         // con `si:{campo:"self.hp"}` para "cuando su Vida llegue a 0" e `ifObjetivo` para "SI el
         // atacante sigue vivo" (evita procesar la maldición si el golpe mató a ambos a la vez).
-        // "Destruye" usa MODIFICAR_STAT vaciar+comprobarMuerte SIN `sinRetribucion` -a
-        // diferencia de Kami/Cañón de positrones/Némesis, la vieja aquí SÍ pasaba
-        // checkDeath(attacker, true): esto da retribución, es una maldición, no una anulación
-        // limpia-. Piezas nuevas en MONEDA: `log` (anuncio ANTES de lanzar, distinto de
-        // logCara/logCruz que anuncian el resultado) y `objetivo` en el fill de logCara/logCruz
-        // (faltaba).
+        // Piezas nuevas en MONEDA: `log` (anuncio ANTES de lanzar, distinto de logCara/logCruz
+        // que anuncian el resultado) y `objetivo` en el fill de logCara/logCruz (faltaba).
+        //
+        // CAMBIO DE REGLA, no cosmético (betasteo de Toto, 31-jul-2026): ahora lleva
+        // `sinRetribucion: true`, así que la víctima NO da Retribución. La vieja pasaba
+        // `checkDeath(attacker, true)` (SÍ la daba) y en la primera migración se replicó tal
+        // cual. Es casi seguro un descuido del código original: el texto dice literalmente
+        // "destruye la carta que realizó ese ataque", y la norma de Toto define destruir como
+        // "mandada a los descartes SIN dar retribución" — de las cinco cartas del juego que
+        // dicen "destruye" (Cañón de positrones, Kami, Némesis, Gárgola y esta), las otras
+        // CUATRO ya pasaban `false`; Muñeca del mal era la única excepción. Sin este flag el
+        // flotante tampoco podía decir DESTRUIDO (los dos van atados por definición).
+        // Revertir = quitar `sinRetribucion` de la línea de abajo.
         abilities: [
             { trigger: "TRAS_DEFENDER", nombre: "IMPRECACIÓN",
               si: { campo: "self.hp", op: "<=", valor: 0 },
@@ -6291,7 +6316,7 @@ const CARD_DB = [
                   log: "¡IMPRECACIÓN! La muñeca lanza una maldición final antes de expirar...",
                   logCara: { msg: "Moneda: CARA - ¡La maldición atrapa a {objetivo} y lo destruye!", tipo: "combat" },
                   logCruz: { msg: "Moneda: CRUZ - La maldición se disipa en el aire.", tipo: "neutral" },
-                  cara: [ { op: "MODIFICAR_STAT", stat: "currentHp", vaciar: true, comprobarMuerte: true,
+                  cara: [ { op: "MODIFICAR_STAT", stat: "currentHp", vaciar: true, sinRetribucion: true, comprobarMuerte: true,
                             floating: { texto: "MALDITO", estilo: "ft-purple", offset: -30 } } ] } ] }
         ],
     },
@@ -6587,7 +6612,7 @@ const CARD_DB = [
         ],
     },
     {
-        name: "Gárgola", hp: 6, def: 4, atk: 4, type: "Esbirro", subtype: "Ser mágico", tags: ["Monstruo"], rarity: "A", cost: 1, series: 2,
+        name: "Gárgola", hp: 6, def: 4, atk: 4, type: "Esbirro", subtype: "Ser mágico", tags: ["Monstruo"], gender: "F", rarity: "A", cost: 1, series: 2,
         text: "P: PRUEBA DE CARÁCTER: Al colocar esta carta, echa dos monedas. 1ª Cara: elige enemigo y quítale 2 Furor. 2ª Cruz: tributa 2 Furor de un aliado o Gárgola se destruye.",
         passiveName: "PRUEBA DE CARÁCTER",
         // Migrada (31-jul-2026). El elegir enemigo pasa del modal genérico (violaba la norma de
@@ -7039,7 +7064,7 @@ const DSL = {
             // (comprobarMuerte sin sinRetribucion), así que sigue siendo una muerte normal.
             const _esDestruccion = e.vaciar && e.sinRetribucion && e.stat === 'currentHp';
             game.modifyStat(target, e.stat, d, e.offsetY || 0, e.fuente !== undefined ? e.fuente : sourceCard, _esDestruccion ? { silent: true } : null);
-            if (_esDestruccion && typeof showFloatingText === 'function') showFloatingText(target.instanceId, target.gender === 'F' ? 'DESTRUIDA' : 'DESTRUIDO', 'ft-red', e.offsetY || 0);
+            if (_esDestruccion) game.floatingDestruido(target, e.offsetY || 0);
             // Furor y demás cambios sin comprobarMuerte: el flotante custom se queda en su
             // posición ORIGINAL (después del cambio de stat) — sin reordenar (ver nota arriba).
             if (e.floating && !e.comprobarMuerte && typeof showFloatingText === 'function') showFloatingText(target.instanceId, String(e.floating.texto).split('{delta}').join(Math.abs(d)), e.floating.estilo || 'ft-green', e.floating.offset !== undefined ? e.floating.offset : -20);
@@ -8203,14 +8228,41 @@ const DSL = {
             // cierre genérico nunca se ejecutaba. Cualquier Activa sin ATACAR se
             // habría quedado sin agotar la carta ni soltar el candado de acción.
             // El guard `!card.exhausted` evita duplicar el cierre cuando sí atacó.
-            const _ejecutarActiva = async (card, game, targets) => {
-                if (costeFuror > 0) game.modifyStat(card, 'furor', -costeFuror);
+            // costeDiferido (Kami, SACRIFICIO EQUIVALENTE, 31-jul-2026): cobra el coste DESPUÉS
+            // de que los efectos se resuelvan con éxito, no antes. Es para Activas cuya primera
+            // acción es una CADENA de elecciones: mientras el jugador sigue eligiendo no ha
+            // cambiado nada en el tablero, así que debe poder cancelar en cualquier punto de la
+            // cadena y que no ocurra NADA -ni Furor gastado, ni carta agotada- (norma de UX de
+            // Toto, ver [[norma-targeting-en-tablero]]). El flotante del NOMBRE de la Activa
+            // tampoco se pinta aquí en ese modo: saldría antes de la primera elección, y estas
+            // cartas lo quieren junto a su efecto de verdad, así que lo declaran ellas con un op
+            // FLOTANTE en el punto que les toque.
+            const _cobrarActiva = (card, game) => {
+                // source 'avatar_passive': un Avatar (Kami) es inmune a TODA resta de stats en
+                // modifyStat salvo con esa fuente — inmunidad pensada contra efectos AJENOS, no
+                // contra el coste que la propia carta declara. Sin esto, SACRIFICIO EQUIVALENTE
+                // (1F) salía gratis. Ya era así en la base vieja; nunca se notó porque su Activa
+                // no llegaba nunca a completarse (ver el bug del gate de targeting, más abajo).
+                // Kami es hoy el único Avatar, así que el cambio no alcanza a ninguna otra carta.
+                if (costeFuror > 0) game.modifyStat(card, 'furor', -costeFuror, 0, 'avatar_passive');
                 if (typeof showFloatingText === 'function') {
-                    showFloatingText(card.instanceId, card.activeName, 'ft-ability', -30);
+                    if (!activa.costeDiferido) showFloatingText(card.instanceId, card.activeName, 'ft-ability', -30);
                     (activa.floatingExtra || []).forEach(fe => showFloatingText(card.instanceId, fe.texto, fe.estilo || 'ft-green', fe.offset !== undefined ? fe.offset : -10));
                 }
                 if (activa.log) game.logMsg(DSL._fill(activa.log, { carta: card.name }), activa.logTipo || 'ability');
-                await DSL._runEffectList(activa.efectos, card, game, card.owner, targets, activa.nombre || tmpl.activeName || null);
+            };
+            const _ejecutarActiva = async (card, game, targets) => {
+                if (!activa.costeDiferido) _cobrarActiva(card, game);
+                const _res = await DSL._runEffectList(activa.efectos, card, game, card.owner, targets, activa.nombre || tmpl.activeName || null);
+                if (activa.costeDiferido && _res && _res.ok === false) {
+                    // Cancelado a mitad de la cadena de elecciones: no se cobra nada y la carta
+                    // NO gasta su acción — solo se suelta el candado y se deshace la selección.
+                    game.isActionLocked = false;
+                    game.cancelAction();
+                    if (typeof game.render === 'function') game.render();
+                    return;
+                }
+                if (activa.costeDiferido) _cobrarActiva(card, game);
                 if (!card.exhausted) {
                     // sinAgotar (Achmay, PÉGAME PERRA, 31-jul-2026): "Esta habilidad no gasta
                     // la acción de Achmay" — cierra la acción igual (candado, sync, render)

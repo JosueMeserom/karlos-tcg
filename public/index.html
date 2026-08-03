@@ -2117,6 +2117,16 @@
                 return (card && card.gender === 'F') ? femenino : masculino;
             }
 
+            // Flotante único de DESTRUCCIÓN (Toto, 31-jul-2026). Cuando una carta dice
+            // explícitamente que DESTRUYE a otra, la víctima va a descartes SIN dar Retribución:
+            // el "-N VIDA" habitual induce a error, porque la Retribución se da precisamente
+            // cuando la Vida llega a 0 y aquí se está saltando ese cauce a propósito. Un solo
+            // punto para que el texto/estilo/género no se desincronicen entre llamadores
+            // (el op MODIFICAR_STAT del DSL y las Activas que siguen siendo imperativas).
+            floatingDestruido(card, offsetY = 0) {
+                if (typeof showFloatingText === 'function') showFloatingText(card.instanceId, this.generoTexto(card, 'DESTRUIDO', 'DESTRUIDA'), 'ft-red', offsetY);
+            }
+
             nCarta(c) {
                 if (!c) return '';
                 return c.name + ((c.type !== 'Personaje' && c.copyId) ? ` [${c.copyId}]` : '');
@@ -4042,11 +4052,23 @@
                 // El holder ES una réplica de la caja de la carta: el contenedor, con su propio CSS
                 // (absolute; bottom:28px; centrado), se coloca solo, EXACTAMENTE como dentro de la carta.
                 hold.style.cssText = `position:absolute; pointer-events:none; transform-origin: top left; width:${hold._base.iw}px; height:${hold._base.ih}px; left:${cr0.left + _bl}px; top:${cr0.top + _bt}px;`; // nace YA colocado (caja interior): sin frame fantasma
-                btnContainer.style.pointerEvents = 'auto';
+                // OJO: NO tocar el pointer-events del CONTENEDOR (bug de betasteo, Toto
+                // 31-jul-2026). `.action-btn-container` mide `width:300%` a propósito (truco de
+                // flexbox para que los botones crezcan centrados) y por eso vive con
+                // `pointer-events:none` en el CSS: la caja invisible se sale ~1 ancho de carta por
+                // cada lado y taparía a las cartas vecinas. Al elevarlo aquí se le ponía
+                // `pointerEvents='auto'` a mano, así que esa caja invisible SÍ capturaba el ratón
+                // y el hover se lo comía la carta de al lado (visible con Némesis y su botón
+                // SACRIFICAR). No hace falta: `.action-btn-card` ya declara `pointer-events:auto`,
+                // y un descendiente puede reactivarlos aunque su ancestro los tenga en `none`.
                 hold.appendChild(btnContainer);
-                // hover sobre el botón = hover sobre la carta (zoom y z como si siguiera dentro)
-                btnContainer.addEventListener('mouseenter', () => { if (document.contains(cardEl)) cardEl.classList.add('btn-hover'); });
-                btnContainer.addEventListener('mouseleave', () => { if (document.contains(cardEl)) cardEl.classList.remove('btn-hover'); });
+                // hover sobre el botón = hover sobre la carta (zoom y z como si siguiera dentro).
+                // Va en cada BOTÓN, no en el contenedor: el contenedor es transparente al ratón
+                // (ver arriba), así que sus propios mouseenter/mouseleave no llegarían a dispararse.
+                btnContainer.querySelectorAll('.action-btn-card').forEach(b => {
+                    b.addEventListener('mouseenter', () => { if (document.contains(cardEl)) cardEl.classList.add('btn-hover'); });
+                    b.addEventListener('mouseleave', () => { if (document.contains(cardEl)) cardEl.classList.remove('btn-hover'); });
+                });
                 layer.appendChild(hold);
                 this._liftTick();
             }
@@ -8427,6 +8449,15 @@
                                 customBtn.innerText = act.label;
                                 customBtn.onclick = (e) => {
                                     e.stopPropagation();
+                                    // Mismo gate que activateAbility (ver su "if (this.activePlayerId
+                                    // !== this.myPlayerId) return;"): el jugador SIN turno ve estos
+                                    // botones a propósito -para saber qué puede hacer el rival- pero
+                                    // no debe poder dispararlos. Sin esto, act.action() corría igual en
+                                    // su cliente: no llegaba a hacer nada real (no se sincroniza), pero
+                                    // sí tocaba selectedCard/inputState y la carta daba un "bote"
+                                    // fantasma al re-renderizar (betasteo de Toto, 31-jul-2026). Los
+                                    // botones de Activa nunca lo hicieron porque ese gate ya existía.
+                                    if (this.gameMode === 'online' && this.myPlayerId !== this.activePlayerId) return;
                                     act.action();
                                 };
                                 addBtnToContainer(customBtn);

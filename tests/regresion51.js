@@ -22,11 +22,18 @@
 //
 // Muñeca del mal: TRAS_DEFENDER (mismo trigger de Imp mayor/Gólem multielemental) con
 // `si:{campo:"self.hp",op:"<=",valor:0}` ("cuando su Vida llegue a 0") + `ifObjetivo` en la
-// MONEDA ("SI el atacante sigue vivo"). A diferencia de Kami/Némesis/Cañón de positrones, NO
-// lleva `sinRetribucion` -la vieja pasaba checkDeath(attacker, true): es una maldición con
-// retribución, no una anulación limpia-. Piezas nuevas en MONEDA: `log` (anuncio ANTES de
+// MONEDA ("SI el atacante sigue vivo"). Piezas nuevas en MONEDA: `log` (anuncio ANTES de
 // lanzar, distinto de logCara/logCruz que anuncian el resultado) y `objetivo` en el fill de
 // logCara/logCruz (faltaba).
+//
+// CAMBIO DE REGLA en Muñeca del mal (betasteo de Toto, 31-jul-2026), no cosmético: ahora lleva
+// `sinRetribucion`, así que su víctima NO da Retribución. La vieja pasaba
+// `checkDeath(attacker, true)` y la primera migración lo replicó tal cual. Es casi seguro un
+// descuido del original: el texto dice "destruye la carta que realizó ese ataque", y la norma
+// de Toto define destruir como "a descartes SIN dar retribución" — de las cinco cartas que
+// dicen "destruye" (Cañón de positrones, Kami, Némesis, Gárgola y esta), las otras cuatro ya
+// pasaban `false`; esta era la única excepción. Los dos efectos van atados por definición: sin
+// el flag, el flotante tampoco podía decir DESTRUIDO. Declarado en `diferenciasEsperadas`.
 //
 // Kami y Némesis comparten la MISMA diferencia de floater ya documentada en Cañón de
 // positrones (regresion40): la vieja hace `card.currentHp = 0` a mano (bypass total de
@@ -98,12 +105,12 @@ const escenarios = [
               a: 'Moneda: CARA - ¡La maldición atrapa a Mini-tigre [1] de J1 (Jugador 1) y lo destruye!',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba attacker.name a secas; la nueva rellena {objetivo} con DSL._nombre (pieza nueva en MONEDA)' },
         ],
-        // Aquí NO se puede usar el substring genérico 'VIDA' (a diferencia de Kami/Némesis):
-        // el escenario ya tiene un "-1 VIDA" COMPARTIDO por el golpe normal previo (Mini-tigre
-        // atacando a la Muñeca), y el filtro por substring borraría también esa línea común de
-        // un solo lado. Se declara el texto exacto del floater EXTRA únicamente.
         flotantesSoloNueva: [
-            { linea: '-20 VIDA', motivo: 'floater automático de game.modifyStat al destruir al atacante (vaciar); la vieja pone currentHp=0 a mano sin pasar por ese canal' },
+            { linea: 'DESTRUIDO', motivo: 'destrucción explícita: la nueva anuncia DESTRUIDO/A (ver cambio de regla arriba); la vieja no pintaba nada, ponía currentHp=0 a mano' },
+        ],
+        diferenciasEsperadas: [
+            { contiene: 'estado.p1.hp',
+              motivo: 'CAMBIO DE REGLA deliberado (ver cabecera): la vieja daba Retribución al destruir al atacante -aquí p1 se queda sin pila y su hp cae a 0-; la nueva, al ser una destrucción explícita, no la da y p1 conserva su hp' },
         ],
     },
     {
