@@ -3014,7 +3014,7 @@ const CARD_DB = [
     },
     {
         name: "Cogorza", type: "Evento", cost: 1, rarity: "C", series: 1,
-        text: "2 turnos. Al colocarla, aumenta en 2 la Def de cada aliado de tu vanguardia mientras dure, y echa una moneda por cada uno: con cruz, ese aliado queda Confuso 2 turnos. Al expirar, cura 1 de Vida a cada aliado de tu vanguardia afectado por esta carta.",
+        text: "2 turnos. Al colocarla, aumenta en 2 la Def de cada aliado de tu vanguardia actual mientras dure, y echa una moneda por cada uno: con cruz, ese aliado queda Confuso 2 turnos. Al expirar, cura 1 de Vida a cada aliado de tu vanguardia afectado por esta carta.",
         duration: 2,
         // Migrada (31-jul-2026). La auditoría la había marcado como "necesita pieza nueva" por
         // creer que el DSL no sabía lanzar UNA MONEDA POR MIEMBRO de un grupo. Falso: al leer
@@ -3038,7 +3038,12 @@ const CARD_DB = [
                   log: "Echando moneda de la Cogorza para {objetivo}...", logTipo: "system",
                   logCara: { msg: "¡CARA! {objetivo} aguanta bien la bebida.", tipo: "neutral" },
                   logCruz: { msg: "¡CRUZ! {objetivo} se emborracha y queda {objetivoG?Confuso|Confusa}.", tipo: "ability" },
-                  cruz: [ { op: "APLICAR_ESTADO", estado: "confusion", duracion: 2, fuente: "Cogorza" } ] } ] },
+                  // Sin `fuente`: por defecto es sourceCard (la propia Cogorza), lo que deja
+                  // sourceInstanceId puesto y por tanto el "Afectado por:" con formato completo
+                  // ("evento Cogorza [n] de Jx"). Poner `fuente:"Cogorza"` a mano (bug mío,
+                  // 31-jul-2026, betasteo de Toto) pasaba un STRING plano: sourceInstanceId se
+                  // quedaba null y refCarta() nunca llegaba a construir la línea.
+                  cruz: [ { op: "APLICAR_ESTADO", estado: "confusion", duracion: 2 } ] } ] },
             { trigger: "AURA", quien: "ALIADO", soloSelfLista: "affectedAllies", stats: { def: 2 } },
             { trigger: "AL_CADUCAR",
               efectos: [
@@ -3088,7 +3093,7 @@ const CARD_DB = [
         ],
     },
     {
-        name: "Espada V", type: "Ayuda", subtype: "Arma", cost: 1, rarity: "B", series: 1,
+        name: "Espada V", type: "Ayuda", subtype: "Arma", tags: ["melé"], cost: 1, rarity: "B", series: 1,
         text: "Requisito: un Personaje aliado 'Karlos' o 'Agah'. Anéxala a dicho Personaje: +2 Atq mientras esté equipada. Sólo puedes usar esta carta una vez por partida.",
         abilities: [
             { trigger: "JUGAR", requisitos: [

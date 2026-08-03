@@ -65,6 +65,17 @@ const escenarios = [
               motivo: 'norma del proyecto (logs en 3ª persona con dueño)' },
         ],
         ...FLOTANTES_REORDENADOS,
+        // CAMBIO DE COMPORTAMIENTO, no cosmético (betasteo de Toto, 31-jul-2026): la vieja
+        // pasaba `card.name` (string plano) como fuente del estado de Confusión, así que
+        // "Afectado por:" salía como "fuente: Cogorza" en vez del formato completo con dueño
+        // y copyId — exactamente el mismo bug que Toto ya nos hizo corregir para los flotantes
+        // de destrucción (DESTRUIDO/A). La nueva, sin `fuente` explícita en APLICAR_ESTADO,
+        // usa por defecto la propia carta Cogorza (sourceCard), que deja sourceInstanceId
+        // puesto y por tanto refCarta() construye "evento Cogorza [n] de Jx (nombre)".
+        diferenciasEsperadas: [
+            { contiene: 'status.confusion.source', motivo: 'la vieja guardaba un string plano (card.name); la nueva guarda la carta real, con formato completo en "Afectado por:"' },
+            { contiene: 'status.confusion.sourceInstanceId', motivo: 'consecuencia de lo mismo: null en la vieja, el instanceId real de Cogorza en la nueva' },
+        ],
     },
     {
         nombre: 'Cogorza: la CRUZ sobre una aliada femenina concuerda en género (norma del proyecto)',
@@ -79,6 +90,12 @@ const escenarios = [
             { de: '¡CRUZ! Ayudante perturbada se emborracha y queda Confuso.',
               a: '¡CRUZ! Ayudante perturbada [1] de J1 (Jugador 1) se emborracha y queda Confusa.',
               motivo: 'nombre con dueño + concordancia de género (norma del proyecto); la vieja decía siempre "Confuso"' },
+        ],
+        // Ver la nota larga del escenario anterior: la vieja guardaba `card.name` (string) como
+        // fuente del estado, la nueva la carta real.
+        diferenciasEsperadas: [
+            { contiene: 'status.confusion.source', motivo: 'la vieja guardaba un string plano (card.name); la nueva guarda la carta real, con formato completo en "Afectado por:"' },
+            { contiene: 'status.confusion.sourceInstanceId', motivo: 'consecuencia de lo mismo: null en la vieja, el instanceId real de Cogorza en la nueva' },
         ],
     },
     {
