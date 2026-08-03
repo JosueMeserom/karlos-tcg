@@ -38,6 +38,11 @@ const SEIS_TURNOS = [
     { finTurno: true }, { finTurno: true }, { finTurno: true },
 ];
 
+// Pedido explícito de Toto (betasteo, 31-jul-2026): un flotante con el nombre de la Pasiva en
+// CADA subida del contador (3 veces por cada SEIS_TURNOS), cosa que ni la vieja ni el primer
+// intento de esta migración hacían. Pieza nueva: `floating` en MODIFICAR_CONTADORES.
+const FLOTANTE_PRACTICA = { linea: 'PRÁCTICA CONSTANTE', motivo: 'flotante nuevo, pedido por Toto, en cada tick del contador de entrenamiento (3 veces por SEIS_TURNOS); la vieja no pintaba nada en ese momento' };
+
 const escenarios = [
     // ---------------- APRENDIZ DE ARMAS (Activa) ----------------
     {
@@ -107,6 +112,7 @@ const escenarios = [
             { de: 'Barajando el mazo...', a: 'Barajando el mazo de J1 (Jugador 1)...',
               motivo: 'norma del proyecto (logs en 3ª persona con jugador), igual que el resto de búsquedas ya migradas (Rezo en grupo, Hexagrama...)' },
         ],
+        flotantesSoloNueva: [ FLOTANTE_PRACTICA ],
     },
     {
         nombre: 'PRÁCTICA CONSTANTE: puedes declinar la búsqueda (no se baraja ni se coge nada)',
@@ -114,6 +120,7 @@ const escenarios = [
         p1: { vanguardia: [{ carta: 'Karlitos', furor: 0 }], mazo: MAZO_LARGO },
         p2: {},
         pasos: [ ...SEIS_TURNOS, { opcion: 'NO BUSCAR' } ],
+        flotantesSoloNueva: [ FLOTANTE_PRACTICA ],
     },
     {
         // También la encuentra en los DESCARTES: es lo que exige el texto ("mazo o descarte") y
@@ -129,6 +136,7 @@ const escenarios = [
             { de: 'Barajando el mazo...', a: 'Barajando el mazo de J1 (Jugador 1)...',
               motivo: 'norma del proyecto (logs en 3ª persona con jugador)' },
         ],
+        flotantesSoloNueva: [ FLOTANTE_PRACTICA ],
     },
     {
         nombre: 'PRÁCTICA CONSTANTE: sin Super Evolución en ninguna zona, ni pregunta',
@@ -136,6 +144,7 @@ const escenarios = [
         p1: { vanguardia: [{ carta: 'Karlitos', furor: 0 }], mazo: ['Longaniza', 'Longaniza', 'Longaniza', 'Longaniza'] },
         p2: {},
         pasos: [ ...SEIS_TURNOS ],
+        flotantesSoloNueva: [ FLOTANTE_PRACTICA ],
     },
     {
         // El entrenamiento es de UNA vez: tras completarlo, `karlitosEntrenado` corta la Pasiva
@@ -145,6 +154,7 @@ const escenarios = [
         p1: { vanguardia: [{ carta: 'Karlitos', furor: 0 }], mazo: ['Longaniza', 'Longaniza', 'Longaniza', 'Longaniza'] },
         p2: {},
         pasos: [ ...SEIS_TURNOS, { finTurno: true }, { finTurno: true } ],
+        flotantesSoloNueva: [ FLOTANTE_PRACTICA ],
     },
 ];
 

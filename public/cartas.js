@@ -3893,8 +3893,15 @@ const CARD_DB = [
             { trigger: "INICIO_TURNO", soloTurnoPropio: true,
               si: [ { campo: "karlitosEntrenado", op: "truthy", no: true } ],
               efectos: [
+                // Sin `fuente`: por defecto es sourceCard.name ("Karlitos"), que al coincidir
+                // con el nombre de la propia carta objetivo resuelve a "esta carta" en
+                // "Afectado por:" (mismo bug que Cogorza, betasteo de Toto: había puesto
+                // `fuente:"PRÁCTICA CONSTANTE"` a mano, un string que nunca podía igualar
+                // card.name). `floating` pinta el nombre de la Pasiva en cada tick, cosa que
+                // ni esta migración ni la vieja hacían automáticamente — Toto lo pidió.
                 { op: "MODIFICAR_CONTADORES", target: { quien: "SELF" }, contador: "karlitos_entrenamiento",
-                  delta: 1, nombreContador: "Práctica", fuente: "PRÁCTICA CONSTANTE", icono: "🏋️" },
+                  delta: 1, nombreContador: "Práctica", icono: "🏋️",
+                  floating: { texto: "PRÁCTICA CONSTANTE", estilo: "ft-ability", offset: -40 } },
                 // A partir de aquí, solo al llegar a 3 (ruta con puntos sobre el contador).
                 { if: { campo: "counters.karlitos_entrenamiento.count", op: ">=", valor: 3 },
                   op: "FLOTANTE", target: { quien: "SELF" }, texto: "¡PRÁCTICA COMPLETADA!", estilo: "ft-ability", offset: -40,
@@ -7070,6 +7077,10 @@ const DSL = {
         if (e.op === 'MODIFICAR_CONTADORES') {
             const d = DSL._value(ownerId, game, e.delta, sourceCard, ctx);
             game.modifyCounters(target, e.contador, d, e.nombreContador || e.contador, e.fuente !== undefined ? e.fuente : sourceCard.name, e.icono || '⚙️');
+            // floating (Karlitos, 31-jul-2026): faltaba, a diferencia de casi todos los demás
+            // ops — un contador que sube en la propia Pasiva de la carta se notaba en el
+            // registro de "Afectado por:" pero no en el tablero en el momento en que ocurre.
+            if (e.floating && typeof showFloatingText === 'function') showFloatingText(target.instanceId, e.floating.texto, e.floating.estilo || 'ft-ability', e.floating.offset !== undefined ? e.floating.offset : -40);
             if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: DSL._nombre(game, target) }), 'ability');
             return true;
         }
