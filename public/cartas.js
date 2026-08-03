@@ -3957,107 +3957,44 @@ const CARD_DB = [
         // que el tempEffect a mano no lleva `duration`-.
         tempEffectSinLinea: true,
         text: "Equipa a un 'Usuario de Súper Evolución' en vanguardia. Sus stats cambian a las de Súper Evolución (restaurando Vida) y elimina estados alterados. Tras 3 turnos tuyos, se destruye y restaura sus stats originales (restaurando Vida) eliminando estados.",
-        canPlayCard: function(card, game, p) {
-            const valid = p.vanguard.filter(c => c.tags.includes("Usuario de Súper Evolución"));
-            if (valid.length === 0) { game.logError("No hay ningún 'Usuario de Súper Evolución' en vanguardia."); return false; }
-            return true;
-        },
-        onPlay: async function(card, game) {
-            const p = game.players[card.owner];
-            const valid = p.vanguard.filter(c => c.tags.includes("Usuario de Súper Evolución"));
-            
-            // pickBoardTargets, no openVisualSearchModal (31-jul-2026, betasteo de Toto): elegir
-            // una carta YA EN EL CAMPO va con reborde verde en el propio tablero (norma de
-            // targeting en tablero), no con el modal genérico de búsqueda visual -ese es solo
-            // para mano/mazo/descartes-.
-            const chosen = await game.pickBoardTargets(valid, 1, '¿A QUIÉN APLICAR SÚPER EVOLUCIÓN?', card, card.owner, true);
-            if (!chosen || chosen.length === 0) { game.cancelAction(); return; }
-            
-            const target = chosen[0];
-            const template = getCardTemplate(target.id);
-            
-            if (!target.equippedCards) target.equippedCards = [];
-            target.equippedCards.push(card);
-            const handIdx = p.hand.findIndex(c => c.instanceId === card.instanceId);
-            if (handIdx !== -1) p.hand.splice(handIdx, 1);
-            
-            card.location = 'equipped';
-            card.equippedTo = target.instanceId;
-
-            // 1. Aplicar Súper Stats y curar
-            if (template.superStats) {
-                target.maxHp = template.superStats.hp;
-                target.currentHp = target.maxHp; 
-            }
-            target.status = {}; // Purifica estados
-            
-            // 2. Añadir temporizador usando nuestro sistema de tempEffects
-            if (!target.tempEffects) target.tempEffects = [];
-            target.tempEffects.push({ sourceId: card.id, ownerId: card.owner, count: 0, instanceId: card.instanceId });
-
-            showFloatingText(target.instanceId, "¡SÚPER EVOLUCIÓN!", "ft-purple", -40);
-            game.logMsg(`¡${target.name} alcanza su Súper Evolución! Su cuerpo se restaura y libera un poder abrumador.`, 'ability');
-            try { await animateEvolution(target.instanceId); } catch(e){}
-
-            game.updatePassives();
-            game.cancelAction();
-            game.render();
-        },
-        onEquipUpdate: function(equipCard, target, game) {
-            // Calculamos matemáticamente el aumento para ATQ y DEF
-            const template = getCardTemplate(target.id);
-            if (template.superStats) {
-                target.currentAtk += (template.superStats.atk - template.atk);
-                target.currentDef += (template.superStats.def - template.def);
-            }
-        },
-        onStartTurnTempEffect: function(target, effect, game, currentTurnPlayerId) {
-            // Sumar al contador cada inicio de turno de su propietario
-            if (currentTurnPlayerId === effect.ownerId) {
-                effect.count++;
-                showFloatingText(target.instanceId, `SÚPER EVO: ${effect.count}/3`, "ft-ability", -20);
-                
-                // Añadimos el contador visual de rayo ⚡ a la carta. Se pasa la CARTA equipada, no
-                // su nombre suelto (Toto, 31-jul-2026): con el nombre, "Afectado por:" decía
-                // "fuente: Súper Evolución" sin dueño ni copyId; con la carta, modifyCounters
-                // guarda su instanceId y sale la referencia completa.
-                const _equipo = (target.equippedCards || []).find(c => c.instanceId === effect.instanceId);
-                game.modifyCounters(target, 'super_evo_timer', 1, 'Turnos Evo', _equipo || 'Súper Evolución', '⚡');
-                
-                if (effect.count >= 3) {
-                    game.logMsg(`¡La Súper Evolución de ${target.name} se ha agotado!`, 'system');
-                    showFloatingText(target.instanceId, "AGOTADO", "ft-red-stat", -30);
-                    
-                    // Borramos el contador visual
-                    if (target.counters && target.counters['super_evo_timer']) {
-                        delete target.counters['super_evo_timer'];
-                    }
-                    
-                    // Restaurar Vida y stats base
-                    const template = getCardTemplate(target.id);
-                    target.maxHp = template.hp;
-                    target.currentHp = target.maxHp;
-                    target.status = {};
-                    
-                    // Destruir este equipo de la lista del Personaje
-                    const p = game.players[effect.ownerId];
-                    if (target.equippedCards) {
-                        const eqIdx = target.equippedCards.findIndex(c => c.instanceId === effect.instanceId);
-                        if (eqIdx !== -1) {
-                            const eqCard = target.equippedCards.splice(eqIdx, 1)[0];
-                            eqCard.location = 'discard';
-                            if (!p.discard) p.discard = [];
-                            p.discard.push(eqCard);
-                        }
-                    }
-                    return false; // Devuelve false para que el motor borre este tempEffect automáticamente
-                }
-            }
-            return true;
-        },
-        onGetPreviewEffects: function(card, game) {
-            return []; // Ocultamos texto extra ya que el cambio visual de los stats se explica solo
-        }
+        // Migrada por completo (31-jul-2026). Tres piezas nuevas, las tres compartidas con las
+        // otras dos cartas de la tanda (Poder Legado y Milkor MGL):
+        //   · `mientrasEquipado: {superStats:true}` — el bono NO es un delta fijo sino la
+        //     diferencia entre los superStats de la plantilla DEL PORTADOR y su base, así que
+        //     `{atk:N,def:N}` no podía expresarlo. De paso fija maxHp y cura ("restaurando Vida").
+        //   · `cuentaAtras` en MARCAR_TEMPORAL — baja 1 por turno propio del portador y dispara
+        //     efectos al llegar a 0. Antes `duracion` solo etiquetaba la marca y decrementar era
+        //     cosa del onStartTurnTempEffect a mano de cada carta.
+        //   · Op `DESEQUIPAR` (con `restaurarStats`/`limpiarEstados`) — el final de vida de un
+        //     equipo, que las tres resolvían a mano cada una a su manera.
+        // AL_EQUIPAR y no AL_USAR_AYUDA a propósito: ese otro pipeline (executeAyuda) manda la
+        // carta jugada a DESCARTES aunque quede anexada -la rareza documentada en Espada V-, y
+        // aquí eso dejaría el equipo en descartes desde el minuto uno, rompiendo el DESEQUIPAR
+        // final. AL_EQUIPAR conserva el flujo onPlay original (mano -> equipped) y el targeting
+        // en tablero lo da ELEGIR, que ya usa pickBoardTargets.
+        abilities: [
+            { trigger: "JUGAR", requisitos: [
+                { count: { quien: "ALIADO", zona: "vanguardia", filtros: [ { campo: "tags", op: "includes", valor: "Usuario de Súper Evolución" } ] },
+                  op: ">=", valor: 1, msg: "No hay ningún 'Usuario de Súper Evolución' en vanguardia." } ] },
+            { trigger: "AL_EQUIPAR",
+              mientrasEquipado: { superStats: true },
+              efectos: [
+                { op: "ELEGIR", de: "ALIADOS", zona: "VANGUARDIA", cantidad: 1,
+                  filtros: [ { campo: "tags", op: "includes", valor: "Usuario de Súper Evolución" } ],
+                  titulo: "¿A QUIÉN APLICAR SÚPER EVOLUCIÓN?",
+                  efectos: [
+                    { op: "EQUIPAR", animacion: "evolucion",
+                      floats: [ { texto: "¡SÚPER EVOLUCIÓN!", estilo: "ft-purple", offset: -40 } ],
+                      log: "¡{objetivo} alcanza su Súper Evolución! Su cuerpo se restaura y libera un poder abrumador." },
+                    { op: "LIMPIAR_ESTADOS", soloObjetivo: true, todos: true },
+                    { op: "MARCAR_TEMPORAL", conOwner: true, duracion: 3,
+                      cuentaAtras: {
+                        floating: { texto: "SÚPER EVO: {n}/{total}", estilo: "ft-ability", offset: -20 },
+                        contador: { id: "super_evo_timer", nombre: "Turnos Evo", icono: "⚡" },
+                        log: "¡La Súper Evolución de {objetivo} se ha agotado!",
+                        floatingFinal: { texto: "AGOTADO", estilo: "ft-red-stat", offset: -30 },
+                        alCaducar: [ { op: "DESEQUIPAR", restaurarStats: true, limpiarEstados: true } ] } } ] } ] }
+        ],
     },
     {
         name: "Karolina", hp: 2, def: 3, atk: 7, type: "Personaje", subtype: "Ser vivo", tags: ["Mercenaria"], gender: "F", rarity: "A", cost: 4, series: 1,
@@ -7526,6 +7463,37 @@ const DSL = {
             if (typeof showFloatingText === 'function') (e.floats || []).forEach(f => showFloatingText(target.instanceId, f.texto, f.estilo || 'ft-green', f.offset !== undefined ? f.offset : -20));
             if (e.log) game.logMsg(DSL._fill(e.log, Object.assign({}, (DSL._vars && DSL._vars[sourceCard.instanceId]) || {}, { carta: sourceCard.name, objetivo: DSL._nombre(game, target) })), e.logTipo || 'ability');
             if (!e.soloAnexar && typeof game.updatePassives === 'function') game.updatePassives();
+            // animacion: la de evolución la lanzaba a mano la Súper Evolución imperativa. Va tras
+            // updatePassives para que la carta ya se pinte con sus stats nuevos.
+            if (e.animacion === 'evolucion' && typeof animateEvolution === 'function') { try { await animateEvolution(target.instanceId); } catch (err) {} }
+            return true;
+        }
+        if (e.op === 'DESEQUIPAR') {
+            // Suelta la carta FUENTE (un equipo) de quien la lleve y la manda al descarte. Es el
+            // final de vida de los equipos con temporizador o con usos contados (Súper Evolución,
+            // Poder Legado, Milkor MGL): los tres lo hacían a mano, cada uno a su manera.
+            // El portador se busca por `equippedTo` y no por el objetivo del efecto, porque al
+            // caducar una marca el "target" es el portador pero al agotarse los usos no.
+            const _host = (typeof game.findCard === 'function' && sourceCard.equippedTo) ? game.findCard(sourceCard.equippedTo) : null;
+            const host = _host || target;
+            if (host && host.equippedCards) host.equippedCards = host.equippedCards.filter(c => c.instanceId !== sourceCard.instanceId);
+            // restaurarStats: devuelve al portador la Vida máxima de su PLANTILLA y lo cura del
+            // todo. Hace falta porque maxHp -a diferencia de currentAtk/currentDef- no se
+            // recalcula en cada updatePassives, así que nadie lo devolvería a su sitio solo.
+            if (host && e.restaurarStats) {
+                const t = getCardTemplate(host.id) || {};
+                if (typeof t.hp === 'number') { host.maxHp = t.hp; host.currentHp = host.maxHp; }
+                if (e.limpiarEstados) host.status = {};
+            }
+            if (host && host.counters && e.contador) delete host.counters[DSL._fill(e.contador, { instancia: sourceCard.instanceId })];
+            sourceCard.equippedTo = null;
+            sourceCard.location = 'discard';
+            const pd = game.players[sourceCard.owner];
+            if (!pd.discard) pd.discard = [];
+            if (!pd.discard.some(c => c.instanceId === sourceCard.instanceId)) pd.discard.push(sourceCard);
+            if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: host ? DSL._nombre(game, host) : '' }), e.logTipo || 'system');
+            if (e.floating && host && typeof showFloatingText === 'function') showFloatingText(host.instanceId, e.floating.texto || e.floating, e.floating.estilo || 'ft-red-stat', e.floating.offset !== undefined ? e.floating.offset : -30);
+            if (typeof game.updatePassives === 'function') game.updatePassives();
             return true;
         }
         if (e.op === 'ANEXAR') {
@@ -7733,6 +7701,20 @@ const DSL = {
             // provocaAtaque (Achmay, 31-jul-2026): ver el onStartTurnTempEffect genérico más
             // abajo (guard "MARCAR_TEMPORAL" en JSON.stringify(abs)).
             if (e.provocaAtaque) marca.provocaAtaque = true;
+            // cuentaAtras (equipos con temporizador, 31-jul-2026): la marca baja UNA unidad por
+            // cada turno propio del dueño de la carta marcada y, al llegar a 0, dispara efectos.
+            // Hasta ahora `duracion` solo ETIQUETABA la marca y decrementar era cosa del
+            // onEndTurnTempEffect imperativo de cada carta (así lo hace todavía Poción
+            // revitalizante); con tres cartas de equipo pidiendo lo mismo ya compensa el hook
+            // genérico. En la marca solo viaja el FLAG y el contador: los efectos viven en la
+            // plantilla (viajan en exportGameState y no son serializables), igual que
+            // `tempEffectVetoLog` o `tempEffectText`.
+            if (e.cuentaAtras) {
+                marca.cuentaAtras = true;
+                marca.duration = e.duracion !== undefined ? e.duracion : (e.cuentaAtras.turnos || 1);
+                marca.turnApplied = game.turn;
+                marca.cuentaTotal = marca.duration;
+            }
             target.tempEffects.push(marca);
             if (e.floating && typeof showFloatingText === 'function') showFloatingText(target.instanceId, e.floating.texto || e.floating, e.floating.estilo || e.floatingStyle || 'ft-ability', (e.floating.offset !== undefined ? e.floating.offset : (e.offsetFloating !== undefined ? e.offsetFloating : -40)));
             if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
@@ -7747,7 +7729,12 @@ const DSL = {
         if (e.op === 'LIMPIAR_ESTADOS') {
             const pid = e.deQuien === 'RIVAL' ? (ownerId === 'p1' ? 'p2' : 'p1') : ownerId;
             const p = game.players[pid];
-            [...p.vanguard, ...p.rearguard].forEach(ally => {
+            // soloObjetivo (Súper Evolución, 31-jul-2026): el op nació como efecto de GRUPO
+            // (limpia a toda una fila), pero "elimina sus estados alterados" de un equipo va
+            // sobre UNA carta. Sin esto habría que recurrir a MARCAR con un objeto literal,
+            // que además compartiría referencia entre invocaciones.
+            const _pool = e.soloObjetivo ? [target] : [...p.vanguard, ...p.rearguard];
+            _pool.forEach(ally => {
                 if (!ally.status) return;
                 let limpiado = false;
                 if (e.todos) {
@@ -8231,6 +8218,23 @@ const DSL = {
         if (_fuenteBuff && typeof tmpl.onEquipUpdate !== 'function') {
             tmpl.onEquipUpdate = function (equipCard, hostCard, game) {
                 const m = _fuenteBuff.mientrasEquipado;
+                // superStats (Súper Evolución, 31-jul-2026): el bono NO es un delta fijo, sino la
+                // diferencia entre los `superStats` de la PLANTILLA DEL PORTADOR y su base — cada
+                // portador evoluciona a los suyos, así que `{atk:N, def:N}` no puede expresarlo.
+                if (m.superStats) {
+                    const t = getCardTemplate(hostCard.id) || {};
+                    if (!t.superStats) return;
+                    hostCard.currentAtk += (t.superStats.atk - t.atk);
+                    hostCard.currentDef += (t.superStats.def - t.def);
+                    // maxHp no se recalcula en cada updatePassives (a diferencia de atk/def), así
+                    // que se fija una vez y de paso se cura -el "restaurando Vida" del texto-.
+                    // Idempotente: en las pasadas siguientes ya coincide y no vuelve a curar.
+                    if (hostCard.maxHp !== t.superStats.hp) {
+                        hostCard.maxHp = t.superStats.hp;
+                        hostCard.currentHp = hostCard.maxHp;
+                    }
+                    return;
+                }
                 if (m.atk) hostCard.currentAtk += m.atk;
                 if (m.def) hostCard.currentDef += m.def;
             };
@@ -8984,11 +8988,59 @@ const DSL = {
             // -campo genérico del motor, ya leído en la fase de inicio de turno bajo el
             // comentario "ATAQUES FORZADOS"- apuntando a `sourceInstanceId` (la propia
             // Achmay) y se autoconsume (return false, una sola vez).
+            // Los efectos de `cuentaAtras` no pueden viajar en la marca, así que se recuperan de
+            // la propia declaración recorriendo `abs`. Con más de un MARCAR_TEMPORAL con cuenta
+            // atrás en la misma carta se coge el primero: ninguna de las que lo usan tiene dos, y
+            // distinguirlos exigiría marcarlas con un id que sí tendría que viajar en el estado.
+            const _cuentaAtras = (() => {
+                let hallado = null;
+                const rec = (n) => {
+                    if (!n || hallado) return;
+                    if (Array.isArray(n)) { n.forEach(rec); return; }
+                    if (typeof n !== 'object') return;
+                    if (n.op === 'MARCAR_TEMPORAL' && n.cuentaAtras) { hallado = n.cuentaAtras; return; }
+                    Object.values(n).forEach(rec);
+                };
+                rec(abs);
+                return hallado;
+            })();
             if (typeof tmpl.onStartTurnTempEffect !== 'function') {
+                // SÍNCRONO a propósito: el motor filtra las marcas con un `filter()` normal
+                // (processStartPhaseEffects), así que un hook `async` devolvería una Promise —
+                // siempre truthy— y NINGUNA marca caducaría jamás. La Súper Evolución imperativa
+                // también era síncrona por esto mismo.
                 tmpl.onStartTurnTempEffect = function (card, eff, game, activePid) {
                     if (eff.provocaAtaque && card.owner === activePid) {
                         card.forcedAttackTarget = eff.sourceInstanceId;
                         return false;
+                    }
+                    // Cuenta atrás por turnos PROPIOS del portador. El turno en que se colocó no
+                    // cuenta (mismo criterio que la Poder Legado imperativa: `turnApplied`),
+                    // porque si no un equipo jugado en tu turno gastaría un tick al instante.
+                    if (eff.cuentaAtras && _cuentaAtras && card.owner === activePid) {
+                        if (eff.turnApplied === game.turn) return true;
+                        eff.duration = (eff.duration || 0) - 1;
+                        const _n = (eff.cuentaTotal || 0) - eff.duration;
+                        const _rell = { objetivo: DSL._nombre(game, card), n: _n, total: eff.cuentaTotal, restantes: eff.duration };
+                        if (eff.duration > 0) {
+                            // Sigue viva: solo el aviso de progreso.
+                            if (_cuentaAtras.contador && typeof game.modifyCounters === 'function') {
+                                const _src = (typeof game.findCard === 'function' && eff.sourceInstanceId) ? game.findCard(eff.sourceInstanceId) : null;
+                                game.modifyCounters(card, _cuentaAtras.contador.id, 1, _cuentaAtras.contador.nombre, _src || tmpl.name, _cuentaAtras.contador.icono || '⏳');
+                            }
+                            if (_cuentaAtras.floating && typeof showFloatingText === 'function') showFloatingText(card.instanceId, DSL._fill(_cuentaAtras.floating.texto, _rell), _cuentaAtras.floating.estilo || 'ft-ability', _cuentaAtras.floating.offset !== undefined ? _cuentaAtras.floating.offset : -20);
+                            return true;
+                        }
+                        // Agotada: los efectos corren con la carta EQUIPO como fuente (es quien se
+                        // desequipa y quien nombra el log) y el PORTADOR como objetivo.
+                        if (_cuentaAtras.log) game.logMsg(DSL._fill(_cuentaAtras.log, _rell), _cuentaAtras.logTipo || 'system');
+                        if (_cuentaAtras.floatingFinal && typeof showFloatingText === 'function') showFloatingText(card.instanceId, DSL._fill(_cuentaAtras.floatingFinal.texto, _rell), _cuentaAtras.floatingFinal.estilo || 'ft-red-stat', _cuentaAtras.floatingFinal.offset !== undefined ? _cuentaAtras.floatingFinal.offset : -30);
+                        const _src = (typeof game.findCard === 'function' && eff.sourceInstanceId) ? game.findCard(eff.sourceInstanceId) : null;
+                        if (_cuentaAtras.contador && card.counters) delete card.counters[_cuentaAtras.contador.id];
+                        // Sin await (el hook es síncrono, ver arriba): los efectos de caducidad de
+                        // los equipos son todos síncronos, así que corren enteros antes de ceder.
+                        if (_src) { const _p = DSL._runEffectList(_cuentaAtras.alCaducar || [], _src, game, _src.owner, [card]); if (_p && _p.catch) _p.catch(() => {}); }
+                        return false; // el motor retira la marca
                     }
                     if (!(eff.hastaInicioTurnoLanzador && eff.ownerId === activePid)) return true;
                     if (tmpl.tempEffectExpiraLog) game.logMsg(DSL._fill(tmpl.tempEffectExpiraLog, { objetivo: DSL._nombre(game, card), genero: card.gender }), 'system');
