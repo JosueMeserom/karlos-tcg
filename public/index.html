@@ -2329,7 +2329,7 @@
             // carta se guarda también su instanceId, que es lo único que permite reconstruir el
             // "fuente: <Nombre> [n] de JX (Nick)" completo en el detalle (mismo criterio que
             // applyStatus). Los llamantes que pasan un string siguen funcionando igual.
-            modifyCounters(card, counterId, amount, name, source, icon = '⚙️') {
+            modifyCounters(card, counterId, amount, name, source, icon = '⚙️', sourceAbility = null) {
                 if (!card.counters || typeof card.counters !== 'object') card.counters = {};
                 const _srcObj = source && typeof source === 'object';
                 const _srcNombre = _srcObj ? source.name : source;
@@ -2339,6 +2339,9 @@
                     if (amount <= 0) return;
                     card.counters[counterId] = { name, count: 0, source: _srcNombre, icon };
                     if (_srcInst) card.counters[counterId].sourceInstanceId = _srcInst;
+                    // Solo Pasivas/Activas: la norma omite el "por HABILIDAD" en Eventos y Ayudas,
+                    // que no lo pasan (Milkor MGL, los Eventos con contadores...).
+                    if (sourceAbility) card.counters[counterId].sourceAbility = sourceAbility;
                 }
                 
                 card.counters[counterId].count += amount;
@@ -3746,7 +3749,7 @@
                         for (const [k, d] of Object.entries(card.counters)) {
                             if (d && d.count > 0) {
                                 const _fc = this.refFuente(d.sourceInstanceId, d.source, card);
-                                effects.push(this.lineaEfecto(`${d.icon ? d.icon + ' ' : ''}${d.name || k} x${d.count}`, { ref: _fc }));
+                                effects.push(this.lineaEfecto(`${d.icon ? d.icon + ' ' : ''}${d.name || k} x${d.count}`, { habilidad: d.sourceAbility, ref: _fc }));
                             }
                         }
                     }
@@ -3875,7 +3878,7 @@
                             // Por instanceId cuando lo haya (dos copias de la misma carta ya no se
                             // atribuyen los contadores la una a la otra); por nombre, como antes,
                             // para los contadores que se pusieron con un string suelto.
-                            if (d && d.count > 0 && (d.sourceInstanceId ? d.sourceInstanceId === card.instanceId : d.source === card.name)) _salientes.push(this.lineaEfecto(`${d.icon ? d.icon + ' ' : ''}${d.name || k} x${d.count}`, { ref: _obj, comoObjetivo: true }));
+                            if (d && d.count > 0 && (d.sourceInstanceId ? d.sourceInstanceId === card.instanceId : d.source === card.name)) _salientes.push(this.lineaEfecto(`${d.icon ? d.icon + ' ' : ''}${d.name || k} x${d.count}`, { habilidad: d.sourceAbility, ref: _obj, comoObjetivo: true }));
                         }
                         // Los stats que vienen del MISMO efecto (misma fuente + misma habilidad)
                         // comparten UNA línea, igual que en la vista "Afectado por" (Toto,

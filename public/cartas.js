@@ -1324,7 +1324,7 @@ const CARD_DB = [
         onUpdatePassive: function(card, game) {
             if (card.lastLocation !== card.location) {
                 if (card.location === 'vanguard') {
-                    game.modifyCounters(card, 'kino_paciencia', 2, 'Contadores', 'esta carta (POCA PACIENCIA)', '⚙️');
+                    game.modifyCounters(card, 'kino_paciencia', 2, 'Contadores', card, '⚙️', 'POCA PACIENCIA');
                     game.logMsg(`¡${card.name} entra a vanguardia y gana 2 Contadores!`, 'ability');
                 } else if (card.location === 'rearguard') {
                     if (card.counters && card.counters['kino_paciencia']) {
@@ -1339,7 +1339,7 @@ const CARD_DB = [
             if (card.location !== 'vanguard' || card.owner !== game.activePlayerId) return;
             if (!card.counters || !card.counters['kino_paciencia']) return; 
             
-            game.modifyCounters(card, 'kino_paciencia', -1, 'Contadores', 'esta carta (POCA PACIENCIA)', '⚙️');
+            game.modifyCounters(card, 'kino_paciencia', -1, 'Contadores', card, '⚙️', 'POCA PACIENCIA');
             const countLeft = card.counters && card.counters['kino_paciencia'] ? card.counters['kino_paciencia'].count : 0;
             game.logMsg(`¡${card.passiveName}! ${card.name} pierde 1 Contador (quedan ${countLeft}).`, 'ability');
             showFloatingText(card.instanceId, "-1 CONTADOR", "ft-red-stat");
@@ -2482,7 +2482,7 @@ const CARD_DB = [
         },
         onAfterPlayAsync: async function(card, game, p) {
             game.modifyStat(card, 'furor', 1);
-            game.modifyCounters(card, 'diego_timer', 3, 'Turnos de Cólera', 'CÓLERA INFINITA', '⏳');
+            game.modifyCounters(card, 'diego_timer', 3, 'Turnos de Cólera', card, '⏳', 'CÓLERA INFINITA');
             game.logMsg(`¡${card.passiveName}! ${card.name} entra con 3 contadores de Cólera.`, 'ability');
         },
         onBeforeTakeDamage: async function(defender, attacker, dmg, isSpecial, game) {
@@ -2510,7 +2510,7 @@ const CARD_DB = [
                     game.logMsg(`¡PACIFISMO! ${card.name} no pierde contador de Cólera este turno.`, 'ability');
                     card.pacifismoActive = false;
                 } else if (card.counters && card.counters['diego_timer']) {
-                    game.modifyCounters(card, 'diego_timer', -1, 'Turnos de Cólera', 'CÓLERA INFINITA', '⏳');
+                    game.modifyCounters(card, 'diego_timer', -1, 'Turnos de Cólera', card, '⏳', 'CÓLERA INFINITA');
                     const left = card.counters['diego_timer'].count;
                     if (left <= 0) {
                         game.logMsg(`¡El tiempo de ${card.name} se ha agotado!`, 'ability');
@@ -4407,7 +4407,7 @@ const CARD_DB = [
         onAfterAttack: async function(attacker, defender, game) {
             // Hook para los Kills
             if (defender.currentHp <= 0) {
-                game.modifyCounters(attacker, 'xidachane_kills', 1, 'Bajas', 'PIRATA GALÁCTICO', '💀');
+                game.modifyCounters(attacker, 'xidachane_kills', 1, 'Bajas', attacker, '💀', 'PIRATA GALÁCTICO');
                 if (attacker.counters['xidachane_kills'] && attacker.counters['xidachane_kills'].count >= 3) {
                     game.logMsg(`¡${attacker.name} ha reunido botín suficiente y escapa a la mano!`, 'ability');
                     showFloatingText(attacker.instanceId, "ESCAPA", "ft-purple", -30);
@@ -5816,7 +5816,9 @@ const CARD_DB = [
 
             equipCard.milkorCounters++;
             // Espejo en el sistema REAL de contadores de la anfitriona: badge visible + flechas + detalle
-            game.modifyCounters(attacker, 'milkor_' + equipCard.instanceId, 1, 'Disparos Milkor', 'Milkor MGL', '💥');
+            // Fuente: la CARTA equipada, no su nombre suelto (así "Afectado por:" la nombra con
+            // dueño y copyId). Sin habilidad: es una Ayuda, y la norma omite el "por HABILIDAD".
+            game.modifyCounters(attacker, 'milkor_' + equipCard.instanceId, 1, 'Disparos Milkor', equipCard, '💥');
             game.logMsg(`¡${attacker.name} dispara el Milkor MGL! (Disparo ${equipCard.milkorCounters}/2)`, 'ability');
             
             const results = await game.triggerCoinFlips(1, attacker.owner);
@@ -6965,7 +6967,11 @@ const DSL = {
             return true;
         }
         if (e.op === 'MODIFICAR_CONTADORES') {
-            game.modifyCounters(target, e.contador, e.delta, e.nombreContador, e.fuente !== undefined ? e.fuente : sourceCard.name, e.icono);
+            // La CARTA fuente, no su nombre: modifyCounters guarda el instanceId y el detalle
+            // puede construir la referencia completa. `habilidad` va aparte y solo existe para
+            // Pasivas/Activas, así que los Eventos/Ayudas no meten el "por HABILIDAD" que la
+            // norma les prohíbe (sus triggers no llevan nombre de habilidad).
+            game.modifyCounters(target, e.contador, e.delta, e.nombreContador, e.fuente !== undefined ? e.fuente : sourceCard, e.icono, habilidad || null);
             if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
             return true;
         }
@@ -7099,7 +7105,9 @@ const DSL = {
         }
         if (e.op === 'MODIFICAR_CONTADORES') {
             const d = DSL._value(ownerId, game, e.delta, sourceCard, ctx);
-            game.modifyCounters(target, e.contador, d, e.nombreContador || e.contador, e.fuente !== undefined ? e.fuente : sourceCard.name, e.icono || '⚙️');
+            // Ver la nota gemela del otro MODIFICAR_CONTADORES: la CARTA fuente (no su nombre)
+            // para que el detalle pueda dar la referencia completa, y la habilidad aparte.
+            game.modifyCounters(target, e.contador, d, e.nombreContador || e.contador, e.fuente !== undefined ? e.fuente : sourceCard, e.icono || '⚙️', habilidad || null);
             // floating (Karlitos, 31-jul-2026): faltaba, a diferencia de casi todos los demás
             // ops — un contador que sube en la propia Pasiva de la carta se notaba en el
             // registro de "Afectado por:" pero no en el tablero en el momento en que ocurre.
@@ -9102,7 +9110,10 @@ const DSL = {
                 if (inicioTurnoCarta.si && !DSL._cond(card, game, inicioTurnoCarta.si)) return;
                 const pid = card.owner;
                 if (inicioTurnoCarta.log) game.logMsg(DSL._fill(inicioTurnoCarta.log, { carta: card.name, jugador: (typeof game.getDisplayName === 'function' ? game.getDisplayName(pid) : pid) }), inicioTurnoCarta.logTipo || 'ability');
-                await DSL._runEffectList(inicioTurnoCarta.efectos, card, game, pid, null);
+                // El nombre de la Pasiva se propaga como `habilidad`, igual que hacen ACTIVA,
+                // TRAS_DEFENDER y compañía: es lo que pone el "por PRÁCTICA CONSTANTE" en la
+                // línea del detalle. INICIO_TURNO era el único que pasaba null (Toto, 31-jul-2026).
+                await DSL._runEffectList(inicioTurnoCarta.efectos, card, game, pid, null, inicioTurnoCarta.nombre || tmpl.passiveName || null);
             };
         }
 
