@@ -26,6 +26,16 @@ const { correrSuite } = require('./harness');
 
 const PODER_LEGADO = 'Poder Legado';
 
+// Bug de motor real y preexistente corregido el 31-jul-2026 (betasteo de Poder Legado, Toto):
+// el op EQUIPAR nunca llamaba a assignCopyId (el motor solo lo hacía en otros pipelines de
+// jugar carta), así que ninguna Ayuda equipable vía AL_EQUIPAR distinguía copias en "Afectado
+// por:" -copyId se quedaba en null para siempre-. Ver regresion6 para la nota completa; aquí
+// solo se declara el efecto.
+const COPY_ID_NACE = [
+    { contiene: 'copyId', motivo: 'bug de motor preexistente: assignCopyId nunca se llamaba al jugar una Ayuda con onPlay propio; arreglado en el op EQUIPAR' },
+    { contiene: 'cardCounts', motivo: 'consecuencia de lo mismo: el contador por el que assignCopyId reparte los números' },
+];
+
 // El requisito es EXACTAMENTE 1 de Vida, así que todos los escenarios parten de ahí.
 const KARLOS_A_1 = { carta: 'Karlos', vida: 1 };
 
@@ -62,7 +72,7 @@ const escenarios = [
             { de: '¡Karlos despierta su verdadero poder!', a: '¡Karlos de J1 (Jugador 1) despierta su verdadero poder!',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba target.name a secas' },
         ],
-        diferenciasEsperadas: MECANISMO_MARCA,
+        diferenciasEsperadas: [...MECANISMO_MARCA, ...COPY_ID_NACE],
     },
     {
         nombre: 'Poder Legado rechazado: el Karlos tiene más de 1 de Vida',
@@ -97,7 +107,7 @@ const escenarios = [
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba attacker.name a secas' },
             AVISO_MEGADRENALINA,
         ],
-        diferenciasEsperadas: MECANISMO_MARCA,
+        diferenciasEsperadas: [...MECANISMO_MARCA, ...COPY_ID_NACE],
     },
     {
         // El ciclo completo: al empezar el SIGUIENTE turno propio, el equipo consume al portador
@@ -117,12 +127,12 @@ const escenarios = [
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba target.name a secas' },
             AVISO_MEGADRENALINA,
         ],
-        // MEJORA, no replicada: la vieja devolvía el Karlos a la mano CON la marca todavía
-        // pegada (basura que viaja en el estado y que nadie vuelve a mirar); la nueva la retira,
-        // que es lo que significa que la cuenta atrás se ha consumido.
-        diferenciasEsperadas: [
-            { contiene: 'hand.0.tempEffects', motivo: 'la vieja dejaba la marca caducada pegada a la carta que vuelve a la mano; la nueva la retira' },
-        ],
+        // Antes de arreglar el `.filter()` síncrono de processStartPhaseEffects (index.html,
+        // motor COMPARTIDO por ambas bases), esta línea sí habría divergido: la vieja habría
+        // dejado la marca caducada pegada a la carta que vuelve a la mano -su hook async nunca
+        // se esperaba, así que el `return false` real jamás se veía-. Con el motor arreglado,
+        // el `return false` se respeta en LAS DOS bases y ambas limpian la marca por igual.
+        diferenciasEsperadas: COPY_ID_NACE,
     },
 ];
 

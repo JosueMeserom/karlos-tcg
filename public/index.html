@@ -4901,19 +4901,28 @@
             async processStartPhaseEffects(playerId) {
                 const p = this.players[playerId];
 
-                ['p1', 'p2'].forEach(pid => {
-                    [...this.players[pid].vanguard, ...this.players[pid].rearguard].forEach(c => {
-                        if (c.tempEffects) {
-                            c.tempEffects = c.tempEffects.filter(eff => {
-                                const template = getCardTemplate(eff.sourceId);
-                                if (typeof template.onStartTurnTempEffect === 'function') {
-                                    return template.onStartTurnTempEffect(c, eff, this, playerId);
-                                }
-                                return true; // Por defecto, los efectos temporales DEBEN sobrevivir al cambio de turno
-                            });
+                // Bug de motor real y preexistente (no introducido por el DSL, Toto 31-jul-2026):
+                // esto era un `.filter()` SÍNCRONO llamando a hooks que pueden ser `async`
+                // (Poder Legado imperativa ya lo era, con su `await animateSpinToHand(...)`). Un
+                // callback async devuelve una Promise -siempre truthy-, así que filter() NUNCA
+                // veía el `return false` real y el nada esperaba a que la animación terminara: la
+                // fase seguía adelante (banners, render()) mientras la animación corría de fondo,
+                // y el siguiente render() la cortaba en seco. Se convierte en un bucle `for`
+                // async-aware que SÍ espera cada hook antes de decidir si la marca sobrevive.
+                for (const pid of ['p1', 'p2']) {
+                    for (const c of [...this.players[pid].vanguard, ...this.players[pid].rearguard]) {
+                        if (!c.tempEffects) continue;
+                        const supervivientes = [];
+                        for (const eff of c.tempEffects) {
+                            const template = getCardTemplate(eff.sourceId);
+                            const sigue = typeof template.onStartTurnTempEffect === 'function'
+                                ? await template.onStartTurnTempEffect(c, eff, this, playerId)
+                                : true; // Por defecto, los efectos temporales DEBEN sobrevivir al cambio de turno
+                            if (sigue) supervivientes.push(eff);
                         }
-                    });
-                });
+                        c.tempEffects = supervivientes;
+                    }
+                }
 
                 // --- ATAQUES FORZADOS (Pégame, perra) ---
                 for (const card of [...p.vanguard, ...p.rearguard]) {

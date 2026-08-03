@@ -105,6 +105,10 @@ const escenarios = [
         diferenciasEsperadas: [
             { contiene: 'estado.p1.vanguard.0.currentAtk',
               motivo: 'la vieja dejaba el ATQ en 4 (la Chaqueta se aplicaba después del suelo); la nueva lo devuelve a su base 7 con el clamp final, que es lo que significa "no bajan de base"' },
+            // copyId/cardCounts (31-jul-2026): bug de motor preexistente corregido -assignCopyId
+            // nunca se llamaba al jugar una Ayuda con onPlay propio-, ver la nota de regresion6.
+            { contiene: 'copyId', motivo: 'bug de motor preexistente: assignCopyId nunca se llamaba al jugar una Ayuda con onPlay propio; arreglado en el op EQUIPAR' },
+            { contiene: 'cardCounts', motivo: 'consecuencia de lo mismo: el contador por el que assignCopyId reparte los números' },
             // _sueloAvisado ya NO aparece aquí: pasó a ser una excepción GLOBAL de diff
             // inerte en harness.js (tanda de contadores/acumuladores, 27-jul-2026), porque
             // el mismo bookkeeping se repite en cualquier carta con SUELO_STAT/TECHO_STAT.

@@ -7415,6 +7415,9 @@ const DSL = {
                 if (hi !== -1) p.hand.splice(hi, 1);
                 target.location = 'equipped';
                 target.equippedTo = sourceCard.instanceId;
+                // "el [n] nace al salir de la mano" (Toto, 31-jul-2026): aquí el arma es TARGET,
+                // no sourceCard -ver la nota de `invertido` arriba-.
+                if (typeof game.assignCopyId === 'function') game.assignCopyId(target);
                 if (typeof showFloatingText === 'function') (e.floats || []).forEach(f => showFloatingText(sourceCard.instanceId, f.texto, f.estilo || 'ft-green', f.offset !== undefined ? f.offset : -20));
                 if (e.log) game.logMsg(DSL._fill(e.log, Object.assign({}, (DSL._vars && DSL._vars[sourceCard.instanceId]) || {}, { carta: sourceCard.name, objetivo: DSL._nombre(game, target) })), e.logTipo || 'ability');
                 if (typeof game.updatePassives === 'function') game.updatePassives();
@@ -7426,6 +7429,17 @@ const DSL = {
                 const hi = p.hand.findIndex(x => x.instanceId === sourceCard.instanceId);
                 if (hi !== -1) p.hand.splice(hi, 1);
                 sourceCard.location = 'equipped';
+                // Bug de motor real y preexistente, NO introducido por el DSL (la Súper Evolución
+                // y la Poder Legado imperativas tampoco lo llamaban): el pipeline de jugar una
+                // Ayuda con `onPlay` propio (motor, card.type==='Ayuda') nunca llamaba a
+                // assignCopyId, a diferencia de Personaje/Esbirro/Evento y del otro pipeline
+                // (AL_USAR_AYUDA -> executeAyuda). Con 2+ copias de la misma Ayuda equipable en
+                // juego (AL_EQUIPAR: Furia berserker, Shichishito, Chaqueta metálica, Súper
+                // Evolución, Poder Legado), "Afectado por:" nunca distinguía cuál -copyId se
+                // quedaba en null para siempre-. Aquí es el único punto por el que pasan TODAS
+                // ("el [n] nace al salir de la mano"), soloAnexar aparte (ese caso lo gestiona el
+                // motor de Ayudas, que sí lo asigna).
+                if (typeof game.assignCopyId === 'function') game.assignCopyId(sourceCard);
             }
             sourceCard.equippedTo = target.instanceId;
             if (typeof showFloatingText === 'function') (e.floats || []).forEach(f => showFloatingText(target.instanceId, f.texto, f.estilo || 'ft-green', f.offset !== undefined ? f.offset : -20));
@@ -8997,11 +9011,7 @@ const DSL = {
                 return hallado;
             })();
             if (typeof tmpl.onStartTurnTempEffect !== 'function') {
-                // SÍNCRONO a propósito: el motor filtra las marcas con un `filter()` normal
-                // (processStartPhaseEffects), así que un hook `async` devolvería una Promise —
-                // siempre truthy— y NINGUNA marca caducaría jamás. La Súper Evolución imperativa
-                // también era síncrona por esto mismo.
-                tmpl.onStartTurnTempEffect = function (card, eff, game, activePid) {
+                tmpl.onStartTurnTempEffect = async function (card, eff, game, activePid) {
                     if (eff.provocaAtaque && card.owner === activePid) {
                         card.forcedAttackTarget = eff.sourceInstanceId;
                         return false;
@@ -9029,9 +9039,7 @@ const DSL = {
                         if (_cuentaAtras.floatingFinal && typeof showFloatingText === 'function') showFloatingText(card.instanceId, DSL._fill(_cuentaAtras.floatingFinal.texto, _rell), _cuentaAtras.floatingFinal.estilo || 'ft-red-stat', _cuentaAtras.floatingFinal.offset !== undefined ? _cuentaAtras.floatingFinal.offset : -30);
                         const _src = (typeof game.findCard === 'function' && eff.sourceInstanceId) ? game.findCard(eff.sourceInstanceId) : null;
                         if (_cuentaAtras.contador && card.counters) delete card.counters[_cuentaAtras.contador.id];
-                        // Sin await (el hook es síncrono, ver arriba): los efectos de caducidad de
-                        // los equipos son todos síncronos, así que corren enteros antes de ceder.
-                        if (_src) { const _p = DSL._runEffectList(_cuentaAtras.alCaducar || [], _src, game, _src.owner, [card]); if (_p && _p.catch) _p.catch(() => {}); }
+                        if (_src) await DSL._runEffectList(_cuentaAtras.alCaducar || [], _src, game, _src.owner, [card]);
                         return false; // el motor retira la marca
                     }
                     if (!(eff.hastaInicioTurnoLanzador && eff.ownerId === activePid)) return true;

@@ -40,6 +40,16 @@ const KARLITOS = 'Karlitos';
 const KARLITOS_SIN_PASIVA = { carta: KARLITOS, campos: { karlitosEntrenado: true } };
 const SUPER_EVO = 1049; // por id: en la base vieja se llama "Super Evolución", sin acento
 
+// Bug de motor real y preexistente corregido el 31-jul-2026 (betasteo de Poder Legado, Toto):
+// el op EQUIPAR nunca llamaba a assignCopyId (el motor solo lo hacía en otros pipelines de
+// jugar carta), así que ninguna Ayuda equipable vía AL_EQUIPAR distinguía copias en "Afectado
+// por:" -copyId se quedaba en null para siempre-. Ver regresion6 para la nota completa; aquí
+// solo se declara el efecto.
+const COPY_ID_NACE = [
+    { contiene: 'copyId', motivo: 'bug de motor preexistente: assignCopyId nunca se llamaba al jugar una Ayuda con onPlay propio; arreglado en el op EQUIPAR' },
+    { contiene: 'cardCounts', motivo: 'consecuencia de lo mismo: el contador por el que assignCopyId reparte los números' },
+];
+
 // La vieja elegía al portador con el modal genérico de búsqueda visual (openVisualSearchModal);
 // la nueva usa ELEGIR -> pickBoardTargets, que es la norma del proyecto para elegir una carta que
 // YA ESTÁ EN EL CAMPO. El paso {elegir} del harness es polimórfico y responde a las dos.
@@ -66,6 +76,7 @@ const escenarios = [
         // `turnApplied` para no gastar tick el turno en que se coloca) y recupera el equipo por
         // el `sourceInstanceId` que toda marca del DSL ya lleva.
         diferenciasEsperadas: [
+            ...COPY_ID_NACE,
             { contiene: 'tempEffects.0.count', motivo: 'la vieja contaba hacia arriba con un campo propio; la nueva cuenta hacia abajo con el mecanismo genérico' },
             { contiene: 'tempEffects.0.instanceId', motivo: 'la vieja guardaba a mano el instanceId del equipo; la nueva usa sourceInstanceId, que toda marca del DSL ya trae' },
             { contiene: 'tempEffects.0.duration', motivo: 'campo de la cuenta atrás genérica, inexistente en la vieja' },
@@ -90,6 +101,7 @@ const escenarios = [
         // `turnApplied` para no gastar tick el turno en que se coloca) y recupera el equipo por
         // el `sourceInstanceId` que toda marca del DSL ya lleva.
         diferenciasEsperadas: [
+            ...COPY_ID_NACE,
             { contiene: 'tempEffects.0.count', motivo: 'la vieja contaba hacia arriba con un campo propio; la nueva cuenta hacia abajo con el mecanismo genérico' },
             { contiene: 'tempEffects.0.instanceId', motivo: 'la vieja guardaba a mano el instanceId del equipo; la nueva usa sourceInstanceId, que toda marca del DSL ya trae' },
             { contiene: 'tempEffects.0.duration', motivo: 'campo de la cuenta atrás genérica, inexistente en la vieja' },
@@ -122,6 +134,7 @@ const escenarios = [
         // El op DESEQUIPAR lo limpia. Replicar la basura habría costado lo mismo y dejaría una
         // trampa para cualquier cosa que en el futuro mire ese campo (p. ej. al rejugar la carta).
         diferenciasEsperadas: [
+            ...COPY_ID_NACE,
             { contiene: 'discard.0.equippedTo', motivo: 'la vieja dejaba el vínculo colgando tras descartar el equipo; DESEQUIPAR lo suelta' },
         ],
     },

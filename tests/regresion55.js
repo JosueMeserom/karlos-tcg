@@ -54,6 +54,15 @@ const SEIS_TURNOS = [
 // intento de esta migración hacían. Pieza nueva: `floating` en MODIFICAR_CONTADORES.
 const FLOTANTE_PRACTICA = { linea: 'PRÁCTICA CONSTANTE', motivo: 'flotante nuevo, pedido por Toto, en cada tick del contador de entrenamiento (3 veces por SEIS_TURNOS); la vieja no pintaba nada en ese momento' };
 
+// Bug de motor real y preexistente corregido el 31-jul-2026 (betasteo de Poder Legado): el op
+// EQUIPAR nunca llamaba a assignCopyId, así que un arma equipada nunca llevaba su [n] en
+// "Afectado por:". Aquí se ve en el propio LOG del ataque, no solo en el estado: ver regresion6
+// para la nota completa.
+const COPY_ID_NACE = [
+    { contiene: 'copyId', motivo: 'bug de motor preexistente: assignCopyId nunca se llamaba al equipar un arma; arreglado en el op EQUIPAR' },
+    { contiene: 'cardCounts', motivo: 'consecuencia de lo mismo: el contador por el que assignCopyId reparte los números' },
+];
+
 const escenarios = [
     // ---------------- APRENDIZ DE ARMAS (Activa) ----------------
     {
@@ -72,9 +81,12 @@ const escenarios = [
         logsIntencionados: [
             { de: 'se equipa velozmente con Espada V y', a: 'se equipa velozmente con Espada V de J1 (Jugador 1) y',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba weapon.name a secas' },
+            { de: 'se equipa velozmente con Espada V de J1 (Jugador 1) y', a: 'se equipa velozmente con Espada V [1] de J1 (Jugador 1) y',
+              motivo: 'consecuencia del mismo bug de copyId: el arma ahora lleva su [n]' },
             { de: 'ataca a Mini-tigre con su nueva arma', a: 'ataca a Mini-tigre [1] de J2 (Jugador 2) con su nueva arma',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba target.name a secas' },
         ],
+        diferenciasEsperadas: COPY_ID_NACE,
     },
     {
         nombre: 'APRENDIZ DE ARMAS: también sirve un Arma legendaria (ignora sus condiciones)',
@@ -91,9 +103,12 @@ const escenarios = [
         logsIntencionados: [
             { de: 'se equipa velozmente con Shichishito y', a: 'se equipa velozmente con Shichishito de J1 (Jugador 1) y',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño)' },
+            { de: 'Shichishito de J1 (Jugador 1) y', a: 'Shichishito [1] de J1 (Jugador 1) y',
+              motivo: 'consecuencia del mismo bug de copyId: el arma ahora lleva su [n] (regla encadenada sobre la anterior)' },
             { de: 'ataca a Mini-tigre con su nueva arma', a: 'ataca a Mini-tigre [1] de J2 (Jugador 2) con su nueva arma',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño)' },
         ],
+        diferenciasEsperadas: COPY_ID_NACE,
     },
     {
         nombre: 'APRENDIZ DE ARMAS rechazada: no hay armas en la mano',
