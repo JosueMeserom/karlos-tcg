@@ -1912,18 +1912,29 @@ const CARD_DB = [
             }
             return true;
         },
-        onAfterPlayAsync: async function(card, game, p) {
-            game.logMsg(`¡${card.passiveName}! Wolfgang inspira a la vanguardia de ${game.getDisplayName(card.owner)}.`, 'ability');
-            p.vanguard.forEach(c => {
-                if (c.instanceId !== card.instanceId) {
-                    c.currentDef += 1;
-                    c.currentAtk += 1;
-                    showFloatingText(c.instanceId, card.passiveName, "ft-ability", -40);
-                    showFloatingText(c.instanceId, "+1 ATQ", "ft-green", -20);
-                    showFloatingText(c.instanceId, "+1 DEF", "ft-green", 0);
-                }
-            });
-        },
+        // SABIDURÍA migrada para ARREGLARLA (31-jul-2026, betasteo de Toto). La versión
+        // imperativa hacía `c.currentAtk += 1; c.currentDef += 1` directamente sobre los aliados,
+        // y eso NO sobrevive: updatePassives resetea currentAtk/currentDef a la plantilla en cada
+        // pasada, y esa función corre constantemente (cada ataque, cada carta jugada, cada cambio
+        // de turno). O sea que el bono duraba hasta el siguiente recálculo -segundos- en vez de
+        // ser permanente. Verificado con probe: 2/3 -> 3/4 -> 2/3 tras un solo updatePassives.
+        // El arreglo es el patrón de Domador: MARCAR_TEMPORAL con `stats` y SIN ninguna marca de
+        // caducidad, que el compilador reaplica en cada pasada — que es la única forma que tiene
+        // este motor de que un bono de Atq/Def persista de verdad.
+        // El resto de la carta (requisito de Aniceto/Manzanahoria y TENTAR A LA SUERTE) se queda
+        // imperativo: aquí solo se toca la Pasiva rota.
+        abilities: [
+            { trigger: "AL_JUGAR",
+              log: "¡SABIDURÍA! {carta} inspira a la vanguardia de {jugador}.",
+              efectos: [
+                { op: "MARCAR_TEMPORAL", target: { quien: "ALIADO", zona: "vanguardia", excludeSelf: true },
+                  stats: { atk: 1, def: 1 },
+                  floating: { texto: "SABIDURÍA", estilo: "ft-ability", offset: -40 } },
+                { op: "FLOTANTE", target: { quien: "ALIADO", zona: "vanguardia", excludeSelf: true },
+                  texto: "+1 ATQ", estilo: "ft-green", offset: -20 },
+                { op: "FLOTANTE", target: { quien: "ALIADO", zona: "vanguardia", excludeSelf: true },
+                  texto: "+1 DEF", estilo: "ft-green", offset: 0 } ] }
+        ],
         canActivateAbility: function(card, game) {
             if (card.furor < 1) { game.logError("Falta Furor (1)."); return false; }
             const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
