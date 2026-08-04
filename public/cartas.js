@@ -5710,6 +5710,13 @@ const CARD_DB = [
         // OJO, hueco de la carta que NO arregla la migración (igual que MAESTRO DE ARMAS en
         // Honsow): el texto dice "Aumenta su Atq en 4 durante el ataque (MÁXIMO 8)" y ese tope
         // de 8 no lo aplicaba la imperativa ni se añade aquí — replicar 1:1 manda. Avisado a Toto.
+        // Lo que el arma le hace a quien la lleva, para su "Afectado por:" (Toto, 31-jul-2026):
+        // el Milkor no toca Atq ni Def, así que sin esto no aparecía por ningún lado en el detalle
+        // del portador pese a cambiarle lo que ocurre al atacar. El contador de disparos no lo
+        // sustituye: ese dice cuántas balas quedan, no qué hace el arma.
+        // OJO al redactar estos textos: " · " está RESERVADO como separador de la coletilla
+        // opcional (`notaEfecto`) en el detalle, así que no debe aparecer dentro de la afección.
+        efectoEquipadoTexto: "Sus ataques normales gastan un disparo y lanzan moneda: cara suma 4 al daño; cruz lo baja 3 y el rival redirige el golpe",
         abilities: [
             { trigger: "JUGAR", requisitos: [
                 { count: { quien: "ALIADO", filtros: [ { campo: "tags", op: "includes", valor: "Animal salvaje", no: true } ] },
@@ -8263,6 +8270,23 @@ const DSL = {
                 }
                 if (m.atk) hostCard.currentAtk += m.atk;
                 if (m.def) hostCard.currentDef += m.def;
+            };
+        }
+
+        // `efectoEquipadoTexto` (Milkor MGL, 31-jul-2026): línea de "Afectado por:" para un equipo
+        // cuyo efecto NO son números. Las líneas automáticas nacen del registro de stats, así que
+        // un arma que no toca Atq/Def -solo cambia lo que pasa al atacar- no aparecía por ningún
+        // lado en el detalle de quien la lleva, aunque le esté cambiando el comportamiento: y es
+        // otra carta afectándole, que es justo lo que esa sección debe contar (Toto). El contador
+        // de disparos no lo sustituye: dice CUÁNTAS balas quedan, no QUÉ hace el arma.
+        // El 3er parámetro del hook es la carta equipada cuando lo llama el bloque de equipos del
+        // detalle, y una marca temporal cuando lo llama el de tempEffects: se distinguen por
+        // `equippedTo`, que solo tiene la primera.
+        if (tmpl.efectoEquipadoTexto && typeof tmpl.onGetPreviewEffects !== 'function') {
+            tmpl.onGetPreviewEffects = function (card, game, eq) {
+                if (!eq || !eq.equippedTo) return [];
+                const ref = typeof game.refCarta === 'function' ? game.refCarta(eq) : tmpl.name;
+                return [`${DSL._fill(tmpl.efectoEquipadoTexto, { genero: card.gender })}, fuente: ${ref}`];
             };
         }
 

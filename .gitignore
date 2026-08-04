@@ -1,3 +1,6 @@
 node_modules/
 *.sqlite
 antiguos/
+# Andamios servidos por pm2 para validar cambios de cliente en el navegador
+# (p. ej. _preview_detalle.html): útiles en el momento, nunca parte del juego.
+public/_preview_*.html

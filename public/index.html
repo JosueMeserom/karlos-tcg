@@ -370,9 +370,11 @@
             .pe-nota { display: block; color: #a5b4fc; font-style: italic; font-size: .68rem; margin-top: 1px; }
             .pe-src { display: block; color: #94a3b8; font-size: .66rem; margin-top: 1px; }
             .pe-src b { color: #cbd5e1; font-weight: 600; }
-            /* La etiqueta "fuente:"/"objetivo:" pesa menos que la carta, pero no tanto como para
-               costar de leer: queda entre el gris del dueño y el blanco del nombre. */
-            .pe-src i { font-style: normal; color: #b6c2d2; }
+            /* Etiqueta "fuente:"/"objetivo:". Va A MEDIO CAMINO entre el gris atenuado que tenía
+               al principio y el gris del dueño (#94a3b8), SIN pasarse de este: sigue siendo lo
+               menos importante de la línea, pero ya se lee sin esfuerzo. Si quieres tocarlo, es
+               este color y nada más. */
+            .pe-src i { font-style: normal; color: #828e9e; }
             /* Secciones del detalle de Eventos (título amarillo unificado; fondos/bordes distintivos) */
             .ev-req { background: rgba(248,113,113,.12); border-left: 3px solid #f87171; }
             .ev-antes { background: rgba(251,146,60,.12); border-left: 3px solid #fb923c; }
@@ -2268,8 +2270,12 @@
                     etiqueta = mRef[1];
                     ref = s.slice(mRef.index + mRef[0].length);
                 }
+                // La coletilla es SIEMPRE lo último que añade lineaEfecto antes del ", fuente:",
+                // así que se busca el separador por el FINAL: si un texto de carta llevara un
+                // " · " dentro, al menos no se confundiría con él. Aun así el separador está
+                // RESERVADO y no debe usarse al redactar afecciones (ver Milkor MGL).
                 let nota = null;
-                const iNota = cabeza.indexOf(' · ');
+                const iNota = cabeza.lastIndexOf(' · ');
                 if (iNota !== -1) { nota = cabeza.slice(iNota + 3); cabeza = cabeza.slice(0, iNota); }
                 let turnos = null;
                 cabeza = cabeza.replace(/\s*\((\d+)\s+(turnos?)\s+restantes?\)/, (m, n, pal) => { turnos = `${n} ${pal}`; return ''; });
@@ -4000,6 +4006,16 @@
                             const txt = ps.length > 1 ? ps.slice(0, -1).join(', ') + ' y ' + ps[ps.length - 1] : ps[0];
                             _salientes.push(this.lineaEfecto(txt, { habilidad: g.habilidad, turnos: g.turnos, ref: _obj, comoObjetivo: true, nota: this._notaDeFuente(g.srcId) }));
                         });
+                        // Vista inversa de `efectoEquipadoTexto`: si ESTA carta es un equipo puesto
+                        // en `otra` y su efecto no son números (Milkor MGL), su propio detalle debe
+                        // decir a quién se lo está haciendo — lo simétrico de la línea que ve el
+                        // portador. Los equipos que sí tocan stats ya salen por _statMods, arriba.
+                        if ((otra.equippedCards || []).some(eq => eq.instanceId === card.instanceId) && template.efectoEquipadoTexto) {
+                            const _txtEq = (typeof DSL !== 'undefined' && DSL._fill)
+                                ? DSL._fill(template.efectoEquipadoTexto, { genero: otra.gender })
+                                : template.efectoEquipadoTexto;
+                            _salientes.push(this.lineaEfecto(_txtEq, { ref: _obj, comoObjetivo: true }));
+                        }
                         [...(otra.tempEffects || []), ...(otra.activeEffects || [])].forEach(eff => {
                             const t = getCardTemplate(eff.sourceId);
                             if (t && t.tempEffectSinLinea) return; // p. ej. Súper Evolución: los +ATQ/+DEF ya salen vía _statMods, esta línea era redundante y sin info (sin duración real)
@@ -4167,15 +4183,15 @@
                     this.pendingInteraction = { tipo: 'boardPick', chooserId, cardsIds: cards.map(c => c.instanceId), n, prompt: prompt || null, sourceId: sourceCard ? sourceCard.instanceId : null, cancelable };
 
                     if (this.gameMode === 'online' && this.myPlayerId !== 'spectator' && this.myPlayerId !== chooserId) {
-                        // No-elector: si estoy en modo espejo (el elector reconectó y mi corrutina
-                        // dirige), le empujo la interacción para que re-monte el picker en su tablero.
-                        if (this._espejandoReaccion) this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'PENDING_INTERACTION', pi: this.pendingInteraction });
-                        // SIN cartel de espera (Toto, 31-jul-2026): elegir un objetivo del campo
-                        // tras jugar una carta de la mano debe ser INVISIBLE para el rival hasta
-                        // que la jugada se resuelva, igual que lo es con Manzanahoria y cualquier
-                        // otra Ayuda dirigida (esas van por SELECT_AYUDA_TARGET y nunca han
-                        // enseñado nada). El cartel sí se mantiene en las REACCIONES, donde el
-                        // rival está legítimamente parado esperando tu decisión.
+                        // No-elector: si le debo el estado al otro (reconectó, sea en modo espejo o
+                        // porque yo estaba eligiendo), le empujo la interacción para que re-monte
+                        // el picker. SIN esto, el reconectado nunca se entera de que le toca elegir
+                        // y la cadena se queda colgada para los dos: softlock (Toto, 31-jul-2026,
+                        // con la cruz del Milkor). Antes solo se empujaba en modo espejo.
+                        if (this._espejandoReaccion || this._reSyncTrasEleccion) {
+                            this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'PENDING_INTERACTION', pi: this.pendingInteraction });
+                        }
+                        this._carteleraEspera(chooserId);
                         return; // sin picker local: lo resuelve el replay remoto (VISUAL_SEARCH_CONFIRM)
                     }
 
@@ -4186,6 +4202,26 @@
                     if (prompt) this.logError(prompt);
                     this.render();
                 });
+            }
+
+            // ¿Toca enseñar "Esperando a que X elija..." al que NO está eligiendo? (Toto,
+            // 31-jul-2026). El criterio no es el tipo de elección, sino si el rival YA está
+            // viendo una cadena en marcha:
+            //   · Elige el RIVAL del jugador activo (la cruz del Milkor, ACERTIJO...): quien
+            //     empezó la cadena está parado esperándole, y sin cartel parece que se colgó.
+            //   · La acción está COMPROMETIDA (isActionLocked): se está resolviendo un ataque o
+            //     una Habilidad, o sea que ya ha pasado algo visible.
+            // Fuera de eso -jugar una carta de la mano y elegir a quién- no se enseña nada: para
+            // el rival no ha ocurrido aún nada, y debe seguir siendo invisible hasta que se
+            // resuelva (es el caso de Manzanahoria y de los equipos al colocarse).
+            _carteleraEspera(chooserId) {
+                if (this.activePlayerId === 'setup') return;
+                const cadenaEnMarcha = (chooserId !== this.activePlayerId) || this.isActionLocked;
+                if (!cadenaEnMarcha) return;
+                const banner = document.getElementById('action-banner');
+                if (!banner) return;
+                banner.innerText = `Esperando a que ${this.getDisplayName(chooserId)} elija...`;
+                banner.style.display = 'block';
             }
 
             _liftExhaustedBtn(cardEl, btnContainer, inst) {
@@ -4413,9 +4449,12 @@
                     this.pendingInteraction = { tipo: 'deckViewer', chooserId: playerId, playerId, elegiblesIds: (elegibles || []).map(c => c.instanceId), titulo: titulo || null, aviso: aviso || null, maxCount };
 
                     if (this.gameMode === 'online' && this.activePlayerId !== 'setup' && this.myPlayerId !== playerId) {
-                        // No-elector en modo espejo (el buscador reconectó y mi corrutina dirige): le
-                        // empujo la interacción para que re-monte el visor de su mazo.
-                        if (this._espejandoReaccion) this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'PENDING_INTERACTION', pi: this.pendingInteraction });
+                        // No-elector: si le debo el estado al otro (reconectó, en espejo o mientras
+                        // yo elegía), le empujo la interacción para que re-monte el visor de su
+                        // mazo. Mismo softlock que el pick de tablero si no se hace.
+                        if (this._espejandoReaccion || this._reSyncTrasEleccion) {
+                            this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'PENDING_INTERACTION', pi: this.pendingInteraction });
+                        }
                         const banner = document.getElementById('action-banner');
                         banner.innerText = `Esperando a que ${this.getDisplayName(playerId)} busque en su mazo...`;
                         banner.style.display = 'block';
@@ -4575,7 +4614,11 @@
                 if (this.gameMode === 'online' && playerId !== 'setup') {
                     this._interaccionChooser = playerId;
                     this.pendingInteraction = { tipo: 'coin', chooserId: playerId, playerId, count };
-                    if (!isMyCoin && this._espejandoReaccion) {
+                    // Igual que el pick de tablero y el visor de mazo: se empuja también cuando le
+                    // debo el estado al otro por haber reconectado mientras YO tenía la elección
+                    // (_reSyncTrasEleccion), no solo en modo espejo. Si no, quien recarga justo
+                    // antes de una moneda suya no la recupera y la cadena se cuelga.
+                    if (!isMyCoin && (this._espejandoReaccion || this._reSyncTrasEleccion)) {
                         this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'PENDING_INTERACTION', pi: this.pendingInteraction });
                     }
                 }
