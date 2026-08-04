@@ -696,6 +696,18 @@ function esDiffInerte(ruta, a, b) {
     // saber si debía restar el +2 Atq al final del ataque; la nueva usa BONO_ATAQUE, que
     // deshace el bono vía updatePassives (recompute) y no necesita recordar nada.
     if (ruta.endsWith('.ayudanteBuff') && typeof a === 'boolean' && b === undefined) return true;
+    // _haAtacado / _haRecibidoDano / _haUsadoActiva (31-jul-2026): bookkeeping del MOTOR, no de
+    // las cartas — sirve para que una carta pueda saber si una unidad "sigue intacta" (la primera
+    // que lo necesita es Neo). Vive en index.html, así que lo comparten LAS DOS bases: cuando
+    // difiere NO es que una lo ponga y la otra no, sino que el CAMINO hasta él es distinto, y esa
+    // diferencia ya está cubierta por el resto de aserciones del escenario:
+    //   · vieja=true, nueva=undefined -> la nueva bloquea ANTES (veto temprano §11b, requisitos
+    //     del DSL) donde la vieja se comprometía y abortaba después. Mismo desenlace.
+    //   · vieja=undefined, nueva=true -> la nueva destruye pasando por modifyStat (que es donde
+    //     se pone la marca) mientras la vieja asignaba currentHp = 0 a pelo. Mismo desenlace.
+    // Si alguna vez una de estas marcas difiere por un motivo REAL, se notará en los stats, los
+    // logs o la zona de la carta, que sí se comparan.
+    if (/\._ha(Atacado|RecibidoDano|UsadoActiva)$/.test(ruta)) return true;
     if (a !== undefined) return false;
     if (ruta.endsWith('.counters') && b && typeof b === 'object' && Object.keys(b).length === 0) return true;
     if (ruta.endsWith('.hasAttackedThisTurn') && b === false) return true;

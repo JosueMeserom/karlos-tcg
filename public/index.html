@@ -2360,6 +2360,15 @@
             modifyStat(card, stat, amount, offsetY = 0, source = null, opts = null) {
                 if (amount === 0) return;
 
+                // Marca de "ya ha sufrido daño", permanente. Va AQUÍ porque este es el único
+                // punto por el que pasa CUALQUIER pérdida de Vida, venga de un ataque normal o
+                // especial, de un efecto de carta, de daño verdadero o de una carta propia. Las
+                // tres marcas (_haAtacado, _haRecibidoDano, _haUsadoActiva) viven en el MOTOR y no
+                // en ninguna carta a propósito: así las comparten las dos bases del arnés y no
+                // generan diferencias, además de quedar disponibles para cualquier carta futura
+                // que necesite saber si una unidad "sigue intacta" (la primera es Neo).
+                if (stat === 'currentHp' && amount < 0) card._haRecibidoDano = true;
+
                 if (getCardTemplate(card.id).isAvatar && amount < 0 && source !== 'avatar_passive') {
                     return; 
                 }
@@ -6151,6 +6160,7 @@
                 this.inputState = 'EXECUTING';
                 this.directAttackUsedThisTurn = true;
                 attacker.hasAttackedThisTurn = true;
+                attacker._haAtacado = true; // permanente, a diferencia de hasAttackedThisTurn
                 this.isActionLocked = true;
                 this.render();
 
@@ -6206,6 +6216,7 @@
             async performAttack(attacker, defender) {
                 this.inputState = 'EXECUTING';
                 attacker.hasAttackedThisTurn = true;
+                attacker._haAtacado = true; // permanente, a diferencia de hasAttackedThisTurn
                 this.isActionLocked = true; 
                 this.render();
 
@@ -6506,6 +6517,10 @@
 
             async executeConfirmedAbility(card) {
                 this.selectedCard = card;
+                // Marca de "ya ha hecho algo" (ver _marcarActuacion). Se pone AQUÍ, en el punto de
+                // compromiso de la Activa, y no en activateAbility: allí todavía se puede cancelar
+                // en el modal de confirmación, y una Activa cancelada no debería contar.
+                card._haUsadoActiva = true;
 
                 // --- COMPROBACIÓN DE SUEÑO EN HABILIDAD ---
                 if (card.status && card.status.sueno && card.status.sueno.duration > 0) {
@@ -9365,6 +9380,48 @@
                     fase: pi.fase === 'avanzando' ? 'avanzando' : 'lanzando',
                     resultados: Array.isArray(pi.resultados) ? pi.resultados : [],
                 };
+            }
+
+            // Sustituye una carta del campo por otra que viene de la MANO, en su mismo hueco y
+            // zona (Neo, 31-jul-2026). La saliente vuelve a la mano LAVADA (resetCard), y a la
+            // entrante se le traspasa lo que el motor sabe mover de forma genérica:
+            //   · los EQUIPOS (con su vínculo `equippedTo` reapuntado), y
+            //   · las MARCAS TEMPORALES, que es donde viven los bonos de stats que de verdad
+            //     persisten en este motor (ver la nota de SABIDURÍA en Wolfgang).
+            // Lo que NO se traspasa son los acumuladores propios de la saliente (el +Def que
+            // Karolina se gana con su Activa y que lee su propia Pasiva): no tendrían quién los
+            // leyera en la entrante. En la práctica da igual, porque ganarlos exige haber actuado
+            // y eso descalifica a la carta como cebo.
+            sustituirEnCampo(saliente, entrante) {
+                const p = this.players[saliente.owner];
+                const zona = saliente.location === 'rearguard' ? 'rearguard' : 'vanguard';
+                const lista = p[zona];
+                const idx = lista.findIndex(c => c.instanceId === saliente.instanceId);
+                if (idx === -1) return false;
+
+                // Traspaso ANTES de lavar a la saliente (resetCard llama a unequipAll).
+                const equipos = saliente.equippedCards || [];
+                const marcas = saliente.tempEffects || [];
+                saliente.equippedCards = [];
+                saliente.tempEffects = [];
+
+                const mano = p.hand;
+                lista.splice(idx, 1);
+                if (typeof this.resetCard === 'function') this.resetCard(saliente);
+                saliente.location = 'hand';
+                mano.push(saliente);
+
+                const iMano = mano.findIndex(c => c.instanceId === entrante.instanceId);
+                if (iMano !== -1) mano.splice(iMano, 1);
+                entrante.location = zona;
+                entrante.equippedCards = equipos;
+                equipos.forEach(eq => { eq.equippedTo = entrante.instanceId; });
+                entrante.tempEffects = marcas;
+                lista.splice(idx, 0, entrante); // el MISMO hueco que ocupaba la saliente
+                this.assignCopyId(entrante);
+                this.updatePassives();
+                this.render();
+                return true;
             }
 
             // Cierra el overlay de una moneda re-montada como ESPECTADOR cuya tirada ya había
