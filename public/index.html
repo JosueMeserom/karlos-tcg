@@ -349,6 +349,10 @@
             #mod-arrows-layer line, #viewer-lift-arrows line { animation: karlosDashMod 0.9s linear infinite; }
             @keyframes karlosDashAnexo { to { stroke-dashoffset: -10; } }
             @keyframes karlosDashMod { to { stroke-dashoffset: -12; } }
+            /* Serie de la carta, al final de la línea de tipo: informativa, nunca protagonista. */
+            .preview-serie { float: right; font-style: normal; font-size: .62rem; letter-spacing: .04em;
+                             color: #64748b; background: rgba(100,116,139,.16); border-radius: 4px;
+                             padding: 0 5px; margin-left: 6px; vertical-align: 1px; }
             /* "Afectado por:" / "Efectos actuales:" — jerarquía tipográfica (Toto, 31-jul-2026).
                Antes era un párrafo de viñetas del mismo tamaño y color: con varias afecciones, o
                con una sola larga, no había por dónde entrar. Ahora cada entrada es un bloque con
@@ -3653,8 +3657,20 @@
                     if (card.tags && card.tags.length > 0) {
                         typeText += ` (${card.tags.join(', ')})`;
                     }
-                    document.getElementById('cp-type').innerText = typeText;
-                    
+                    // La serie se pinta al final de la línea de tipo, atenuada y separada, para que
+                    // esté disponible sin robarle sitio a lo que de verdad se consulta (Toto,
+                    // 31-jul-2026: no aparecía en ningún lado del detalle). Solo si la carta la
+                    // declara: las que no la tienen no ganan un hueco vacío.
+                    const _serie = getCardTemplate(card.id) ? getCardTemplate(card.id).series : card.series;
+                    const _elTipo = document.getElementById('cp-type');
+                    _elTipo.innerText = typeText;
+                    if (_serie !== undefined && _serie !== null && _serie !== '') {
+                        const _sp = document.createElement('span');
+                        _sp.className = 'preview-serie';
+                        _sp.innerText = `Serie ${_serie}`;
+                        _elTipo.appendChild(_sp);
+                    }
+
                    let parts;
                     // COSTE / REQUISITO: si el texto empieza por "Coste: ..." o "Requisito: ...",
                     // van a su propia caja tipo stats (misma apariencia), antes que todo. La norma
