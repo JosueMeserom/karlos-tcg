@@ -4233,11 +4233,15 @@
                 const sourceCard = arguments.length > 3 ? arguments[3] : null;
                 const chooserId = arguments.length > 4 ? arguments[4] : this.activePlayerId;
                 const cancelable = arguments.length > 5 ? arguments[5] !== false : true;
+                // opts (7º): ajustes finos de la elección. `permitirParar` saca el botón OK para
+                // cerrarla antes de llenar el cupo (AL-FÉNIX: "hasta 3 en Van. y 1 en Ret.");
+                // `maxPorZona` limita cuántos caben de cada fila.
+                const opts = (arguments.length > 6 && arguments[6]) || {};
                 return new Promise(resolve => {
                     this.currentVisualResolve = (sel) => { resolve(sel && sel.length ? sel : null); };
                     this._interaccionChooser = chooserId; // quién debe elegir (para la recuperación por reconexión)
                     // Descriptor serializable (reanudar-perfecto): si el elector reconecta, se re-monta este picker.
-                    this.pendingInteraction = { tipo: 'boardPick', chooserId, cardsIds: cards.map(c => c.instanceId), n, prompt: prompt || null, sourceId: sourceCard ? sourceCard.instanceId : null, cancelable };
+                    this.pendingInteraction = { tipo: 'boardPick', chooserId, cardsIds: cards.map(c => c.instanceId), n, prompt: prompt || null, sourceId: sourceCard ? sourceCard.instanceId : null, cancelable, permitirParar: !!opts.permitirParar, maxPorZona: opts.maxPorZona || null };
 
                     if (this.gameMode === 'online' && this.myPlayerId !== 'spectator' && this.myPlayerId !== chooserId) {
                         // No-elector: si le debo el estado al otro (reconectó, sea en modo espejo o
@@ -4252,7 +4256,7 @@
                         return; // sin picker local: lo resuelve el replay remoto (VISUAL_SEARCH_CONFIRM)
                     }
 
-                    this.dslPick = { pool: new Set(cards.map(c => c.instanceId)), n: n, targets: [], byId: {}, chooserId, cancelable };
+                    this.dslPick = { pool: new Set(cards.map(c => c.instanceId)), n: n, targets: [], byId: {}, chooserId, cancelable, permitirParar: !!opts.permitirParar, maxPorZona: opts.maxPorZona || null };
                     this.selectedCard = sourceCard; // la Ayuda origen: el render la necesita
                     cards.forEach(c => this.dslPick.byId[c.instanceId] = c);
                     this.inputState = 'SELECT_DSL_TARGETS';
@@ -4344,6 +4348,25 @@
                 requestAnimationFrame(paso);
             }
 
+            // "Ya he elegido bastantes": cierra un ELEGIR con parada anticipada quedándose con lo
+            // seleccionado hasta ahora. No necesita canal nuevo — resuelve por el MISMO camino
+            // que completar la elección del todo (VISUAL_SEARCH_CONFIRM fuera de cola), así que
+            // el rival y cualquier reconectado se enteran igual que siempre.
+            pararEleccionDsl() {
+                const ctx = this.dslPick;
+                if (!ctx || !ctx.permitirParar || !ctx.targets.length) return;
+                if (this.gameMode === 'online' && this.myPlayerId !== (ctx.chooserId || this.activePlayerId)) return;
+                const sel = ctx.targets.slice();
+                this.dslPick = null;
+                this.selectedCard = null;
+                this.inputState = 'IDLE';
+                this.render();
+                if (this.gameMode === 'online') {
+                    this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'VISUAL_SEARCH_CONFIRM', ids: sel.map(c => c.instanceId) });
+                }
+                this.resolveVisualSearch(sel);
+            }
+
             _dslPickClick(card) {
                 const ctx = this.dslPick;
                 if (!ctx) return;
@@ -4354,6 +4377,19 @@
                     return;
                 }
                 if (ctx.targets.some(t => t.instanceId === card.instanceId)) return;
+                // maxPorZona (AL-FÉNIX, 31-jul-2026): cupo POR FILA además del total. El cupo
+                // global (ctx.n) no puede expresar "hasta 3 en vanguardia y 1 en retaguardia".
+                if (ctx.maxPorZona) {
+                    const _z = card.location === 'rearguard' ? 'retaguardia' : 'vanguardia';
+                    const _tope = ctx.maxPorZona[_z];
+                    if (typeof _tope === 'number') {
+                        const _ya = ctx.targets.filter(t => (t.location === 'rearguard' ? 'retaguardia' : 'vanguardia') === _z).length;
+                        if (_ya >= _tope) {
+                            if (_soyElChooser) this.logError(`Ya has elegido el máximo de ${_tope} en ${_z}.`);
+                            return;
+                        }
+                    }
+                }
                 ctx.targets.push(ctx.byId[card.instanceId]);
                 if (ctx.targets.length >= ctx.n) {
                     const sel = ctx.targets.slice();
@@ -7972,6 +8008,15 @@
                 if (this.inputState === 'SELECT_ABILITY_TARGETS' && this.abilityContext && this.abilityContext.canStopEarly && this.abilityContext.targets.length > 0) {
                     uiHtml += `<button class="game-btn" style="background:#8b5cf6;" onclick="event.stopPropagation(); window.game.finishEarlyTargetSelection()">OK</button>`;
                 }
+                // Mismo botón para el ELEGIR del DSL con parada anticipada (AL-FÉNIX: "hasta 3 en
+                // Van. y 1 en Ret."). El camino crudo ya lo tenía; el declarativo no, y era la
+                // única pieza que le faltaba a esa familia de Habilidades. Solo lo ve el ELECTOR
+                // y solo con al menos un objetivo puesto: parar con cero es cancelar, y para eso
+                // está la [X].
+                if (_esDslPick && this.dslPick.permitirParar && this.dslPick.targets.length > 0
+                    && (this.gameMode === 'local' || this.myPlayerId === (this.dslPick.chooserId || this.activePlayerId))) {
+                    uiHtml += `<button class="game-btn" style="background:#8b5cf6;" onclick="event.stopPropagation(); window.game.pararEleccionDsl()">OK</button>`;
+                }
 
                 uiLayer.innerHTML = uiHtml;
 
@@ -9405,7 +9450,7 @@
                     const cards = (pi.cardsIds || []).map(id => this.findCard(id)).filter(Boolean);
                     if (!cards.length) return;
                     const source = pi.sourceId ? this.findCard(pi.sourceId) : null;
-                    this.dslPick = { pool: new Set(cards.map(c => c.instanceId)), n: pi.n, targets: [], byId: {}, chooserId: pi.chooserId, cancelable: pi.cancelable };
+                    this.dslPick = { pool: new Set(cards.map(c => c.instanceId)), n: pi.n, targets: [], byId: {}, chooserId: pi.chooserId, cancelable: pi.cancelable, permitirParar: !!pi.permitirParar, maxPorZona: pi.maxPorZona || null };
                     cards.forEach(c => this.dslPick.byId[c.instanceId] = c);
                     this.selectedCard = source;      // la Ayuda/origen: el render la resalta
                     this.inputState = 'SELECT_DSL_TARGETS';

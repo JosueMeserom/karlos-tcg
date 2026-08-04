@@ -1662,18 +1662,6 @@ const CARD_DB = [
             }
         },
         
-        onUpdatePassive: function(card, game) {
-            const hasDoT = card.status && card.status.dot && card.status.dot.duration > 0;
-            if (hasDoT && !card.zoeDefBuffActive) {
-                showFloatingText(card.instanceId, card.passiveName, "ft-ability", -40);
-                showFloatingText(card.instanceId, "+2 DEF", "ft-green", -20);
-                card.currentDef += 2;
-                card.zoeDefBuffActive = true;
-            } else if (!hasDoT && card.zoeDefBuffActive) {
-                card.currentDef -= 2;
-                card.zoeDefBuffActive = false;
-            }
-        },
 
         onAfterAttack: async function(attacker, defender, game) {
             game.logMsg(`¡${attacker.passiveName} quema a ambos!`, 'ability');
@@ -1687,107 +1675,42 @@ const CARD_DB = [
             game.applyStatus(attacker, 'dot', 2, defender);
         },
 
-        canActivateAbility: function(card, game) {
-            if (card.furor < (card.activeCost || 1)) { game.logError(`Falta Furor.`); return false; }
-            const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
-            
-            // Verificamos que al menos haya un enemigo en vanguardia que NO esté en sigilo
-            const validEnemies = game.players[enemyId].vanguard.filter(c => !c.stealth);
-            
-            if (validEnemies.length === 0) { 
-                game.logError("No hay enemigos válidos (sin Ocultarse) en la vanguardia para aplicar el ataque."); 
-                return false; 
-            }
-            return true;
-        },
-        
-        onExecuteAbility: function(card, game) {
-            game.selectedCard = card;
-            game.inputState = 'SELECT_ABILITY_TARGETS';
-            // Activamos canStopEarly para que salga el botón "OK" en la interfaz
-            game.abilityContext = { targets: [], maxTargets: 4, canStopEarly: true, name: 'AL-FÉNIX', targetType: 'enemy', vanCount: 0, rearCount: 0 };
-            game.logError("AL-FÉNIX: Elige hasta 3 en Van. y 1 en Ret. Pulsa 'OK' cuando termines.");
-            game.render();
-        },
-        
-        onValidateTarget: function(card, target, game, isSilent = false) {
-            const ctx = game.abilityContext;
-            if (ctx.targets.some(t => t.instanceId === target.instanceId)) {
-                if (!isSilent) game.logError("Ya seleccionaste a este enemigo.");
-                return false;
-            }
-            
-            // Calculamos cuántos hay YA en el array real de objetivos elegidos
-            const currentVan = ctx.targets.filter(t => t.location === 'vanguard').length;
-            const currentRear = ctx.targets.filter(t => t.location === 'rearguard').length;
-
-            if (target.location === 'vanguard') {
-                if (currentVan >= 3) {
-                    if (!isSilent) game.logError("Límite de 3 enemigos en vanguardia alcanzado.");
-                    return false;
-                }
-            } else if (target.location === 'rearguard') {
-                if (currentRear >= 1) {
-                    if (!isSilent) game.logError("Límite de 1 enemigo en retaguardia alcanzado.");
-                    return false;
-                }
-            }
-            return true;
-        },
-
-        // Le dice al motor si debe esperar a que elijas más cartas, o si debe lanzar el ataque automático
-        hasMoreValidTargets: function(card, game) {
-            const ctx = game.abilityContext;
-            const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
-            const enemyP = game.players[enemyId];
-            
-            // Calculamos cuántos hemos elegido ya realmente
-            const currentVan = ctx.targets.filter(t => t.location === 'vanguard').length;
-            const currentRear = ctx.targets.filter(t => t.location === 'rearguard').length;
-
-            // Enemigos que AÚN no hemos seleccionado (y que NO están Ocultos)
-            const unselectedVan = enemyP.vanguard.filter(c => !c.stealth && !ctx.targets.some(t => t.instanceId === c.instanceId)).length;
-            const unselectedRear = enemyP.rearguard.filter(c => !c.stealth && !ctx.targets.some(t => t.instanceId === c.instanceId)).length;
-            
-            // Comprobamos si podemos seguir eligiendo (no hemos llegado al límite y hay objetivos)
-            const canPickVan = currentVan < 3 && unselectedVan > 0;
-            const canPickRear = currentRear < 1 && unselectedRear > 0;
-            
-            return canPickVan || canPickRear;
-        },
-        
-        onTargetsReady: async function(card, game) {
-            const attacker = card;
-            const targets = game.abilityContext.targets;
-            
-            game.inputState = 'EXECUTING';
-            game.render();
-            await game.sleep(800);
-            
-            for (let i = 0; i < targets.length; i++) {
-                // 1. ¿Sigue Wolfgang viva y en el campo antes de la dentellada?
-                if (attacker.currentHp <= 0 || (attacker.location !== 'vanguard' && attacker.location !== 'rearguard')) break;
-                
-                // 2. Refrescamos el objetivo
-                const currentTarget = game.findCard(targets[i].instanceId);
-                
-                // 3. ¿Sigue el objetivo vivo Y en el campo?
-                if (currentTarget && (currentTarget.location === 'vanguard' || currentTarget.location === 'rearguard') && currentTarget.currentHp > 0) {
-                    game.logMsg(`¡Wolfgang ataca (Golpe ${i+1})!`, 'ability');
-                    
-                    await game.performAttack(attacker, currentTarget);
-                    await game.sleep(400);
-                } else {
-                    game.logMsg(`El objetivo ${i+1} ya está muerto o fuera de alcance.`, 'system');
-                }
-            }
-            
-            attacker.exhausted = true;
-            game.isActionLocked = false; 
-            game.cancelAction();
-            game.updatePassives();
-            game.render();
-        }
+        // AL-FÉNIX migrada (31-jul-2026). Su parada anticipada es LEGÍTIMA -el texto dice "hasta
+        // 3 en Van. y 1 en Ret."-, a diferencia de COMA/SANCIÓN/CASTIGO, donde el canStopEarly
+        // estaba mal diagnosticado y en realidad exigían cantidad exacta. Por eso necesitaba dos
+        // piezas que el ELEGIR declarativo no tenía y que ahora sí:
+        //   · `permitirParar`: saca el botón OK para cerrar la elección antes de llenar el cupo.
+        //     `hastaCantidad` NO servía: ajusta el cupo a los objetivos DISPONIBLES, pero no deja
+        //     plantarse al jugador teniendo más a mano, que es justo lo que pide esta carta.
+        //   · `maxPorZona`: cupo por fila además del total, porque "3 en vanguardia y 1 en
+        //     retaguardia" no se puede expresar con un único `cantidad`.
+        // El resto de la carta (la Pasiva JUSTICIERA ABRASADORA con su DoT que cura, y el veto de
+        // colocación) sigue imperativo: son hooks sin arquetipo declarativo.
+        abilities: [
+            // El +2 DEF mientras tenga DoT: MISMO caso (y mismo arreglo) que la Zoe normal en
+            // regresion23. La imperativa lo aplicaba con un flag-cerrojo (`zoeDefBuffActive`) que
+            // solo sumaba en la transición sin-DoT -> con-DoT; pero currentDef se resetea a la
+            // plantilla en CADA pasada de updatePassives, así que en cuanto había una pasada de
+            // más el bono desaparecía y el cerrojo impedía volver a ponerlo. PASIVA_CONTINUA lo
+            // reaplica siempre, que es la única forma de que un bono de Def persista aquí.
+            { trigger: "PASIVA_CONTINUA", nombre: "JUSTICIERA ABRASADORA",
+              if: { campo: "dotActivo", op: "truthy" },
+              then: [ { op: "MODIFICAR_STAT", stat: "def", delta: 2 } ] },
+            { trigger: "ACTIVA", nombre: "AL-FÉNIX", coste: { furor: 4 }, sinObjetivo: true,
+              requisitos: [
+                { count: { quien: "ENEMIGO", zona: "vanguardia", filtros: [ { campo: "stealth", op: "falsy" } ] },
+                  op: ">=", valor: 1,
+                  msg: "No hay enemigos válidos (sin Ocultarse) en la vanguardia para aplicar el ataque." } ],
+              efectos: [
+                { op: "ELEGIR", de: "ENEMIGOS", cantidad: 4,
+                  permitirParar: true, maxPorZona: { vanguardia: 3, retaguardia: 1 },
+                  filtros: [ { campo: "stealth", op: "falsy" } ],
+                  titulo: "AL-FÉNIX: elige hasta 3 en vanguardia y 1 en retaguardia (pulsa OK al terminar)",
+                  // Sin log propio: el op ATACAR no lo lleva, y no hace falta — performAttack ya
+                  // anuncia cada golpe. La imperativa sí ponía uno ("¡Wolfgang ataca (Golpe N)!"),
+                  // pero era un copia-pega de otra carta: aquí no interviene ninguna Wolfgang.
+                  efectos: [ { op: "ATACAR" } ] } ] }
+        ],
     },
     {
         name: "Necronomicón", type: "Ayuda", subtype: "Mágico", tags: ["Consumible"], rarity: "B",
@@ -7820,7 +7743,12 @@ const DSL = {
             // no inferido automáticamente.
             if (e.de !== 'MANO' && !e.forzarModal && typeof game.pickBoardTargets === 'function') {
                 const _texto = e.cancelable === false ? '' : ' (clic en el tablero; X para cancelar)';
-                const sel = await game.pickBoardTargets(pool, n, DSL._fill(e.titulo || 'Elige objetivo', { carta: sourceCard.name }) + _texto, sourceCard, chooserId, e.cancelable !== false);
+                // permitirParar / maxPorZona (AL-FÉNIX, 31-jul-2026): parada anticipada con botón
+                // OK, y cupo por fila además del total. `hastaCantidad` NO servía para esto:
+                // aquel ajusta el cupo a los objetivos disponibles, pero no deja al jugador
+                // plantarse cuando quiera teniendo más objetivos a mano.
+                const sel = await game.pickBoardTargets(pool, n, DSL._fill(e.titulo || 'Elige objetivo', { carta: sourceCard.name }) + _texto, sourceCard, chooserId, e.cancelable !== false,
+                    { permitirParar: !!e.permitirParar, maxPorZona: e.maxPorZona || null });
                 if (!sel) {
                     if (e.logCancela && !e.opcional) game.logError(F(e.logCancela));
                     if (e.siNoElegido) { const r = await DSL._runEffectList(e.siNoElegido, sourceCard, game, ownerId, null, habilidad); return !(r && r.ok === false); }

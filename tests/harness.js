@@ -607,6 +607,13 @@ async function ejecutarPaso(ctx, inst, paso) {
         inst.handleOpponentDiscard(c);
     } else if (paso.robar !== undefined) {
         lanzar(ctx, inst.drawCard(paso.robar === true ? inst.activePlayerId : paso.robar, true));
+    } else if (paso.pararEleccion !== undefined) {
+        // Parada anticipada ("ya he elegido bastantes"). Es POLIMÓRFICO como {elegir}: el camino
+        // crudo de la vieja (SELECT_ABILITY_TARGETS + canStopEarly) y el ELEGIR del DSL tienen
+        // cada uno su propio botón OK, así que el paso responde al que esté abierto y el mismo
+        // escenario vale para las dos bases.
+        if (inst.inputState === 'SELECT_DSL_TARGETS' && inst.dslPick) lanzar(ctx, inst.pararEleccionDsl());
+        else lanzar(ctx, inst.finishEarlyTargetSelection());
     } else if (paso.finTurno !== undefined) {
         lanzar(ctx, inst.confirmEndTurn());
     } else {
