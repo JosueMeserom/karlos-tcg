@@ -6613,17 +6613,17 @@ const CARD_DB = [
             return { nuevoAtacante: handCard };
         },
 
-        // Reacción a que un cebo VAYA A RECIBIR DAÑO. Este punto ya existía (lo usan Escudo
-        // mágico y compañía) y cubre TODAS las fuentes de daño, no solo los ataques: el op DAÑO
-        // del DSL también pasa por dealDamage. `colocada` le dice al motor que Neo se ha puesto
-        // ella sola en el campo y que no la mande al descarte como al resto de reacciones.
-        onHandReactionToDamage: async function(handCard, defensor, atacante, dmg, isSpecial, game, p) {
-            if (!NEO.puedeSustituir(handCard, defensor, game)) return null;
-            const ok = await NEO.preguntar(handCard, defensor, game,
-                `¿Cambiar a ${game.getCardNameWithOwner(defensor)} por Neo para recibir el golpe?`);
+        // Reacción a que un cebo VAYA A RECIBIR DAÑO, del tipo que sea. Usa el punto ÚNICO del
+        // motor (ofrecerReaccionDano), al que llaman tanto dealDamage -ataques normales y
+        // especiales, y el op DAÑO- como el MODIFICAR_STAT del DSL, que es por donde entra el
+        // daño de efecto (Atomización, TORMENTA PERFECTA...) y que antes se escapaba.
+        onHandReactionToAllyDamage: async function(handCard, objetivo, origen, game) {
+            if (!NEO.puedeSustituir(handCard, objetivo, game)) return null;
+            const ok = await NEO.preguntar(handCard, objetivo, game,
+                `¿Cambiar a ${game.getCardNameWithOwner(objetivo)} por Neo para recibir el golpe?`);
             if (!ok) return null;
-            NEO.revelar(handCard, defensor, game);
-            return { used: true, colocada: true, nuevoDefensor: handCard, newDmg: dmg };
+            NEO.revelar(handCard, objetivo, game);
+            return { nuevoObjetivo: handCard };
         },
     },
 ];
@@ -7038,6 +7038,15 @@ const DSL = {
             let d = DSL._value(ownerId, game, e.delta, sourceCard, ctx);
             if (e.deltaCondicional) for (const dc of e.deltaCondicional) if (DSL._match(target, dc.filtro)) { d = dc.delta; break; }
             if (e.vaciar) d = -(target[e.stat] || 0); // "vacía este stat a 0" (Cortarrollos: todo el Furor del atacante)
+            // Reacción de mano ante daño que NO viene de un ataque (Toto, 31-jul-2026: lo pilló
+            // con Atomización). El daño de efecto se aplica por aquí y no por dealDamage, así que
+            // una carta que reacciona a "un aliado va a recibir daño" no se enteraba. El motor
+            // decide y devuelve a quién le toca ahora: si nadie reacciona no pasa absolutamente
+            // nada, así que es inocuo para el resto de cartas.
+            if (e.stat === 'currentHp' && d < 0 && typeof game.ofrecerReaccionDano === 'function') {
+                const _nuevo = await game.ofrecerReaccionDano(target, sourceCard);
+                if (_nuevo) target = _nuevo;
+            }
             const antes = target[e.stat];
             // Orden de flotantes (betasteo de Toto, 31-jul-2026): en cambios ligados a
             // comprobarMuerte (daño/destrucción — MALDITO de Muñeca del mal, DAÑO VERDADERO...)

@@ -349,10 +349,19 @@
             #mod-arrows-layer line, #viewer-lift-arrows line { animation: karlosDashMod 0.9s linear infinite; }
             @keyframes karlosDashAnexo { to { stroke-dashoffset: -10; } }
             @keyframes karlosDashMod { to { stroke-dashoffset: -12; } }
-            /* Serie de la carta, al final de la línea de tipo: informativa, nunca protagonista. */
-            .preview-serie { float: right; font-style: normal; font-size: .62rem; letter-spacing: .04em;
+            /* Serie de la carta: informativa, nunca protagonista. Va anclada abajo a la derecha
+               en vez de flotada (Toto, 31-jul-2026): con `float` se pegaba ARRIBA del bloque, así
+               que con dos líneas de tipo quedaba junto a la primera y con una sola se montaba
+               sobre la raya de debajo del nombre. Anclándola al fondo cae siempre a la altura de
+               la ÚLTIMA línea, tenga las que tenga. El hueco reservado a la derecha evita que el
+               texto de tipo se le meta debajo. El relleno lleva 1px más abajo que arriba porque
+               la caja se veía cargada hacia arriba: las mayúsculas y los números no bajan de la
+               línea base, y sin ese píxel el texto no queda ópticamente centrado. */
+            .preview-type { position: relative; padding-right: 58px; }
+            .preview-serie { position: absolute; right: 0; bottom: 0;
+                             font-style: normal; font-size: .62rem; letter-spacing: .04em; line-height: 1.25;
                              color: #64748b; background: rgba(100,116,139,.16); border-radius: 4px;
-                             padding: 0 5px; margin-left: 6px; vertical-align: 1px; }
+                             padding: 1px 5px 2px; }
             /* "Afectado por:" / "Efectos actuales:" — jerarquía tipográfica (Toto, 31-jul-2026).
                Antes era un párrafo de viñetas del mismo tamaño y color: con varias afecciones, o
                con una sola larga, no había por dónde entrar. Ahora cada entrada es un bloque con
@@ -7218,6 +7227,13 @@
                     return;
                 }
 
+                // Reacción de mano ante "voy a recibir daño", MISMO punto que usa el daño de
+                // efecto (ver ofrecerReaccionDano). Va lo primero para que todo lo que viene
+                // después -auras anti-daño, interceptores, animaciones- se aplique ya a quien de
+                // verdad va a encajar el golpe.
+                const _relevo = await this.ofrecerReaccionDano(defender, attacker);
+                if (_relevo) defender = _relevo;
+
                 // --- Auras Globales Anti-Daño (Ej. NoName) ---
                 for (let pid of ['p1', 'p2']) {
                     this.players[pid].vanguard.forEach(vanCard => {
@@ -9420,6 +9436,25 @@
                     if (typeof t.onHandReactionToAllyAttack !== 'function') continue;
                     const r = await t.onHandReactionToAllyAttack(mano, atacante, defensor, this);
                     if (r && r.nuevoAtacante) return r.nuevoAtacante;
+                }
+                return null;
+            }
+
+            // Ofrece a la mano del DUEÑO de `objetivo` reaccionar a que este vaya a perder Vida,
+            // venga el daño de donde venga. Es el punto ÚNICO para eso: lo llaman tanto dealDamage
+            // (ataques normales/especiales y el op DAÑO) como el MODIFICAR_STAT del DSL (daño de
+            // efecto, que no pasa por dealDamage — Atomización, TORMENTA PERFECTA…). Devuelve el
+            // nuevo objetivo, o null si nadie reacciona. Con la mano sin cartas que reaccionen no
+            // hace absolutamente nada, así que es inocuo para el resto de la partida.
+            async ofrecerReaccionDano(objetivo, origen) {
+                if (!objetivo) return null;
+                const p = this.players[objetivo.owner];
+                if (!p || !p.hand) return null;
+                for (const mano of [...p.hand]) {
+                    const t = getCardTemplate(mano.id);
+                    if (typeof t.onHandReactionToAllyDamage !== 'function') continue;
+                    const r = await t.onHandReactionToAllyDamage(mano, objetivo, origen || null, this);
+                    if (r && r.nuevoObjetivo) return r.nuevoObjetivo;
                 }
                 return null;
             }

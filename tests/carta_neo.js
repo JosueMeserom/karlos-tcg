@@ -180,6 +180,27 @@ const declinaNeo = (g) => { g.openChoiceModal = (t, ch) => ch[1].action(); };
               g.players.p1.vanguard.some(c => c.name === 'Sra. Kumicho'), 'desapareció');
     }
 
+    {
+        // DAÑO DE EFECTO, no de ataque (Toto lo pilló con Atomización): entra por MODIFICAR_STAT
+        // y NO por dealDamage, así que antes se escapaba y no se ofrecía la sustitución. Ahora
+        // los dos caminos pasan por el mismo punto del motor.
+        const { ctx, g } = await mesa({
+            turno: 2, turnoDe: 'p2', empieza: 'p1',
+            p1: { vanguardia: ['Karlos'], mano: [NEO] },
+            p2: { vanguardia: ['Mini-tigre'], mano: ['Atomización'] },
+        });
+        aceptaNeo(g);
+        await g.playCard(g.players.p2.hand[0].instanceId, true); await asentar(ctx);
+        // Atomización: primero el aliado que gasta su acción, luego el enemigo a atomizar.
+        g._dslPickClick(g.players.p2.vanguard[0]); await asentar(ctx);
+        g._dslPickClick(g.players.p1.vanguard[0]); await asentar(ctx);
+
+        const enCampo = g.players.p1.vanguard[0];
+        check('el daño de EFECTO también ofrece la sustitución', enCampo.id === NEO, enCampo.name);
+        check('y es Neo quien lo encaja', enCampo._haRecibidoDano === true, '_haRecibidoDano=' + enCampo._haRecibidoDano);
+        check('el cebo se salva y vuelve a la mano', g.players.p1.hand.some(c => c.name === 'Karlos'), 'no volvió');
+    }
+
     console.log('\n--- PARED FALSA ---');
     {
         const { ctx, g } = await mesa({
