@@ -6563,7 +6563,154 @@ const CARD_DB = [
               ] }
         ]
     },
+    {
+        name: "Neo", hp: 3, def: 8, atk: 6, type: "Personaje", subtype: "Ser vivo",
+        tags: ["Usuaria de semblanza", "mafia"], gender: "F", rarity: "A", series: "R",
+        text: "P: IMAGINACIÓN HIPERACTIVA: No se coloca de forma normal. Desde tu mano, cuando un aliado 'cebo' declare un ataque o vaya a recibir daño, puedes cambiarlo por Neo: el cebo vuelve a tu mano y Neo ocupa su hueco con sus equipos y bonos, y da o recibe el golpe. Cebo: aliado Personaje/Esbirro que no sea Máquina, Ser mágico, Animal salvaje ni Cosa, que no tuviera requisitos para colocarse y que no haya atacado, sufrido daño ni usado su Activa. A: PARED FALSA (4F): Pon un contador en Neo. El próximo ataque que reciba, normal o especial, queda anulado con todos sus efectos y se retira el contador. No acumulable.",
+        passiveName: "IMAGINACIÓN HIPERACTIVA", activeName: "PARED FALSA", activeCost: 4,
+
+        // PARED FALSA es 100% declarativa y no necesitó ninguna pieza nueva: el op ESQUIVAR ya
+        // anula el golpe Y todos sus efectos (el motor lo trata como ataque fallido), y sirve
+        // igual para normal y especial porque ANTES_DE_DEFENDER solo se limita a normales si se
+        // le pide con `soloAtaqueNormal`. El "no acumulable" es un requisito sobre su propio
+        // contador, gracias a que `_field` sabe leer rutas con puntos.
+        abilities: [
+            { trigger: "ACTIVA", nombre: "PARED FALSA", coste: { furor: 4 }, sinObjetivo: true,
+              requisitos: [
+                { campo: "counters.pared_falsa.count", op: "falsy",
+                  msg: "Neo ya tiene su Pared falsa levantada." } ],
+              efectos: [
+                { op: "MODIFICAR_CONTADORES", target: { quien: "SELF" }, contador: "pared_falsa",
+                  delta: 1, nombreContador: "Pared falsa", icono: "🧱",
+                  log: "{carta} levanta una Pared falsa." } ] },
+            { trigger: "ANTES_DE_DEFENDER",
+              si: [ { campo: "counters.pared_falsa.count", op: ">=", valor: 1 } ],
+              efectos: [
+                { op: "FLOTANTE", target: { quien: "SELF" }, texto: "¡PARED FALSA!", estilo: "ft-purple", offset: -40 },
+                { op: "MODIFICAR_CONTADORES", target: { quien: "SELF" }, contador: "pared_falsa", delta: -1 },
+                { op: "ESQUIVAR", sinAnimacion: true,
+                  log: "¡El ataque de {objetivo} atraviesa a {defensor}: no era más que una Pared falsa!" } ] }
+        ],
+
+        // ---- IMAGINACIÓN HIPERACTIVA (imperativa: no hay arquetipo DSL para esto) ----
+        // "No puedes colocar a Neo de manera normal": el motor consulta canPlayCard también para
+        // Personaje/Esbirro desde la migración de Némesis, así que basta con negar aquí. De paso
+        // es el sitio natural para el diagnóstico que pidió Toto: al clicarla te explica por qué
+        // no cualifica cada aliado, en vez de dejarte adivinando.
+        canPlayCard: function(card, game, p) {
+            game.logError(NEO.diagnostico(card, game, p));
+            return false;
+        },
+
+        // Reacción al DECLARAR un ataque con un cebo (punto nuevo del motor:
+        // onHandReactionToAllyAttack, ver ofrecerReaccionAtacante). Devuelve el nuevo atacante.
+        onHandReactionToAllyAttack: async function(handCard, atacante, defensor, game) {
+            if (!NEO.puedeSustituir(handCard, atacante, game)) return null;
+            const ok = await NEO.preguntar(handCard, atacante, game,
+                `¿Cambiar a ${game.getCardNameWithOwner(atacante)} por Neo para atacar?`);
+            if (!ok) return null;
+            NEO.revelar(handCard, atacante, game);
+            return { nuevoAtacante: handCard };
+        },
+
+        // Reacción a que un cebo VAYA A RECIBIR DAÑO. Este punto ya existía (lo usan Escudo
+        // mágico y compañía) y cubre TODAS las fuentes de daño, no solo los ataques: el op DAÑO
+        // del DSL también pasa por dealDamage. `colocada` le dice al motor que Neo se ha puesto
+        // ella sola en el campo y que no la mande al descarte como al resto de reacciones.
+        onHandReactionToDamage: async function(handCard, defensor, atacante, dmg, isSpecial, game, p) {
+            if (!NEO.puedeSustituir(handCard, defensor, game)) return null;
+            const ok = await NEO.preguntar(handCard, defensor, game,
+                `¿Cambiar a ${game.getCardNameWithOwner(defensor)} por Neo para recibir el golpe?`);
+            if (!ok) return null;
+            NEO.revelar(handCard, defensor, game);
+            return { used: true, colocada: true, nuevoDefensor: handCard, newDmg: dmg };
+        },
+    },
 ];
+
+// ===================================================================
+//  NEO — IMAGINACIÓN HIPERACTIVA
+//  Vive aparte porque son varias piezas que se llaman entre sí y meterlas dentro de la carta
+//  la volvía ilegible. La Pasiva NO es declarable: no existe (ni compensa inventar) un
+//  arquetipo para "sustituir un aliado por mí desde la mano en mitad de un ataque".
+// ===================================================================
+const NEO = {
+    // Un cebo es un aliado que sigue INTACTO y que no es de los "raros". Cada condición se
+    // evalúa por separado para poder explicar en el log cuál falla (ver diagnostico).
+    // El orden importa poco, pero se listan de la más estructural a la más circunstancial.
+    razonesNoCebo(c, game) {
+        const razones = [];
+        const t = getCardTemplate(c.id) || {};
+        if (c.type !== 'Personaje' && c.type !== 'Esbirro') razones.push('no es Personaje ni Esbirro');
+        if (c.subtype === 'Máquina') razones.push('es una Máquina');
+        if (c.subtype === 'Ser mágico') razones.push('es un Ser mágico');
+        if ((c.tags || []).includes('Animal salvaje')) razones.push('es un Animal salvaje');
+        if ((c.tags || []).includes('Cosa')) razones.push('es una Cosa');
+        // "No ha tenido requisitos para colocarse" se mide sobre la PLANTILLA (decisión de Toto):
+        // canPlayCard es el gancho de los requisitos y onBeforePlayAsync el de los tributos.
+        if (typeof t.canPlayCard === 'function' || typeof t.onBeforePlayAsync === 'function') {
+            razones.push('tuvo requisitos para colocarse');
+        }
+        // Las tres marcas del motor (ver modifyStat / performAttack / executeConfirmedAbility).
+        if (c._haAtacado) razones.push('atacó');
+        if (c._haRecibidoDano) razones.push('sufrió daño');
+        if (c._haUsadoActiva) razones.push('usó su Activa');
+        return razones;
+    },
+
+    esCebo(c, game) { return this.razonesNoCebo(c, game).length === 0; },
+
+    // "Karlos atacó y sufrió daño" — enumeración natural, con "y" antes de la última.
+    _enumerar(xs) {
+        if (xs.length <= 1) return xs[0] || '';
+        return xs.slice(0, -1).join(', ') + ' y ' + xs[xs.length - 1];
+    },
+
+    // Texto que sale al clicar a Neo en la mano. Explica por qué NO se puede colocar y, si algún
+    // aliado no cualifica, por qué no — que es justo lo que el jugador necesita para decidir.
+    diagnostico(card, game, p) {
+        const base = 'Neo solo se coloca si un cebo declara un ataque o va a recibir daño.';
+        const colocados = [...p.vanguard, ...p.rearguard];
+        const fallan = colocados
+            .map(c => ({ c, razones: this.razonesNoCebo(c, game) }))
+            .filter(x => x.razones.length > 0);
+        if (colocados.length === 0) return `${base} Ahora mismo no tienes ningún aliado colocado.`;
+        if (fallan.length === 0) return base;
+        const detalle = fallan
+            .map(x => `${game.nCarta(x.c)} ${this._enumerar(x.razones)}`)
+            .join('; ');
+        const todos = fallan.length === colocados.length;
+        return `${base} ${todos ? 'Ninguno cualifica' : 'No cualifica'}: ${detalle}.`;
+    },
+
+    // Además de ser cebo, hay un límite de sitio: Neo es un Personaje, así que si el cebo está en
+    // vanguardia y ya hay DOS Personajes MÁS, no cabría (el motor solo admite 2 por vanguardia).
+    puedeSustituir(neo, cebo, game) {
+        if (!cebo || cebo.owner !== neo.owner) return false;
+        if (!this.esCebo(cebo, game)) return false;
+        if (cebo.location === 'vanguard') {
+            const otros = game.players[cebo.owner].vanguard
+                .filter(c => c.type === 'Personaje' && c.instanceId !== cebo.instanceId).length;
+            if (otros >= 2) return false;
+        }
+        return true;
+    },
+
+    preguntar(neo, cebo, game, titulo) {
+        return new Promise(resolve => {
+            game.openChoiceModal(titulo, [
+                { label: 'SÍ, REVELAR A NEO', action: () => resolve(true) },
+                { label: 'NO', action: () => resolve(false) },
+            ], neo.owner);
+        });
+    },
+
+    revelar(neo, cebo, game) {
+        game.logMsg(`¡IMAGINACIÓN HIPERACTIVA! ${game.getCardNameWithOwner(cebo)} no era más que un señuelo: ${game.nCarta(neo)} ocupa su lugar.`, 'ability');
+        game.sustituirEnCampo(cebo, neo);
+        if (typeof showFloatingText === 'function') showFloatingText(neo.instanceId, '¡NEO!', 'ft-purple', -40);
+    },
+};
 
 // --- AUTO-GENERADOR DE IDs ---
 let _autoIdCounter = 1000;
@@ -7369,7 +7516,9 @@ const DSL = {
             // game, así que no ensucia el estado que compara el arnés.
             // sourceCard = quien defiende/esquiva · target = quien ataca.
             game._dslEsquiva = true;
-            if (typeof animateDodge === 'function') { try { await animateDodge(target.instanceId, sourceCard.instanceId); } catch (err) {} }
+            // sinAnimacion (Neo, 31-jul-2026): PARED FALSA no esquiva, se desvanece — el quiebro
+            // lateral de animateDodge contaba otra cosa. El efecto de reglas es idéntico.
+            if (!e.sinAnimacion && typeof animateDodge === 'function') { try { await animateDodge(target.instanceId, sourceCard.instanceId); } catch (err) {} }
             if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, defensor: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target) }), e.logTipo || 'combat');
             return true;
         }

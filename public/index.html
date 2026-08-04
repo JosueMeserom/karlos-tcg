@@ -6215,9 +6215,7 @@
 
             async performAttack(attacker, defender) {
                 this.inputState = 'EXECUTING';
-                attacker.hasAttackedThisTurn = true;
-                attacker._haAtacado = true; // permanente, a diferencia de hasAttackedThisTurn
-                this.isActionLocked = true; 
+                this.isActionLocked = true;
                 this.render();
 
                 let currentDefender = defender;
@@ -6234,6 +6232,22 @@
                     this.selectedCard = null;
                     return;
                 }
+
+                // 0. REACCIÓN DEL ATACANTE DESDE SU PROPIA MANO (Neo, 31-jul-2026). Va lo PRIMERO,
+                // antes incluso de comprobar estados: la carta que reacciona SUSTITUYE al
+                // atacante, así que quien tiene que pasar esos controles -y a quien el rival
+                // podrá reaccionar después- es ya la sustituta. El pipeline de reacciones que
+                // existía solo miraba la mano del DEFENSOR y mandaba la carta usada al descarte;
+                // este es el simétrico, y su carta acaba en el CAMPO.
+                const _sust = await this.ofrecerReaccionAtacante(attacker, currentDefender);
+                if (_sust) attacker = _sust;
+
+                // Las marcas van DESPUÉS de la posible sustitución, y esto importa: quien ataca de
+                // verdad es quien acaba en el campo, y marcar al aliado ANTES de ofrecerle el
+                // cambio lo descalificaba a sí mismo justo cuando se le estaba preguntando (una
+                // de las condiciones de "cebo" es no haber atacado, así que se pisaba sola).
+                attacker.hasAttackedThisTurn = true;
+                attacker._haAtacado = true; // permanente, a diferencia de hasAttackedThisTurn
 
                 // 1. COMPROBAR ESTADOS (CLARISE) ANTES DE PREGUNTAR POR REACCIONES
                 const canAttack = await this.checkAttackStatus(attacker, currentDefender);
@@ -7244,13 +7258,25 @@
                             const result = await handTemplate.onHandReactionToDamage(handCard, defender, attacker, dmg, isSpecial, this, p);
                             
                             if (result && result.used) {
+                                // nuevoDefensor (Neo, 31-jul-2026): la reacción no modifica el
+                                // golpe, sino QUIÉN lo recibe — se ha sustituido al defensor y el
+                                // daño va a la sustituta. `colocada` dice que la carta se ha
+                                // puesto ella misma en el campo, así que NO va al descarte como el
+                                // resto de reacciones de mano.
+                                if (result.nuevoDefensor) defender = result.nuevoDefensor;
+                                if (result.colocada) {
+                                    i--;
+                                    if (result.newDmg !== undefined) dmg = result.newDmg;
+                                    if (dmg <= 0) break;
+                                    continue;
+                                }
                                 p.hand.splice(i, 1);
                                 this.assignCopyId(handCard); // el [n] nace al salir de la mano
                                 if (!p.discard) p.discard = [];
                                 p.discard.push(handCard);
-                                i--; 
+                                i--;
                                 dmg = result.newDmg;
-                                if (dmg <= 0) break; 
+                                if (dmg <= 0) break;
                             } else {
                                 declinedReactions.add(handCard.id);
                             }
@@ -9380,6 +9406,22 @@
                     fase: pi.fase === 'avanzando' ? 'avanzando' : 'lanzando',
                     resultados: Array.isArray(pi.resultados) ? pi.resultados : [],
                 };
+            }
+
+            // Ofrece a las cartas de la mano del ATACANTE sustituirle justo al declarar el ataque.
+            // Simétrico de las reacciones de mano del defensor, con dos diferencias: la mano que
+            // se mira es la del atacante, y la carta usada no va al descarte sino al CAMPO (lo
+            // hace ella misma vía sustituirEnCampo). Devuelve el nuevo atacante, o null.
+            async ofrecerReaccionAtacante(atacante, defensor) {
+                const p = this.players[atacante.owner];
+                if (!p || !p.hand) return null;
+                for (const mano of [...p.hand]) {
+                    const t = getCardTemplate(mano.id);
+                    if (typeof t.onHandReactionToAllyAttack !== 'function') continue;
+                    const r = await t.onHandReactionToAllyAttack(mano, atacante, defensor, this);
+                    if (r && r.nuevoAtacante) return r.nuevoAtacante;
+                }
+                return null;
             }
 
             // Sustituye una carta del campo por otra que viene de la MANO, en su mismo hueco y
