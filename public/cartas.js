@@ -4573,7 +4573,15 @@ const CARD_DB = [
         // Al caducar basta con VOLVER_A_MANO con `reset`: resetCard llama a unequipAll, así que
         // el propio equipo se va a la basura solo -sin él, el Karlos volvería a la mano con los
         // stats aún bloqueados a 9 y el equipo encima-.
-        tempEffectText: "Stats bloqueados a 9; vuelve a la mano al inicio de tu próximo turno",
+        // El detalle lo pinta la línea AUTOMÁTICA de stats (el registro de updatePassives), que
+        // ya dice "+3 VIDA MÁX., +3 DEF y +4 ATQ" con los números reales de ESTE portador.
+        // `notaEfecto` le añade lo único que los números no cuentan. Antes esto era un
+        // `tempEffectText` escrito a mano que salía TRES veces en "Afectado por:" (Toto,
+        // 31-jul-2026): una por ser equipo (sin el [n], porque ahí el 3er parámetro es la carta
+        // equipada y no la marca), otra por tener marca temporal (con el [n]) y la automática.
+        // `tempEffectSinLinea` mata además la línea genérica de la vista inversa.
+        notaEfecto: "vuelve a la mano al inicio de tu próximo turno",
+        tempEffectSinLinea: true,
         abilities: [
             { trigger: "JUGAR", requisitos: [
                 { count: { quien: "ALIADO", zona: "vanguardia", filtros: [ { campo: "name", op: "contieneTexto", valor: "Karlos" }, { campo: "currentHp", op: "<=", valor: 1 } ] },
@@ -8200,6 +8208,25 @@ const DSL = {
         if (_fuenteBuff && typeof tmpl.onEquipUpdate !== 'function') {
             tmpl.onEquipUpdate = function (equipCard, hostCard, game) {
                 const m = _fuenteBuff.mientrasEquipado;
+                // La VIDA MÁX. la DECLARA el equipo, no la deduce el motor (Toto, 31-jul-2026).
+                // El registro automático de "Afectado por:" funciona por diferencias antes/después
+                // de cada pasada, y eso sirve para currentAtk/currentDef porque se resetean a la
+                // plantilla en cada una; `maxHp` NO se resetea, así que el diff solo la vería en la
+                // pasada en que cambia y la línea desaparecería acto seguido. Por eso el bono de
+                // Vida se anota explícitamente aquí, en cada pasada (registrarStatMod dedupe por
+                // stat+origen+habilidad, así que no se acumula).
+                const _anotaVida = () => {
+                    const t = getCardTemplate(hostCard.id) || {};
+                    if (typeof t.hp !== 'number' || hostCard.maxHp === t.hp) return;
+                    if (typeof game.registrarStatMod !== 'function') return;
+                    game.registrarStatMod(hostCard, {
+                        stat: 'VIDA MÁX.', delta: hostCard.maxHp - t.hp,
+                        fuente: equipCard.name,
+                        ref: typeof game.refCarta === 'function' ? game.refCarta(equipCard) : equipCard.name,
+                        habilidad: null, turnos: null,
+                        srcId: equipCard.instanceId, srcAltId: hostCard.instanceId, srcZone: null,
+                    });
+                };
                 // superStats (Súper Evolución, 31-jul-2026): el bono NO es un delta fijo, sino la
                 // diferencia entre los `superStats` de la PLANTILLA DEL PORTADOR y su base — cada
                 // portador evoluciona a los suyos, así que `{atk:N, def:N}` no puede expresarlo.
@@ -8215,6 +8242,7 @@ const DSL = {
                         hostCard.maxHp = t.superStats.hp;
                         hostCard.currentHp = hostCard.maxHp;
                     }
+                    _anotaVida();
                     return;
                 }
                 // fijar (Poder Legado, 31-jul-2026): stats BLOQUEADOS a un valor, no sumados.
@@ -8225,6 +8253,7 @@ const DSL = {
                     if (m.fijar.def !== undefined) hostCard.currentDef = m.fijar.def;
                     if (m.fijar.hp !== undefined) { hostCard.maxHp = m.fijar.hp; hostCard.currentHp = m.fijar.hp; }
                     if (m.ignorarTopes) hostCard.ignoreStatCaps = true;
+                    _anotaVida();
                     return;
                 }
                 if (m.atk) hostCard.currentAtk += m.atk;

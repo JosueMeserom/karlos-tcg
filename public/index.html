@@ -1836,7 +1836,8 @@
                     // el estado final). Lo atiendo AQUÍ, fuera de cola. Sin interacción, sigue a la
                     // cola como antes (para capturar estados estables).
                     if (data.action === 'REQUEST_SYNC') {
-                        const hayInteraccion = this.currentChoices || this.currentVisualResolve || this.dslPick || this.pendingInteraction;
+                        const hayInteraccion = this.currentChoices || this.currentVisualResolve || this.dslPick || this.pendingInteraction
+                                            || this.inputState === 'SELECT_ABILITY_TARGETS';
                         if (hayInteraccion) { this._dbgRx('REQUEST_SYNC atendido FUERA DE COLA (hay interacción)'); this._atenderRequestSync(data); return; }
                     }
                     // --- SINCRONIZACIÓN DE MONEDAS EN TIEMPO REAL ---
@@ -2203,14 +2204,32 @@
                 arr.push(entry);
             }
 
-            lineaEfecto(afeccion, { turnos, habilidad, ref, comoObjetivo } = {}) {
+            lineaEfecto(afeccion, { turnos, habilidad, ref, comoObjetivo, nota } = {}) {
                 // "(N turnos restantes)" (Toto, 27-jul-2026): igual para estados alterados y
                 // efectos temporales; con la cuenta atrás ya se sobreentiende que es temporal,
                 // así que sustituye también al antiguo "(efecto temporal)".
                 const t = (turnos !== undefined && turnos !== null && turnos !== '')
                     ? ` (${turnos} turno${turnos === 1 ? '' : 's'} restante${turnos === 1 ? '' : 's'})` : '';
                 const h = habilidad ? ` por ${habilidad}` : '';
-                return `${afeccion}${t}${h}, ${comoObjetivo ? 'objetivo' : 'fuente'}: ${ref}`;
+                // `nota` (Toto, 31-jul-2026): coletilla OPCIONAL entre la parte automática y el
+                // ", fuente:". La línea automática solo sabe de stats, así que una carta cuyo
+                // efecto no se agota en números (Poder Legado: además devuelve al portador a la
+                // mano) se quedaba sin contarlo, o lo contaba en una SEGUNDA línea escrita a mano
+                // que acababa duplicando la información. La nota la declara la plantilla en
+                // `notaEfecto` y se resuelve al pintar, así que no viaja en el estado.
+                const n = nota ? `, ${nota}` : '';
+                return `${afeccion}${t}${h}${n}, ${comoObjetivo ? 'objetivo' : 'fuente'}: ${ref}`;
+            }
+
+            // Coletilla declarada por la plantilla de la carta ORIGEN de un modificador, para
+            // ampliar su línea automática (ver `nota` en lineaEfecto). Se busca por instanceId
+            // para que valga igual con equipos, eventos o cartas en mesa.
+            _notaDeFuente(srcId) {
+                if (!srcId) return null;
+                const c = this.findCard(srcId);
+                if (!c) return null;
+                const t = getCardTemplate(c.id) || {};
+                return t.notaEfecto || null;
             }
 
             getCardSourceString(card) {
@@ -3785,7 +3804,7 @@
                             // (Toto, 27-jul-2026 — encontrado con Karolina: dos contribuciones a DEF
                             // de la MISMA fuente/habilidad -el bono y el techo- salían como "+5 DEF y
                             // -2 DEF" en vez de netear a "+3 DEF").
-                            if (!porFuente.has(clave)) porFuente.set(clave, { netPorStat: new Map(), fuente: _fm, habilidad: m.habilidad, turnos: m.turnos });
+                            if (!porFuente.has(clave)) porFuente.set(clave, { netPorStat: new Map(), fuente: _fm, habilidad: m.habilidad, turnos: m.turnos, srcId: m.srcId });
                             const _np = porFuente.get(clave).netPorStat;
                             _np.set(m.stat, (_np.get(m.stat) || 0) + m.delta);
                         });
@@ -3798,7 +3817,7 @@
                                 .map(([stat, v]) => `${v > 0 ? '+' : ''}${v} ${stat}`);
                             if (!partes.length) return;
                             const txt = partes.length > 1 ? partes.slice(0, -1).join(', ') + ' y ' + partes[partes.length - 1] : partes[0];
-                            effects.push(this.lineaEfecto(txt, { habilidad: g.habilidad, turnos: g.turnos, ref: g.fuente }));
+                            effects.push(this.lineaEfecto(txt, { habilidad: g.habilidad, turnos: g.turnos, ref: g.fuente, nota: this._notaDeFuente(g.srcId) }));
                         });
                         // Residuo que el registro no explica (p. ej. valores arrastrados en cartas fuera de mesa)
                         const resA = (card.currentAtk - base.atk) - acumA;
@@ -3893,13 +3912,17 @@
                                 if (m.stat === 'OCULTO') { if (!_cs || !_cs.has('oculto')) _salientes.push(this.lineaEfecto(this.generoTexto(otra, 'Oculto', 'Oculta'), { habilidad: m.habilidad, ref: _obj, comoObjetivo: true })); return; }
                                 if (m.stat === 'SILENCIO') { if (!_cs || !_cs.has('silencio')) _salientes.push(this.lineaEfecto(this.generoTexto(otra, 'Silenciado', 'Silenciada'), { habilidad: m.habilidad, ref: _obj, comoObjetivo: true })); return; }
                                 const clave = (m.srcId || '') + '|' + (m.habilidad || '');
-                                if (!_grupos.has(clave)) _grupos.set(clave, { partes: [], habilidad: m.habilidad, turnos: m.turnos });
-                                _grupos.get(clave).partes.push(`${m.delta > 0 ? '+' : ''}${m.delta} ${m.stat}`);
+                                if (!_grupos.has(clave)) _grupos.set(clave, { partes: [], habilidad: m.habilidad, turnos: m.turnos, srcId: m.srcId });
+                                _grupos.get(clave).partes.push({ stat: m.stat, txt: `${m.delta > 0 ? '+' : ''}${m.delta} ${m.stat}` });
                             }
                         });
+                        // Mismo orden VIDA -> DEF -> ATQ que en "Afectado por" (y que la cara de la
+                        // carta): esta vista lo dejaba al azar del orden de registro.
+                        const _ordenSal = { 'VIDA MÁX.': 0, DEF: 1, ATQ: 2 };
                         _grupos.forEach(g => {
-                            const txt = g.partes.length > 1 ? g.partes.slice(0, -1).join(', ') + ' y ' + g.partes[g.partes.length - 1] : g.partes[0];
-                            _salientes.push(this.lineaEfecto(txt, { habilidad: g.habilidad, turnos: g.turnos, ref: _obj, comoObjetivo: true }));
+                            const ps = g.partes.slice().sort((a, b) => (_ordenSal[a.stat] ?? 9) - (_ordenSal[b.stat] ?? 9)).map(p => p.txt);
+                            const txt = ps.length > 1 ? ps.slice(0, -1).join(', ') + ' y ' + ps[ps.length - 1] : ps[0];
+                            _salientes.push(this.lineaEfecto(txt, { habilidad: g.habilidad, turnos: g.turnos, ref: _obj, comoObjetivo: true, nota: this._notaDeFuente(g.srcId) }));
                         });
                         [...(otra.tempEffects || []), ...(otra.activeEffects || [])].forEach(eff => {
                             const t = getCardTemplate(eff.sourceId);
@@ -6374,6 +6397,9 @@
                         await template.onTargetsReady(this.selectedCard, this);
                     }
                     this.forceSync(); // <--- MARTILLO TRAS EJECUTAR HABILIDAD CON OBJETIVO (Ej: Clarise)
+                    // Red de seguridad si un rival reconectó mientras yo elegía objetivos (y
+                    // consume el flag para que no dispare en una elección posterior).
+                    this._reSyncTrasEleccionSiHaceFalta();
                 } else {
                     this.logMsg(`Objetivo ${current} fijado. Elige al siguiente objetivo.`, 'system');
                     this.render();
@@ -8868,8 +8894,29 @@
                     // Interacción visual pendiente del rival (elección en tablero, búsqueda en
                     // mazo o moneda): mismo reanudar-perfecto que la reacción, pero para esos
                     // tipos (ver pickBoardTargets/openDeckSearchViewer/triggerCoinFlips).
-                    pendingInteraction: this.pendingInteraction || null
+                    pendingInteraction: this.pendingInteraction || null,
+                    // Targeting "crudo" de una Activa (SELECT_ABILITY_TARGETS). Misma fragilidad
+                    // que la Ayuda dirigida: inputState/selectedCard/abilityContext son estado
+                    // LOCAL, así que quien recargaba aquí los perdía y el replay del clic
+                    // (SELECT_CARD) dejaba de encajar. No se puede marcar al entrar como se hace
+                    // con `pendingInteraction`, porque quien pone SELECT_ABILITY_TARGETS es CADA
+                    // carta imperativa por su cuenta (una veintena de sitios): se DERIVA aquí, que
+                    // es el único punto por el que pasa todo lo que se envía.
+                    pendingAbilityTarget: this._descriptorAbilityTarget()
                 };
+            }
+
+            // Descriptor serializable del targeting de Activa en curso (o null). `targets` guarda
+            // CARTAS, que no pueden viajar: se mandan sus instanceId y se rehidratan al importar.
+            _descriptorAbilityTarget() {
+                if (this.inputState !== 'SELECT_ABILITY_TARGETS') return null;
+                if (!this.abilityContext || !this.selectedCard) return null;
+                let ctx;
+                try {
+                    ctx = JSON.parse(JSON.stringify(Object.assign({}, this.abilityContext, { targets: undefined })));
+                } catch (e) { return null; } // contexto no serializable: mejor no prometer nada
+                ctx.targetsIds = (this.abilityContext.targets || []).map(c => c && c.instanceId).filter(Boolean);
+                return { sourceId: this.selectedCard.instanceId, chooserId: this.activePlayerId, ctx };
             }
 
             importGameState(state) {
@@ -9041,6 +9088,24 @@
                 // Sin cartel para el NO elector (Toto, 31-jul-2026): ver la nota de
                 // pickBoardTargets. Elegir objetivo en el campo tras jugar una carta debe ser
                 // invisible para el rival; el cartel se queda solo en las reacciones (arriba).
+
+                // Targeting de Activa en curso: se re-monta en LOS DOS clientes, por el mismo
+                // motivo que `ayudaTarget` — la elección no la resuelve una Promise viva sino el
+                // replay del clic (SELECT_CARD), y el no elector necesita el mismo
+                // inputState/selectedCard/abilityContext para que ese replay vuelva a encajar.
+                const pat = state.pendingAbilityTarget;
+                if (pat && !yaTengoUI && this.inputState !== 'SELECT_ABILITY_TARGETS') {
+                    const _src = this.findCard(pat.sourceId);
+                    if (_src) {
+                        const ctx = Object.assign({}, pat.ctx);
+                        ctx.targets = (pat.ctx.targetsIds || []).map(id => this.findCard(id)).filter(Boolean);
+                        delete ctx.targetsIds;
+                        this.selectedCard = _src;
+                        this.abilityContext = ctx;
+                        this.inputState = 'SELECT_ABILITY_TARGETS';
+                        this.render();
+                    }
+                }
             }
 
             _reMostrarReaccionPendiente(pr) {
@@ -9210,17 +9275,26 @@
                 // redirección de Pequeña traición…)? Si el rival acaba de reconectar, ha perdido
                 // ese overlay. Con reanudar-perfecto entro en modo espejo: mi corrutina viva
                 // dirige y, al terminar, le vuelco el estado final. Lo no cubierto se auto-declina.
-                const tengoInteraccion = this.currentChoices || this.currentVisualResolve || this.dslPick || this.pendingInteraction;
-                const esperandoRival = tengoInteraccion && this._interaccionChooser && this._interaccionChooser !== this.myPlayerId;
-                this._dbgRx('atenderRequestSync', { esperandoRival, chooser: this._interaccionChooser, currentChoices: !!this.currentChoices, pendingReaction: !!this.pendingReaction, pendingInteraction: this.pendingInteraction && this.pendingInteraction.tipo, inputState: this.inputState });
+                const tengoInteraccion = this.currentChoices || this.currentVisualResolve || this.dslPick || this.pendingInteraction
+                                      || this.inputState === 'SELECT_ABILITY_TARGETS';
+                // En el targeting de Activa no hay `_interaccionChooser` (lo pone cada carta
+                // imperativa a mano y ninguna lo hace): elige siempre el jugador activo.
+                const _chooser = this._interaccionChooser
+                              || (this.inputState === 'SELECT_ABILITY_TARGETS' ? this.activePlayerId : null);
+                const esperandoRival = tengoInteraccion && _chooser && _chooser !== this.myPlayerId;
+                this._dbgRx('atenderRequestSync', { esperandoRival, chooser: _chooser, currentChoices: !!this.currentChoices, pendingReaction: !!this.pendingReaction, pendingInteraction: this.pendingInteraction && this.pendingInteraction.tipo, inputState: this.inputState });
                 // Ayuda dirigida esperando objetivo: NO hace falta modo espejo. Ahí no hay ninguna
                 // corrutina viva que dirigir -la elección se resuelve con el replay del clic
                 // (SELECT_CARD) que la cola entrega a los dos clientes-, y el reconectado recupera
                 // su targeting solo con el estado, porque `pendingInteraction` lo describe entero.
                 // Entrar en espejo dejaría el flag encendido sin nadie que lo apague.
-                const _soloEstado = this.pendingInteraction && this.pendingInteraction.tipo === 'ayudaTarget';
+                // Targeting de Activa: mismo caso exacto que `ayudaTarget` (lo resuelve el replay
+                // del clic, no una corrutina). Sin esto caería en la rama de "no cubierto" de más
+                // abajo y AUTO-DECLINARÍA una elección que en realidad se recupera sola.
+                const _soloEstado = (this.pendingInteraction && this.pendingInteraction.tipo === 'ayudaTarget')
+                                 || this.inputState === 'SELECT_ABILITY_TARGETS';
                 if (esperandoRival && _soloEstado) {
-                    this._dbgRx('-> ayudaTarget: solo estado, sin modo espejo');
+                    this._dbgRx('-> targeting replicable: solo estado, sin modo espejo');
                     this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'HARD_SYNC', state: this.exportGameState(), targetId: target });
                 } else if (esperandoRival && ((this.currentChoices && this.pendingReaction) || this.pendingInteraction)) {
                     // REACCIÓN o interacción visual (tablero/mazo/moneda) del rival: reanudar
@@ -9242,7 +9316,7 @@
                     // Caso espejo: soy YO quien está eligiendo (mi overlay sigue vivo) y el rival
                     // reconectó. Le mando el estado actual y, tras completar mi elección, le reenvío
                     // el estado final (si no, se quedaría en el estado pre-acción).
-                    if (tengoInteraccion && this._interaccionChooser === this.myPlayerId) {
+                    if (tengoInteraccion && _chooser === this.myPlayerId) {
                         this._reSyncTrasEleccion = true;
                         this._reSyncTarget = target; // a quién le debo el estado final (volcado DIRIGIDO)
                     }

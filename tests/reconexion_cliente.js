@@ -48,6 +48,14 @@ const ESC_AYUDA = {
     p2: {},
 };
 
+// BI-CHOQUE (Activa de Karlos) usa el targeting CRUDO del motor: SELECT_ABILITY_TARGETS +
+// abilityContext, que es otro camino distinto de los dos anteriores. Pide 2 objetivos.
+const ESC_ACTIVA = {
+    turno: 2, turnoDe: 'p1', empieza: 'p2',
+    p1: { vanguardia: [{ carta: 'Karlos', furor: 3 }] },
+    p2: { vanguardia: [{ carta: 'Mini-tigre', vida: 20 }, { carta: 'Oso con armadura', vida: 20 }] },
+};
+
 // Poder Legado exige un Karlos con 1 de Vida o menos; al equiparse le fija los stats a 9.
 const ESC_EQUIPO = {
     turno: 2, turnoDe: 'p1', empieza: 'p2',
@@ -221,6 +229,64 @@ function primeraDif(gA, gB) {
 
         check('ESTADO DE PARTIDA IDÉNTICO en ambos clientes', primeraDif(P2.g, Q.g) === 'sin diferencias',
               primeraDif(P2.g, Q.g));
+    }
+
+    // ------------------------------------------------------------------------------------
+    console.log('\n--- Activa con targeting crudo (BI-CHOQUE): recarga el rival a medio elegir ---');
+    // Tercer camino, el que quedaba sin cubrir: SELECT_ABILITY_TARGETS + abilityContext. No se
+    // puede marcar al entrar como los otros dos, porque quien pone ese inputState es CADA carta
+    // imperativa por su cuenta (una veintena de sitios); el descriptor se DERIVA en
+    // exportGameState. Se prueba además con UN objetivo ya elegido, para verificar que los
+    // objetivos acumulados sobreviven al viaje (van como instanceId y se rehidratan).
+    {
+        const R = await cliente('p1', ESC_ACTIVA); // elector
+        const S = await cliente('p2', ESC_ACTIVA); // rival, que recargará
+
+        R.g.activateAbility(R.g.players.p1.vanguard[0].instanceId, true); await asentar(R.ctx);
+        S.g.activateAbility(S.g.players.p1.vanguard[0].instanceId, true); await asentar(S.ctx);
+        // La Activa pasa primero por su modal de confirmación ("¿Usar Karlos?").
+        await R.g.confirmAction(true); await asentar(R.ctx);
+        await S.g.confirmAction(true); await asentar(S.ctx);
+        check('la Activa abre el targeting crudo', R.g.inputState === 'SELECT_ABILITY_TARGETS', R.g.inputState);
+
+        // Primer objetivo, replicado a los dos como en una partida normal.
+        await R.g.selectCard(R.g.players.p2.vanguard[0].instanceId); await asentar(R.ctx);
+        await S.g.selectCard(S.g.players.p2.vanguard[0].instanceId, true); await asentar(S.ctx);
+        check('queda 1 objetivo fijado de los 2', R.g.abilityContext && R.g.abilityContext.targets.length === 1,
+              'targets=' + (R.g.abilityContext && R.g.abilityContext.targets.length));
+
+        const estadoR = JSON.parse(JSON.stringify(R.g.exportGameState()));
+        check('exportGameState describe el targeting de Activa en curso',
+              !!estadoR.pendingAbilityTarget && estadoR.pendingAbilityTarget.ctx.name === 'BI-CHOQUE',
+              JSON.stringify(estadoR.pendingAbilityTarget && estadoR.pendingAbilityTarget.ctx));
+        check('...incluidos los objetivos ya elegidos (como instanceId)',
+              !!estadoR.pendingAbilityTarget && estadoR.pendingAbilityTarget.ctx.targetsIds.length === 1,
+              JSON.stringify(estadoR.pendingAbilityTarget && estadoR.pendingAbilityTarget.ctx.targetsIds));
+
+        // --- S RECARGA a medio targeting ---
+        const S2 = await cliente('p2', ESC_ACTIVA);
+        S2.g.players.p1.vanguard = []; S2.g.players.p2.vanguard = [];
+        S2.g._reconnectRecovery = true;
+        S2.g.importGameState(estadoR);
+
+        check('el rival reconectado recupera el targeting de Activa',
+              S2.g.inputState === 'SELECT_ABILITY_TARGETS', S2.g.inputState);
+        check('...y el objetivo ya elegido, rehidratado como carta',
+              !!S2.g.abilityContext && S2.g.abilityContext.targets.length === 1
+              && !!S2.g.abilityContext.targets[0] && S2.g.abilityContext.targets[0].name === 'Mini-tigre',
+              JSON.stringify(S2.g.abilityContext && S2.g.abilityContext.targets.map(t => t && t.name)));
+
+        // --- Segundo objetivo: completa la Activa en los dos ---
+        await R.g.selectCard(R.g.players.p2.vanguard[1].instanceId); await asentar(R.ctx);
+        await S2.g.selectCard(S2.g.players.p2.vanguard[1].instanceId, true); await asentar(S2.ctx);
+        await dormir(200); await asentar(R.ctx); await asentar(S2.ctx);
+
+        const vidasR = R.g.players.p2.vanguard.map(c => c.currentHp).join('/');
+        const vidasS = S2.g.players.p2.vanguard.map(c => c.currentHp).join('/');
+        check('BI-CHOQUE golpea a los dos enemigos en el elector', vidasR !== '20/20', 'vidas=' + vidasR);
+        check('...y exactamente igual en el rival reconectado', vidasR === vidasS, `R=${vidasR} S=${vidasS}`);
+        check('ESTADO DE PARTIDA IDÉNTICO en ambos clientes', primeraDif(R.g, S2.g) === 'sin diferencias',
+              primeraDif(R.g, S2.g));
     }
 
     console.log(fallos === 0
