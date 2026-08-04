@@ -370,7 +370,9 @@
             .pe-nota { display: block; color: #a5b4fc; font-style: italic; font-size: .68rem; margin-top: 1px; }
             .pe-src { display: block; color: #94a3b8; font-size: .66rem; margin-top: 1px; }
             .pe-src b { color: #cbd5e1; font-weight: 600; }
-            .pe-src i { font-style: normal; opacity: .65; }  /* la etiqueta "fuente:"/"objetivo:" pesa menos que la carta */
+            /* La etiqueta "fuente:"/"objetivo:" pesa menos que la carta, pero no tanto como para
+               costar de leer: queda entre el gris del dueño y el blanco del nombre. */
+            .pe-src i { font-style: normal; color: #b6c2d2; }
             /* Secciones del detalle de Eventos (título amarillo unificado; fondos/bordes distintivos) */
             .ev-req { background: rgba(248,113,113,.12); border-left: 3px solid #f87171; }
             .ev-antes { background: rgba(251,146,60,.12); border-left: 3px solid #fb923c; }
@@ -6195,7 +6197,10 @@
                 // 4. Reacciones de Armas (Milkor MGL)
                 let dmgModifier = 0;
                 if (attacker.equippedCards) {
-                    for (let eq of attacker.equippedCards) {
+                    // Copia de la lista: un arma con usos contados (Milkor MGL) puede DESEQUIPARSE
+                    // a sí misma dentro de este mismo hook al gastar su última carga, y mutar el
+                    // array mientras se recorre haría saltarse el siguiente equipo.
+                    for (let eq of [...attacker.equippedCards]) {
                         const eqTemp = getCardTemplate(eq.id);
                         if (typeof eqTemp.onEquipBeforeAttack === 'function') {
                             const result = await eqTemp.onEquipBeforeAttack(eq, attacker, currentDefender, this);

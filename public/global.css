@@ -788,7 +788,9 @@ button.game-btn:disabled { background: #64748b; cursor: not-allowed; opacity: 0.
 #card-preview { position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 260px; min-height: 100px; height: auto; background: rgba(15, 23, 42, 0.95); border: 2px solid #94a3b8; border-left: none; border-radius: 0 10px 10px 0; z-index: 5000; display: none; flex-direction: column; padding: 15px; box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.5); pointer-events: none; }
 .preview-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 5px; border-bottom: 1px solid #475569; }
 .preview-title { font-size: 1.2rem; font-weight: bold; color: #fbbf24; }
-.preview-id { font-size: 0.8rem; color: #64748b; }
+/* El [n] de copia iba a 0.8rem en gris oscuro y pasaba desapercibido, aunque es justo lo que
+   distingue dos copias de la misma carta en el detalle (Toto, 31-jul-2026). */
+.preview-id { font-size: 0.95rem; font-weight: 600; color: #7c8ba1; }
 .preview-type { font-size: 0.8rem; color: #94a3b8; margin-bottom: 6px; font-style: italic; }
 .preview-effects { font-size: 0.75rem; color: #22d3ee; margin-bottom: 12px; padding: 5px; border-top: 1px dashed #475569; border-bottom: 1px dashed #475569; background: rgba(0, 0, 0, 0.3); border-radius: 4px; }
 .preview-text { font-size: 0.8rem; line-height: 1.3; color: white; flex: 1; margin-bottom: 10px; }

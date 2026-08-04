@@ -5692,84 +5692,59 @@ const CARD_DB = [
     {
         name: "Milkor MGL", type: "Ayuda", subtype: "Arma", tags: ["Equipable", "a distancia"], rarity: "B", cost: 1, series: 2,
         text: "Equípala a un aliado (NO 'Animal salvaje'). Al atacar normal: +1 contador y lanza moneda. Cara: Aumenta su Atq en 4 durante el ataque (máximo 8). Cruz: Rival elige el objetivo y reduce el daño en 3. Se destruye con 2 contadores.",
-        canPlayCard: function(card, game, p) {
-            const valid = [...p.vanguard, ...p.rearguard].filter(c => !c.tags.includes('Animal salvaje') && !getCardTemplate(c.id).isAvatar);
-            if (valid.length === 0) { game.logError("No hay aliados válidos para empuñar el arma."); return false; }
-            return true;
-        },
-        onPlay: async function(card, game) {
-            const p = game.players[card.owner];
-            const valid = [...p.vanguard, ...p.rearguard].filter(c => !c.tags.includes('Animal salvaje') && !getCardTemplate(c.id).isAvatar);
-            const chosen = await game.openVisualSearchModal('¿QUIÉN EMPUÑA EL MILKOR MGL?', valid, 1, true, card.owner);
-            if (!chosen || chosen.length === 0) { game.cancelAction(); return; }
-            
-            const target = chosen[0];
-            if (!target.equippedCards) target.equippedCards = [];
-            target.equippedCards.push(card);
-            card.location = 'equipped';
-            card.equippedTo = target.instanceId;
-            card.milkorCounters = 0;
-
-            const handIdx = p.hand.findIndex(c => c.instanceId === card.instanceId);
-            if (handIdx !== -1) p.hand.splice(handIdx, 1);
-
-            game.logMsg(`${target.name} carga el Milkor MGL.`, 'ability');
-            game.updatePassives();
-            game.cancelAction();
-            game.render();
-        },
-        onEquipBeforeAttack: async function(equipCard, attacker, defender, game) {
-            const isNormal = !game.abilityContext || game.abilityContext.isNormalAttack;
-            if (!isNormal) return null;
-
-            equipCard.milkorCounters++;
-            // Espejo en el sistema REAL de contadores de la anfitriona: badge visible + flechas + detalle
-            // Fuente: la CARTA equipada, no su nombre suelto (así "Afectado por:" la nombra con
-            // dueño y copyId). Sin habilidad: es una Ayuda, y la norma omite el "por HABILIDAD".
-            game.modifyCounters(attacker, 'milkor_' + equipCard.instanceId, 1, 'Disparos Milkor', equipCard, '💥');
-            game.logMsg(`¡${attacker.name} dispara el Milkor MGL! (Disparo ${equipCard.milkorCounters}/2)`, 'ability');
-            
-            const results = await game.triggerCoinFlips(1, attacker.owner);
-            if (results && results[0] === 'heads') {
-                game.logMsg(`Moneda: CARA - ¡Impacto explosivo! (+4 ATQ temporal)`, 'combat');
-                showFloatingText(attacker.instanceId, "+4 ATQ", "ft-green", -20);
-                return { dmgMod: 4 };
-            } else {
-                game.logMsg(`Moneda: CRUZ - ¡El disparo se desvía! El rival redirige el daño reducido.`, 'neutral');
-                const enemyId = attacker.owner === 'p1' ? 'p2' : 'p1';
-                const enemyP = game.players[enemyId];
-                const validTargets = [...enemyP.vanguard, ...enemyP.rearguard].filter(c => !getCardTemplate(c.id).isAvatar);
-                
-                if (validTargets.length > 0) {
-                    const chosen = await game.openVisualSearchModal('MILKOR FALLIDO: ELIGE QUIÉN RECIBE EL ROCE', validTargets, 1, true, enemyId);
-                    if (chosen && chosen.length > 0) {
-                        return { dmgMod: -3, newDefender: chosen[0] };
-                    }
-                }
-                return { dmgMod: -3 };
-            }
-        },
-        onEquipUpdate: function(equipCard, target, game) {
-            // Comprobación de destrucción tras disparos
-            if (equipCard.milkorCounters >= 2 && !equipCard.pendingDestroy) {
-                equipCard.pendingDestroy = true;
-                setTimeout(() => {
-                    game.logMsg(`El Milkor MGL se queda sin munición y es descartado.`, 'system');
-                    if (target.counters) delete target.counters['milkor_' + equipCard.instanceId];
-                    target.equippedCards = target.equippedCards.filter(c => c.instanceId !== equipCard.instanceId);
-                    equipCard.location = 'discard';
-                    const p = game.players[equipCard.owner];
-                    if (!p.discard) p.discard = [];
-                    p.discard.push(equipCard);
-                    game.render();
-                }, 1000);
-            }
-        },
-        onGetPreviewEffects: function(card, game) {
-            // Puede llamarse con la ANFITRIONA (lista sus Milkors equipados) o con el propio equipo
-            if (card.equippedCards) return card.equippedCards.filter(e => e.name === 'Milkor MGL').map(e => `Equipado con Milkor MGL (${e.milkorCounters || 0}/2 disparos)`);
-            return [`Milkor MGL (${card.milkorCounters || 0}/2 disparos)`];
-        }
+        // Migrada (31-jul-2026), tercera y última de la tanda de equipos con vida propia. Es la
+        // que tenía el trozo delicado: su interceptor DEVUELVE un valor al motor
+        // ({dmgMod, newDefender}) y, en la rama de cruz, hace elegir al RIVAL a mitad del ataque.
+        // Piezas nuevas:
+        //   · Trigger `EQUIPO_ANTES_DE_ATACAR` -> onEquipBeforeAttack, gemelo del
+        //     EQUIPO_ANTES_DE_DEFENDER de Poder Legado pero para cuando ATACA el portador.
+        //   · Ops `DAÑO_ATAQUE` (modificador del daño del golpe, no del Atq) y `REDIRIGIR_ATAQUE`
+        //     (cambia el destinatario), que llenan el transitorio que el trigger devuelve. Mismo
+        //     criterio que ESQUIVAR: viven en `game`, son de UNA resolución y no viajan.
+        //   · `{instancia}` en el id de MODIFICAR_CONTADORES/DESEQUIPAR, para que dos copias del
+        //     arma sobre el mismo portador no compartan la cuenta de disparos.
+        // La elección del rival es un `ELEGIR` de ENEMIGOS con `elegidoPor:"RIVAL"` -que ya
+        // existía desde ACERTIJO- y por tanto va por reborde verde en el tablero del rival, no
+        // por el modal genérico que usaba la vieja: cumple la norma de targeting sin nada nuevo.
+        //
+        // OJO, hueco de la carta que NO arregla la migración (igual que MAESTRO DE ARMAS en
+        // Honsow): el texto dice "Aumenta su Atq en 4 durante el ataque (MÁXIMO 8)" y ese tope
+        // de 8 no lo aplicaba la imperativa ni se añade aquí — replicar 1:1 manda. Avisado a Toto.
+        abilities: [
+            { trigger: "JUGAR", requisitos: [
+                { count: { quien: "ALIADO", filtros: [ { campo: "tags", op: "includes", valor: "Animal salvaje", no: true } ] },
+                  op: ">=", valor: 1, msg: "No hay aliados válidos para empuñar el arma." } ] },
+            { trigger: "AL_EQUIPAR",
+              efectos: [
+                { op: "ELEGIR", de: "ALIADOS", cantidad: 1,
+                  filtros: [ { campo: "tags", op: "includes", valor: "Animal salvaje", no: true } ],
+                  titulo: "¿QUIÉN EMPUÑA EL MILKOR MGL?",
+                  efectos: [
+                    { op: "MARCAR", target: { quien: "SELF" }, campo: "milkorCounters", valor: 0 },
+                    { op: "EQUIPAR", log: "{objetivo} carga el Milkor MGL." } ] } ] },
+            { trigger: "EQUIPO_ANTES_DE_ATACAR", soloAtaqueNormal: true,
+              efectos: [
+                { op: "MARCAR", target: { quien: "SELF" }, campo: "milkorCounters", delta: 1 },
+                // Espejo del contador en la ANFITRIONA: badge visible, flecha y línea de detalle.
+                { op: "MODIFICAR_CONTADORES", target: { quien: "ATACANTE" }, contador: "milkor_{instancia}",
+                  delta: 1, nombreContador: "Disparos Milkor", icono: "💥" },
+                { op: "FLOTANTE", target: { quien: "ATACANTE" }, texto: "¡MILKOR!", estilo: "ft-ability", offset: -40,
+                  log: "¡{objetivo} dispara el Milkor MGL!" },
+                { op: "MONEDA",
+                  logCara: { msg: "Moneda: CARA - ¡Impacto explosivo! (+4 ATQ temporal)", tipo: "combat" },
+                  cara: [ { op: "DAÑO_ATAQUE", delta: 4, enAtacante: true,
+                            floating: { texto: "+4 ATQ", estilo: "ft-green", offset: -20 } } ],
+                  logCruz: { msg: "Moneda: CRUZ - ¡El disparo se desvía! El rival redirige el daño reducido.", tipo: "neutral" },
+                  cruz: [
+                    { op: "DAÑO_ATAQUE", delta: -3 },
+                    { op: "ELEGIR", de: "ENEMIGOS", elegidoPor: "RIVAL", cantidad: 1, cancelable: false, opcional: true,
+                      titulo: "MILKOR FALLIDO: ELIGE QUIÉN RECIBE EL ROCE",
+                      efectos: [ { op: "REDIRIGIR_ATAQUE" } ] } ] },
+                // Sin munición: el arma se suelta y va al descarte, llevándose su contador.
+                { if: { campo: "milkorCounters", op: ">=", valor: 2 },
+                  op: "DESEQUIPAR", contador: "milkor_{instancia}",
+                  log: "El Milkor MGL se queda sin munición y es descartado." } ] }
+        ],
     },
     {
         name: "Apuesta", type: "Evento", rarity: "C", cost: 1, duration: 2, series: 2,
@@ -6602,12 +6577,12 @@ const KARLOS_RULES = {
 //  Valores: número | {COUNT:{...}} | {REF:"objetivo.furorMax"} (campos computados)
 // ===================================================================
 const DSL = {
-    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE', 'AURA', 'ANTES_DE_JUGAR', 'PUEDE_ATACAR', 'SOBRECURACION', 'REACCION', 'AL_MORIR', 'AL_MORIR_ALIADO', 'AL_DESTRUIR', 'ESPEJO', 'ANTES_DE_ATACAR', 'TRAS_ATACAR', 'TRAS_DEFENDER', 'ANTES_DE_DEFENDER', 'INTERCEPTOR_ATAQUE', 'EQUIPO_ANTES_DE_DEFENDER'],
+    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE', 'AURA', 'ANTES_DE_JUGAR', 'PUEDE_ATACAR', 'SOBRECURACION', 'REACCION', 'AL_MORIR', 'AL_MORIR_ALIADO', 'AL_DESTRUIR', 'ESPEJO', 'ANTES_DE_ATACAR', 'TRAS_ATACAR', 'TRAS_DEFENDER', 'ANTES_DE_DEFENDER', 'INTERCEPTOR_ATAQUE', 'EQUIPO_ANTES_DE_DEFENDER', 'EQUIPO_ANTES_DE_ATACAR'],
     // Los 5 últimos ops solo tienen sentido dentro de una REACCION (los interpreta
     // DSL._runReaccion, no _doEffect): controlan el resultado que la reacción
     // devuelve al motor de combate (redirigir el ataque, cancelarlo, drenar Furor
     // tras él, fijar el daño, autoataque del atacante).
-    OPS_EFECTO: ['MODIFICAR_STAT', 'CURAR', 'DAÑO', 'APLICAR_ESTADO', 'MODIFICAR_CONTADORES', 'ATACAR', 'MONEDA', 'ROBAR', 'BUSCAR', 'MARCAR', 'VER_MANO', 'LIMPIAR_ESTADOS', 'ELEGIR', 'DESTRUIR_EVENTO', 'MARCAR_TEMPORAL', 'DESCARTAR', 'EQUIPAR', 'MARCAR_JUGADOR', 'FLOTANTE', 'FIJAR_STAT', 'REDIRIGIR', 'CANCELAR_ATAQUE', 'MARCAR_DRENAJE', 'FIJAR_DAÑO', 'ATACANTE_SE_AUTOATACA', 'VOLVER_A_MANO', 'RETRIBUCION', 'SUELO_STAT', 'TECHO_STAT', 'NO_CONSUMIR', 'BONO_ATAQUE', 'MARCAR_PARTIDA', 'ESQUIVAR'],
+    OPS_EFECTO: ['MODIFICAR_STAT', 'CURAR', 'DAÑO', 'APLICAR_ESTADO', 'MODIFICAR_CONTADORES', 'ATACAR', 'MONEDA', 'ROBAR', 'BUSCAR', 'MARCAR', 'VER_MANO', 'LIMPIAR_ESTADOS', 'ELEGIR', 'DESTRUIR_EVENTO', 'MARCAR_TEMPORAL', 'DESCARTAR', 'EQUIPAR', 'MARCAR_JUGADOR', 'FLOTANTE', 'FIJAR_STAT', 'REDIRIGIR', 'CANCELAR_ATAQUE', 'MARCAR_DRENAJE', 'FIJAR_DAÑO', 'ATACANTE_SE_AUTOATACA', 'VOLVER_A_MANO', 'RETRIBUCION', 'SUELO_STAT', 'TECHO_STAT', 'NO_CONSUMIR', 'BONO_ATAQUE', 'MARCAR_PARTIDA', 'ESQUIVAR', 'DESEQUIPAR', 'DAÑO_ATAQUE', 'REDIRIGIR_ATAQUE'],
     OPS_CMP: ['==', '!=', '<=', '>=', '<', '>', 'includes', 'contieneTexto', 'includesCI', 'truthy', 'falsy'],
     QUIEN: ['SELF', 'ALIADO', 'ENEMIGO', 'TODOS', 'ATACANTE', 'DEFENSOR'], // ATACANTE/DEFENSOR: solo en GLOBAL_TRAS_ATAQUE y REACCION
 
@@ -6681,6 +6656,10 @@ const DSL = {
     },
     _pool(ownerId, game, spec, selfCard) {
         if (spec.quien === 'SELF') return selfCard ? [selfCard] : [];
+        // ATACANTE (Milkor MGL, 31-jul-2026): dentro de EQUIPO_ANTES_DE_ATACAR la carta fuente es
+        // el EQUIPO, así que "SELF" no sirve para apuntar a quien lo empuña. El trigger deja al
+        // portador en este transitorio de `game` (no viaja en el estado, igual que ESQUIVAR).
+        if (spec.quien === 'ATACANTE') return game._dslEquipoAtacante ? [game._dslEquipoAtacante] : [];
         // selfLista: cartas en mesa cuyo instanceId está en la lista guardada en la
         // propia carta (p. ej. Esfuerzo dividido con chosenAllies). Ignora bandos.
         if (spec.selfLista) {
@@ -7015,7 +6994,10 @@ const DSL = {
             const d = DSL._value(ownerId, game, e.delta, sourceCard, ctx);
             // Ver la nota gemela del otro MODIFICAR_CONTADORES: la CARTA fuente (no su nombre)
             // para que el detalle pueda dar la referencia completa, y la habilidad aparte.
-            game.modifyCounters(target, e.contador, d, e.nombreContador || e.contador, e.fuente !== undefined ? e.fuente : sourceCard, e.icono || '⚙️', habilidad || null);
+            // {instancia} en el id (Milkor MGL, 31-jul-2026): un equipo con usos contados necesita
+            // SU propio contador en el portador, o dos copias del arma compartirían la cuenta.
+            const _idCont = DSL._fill(e.contador, { instancia: sourceCard.instanceId });
+            game.modifyCounters(target, _idCont, d, e.nombreContador || e.contador, e.fuente !== undefined ? e.fuente : sourceCard, e.icono || '⚙️', habilidad || null);
             // floating (Karlitos, 31-jul-2026): faltaba, a diferencia de casi todos los demás
             // ops — un contador que sube en la propia Pasiva de la carta se notaba en el
             // registro de "Afectado por:" pero no en el tablero en el momento en que ocurre.
@@ -7371,6 +7353,29 @@ const DSL = {
             game._dslEsquiva = true;
             if (typeof animateDodge === 'function') { try { await animateDodge(target.instanceId, sourceCard.instanceId); } catch (err) {} }
             if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, defensor: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target) }), e.logTipo || 'combat');
+            return true;
+        }
+        // Los dos ops siguientes solo tienen sentido dentro de EQUIPO_ANTES_DE_ATACAR, que es
+        // quien lee este transitorio y lo convierte en el `{dmgMod, newDefender}` que espera
+        // performAttack. Mismo criterio que ESQUIVAR: vive en `game`, es de UNA resolución y
+        // exportGameState no serializa campos sueltos de game, así que no ensucia el arnés.
+        if (e.op === 'DAÑO_ATAQUE') {
+            // Modificador de DAÑO del golpe en curso, no un cambio de Atq: el motor lo suma en
+            // `dmg = atacante.Atq - defensor.Def + dmgModifier`.
+            const v = DSL._value(ownerId, game, e.delta, sourceCard, ctx) || 0;
+            game._dslEquipoAtaque = game._dslEquipoAtaque || {};
+            game._dslEquipoAtaque.dmgMod = (game._dslEquipoAtaque.dmgMod || 0) + v;
+            const _anc = e.enAtacante && game._dslEquipoAtacante ? game._dslEquipoAtacante : sourceCard;
+            if (e.floating && typeof showFloatingText === 'function') showFloatingText(_anc.instanceId, DSL._fill(e.floating.texto, { valor: Math.abs(v) }), e.floating.estilo || (v >= 0 ? 'ft-green' : 'ft-red-stat'), e.floating.offset !== undefined ? e.floating.offset : -20);
+            if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, valor: Math.abs(v) }), e.logTipo || 'combat');
+            return true;
+        }
+        if (e.op === 'REDIRIGIR_ATAQUE') {
+            // El golpe cambia de destinatario (el objetivo de este efecto pasa a ser el defensor).
+            if (!target) return 'skip';
+            game._dslEquipoAtaque = game._dslEquipoAtaque || {};
+            game._dslEquipoAtaque.newDefender = target;
+            if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: DSL._nombre(game, target) }), e.logTipo || 'combat');
             return true;
         }
         if (e.op === 'MARCAR_PARTIDA') {
@@ -8606,6 +8611,28 @@ const DSL = {
                 if (eqDefender.si && !DSL._cond(defender, game, eqDefender.si)) return;
                 if (eqDefender.log) game.logMsg(DSL._fill(eqDefender.log, { carta: equipCard.name, defensor: DSL._nombre(game, defender), objetivo: DSL._nombre(game, attacker) }), eqDefender.logTipo || 'ability');
                 await DSL._runEffectList(eqDefender.efectos || [], equipCard, game, equipCard.owner, [attacker], eqDefender.nombre || null);
+            };
+        }
+
+        // EQUIPO_ANTES_DE_ATACAR -> onEquipBeforeAttack: gemelo del anterior, para cuando ATACA
+        // quien lleva el equipo (Milkor MGL). A diferencia del resto de triggers, el motor espera
+        // un VALOR DE VUELTA -{dmgMod, newDefender}- que se recoge del transitorio que llenan los
+        // ops DAÑO_ATAQUE y REDIRIGIR_ATAQUE. `sourceCard` es el EQUIPO y `target` el defensor;
+        // el atacante (el portador) queda accesible para anclar flotantes.
+        const eqAtacar = abs.find(a => a.trigger === 'EQUIPO_ANTES_DE_ATACAR');
+        if (eqAtacar && typeof tmpl.onEquipBeforeAttack !== 'function') {
+            tmpl.onEquipBeforeAttack = async function (equipCard, attacker, defender, game) {
+                // soloAtaqueNormal: misma heurística que el resto de interceptores del proyecto.
+                if (eqAtacar.soloAtaqueNormal && game.abilityContext && !game.abilityContext.isNormalAttack) return null;
+                if (eqAtacar.si && !DSL._cond(equipCard, game, eqAtacar.si)) return null;
+                game._dslEquipoAtaque = {};
+                game._dslEquipoAtacante = attacker; // para `enAtacante` en los flotantes
+                if (eqAtacar.log) game.logMsg(DSL._fill(eqAtacar.log, { carta: equipCard.name, atacante: DSL._nombre(game, attacker), objetivo: DSL._nombre(game, defender) }), eqAtacar.logTipo || 'ability');
+                await DSL._runEffectList(eqAtacar.efectos || [], equipCard, game, equipCard.owner, [defender], eqAtacar.nombre || null);
+                const r = game._dslEquipoAtaque;
+                game._dslEquipoAtaque = null;
+                game._dslEquipoAtacante = null;
+                return (r && (r.dmgMod || r.newDefender)) ? r : null;
             };
         }
 
