@@ -5751,59 +5751,43 @@ const CARD_DB = [
     {
         name: "Bancarrota", type: "Evento", rarity: "A", cost: 1, duration: 3, series: 2,
         text: "3 turnos. Mientras esté en juego, aliados y enemigos tienen siempre 0 de Furor y no ganan ninguno; el Furor original se restablece cuando esta carta expira o es destruida.",
-        onPlay: function(card, game) {
-            game.logMsg("¡BANCARROTA! Toda la energía del tablero queda congelada a 0.", 'ability');
-            
-            // Secuestramos el Furor real de todos y los dejamos a 0
-            ['p1', 'p2'].forEach(pid => {
-                [...game.players[pid].vanguard, ...game.players[pid].rearguard].forEach(c => {
-                    c.bankruptStoredFuror = c.furor; // Lo guardamos en el bolsillo
-                    c.furor = 0;                     // Lo vaciamos
-                });
-            });
-            game.render();
-        },
-        
-        // Bloqueamos cualquier intento de sumar o restar Furor mientras esté activa
-        onGlobalBeforeStatChange: function(eventCard, targetCard, stat, amount, source, game) {
-            if (stat === 'furor') {
-                return 0; 
-            }
-            return amount;
-        },
-        
-        // Texto dinámico para el panel de previsualización de las cartas afectadas
-        onGlobalGetPreviewEffects: function(eventCard, targetCard, game) {
-            if (targetCard.type === 'Personaje' || targetCard.type === 'Esbirro') {
-                const original = targetCard.bankruptStoredFuror !== undefined ? targetCard.bankruptStoredFuror : 0;
-                if (targetCard.owner !== eventCard.owner && (getCardTemplate(targetCard.id) || {}).immuneToEnemyEvents) return [];
-                return [`Furor agotado (originalmente ${original}), fuente: ${typeof game.refCarta === 'function' ? game.refCarta(eventCard) : eventCard.name}`];
-            }
-            return [];
-        },
-        
-        onExpire: function(card, game, playerId) {
-            game.logMsg("La Bancarrota ha terminado. El Furor vuelve a fluir a sus dueños.", 'system');
-            
-            // Devolvemos el Furor del bolsillo a la realidad
-            ['p1', 'p2'].forEach(pid => {
-                [...game.players[pid].vanguard, ...game.players[pid].rearguard].forEach(c => {
-                    if (c.bankruptStoredFuror !== undefined) {
-                        c.furor = c.bankruptStoredFuror;
-                        delete c.bankruptStoredFuror;
-                    }
-                });
-            });
-            
-            // Forzamos un repintado general para quitar las X rojas de golpe
-            game.updatePassives();
-            game.render();
-        },
-        
-        onDestroy: function(card, game, playerId) {
-            // Si la destruyen prematuramente (Ej. Giro de Guion), ejecutamos la misma liberación
-            this.onExpire(card, game, playerId);
-        }
+        // Migrada (31-jul-2026). Era la última de las "pieza pequeña" y necesitaba tres:
+        //   · Ops `SECUESTRAR_STAT` / `DEVOLVER_STAT`: guardan un stat en el bolsillo dejándolo a
+        //     un valor fijo, y lo reponen. Van SIEMPRE en pareja.
+        //   · Trigger `GLOBAL_ANTES_DE_CAMBIO_STAT` -> onGlobalBeforeStatChange: intercepta
+        //     CUALQUIER cambio de stat mientras el Evento viva. Ojo, no es GLOBAL_MODIFICAR_FUROR:
+        //     aquel solo mira la ganancia de la fase de Furor, y esta carta tiene que atajar
+        //     también las subidas y bajadas que vengan de efectos de carta.
+        //   · `valorCampo` en PREVIEW_GLOBAL, para que la línea del detalle diga el Furor ORIGINAL
+        //     de cada carta ("originalmente 3"); antes el texto solo sabía interpolar el género.
+        // AL_DESTRUIR repite el mismo efecto que AL_CADUCAR: si la destruyen antes de tiempo
+        // (Giro de guion), el Furor tiene que volver igual.
+        //
+        // FIEL A LA VIEJA, aunque chiríe: el secuestro y el bloqueo alcanzan a TODAS las cartas,
+        // incluidas las inmunes a Eventos enemigos (Kami), mientras que la línea del detalle SÍ
+        // las excluye — esa incoherencia ya estaba en la imperativa y se replica sin tocarla.
+        // Cambiarla es una decisión de diseño de Toto, no un efecto colateral de la migración.
+        abilities: [
+            { trigger: "AL_JUGAR", log: "¡BANCARROTA! Toda la energía del tablero queda congelada a 0.",
+              efectos: [
+                { op: "SECUESTRAR_STAT", target: { quien: "TODOS" }, stat: "furor",
+                  guardarEn: "bankruptStoredFuror", valor: 0 } ] },
+            { trigger: "GLOBAL_ANTES_DE_CAMBIO_STAT",
+              reglas: [ { stat: "furor", fijar: 0 } ] },
+            { trigger: "PREVIEW_GLOBAL",
+              lineas: [
+                { soloTipos: ["Personaje", "Esbirro"], valorCampo: "bankruptStoredFuror",
+                  texto: "Furor agotado (originalmente {valor})" } ] },
+            { trigger: "AL_CADUCAR", log: "La Bancarrota ha terminado. El Furor vuelve a fluir a sus dueños.", logTipo: "system",
+              efectos: [
+                { op: "DEVOLVER_STAT", target: { quien: "TODOS" }, stat: "furor",
+                  guardadoEn: "bankruptStoredFuror" } ] },
+            // AL_DESTRUIR usa `log: {msg, tipo}` (objeto), no el string plano de AL_CADUCAR.
+            { trigger: "AL_DESTRUIR", log: { msg: "La Bancarrota ha terminado. El Furor vuelve a fluir a sus dueños.", tipo: "system" },
+              efectos: [
+                { op: "DEVOLVER_STAT", target: { quien: "TODOS" }, stat: "furor",
+                  guardadoEn: "bankruptStoredFuror" } ] }
+        ]
     },
     {
         name: "Imp mayor", hp: 6, def: 2, atk: 4, type: "Esbirro", subtype: "Ser mágico", tags: ["Monstruo"], rarity: "B", cost: 1, series: 2,
@@ -6694,12 +6678,12 @@ const KARLOS_RULES = {
 //  Valores: número | {COUNT:{...}} | {REF:"objetivo.furorMax"} (campos computados)
 // ===================================================================
 const DSL = {
-    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE', 'AURA', 'ANTES_DE_JUGAR', 'PUEDE_ATACAR', 'SOBRECURACION', 'REACCION', 'AL_MORIR', 'AL_MORIR_ALIADO', 'AL_DESTRUIR', 'ESPEJO', 'ANTES_DE_ATACAR', 'TRAS_ATACAR', 'TRAS_DEFENDER', 'ANTES_DE_DEFENDER', 'INTERCEPTOR_ATAQUE', 'EQUIPO_ANTES_DE_DEFENDER', 'EQUIPO_ANTES_DE_ATACAR'],
+    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE', 'AURA', 'ANTES_DE_JUGAR', 'PUEDE_ATACAR', 'SOBRECURACION', 'REACCION', 'AL_MORIR', 'AL_MORIR_ALIADO', 'AL_DESTRUIR', 'ESPEJO', 'ANTES_DE_ATACAR', 'TRAS_ATACAR', 'TRAS_DEFENDER', 'ANTES_DE_DEFENDER', 'INTERCEPTOR_ATAQUE', 'EQUIPO_ANTES_DE_DEFENDER', 'EQUIPO_ANTES_DE_ATACAR', 'GLOBAL_ANTES_DE_CAMBIO_STAT'],
     // Los 5 últimos ops solo tienen sentido dentro de una REACCION (los interpreta
     // DSL._runReaccion, no _doEffect): controlan el resultado que la reacción
     // devuelve al motor de combate (redirigir el ataque, cancelarlo, drenar Furor
     // tras él, fijar el daño, autoataque del atacante).
-    OPS_EFECTO: ['MODIFICAR_STAT', 'CURAR', 'DAÑO', 'APLICAR_ESTADO', 'MODIFICAR_CONTADORES', 'ATACAR', 'MONEDA', 'ROBAR', 'BUSCAR', 'MARCAR', 'VER_MANO', 'LIMPIAR_ESTADOS', 'ELEGIR', 'DESTRUIR_EVENTO', 'MARCAR_TEMPORAL', 'DESCARTAR', 'EQUIPAR', 'MARCAR_JUGADOR', 'FLOTANTE', 'FIJAR_STAT', 'REDIRIGIR', 'CANCELAR_ATAQUE', 'MARCAR_DRENAJE', 'FIJAR_DAÑO', 'ATACANTE_SE_AUTOATACA', 'VOLVER_A_MANO', 'RETRIBUCION', 'SUELO_STAT', 'TECHO_STAT', 'NO_CONSUMIR', 'BONO_ATAQUE', 'MARCAR_PARTIDA', 'ESQUIVAR', 'DESEQUIPAR', 'DAÑO_ATAQUE', 'REDIRIGIR_ATAQUE'],
+    OPS_EFECTO: ['MODIFICAR_STAT', 'CURAR', 'DAÑO', 'APLICAR_ESTADO', 'MODIFICAR_CONTADORES', 'ATACAR', 'MONEDA', 'ROBAR', 'BUSCAR', 'MARCAR', 'VER_MANO', 'LIMPIAR_ESTADOS', 'ELEGIR', 'DESTRUIR_EVENTO', 'MARCAR_TEMPORAL', 'DESCARTAR', 'EQUIPAR', 'MARCAR_JUGADOR', 'FLOTANTE', 'FIJAR_STAT', 'REDIRIGIR', 'CANCELAR_ATAQUE', 'MARCAR_DRENAJE', 'FIJAR_DAÑO', 'ATACANTE_SE_AUTOATACA', 'VOLVER_A_MANO', 'RETRIBUCION', 'SUELO_STAT', 'TECHO_STAT', 'NO_CONSUMIR', 'BONO_ATAQUE', 'MARCAR_PARTIDA', 'ESQUIVAR', 'DESEQUIPAR', 'DAÑO_ATAQUE', 'REDIRIGIR_ATAQUE', 'SECUESTRAR_STAT', 'DEVOLVER_STAT'],
     OPS_CMP: ['==', '!=', '<=', '>=', '<', '>', 'includes', 'contieneTexto', 'includesCI', 'truthy', 'falsy'],
     QUIEN: ['SELF', 'ALIADO', 'ENEMIGO', 'TODOS', 'ATACANTE', 'DEFENSOR'], // ATACANTE/DEFENSOR: solo en GLOBAL_TRAS_ATAQUE y REACCION
 
@@ -7504,6 +7488,23 @@ const DSL = {
             game._dslEquipoAtaque = game._dslEquipoAtaque || {};
             game._dslEquipoAtaque.newDefender = target;
             if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: DSL._nombre(game, target) }), e.logTipo || 'combat');
+            return true;
+        }
+        // SECUESTRAR_STAT / DEVOLVER_STAT (Bancarrota, 31-jul-2026): guardan un stat "en el
+        // bolsillo" y lo dejan a un valor fijo, y luego lo reponen. Es un par: sin el segundo, el
+        // valor original se perdería para siempre. El campo donde se guarda es explícito
+        // (`guardarEn`) y NO viaja en la plantilla, así que se ve en el estado exportado — por eso
+        // se BORRA al devolver, para no dejar rastro una vez usado.
+        if (e.op === 'SECUESTRAR_STAT') {
+            if (target[e.guardarEn] === undefined) target[e.guardarEn] = target[e.stat];
+            target[e.stat] = e.valor !== undefined ? e.valor : 0;
+            return true;
+        }
+        if (e.op === 'DEVOLVER_STAT') {
+            if (target[e.guardadoEn] !== undefined) {
+                target[e.stat] = target[e.guardadoEn];
+                delete target[e.guardadoEn];
+            }
             return true;
         }
         if (e.op === 'MARCAR_PARTIDA') {
@@ -9118,6 +9119,26 @@ const DSL = {
                 if (res.anyApplied && caducar.logSiAplicado) game.logMsg(caducar.logSiAplicado.msg, caducar.logSiAplicado.tipo || 'ability');
             };
         }
+        // GLOBAL_ANTES_DE_CAMBIO_STAT -> onGlobalBeforeStatChange: interceptor de CUALQUIER
+        // cambio de stat del tablero mientras el Evento esté en juego (Bancarrota congela el
+        // Furor). No confundir con GLOBAL_MODIFICAR_FUROR, que solo mira la GANANCIA de la fase
+        // de Furor: este pasa por modifyStat, o sea por todas las subidas y bajadas, vengan de
+        // donde vengan. Devuelve la cantidad ya modificada; `fijar: 0` la anula del todo.
+        const globalStat = abs.find(a => a.trigger === 'GLOBAL_ANTES_DE_CAMBIO_STAT');
+        if (globalStat && typeof tmpl.onGlobalBeforeStatChange !== 'function') {
+            tmpl.onGlobalBeforeStatChange = function (ev, target, stat, amount, source, game) {
+                for (const r of (globalStat.reglas || [])) {
+                    if (r.stat && r.stat !== stat) continue;
+                    if (r.quien === 'ALIADO' && target.owner !== ev.owner) continue;
+                    if (r.quien === 'ENEMIGO' && target.owner === ev.owner) continue;
+                    if (r.filtros && !r.filtros.every(f => DSL._match(target, f))) continue;
+                    if (r.fijar !== undefined) return r.fijar;
+                    if (r.delta !== undefined) return amount + r.delta;
+                }
+                return amount;
+            };
+        }
+
         const previewG = abs.find(a => a.trigger === 'PREVIEW_GLOBAL');
         if (previewG) {
             const _prevHook = tmpl.onGlobalGetPreviewEffects; // combinamos, no cedemos (el auto-preview de furor podía hacer sombra)
@@ -9139,7 +9160,12 @@ const DSL = {
                     if (l.exentoPlantilla && tplT[l.exentoPlantilla]) continue;
                     if (l.campoSelfId && ev[l.campoSelfId] !== target.instanceId) continue;
                     if (l.campoSelfLista && !(Array.isArray(ev[l.campoSelfLista]) && ev[l.campoSelfLista].includes(target.instanceId))) continue;
-                    out.push(`${DSL._fill(l.texto, { genero: target.gender })}, fuente: ${typeof game.refCarta === 'function' ? game.refCarta(ev) : ev.name}`);
+                    // valorCampo (Bancarrota, 31-jul-2026): mete en {valor} un campo de la carta
+                    // AFECTADA, para líneas que dependen de cada una ("originalmente 3"). Antes
+                    // el texto solo podía interpolar el género, que es igual para todas.
+                    const _rell = { genero: target.gender };
+                    if (l.valorCampo) _rell.valor = (target[l.valorCampo] !== undefined ? target[l.valorCampo] : 0);
+                    out.push(`${DSL._fill(l.texto, _rell)}, fuente: ${typeof game.refCarta === 'function' ? game.refCarta(ev) : ev.name}`);
                 }
                 if (typeof _prevHook === 'function') out.push(...(_prevHook(ev, target, game) || []));
                 return out;
