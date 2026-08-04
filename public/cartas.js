@@ -1610,7 +1610,21 @@ const CARD_DB = [
                     calcinante.currentHp = calcinante.maxHp;
                     calcinante.furor = zoe.furor;
                     calcinante.status = { ...zoe.status };
-                    
+                    // Las MARCAS TEMPORALES también viajan (Toto, 31-jul-2026, barrido tras el bug
+                    // de SABIDURÍA). Sin esto, el `+=` de arriba copiaba el bono como un número
+                    // suelto sobre currentAtk/currentDef, y updatePassives lo borra en la primera
+                    // pasada porque resetea esos stats a la plantilla: el jugador veía el +2 al
+                    // evolucionar y se le evaporaba acto seguido (comprobado con probe: 11 -> 9).
+                    // Las marcas son el único carrier que el motor reaplica solo, así que
+                    // transferirlas es lo que hace que el bono de verdad se quede. Los equipos ya
+                    // no hacen falta transferirlos aquí: Zoe no puede llevarlos al evolucionar por
+                    // este camino (el Evento la sustituye entera), pero se dejan por si acaso.
+                    calcinante.tempEffects = zoe.tempEffects || [];
+                    if (zoe.equippedCards && zoe.equippedCards.length) {
+                        calcinante.equippedCards = zoe.equippedCards;
+                        calcinante.equippedCards.forEach(eq => { eq.equippedTo = calcinante.instanceId; });
+                    }
+
                     calcinante.location = zoe.location;
                     if (zoe.location === 'vanguard') {
                         const idx = p.vanguard.findIndex(c => c.instanceId === zoe.instanceId);
