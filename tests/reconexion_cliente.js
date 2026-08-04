@@ -345,6 +345,52 @@ function primeraDif(gA, gB) {
               'targetId=' + (ult && ult.targetId));
     }
 
+    // ------------------------------------------------------------------------------------
+    console.log('\n--- Moneda YA CAÍDA: reconectar no debe relanzarla ---');
+    // El descriptor decía "hay una moneda" pero no EN QUÉ PUNTO. Si alguien recargaba con la
+    // moneda ya caída y el modal aún abierto, se re-montaba desde cero: el que lanza sacaba un
+    // resultado NUEVO -cambiando lo que los dos ya habían visto- y el que mira se quedaba
+    // esperando una tirada que ya había caído (softlock). Ahora el descriptor lleva fase.
+    {
+        const V = await cliente('p1', ESC_ACTIVA);
+        V.g.logMsg = () => {};
+        delete V.g.triggerCoinFlips; // el arnés lo sustituye por un stub; aquí interesa el real
+
+        const fases = [];
+        let _pi = null;
+        Object.defineProperty(V.g, 'pendingInteraction', {
+            get: () => _pi,
+            set: (v) => { _pi = v; if (v && v.tipo === 'coin') fases.push(v.fase); },
+            configurable: true,
+        });
+
+        V.g.debugCoinMode = 'heads';
+        V.g.triggerCoinFlips(1, 'p1');           // Promise viva: espera al "continuar"
+        await asentar(V.ctx);
+        const hitbox = V.ctx.sandbox.document.getElementById('coin-hitbox');
+        check('el que lanza tiene la moneda pinchable', typeof hitbox.onclick === 'function', typeof hitbox.onclick);
+        check('arranca en fase "lanzando"', fases[0] === 'lanzando', fases.join(','));
+
+        await hitbox.onclick();                   // lanza
+        for (let k = 0; k < 12; k++) await asentar(V.ctx); // deja caer la animación
+
+        check('tras caer, el descriptor pasa a "avanzando"', _pi && _pi.fase === 'avanzando', JSON.stringify(_pi));
+        check('...guardando el resultado que ya salió', !!_pi && _pi.resultados[0] === 'heads',
+              JSON.stringify(_pi && _pi.resultados));
+
+        // Lo que verá quien reconecte en ese punto.
+        const r = V.g._reanudarMoneda(_pi);
+        check('al reconectar NO se relanza (se reanuda en "avanzando")', r.fase === 'avanzando', r.fase);
+        check('...y el resultado se conserva, no se vuelve a sortear', r.resultados[0] === 'heads',
+              JSON.stringify(r.resultados));
+        check('...desde la tirada correcta', r.idx === 0, 'idx=' + r.idx);
+
+        // Un descriptor viejo (sin fase) se trata como "aún no lanzada", que es lo que se hacía
+        // antes de que existieran las fases: no rompe partidas a medias de una versión anterior.
+        const rViejo = V.g._reanudarMoneda({ tipo: 'coin', chooserId: 'p1', playerId: 'p1', count: 1 });
+        check('un descriptor sin fase se reanuda como "lanzando"', rViejo.fase === 'lanzando', rViejo.fase);
+    }
+
     console.log(fallos === 0
         ? `\nSUITE reconexion_cliente: ${comprobaciones}/${comprobaciones} comprobaciones — CLIENTES SINCRONIZADOS`
         : `\nSUITE reconexion_cliente: ${fallos} FALLOS de ${comprobaciones} comprobaciones`);

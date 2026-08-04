@@ -4592,8 +4592,13 @@
                 });
             }
 
-            async triggerCoinFlips(count = 1, playerId) {
-                const results = [];
+            // `reanudar` (Toto, 31-jul-2026): {idx, resultados, fase} para re-montar una tirada a
+            // MEDIAS tras reconectar. Sin esto, el descriptor solo decía "hay una moneda" y no en
+            // qué punto, así que al recargar se volvía a empezar: el que lanza sacaba un resultado
+            // NUEVO -cambiando lo que ya había salido- y el que mira se quedaba esperando una
+            // tirada que ya había caído (softlock).
+            async triggerCoinFlips(count = 1, playerId, reanudar = null) {
+                const results = reanudar && Array.isArray(reanudar.resultados) ? [...reanudar.resultados] : [];
                 const overlay = document.getElementById('coin-overlay');
                 const coin = document.getElementById('coin');
                 const title = document.getElementById('coin-title');
@@ -4616,18 +4621,32 @@
                     overlay.appendChild(hitbox);
                 }
 
-                historyContainer.innerHTML = ''; 
-                overlay.style.zIndex = '9999'; 
+                historyContainer.innerHTML = '';
+                overlay.style.zIndex = '9999';
                 overlay.style.display = 'flex';
 
                 const isMyCoin = this.gameMode === 'local' || this.myPlayerId === playerId;
 
+                // Al reanudar, se repintan las chapas de las tiradas que ya cayeron.
+                const _chapa = (res) => `
+                        <div style="background: ${res === 'heads' ? '#eab308' : '#64748b'}; color: white; padding: 6px 16px; border-radius: 20px; font-weight: bold; font-size: 1.2rem; box-shadow: 0 2px 5px rgba(0,0,0,0.5); animation: popIn 0.3s ease-out;">
+                            ${res === 'heads' ? 'CARA' : 'CRUZ'}
+                        </div>
+                    `;
+                if (reanudar) results.forEach(r => { historyContainer.innerHTML += _chapa(r); });
+
                 // Reanudar-perfecto: descriptor serializable de la moneda. Si el que lanza reconecta,
                 // se re-lanza en su cliente (ver _reMostrarInteraccionPendiente). En modo espejo (el
                 // que lanza reconectó y mi corrutina dirige) se lo empujo para que re-monte el overlay.
+                // El descriptor se REESCRIBE en cada cambio de fase (ver _pi más abajo): tiene que
+                // decir en qué tirada vamos y si esa ya cayó, no solo que hay una moneda.
+                const _pi = (idx, fase) => {
+                    if (this.gameMode !== 'online' || playerId === 'setup') return;
+                    this.pendingInteraction = { tipo: 'coin', chooserId: playerId, playerId, count, idx, fase, resultados: [...results] };
+                };
                 if (this.gameMode === 'online' && playerId !== 'setup') {
                     this._interaccionChooser = playerId;
-                    this.pendingInteraction = { tipo: 'coin', chooserId: playerId, playerId, count };
+                    this.pendingInteraction = { tipo: 'coin', chooserId: playerId, playerId, count, idx: reanudar ? reanudar.idx : 0, fase: reanudar ? reanudar.fase : 'lanzando', resultados: [...results] };
                     // Igual que el pick de tablero y el visor de mazo: se empuja también cuando le
                     // debo el estado al otro por haber reconectado mientras YO tenía la elección
                     // (_reSyncTrasEleccion), no solo en modo espejo. Si no, quien recarga justo
@@ -4651,15 +4670,29 @@
                     window.addEventListener('game-sync', remoteHandler);
                 }
 
-                for (let i = 0; i < count; i++) {
-                    title.innerText = isMyCoin 
+                for (let i = (reanudar ? reanudar.idx : 0); i < count; i++) {
+                    // ¿Esta tirada concreta YA cayó y solo faltaba cerrar el modal? Entonces no se
+                    // vuelve a lanzar (eso cambiaría un resultado ya visto por los dos): se repinta
+                    // la moneda en su cara final y se salta directo a la fase de continuar.
+                    const _yaCayo = !!reanudar && i === reanudar.idx && reanudar.fase === 'avanzando';
+                    let result;
+                    if (_yaCayo) {
+                        result = results[i];
+                        const _glow = result === 'heads' ? '#facc15' : '#94a3b8';
+                        coin.style.transition = 'none';
+                        coin.style.transform = `translateY(0px) rotateX(${1800 + (result === 'heads' ? 0 : 180)}deg) scale(1)`;
+                        coin.style.boxShadow = `0 0 80px ${_glow}, inset 0 0 30px ${_glow}`;
+                        coin.style.opacity = '1';
+                    } else {
+                    _pi(i, 'lanzando');
+                    title.innerText = isMyCoin
                         ? (count > 1 ? `LANZANDO MONEDA ${i + 1} DE ${count}` : `¡LANZA LA MONEDA!`)
                         : `${this.getDisplayName(playerId).toUpperCase()} ESTÁ LANZANDO...`;
-                        
+
                     instruction.innerText = isMyCoin ? "Haz clic en la moneda para lanzarla" : "Esperando tirada en vivo...";
                     instruction.style.opacity = '1';
-                    
-                    const result = await new Promise((resolve) => {
+
+                    result = await new Promise((resolve) => {
                         coin.style.transition = 'none'; 
                         coin.style.transform = 'translateY(0) rotateX(0deg) scale(1)'; 
                         coin.style.boxShadow = 'none';
@@ -4801,14 +4834,13 @@
                     
                     onRemoteEvent = null; // Limpiar para que no interfiera con el avance
                     results.push(result);
+                    historyContainer.innerHTML += _chapa(result);
+                    } // fin del camino "hay que lanzarla" (con `_yaCayo` la chapa ya está puesta)
 
-                    const badgeColor = result === 'heads' ? '#eab308' : '#64748b'; 
-                    historyContainer.innerHTML += `
-                        <div style="background: ${badgeColor}; color: white; padding: 6px 16px; border-radius: 20px; font-weight: bold; font-size: 1.2rem; box-shadow: 0 2px 5px rgba(0,0,0,0.5); animation: popIn 0.3s ease-out;">
-                            ${result === 'heads' ? 'CARA' : 'CRUZ'}
-                        </div>
-                    `;
-                    
+                    // A partir de aquí la tirada está resuelta y solo falta continuar: si alguien
+                    // recarga AHORA, debe re-montarse en esta fase y no volver a lanzar.
+                    _pi(i, 'avanzando');
+
                     if (i < count - 1) {
                         coin.style.transition = 'transform 0.4s ease-in, opacity 0.4s, box-shadow 0.4s';
                         const currentRot = result === 'heads' ? 0 : 180;
@@ -9238,7 +9270,7 @@
                     // Si ya había caído, la cierra _cerrarMonedaHuerfana en cuanto llegue un
                     // estado sin moneda pendiente (si no, se quedaría el velo puesto).
                     this._monedaHuerfana = true;
-                    this.triggerCoinFlips(pi.count || 1, pi.playerId);
+                    this.triggerCoinFlips(pi.count || 1, pi.playerId, this._reanudarMoneda(pi));
                 }
                 // Sin cartel para el NO elector (Toto, 31-jul-2026): ver la nota de
                 // pickBoardTargets. Elegir objetivo en el campo tras jugar una carta debe ser
@@ -9299,12 +9331,24 @@
                     // ya emiten VISUAL_SEARCH_CONFIRM. La Promise que crea queda huérfana (inocua).
                     this.openDeckSearchViewer(pi.playerId, elegibles, pi.titulo, pi.aviso, pi.maxCount || 1);
                 } else if (pi.tipo === 'coin') {
-                    // Re-lanzo la moneda "huérfana" (isMyCoin, porque soy quien lanza): el clic
-                    // emite COIN_FLIP_REMOTE que consume la corrutina viva del rival. La moneda
-                    // aún no se había lanzado al desconectar, así que generar ahora el resultado
-                    // es correcto. La Promise que devuelve queda huérfana (inocua).
-                    this.triggerCoinFlips(pi.count || 1, pi.playerId);
+                    // Re-monto la moneda (soy quien lanza). Se REANUDA en la fase exacta que trae
+                    // el descriptor: si la tirada ya había caído, NO se vuelve a lanzar -eso
+                    // cambiaría un resultado que los dos ya vieron- y se salta al "haz clic para
+                    // continuar". La Promise que devuelve queda huérfana (inocua).
+                    this.triggerCoinFlips(pi.count || 1, pi.playerId, this._reanudarMoneda(pi));
                 }
+            }
+
+            // Traduce el descriptor de moneda a los argumentos de reanudación de triggerCoinFlips.
+            // Los descriptores viejos (sin fase) se tratan como "aún no lanzada", que es lo que
+            // hacían antes de que existieran las fases.
+            _reanudarMoneda(pi) {
+                if (!pi) return null;
+                return {
+                    idx: typeof pi.idx === 'number' ? pi.idx : 0,
+                    fase: pi.fase === 'avanzando' ? 'avanzando' : 'lanzando',
+                    resultados: Array.isArray(pi.resultados) ? pi.resultados : [],
+                };
             }
 
             // Cierra el overlay de una moneda re-montada como ESPECTADOR cuya tirada ya había
