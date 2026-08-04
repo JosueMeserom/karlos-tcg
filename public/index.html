@@ -1866,6 +1866,20 @@
                                             || this.inputState === 'SELECT_ABILITY_TARGETS';
                         if (hayInteraccion) { this._dbgRx('REQUEST_SYNC atendido FUERA DE COLA (hay interacción)'); this._atenderRequestSync(data); return; }
                     }
+                    // Animación reenviada por el rival estable mientras mi corrutina estaba muerta
+                    // (ver instalarReenvioAnimaciones). Es PURO ADORNO: no toca el estado, que
+                    // llega por su cuenta en las instantáneas. Si la carta aún no existe en mi
+                    // tablero, la animación no encuentra su elemento y no hace nada, que es
+                    // exactamente lo que debe pasar.
+                    if (data.action === 'ANIM_REMOTE') {
+                        const fn = window[data.fn];
+                        if (typeof fn === 'function') {
+                            this._animRemota = true;
+                            try { fn(...(data.args || [])); } catch (e) {}
+                            this._animRemota = false;
+                        }
+                        return;
+                    }
                     // --- SINCRONIZACIÓN DE MONEDAS EN TIEMPO REAL ---
                     if (data.action === 'COIN_FLIP_REMOTE' || data.action === 'COIN_ADVANCE_REMOTE') {
                         this._dbgRx('recibido', data.action, { espejando: !!this._espejandoReaccion });
@@ -9193,6 +9207,9 @@
                 // reacción (ya lo cubre pendingReaction arriba, que puede llevar además esto).
                 const pi = state.pendingInteraction;
                 const yaTengoUI = this.currentChoices || this.dslPick || this._deckSearchActivo;
+                // La moneda re-montada como espectador (más abajo) no tiene quien la resuelva si
+                // la tirada ya había caído: se cierra en cuanto el estado deja de traerla.
+                if (this._monedaHuerfana && !(pi && pi.tipo === 'coin')) this._cerrarMonedaHuerfana();
                 if (pi && pi.tipo === 'ayudaTarget') {
                     // Ayuda dirigida esperando objetivo (Manzanahoria y compañía). Se restaura en
                     // LOS DOS clientes, no solo en el elector, y esa es justo la diferencia con el
@@ -9211,6 +9228,17 @@
                     }
                 } else if (pi && pi.chooserId === this.myPlayerId && !yaTengoUI) {
                     this._reMostrarInteraccionPendiente(pi);
+                } else if (pi && pi.tipo === 'coin' && pi.chooserId !== this.myPlayerId
+                           && this.myPlayerId !== 'spectator' && this.activePlayerId !== 'setup' && !yaTengoUI) {
+                    // ESPECTADOR de una moneda ajena que reconecta (Toto, 31-jul-2026): su
+                    // corrutina murió, así que no tenía overlay ni escuchaba los COIN_FLIP_REMOTE
+                    // del que lanza — se perdía la tirada entera. Se re-monta el overlay en modo
+                    // espectador: la Promise queda huérfana (inocua) y el listener de eventos
+                    // remotos sí se registra, así que la tirada se ve en vivo si aún no ha caído.
+                    // Si ya había caído, la cierra _cerrarMonedaHuerfana en cuanto llegue un
+                    // estado sin moneda pendiente (si no, se quedaría el velo puesto).
+                    this._monedaHuerfana = true;
+                    this.triggerCoinFlips(pi.count || 1, pi.playerId);
                 }
                 // Sin cartel para el NO elector (Toto, 31-jul-2026): ver la nota de
                 // pickBoardTargets. Elegir objetivo en el campo tras jugar una carta debe ser
@@ -9277,6 +9305,16 @@
                     // es correcto. La Promise que devuelve queda huérfana (inocua).
                     this.triggerCoinFlips(pi.count || 1, pi.playerId);
                 }
+            }
+
+            // Cierra el overlay de una moneda re-montada como ESPECTADOR cuya tirada ya había
+            // caído mientras estábamos desconectados: su corrutina espera un COIN_FLIP_REMOTE que
+            // no va a llegar, así que sin esto el velo se quedaría puesto para siempre.
+            _cerrarMonedaHuerfana() {
+                this._monedaHuerfana = false;
+                const ov = document.getElementById('coin-overlay');
+                if (ov) ov.style.display = 'none';
+                if (this.pendingInteraction && this.pendingInteraction.tipo === 'coin') this.pendingInteraction = null;
             }
 
             // Aborta la interacción pendiente de ESTE cliente (una reacción/elección donde
@@ -9462,6 +9500,35 @@
 
         window.game = new Game();
         inicializarReglas();
+
+        // --- REENVÍO DE ANIMACIONES A UN CLIENTE RECONECTADO (Toto, 31-jul-2026) ---
+        // El reanudar-perfecto le devuelve al reconectado el ESTADO, pero no el espectáculo: su
+        // corrutina murió y las animaciones las generaba ella, así que veía la vida bajar de golpe
+        // sin ver el golpe. Como las animaciones son funciones globales con argumentos
+        // primitivos (ids y textos), se pueden reenviar tal cual: se envuelven UNA vez aquí, y
+        // cuando el cliente sabe que le DEBE estado a alguien (modo espejo o volcado pendiente)
+        // manda además la orden de animar. No hay eco posible: solo emite quien tiene esos flags,
+        // y el reconectado nunca los tiene -es el que los recibe-.
+        // Se reenvía lo que se NOTA en combate; el resto sigue llegando como cambio de estado.
+        (function instalarReenvioAnimaciones() {
+            const REENVIABLES = ['showFloatingText', 'animateAttack', 'animateSpecialAttack',
+                                 'animateDirectAttack', 'animateEvolution', 'animateSpinToHand',
+                                 'animateTrueDamage', 'animateResurrect', 'animateDodge'];
+            REENVIABLES.forEach(nombre => {
+                const orig = window[nombre];
+                if (typeof orig !== 'function') return;
+                window[nombre] = function (...args) {
+                    const g = window.game;
+                    if (g && !g._animRemota && g.gameMode === 'online' && g.myPlayerId !== 'spectator'
+                        && (g._espejandoReaccion || g._reSyncTrasEleccion) && g.socket) {
+                        const msg = { roomCode: g.roomCode, action: 'ANIM_REMOTE', fn: nombre, args };
+                        if (g._reSyncTarget) msg.targetId = g._reSyncTarget; // dirigido a quien reconectó
+                        try { g.socket.emit('gameAction', msg); } catch (e) {}
+                    }
+                    return orig.apply(this, args);
+                };
+            });
+        })();
 
         window.addEventListener('resize', () => {
             if (window.game) {

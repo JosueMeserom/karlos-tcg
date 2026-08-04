@@ -289,6 +289,62 @@ function primeraDif(gA, gB) {
               primeraDif(R.g, S2.g));
     }
 
+    // ------------------------------------------------------------------------------------
+    console.log('\n--- Moneda ajena y reenvío de animaciones al reconectado ---');
+    // Dos límites que quedaban del reanudar-perfecto, los dos por lo mismo: el reconectado
+    // recuperaba el ESTADO pero no el espectáculo, porque las animaciones (y el overlay de la
+    // moneda) los generaba su corrutina, que murió.
+    {
+        const T = await cliente('p1', ESC_ACTIVA); // lanza la moneda / ataca
+        const U = await cliente('p2', ESC_ACTIVA); // reconectará
+
+        // El descriptor de moneda debe describir de quién es la tirada, no solo que la hay.
+        T.g.pendingInteraction = { tipo: 'coin', chooserId: 'p1', playerId: 'p1', count: 1 };
+        T.g._interaccionChooser = 'p1';
+        const estadoConMoneda = JSON.parse(JSON.stringify(T.g.exportGameState()));
+        check('la moneda viaja en el estado con su dueño',
+              !!estadoConMoneda.pendingInteraction && estadoConMoneda.pendingInteraction.tipo === 'coin'
+              && estadoConMoneda.pendingInteraction.chooserId === 'p1',
+              JSON.stringify(estadoConMoneda.pendingInteraction));
+
+        // El rival reconecta: NO es su moneda, pero debe recuperar el overlay para verla caer.
+        const U2 = await cliente('p2', ESC_ACTIVA);
+        U2.g._reconnectRecovery = true;
+        let monedaMontada = null;
+        U2.g.triggerCoinFlips = (count, playerId) => { monedaMontada = { count, playerId }; return Promise.resolve([]); };
+        U2.g.importGameState(estadoConMoneda);
+        check('el espectador reconectado re-monta la moneda del rival',
+              !!monedaMontada && monedaMontada.playerId === 'p1', JSON.stringify(monedaMontada));
+        check('...y queda marcada como huérfana, para poder cerrarla luego',
+              U2.g._monedaHuerfana === true, 'flag=' + U2.g._monedaHuerfana);
+
+        // Si la tirada ya había caído, no llegará ningún COIN_FLIP_REMOTE: el siguiente estado
+        // sin moneda debe cerrar el overlay en vez de dejar el velo puesto para siempre.
+        T.g.pendingInteraction = null;
+        U2.g.importGameState(JSON.parse(JSON.stringify(T.g.exportGameState())));
+        check('un estado sin moneda cierra la moneda huérfana', U2.g._monedaHuerfana === false,
+              'flag=' + U2.g._monedaHuerfana);
+
+        // --- Reenvío de animaciones ---
+        // Solo emite quien DEBE estado (modo espejo o volcado pendiente); el resto del tiempo,
+        // las animaciones son locales y no viajan, que es como debe ser.
+        const emitidas = () => (T.g.__emitidos || []).filter(d => d.action === 'ANIM_REMOTE');
+        T.g.__emitidos = [];
+        T.g._espejandoReaccion = false; T.g._reSyncTrasEleccion = false;
+        T.ctx.sandbox.animateAttack('a', 'b');
+        check('sin nadie a quien deber estado, la animación NO viaja', emitidas().length === 0,
+              'emitidas=' + emitidas().length);
+
+        T.g._reSyncTrasEleccion = true; T.g._reSyncTarget = 'sock_p2';
+        T.ctx.sandbox.animateAttack('a', 'b');
+        const ult = emitidas()[emitidas().length - 1];
+        check('debiendo estado, la animación se reenvía', emitidas().length === 1, 'emitidas=' + emitidas().length);
+        check('...con la función y sus argumentos', !!ult && ult.fn === 'animateAttack' && ult.args[0] === 'a' && ult.args[1] === 'b',
+              JSON.stringify(ult && { fn: ult.fn, args: ult.args }));
+        check('...y DIRIGIDA a quien reconectó, no a todos', !!ult && ult.targetId === 'sock_p2',
+              'targetId=' + (ult && ult.targetId));
+    }
+
     console.log(fallos === 0
         ? `\nSUITE reconexion_cliente: ${comprobaciones}/${comprobaciones} comprobaciones — CLIENTES SINCRONIZADOS`
         : `\nSUITE reconexion_cliente: ${fallos} FALLOS de ${comprobaciones} comprobaciones`);
