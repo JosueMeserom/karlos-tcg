@@ -4717,6 +4717,14 @@
                 if (!isMyCoin) window.removeEventListener('game-sync', remoteHandler);
                 if (this.pendingInteraction && this.pendingInteraction.tipo === 'coin') this.pendingInteraction = null; // moneda resuelta (reanudar-perfecto)
 
+                // Mismo caso que en resolveVisualSearch, y también faltaba: si el rival reconectó
+                // y ha sido ÉL quien ha lanzado (su moneda re-montada dirige mi corrutina con
+                // COIN_FLIP_REMOTE / COIN_ADVANCE_REMOTE), le debo el estado resultante. Cubre
+                // los dos momentos que señaló Toto: antes de tirar y con el resultado ya visible
+                // pero el modal aún sin cerrar.
+                if (this._espejandoReaccion && !isMyCoin) this._syncTrasCompletarEspejo();
+                this._reSyncTrasEleccionSiHaceFalta();
+
                 return results;
             }
             
@@ -6625,10 +6633,12 @@
             // Tras completar MI elección, si un rival reconectó durante ella (caso espejo),
             // le reenvío el estado FINAL una vez la acción reanudada ha terminado.
             _reSyncTrasEleccionSiHaceFalta() {
-                if (this._reSyncTrasEleccion) {
-                    this._reSyncTrasEleccion = false;
-                    setTimeout(() => this._syncAutoritativo(), 1500);
-                }
+                // El flag NO se apaga aquí: lo consume el poller al asentar (ver
+                // _syncTrasCompletarEspejo), que es quien decide CUÁNDO está listo el estado.
+                // Antes esto era un setTimeout(1500) a ciegas: mandaba el estado a media acción
+                // si tardaba más, y dejaba 1,5 s en los que el reconectado aplicaba acciones
+                // nuevas sobre un estado viejo (el "ataco muy rápido y se desincroniza").
+                if (this._reSyncTrasEleccion) this._syncTrasCompletarEspejo();
             }
 
             openVisualSearchModal(titleText, cards, exactCount = 0, autoSelectMax = false, chooserId = null) {
@@ -6812,6 +6822,14 @@
                     this.currentVisualResolve(finalCards);
                     this.currentVisualResolve = null;
                 }
+                // MODO ESPEJO (Toto, 31-jul-2026): el rival reconectado acaba de dirigir MI
+                // corrutina con su clic en el tablero (o en el visor de mazo), así que le debo el
+                // estado resultante. Esto faltaba: el volcado del espejo solo estaba cableado a
+                // executeChoice (los modales de reacción), NO a las elecciones visuales. Por eso
+                // el reconectado clicaba su objetivo, "no pasaba nada" en su pantalla y sí se
+                // aplicaba en la del rival: nadie le devolvía nunca el resultado. Era una
+                // desincronización PERMANENTE, no una lenta.
+                if (this._espejandoReaccion && isRemote) this._syncTrasCompletarEspejo();
                 this._reSyncTrasEleccionSiHaceFalta();
             }
 
@@ -9105,14 +9123,33 @@
             // pendiente, sin animaciones, IDLE — y solo entonces vuelca el estado final. Sustituye
             // al antiguo setTimeout(700ms) a ojo, que mandaba el estado a medias si la animación
             // tardaba (p. ej. Escudo: carta ya descartada pero atacante aún sin agotar).
+            // Sirve a los DOS motivos por los que puedo deber un volcado de estado (Toto,
+            // 31-jul-2026). Antes solo cubría el primero, y encima solo desde executeChoice:
+            //   · MODO ESPEJO (_espejandoReaccion): el rival reconectó y su UI es un mando a
+            //     distancia; mi corrutina viva hace el trabajo y debo devolverle el resultado.
+            //   · RIVAL RECONECTADO MIENTRAS YO ELEGÍA (_reSyncTrasEleccion): mi corrutina
+            //     también hace el trabajo, pero él ni siquiera tiene UI que mostrar; solo
+            //     necesita el estado. Este caso usaba un setTimeout(1500) a ojo, que es la causa
+            //     del "a veces se sincroniza y a veces no": si la acción tardaba más, el volcado
+            //     salía a medias; y durante esos 1,5 s el reconectado seguía aplicando acciones
+            //     nuevas (un ataque rápido) sobre un estado viejo. Ahora ambos esperan al ASENTADO
+            //     real y van mandando instantáneas intermedias cada 60 ms.
             _syncTrasCompletarEspejo() {
-                if (!this._espejandoReaccion) return;
+                if (!this._espejandoReaccion && !this._reSyncTrasEleccion) return;
                 if (this._esperandoSettleEspejo) return; // ya hay un poller en marcha
                 this._esperandoSettleEspejo = true;
                 this._ultimoSnapEspejo = null; // firma del último estado intermedio enviado (dedup)
                 const CADENCIA = 60; // ms entre sondeos; con dedup, solo emite/renderiza si el estado cambió
+                // Volcado DIRIGIDO cuando sé a quién se lo debo (el que acaba de reconectar): así
+                // no se le pisa el estado a un cliente que está perfectamente bien.
+                const _emitirEstado = (snap) => {
+                    if (this.gameMode !== 'online' || this.myPlayerId === 'spectator') return;
+                    const msg = { roomCode: this.roomCode, action: 'HARD_SYNC', admin: true, state: snap || this.exportGameState() };
+                    if (this._reSyncTarget) msg.targetId = this._reSyncTarget;
+                    this.socket.emit('gameAction', msg);
+                };
                 const poll = () => {
-                    if (!this._espejandoReaccion) { this._esperandoSettleEspejo = false; return; }
+                    if (!this._espejandoReaccion && !this._reSyncTrasEleccion) { this._esperandoSettleEspejo = false; return; }
                     const esperandoOtraInteraccion =
                         this.pendingReaction ||          // otra reacción de la cadena (ya empujada por PENDING_REACTION)
                         this.pendingInteraction ||       // interacción visual encadenada (tablero/mazo/moneda)
@@ -9125,8 +9162,10 @@
                     if (asentado) {
                         this._esperandoSettleEspejo = false;
                         this._espejandoReaccion = false;
+                        this._reSyncTrasEleccion = false;
                         this._dbgRx('poller ASENTADO -> vuelco estado final');
-                        this._syncAutoritativo();
+                        _emitirEstado();
+                        this._reSyncTarget = null;
                     } else {
                         // Snapshot INTERMEDIO: la corrutina sigue trabajando pero el rival NO tiene
                         // un prompt abierto (esperandoOtraInteraccion=false → fase de animación/
@@ -9144,7 +9183,7 @@
                             if (firma !== this._ultimoSnapEspejo) {
                                 this._ultimoSnapEspejo = firma;
                                 this._dbgRx('snapshot intermedio (espejo)');
-                                this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'HARD_SYNC', admin: true, state: snap });
+                                _emitirEstado(snap);
                             }
                         }
                         setTimeout(poll, CADENCIA);
@@ -9203,7 +9242,10 @@
                     // Caso espejo: soy YO quien está eligiendo (mi overlay sigue vivo) y el rival
                     // reconectó. Le mando el estado actual y, tras completar mi elección, le reenvío
                     // el estado final (si no, se quedaría en el estado pre-acción).
-                    if (tengoInteraccion && this._interaccionChooser === this.myPlayerId) this._reSyncTrasEleccion = true;
+                    if (tengoInteraccion && this._interaccionChooser === this.myPlayerId) {
+                        this._reSyncTrasEleccion = true;
+                        this._reSyncTarget = target; // a quién le debo el estado final (volcado DIRIGIDO)
+                    }
                     this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'HARD_SYNC', state: this.exportGameState(), targetId: target });
                 }
             }

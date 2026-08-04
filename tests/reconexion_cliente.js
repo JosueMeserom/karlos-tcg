@@ -42,31 +42,79 @@ function check(titulo, ok, detalle) {
 }
 
 // Mini-tigre a 1 de Vida para que la curación sea observable; Manzanahoria cura 2.
-const ESC = {
+const ESC_AYUDA = {
     turno: 2, turnoDe: 'p1', empieza: 'p2',
     p1: { vanguardia: [{ carta: 'Mini-tigre', vida: 1 }], mano: ['Manzanahoria'] },
     p2: {},
 };
 
-async function cliente(quienSoy) {
+// Poder Legado exige un Karlos con 1 de Vida o menos; al equiparse le fija los stats a 9.
+const ESC_EQUIPO = {
+    turno: 2, turnoDe: 'p1', empieza: 'p2',
+    p1: { vanguardia: [{ carta: 'Karlos', vida: 1 }], mano: ['Poder Legado'] },
+    p2: {},
+};
+
+async function cliente(quienSoy, esc) {
     const ctx = crearContexto('nueva');
     ctx.semilla = 1;
     const g = crearJuego(ctx);
     await asentar(ctx);
-    construirEstado(ctx, g, ESC);
+    construirEstado(ctx, g, esc);
     g.gameMode = 'online';
     g.myPlayerId = quienSoy;
     g.roomCode = 'TEST';
-    // Socket de mentira: solo anota lo que se habría emitido (aquí el replay se hace a mano).
-    g.socket = { id: 'sock_' + quienSoy, emit: (ev, data) => { (g.__emitidos = g.__emitidos || []).push(data); } };
+    // Socket de mentira: anota lo emitido y, si hay un par conectado, lo ENTREGA como haría el
+    // servidor. Solo se enrutan las dos acciones que este test necesita, que además son
+    // exactamente las que el listener real atiende FUERA de la cola de acciones:
+    //   · VISUAL_SEARCH_CONFIRM -> resolveVisualSearch(ids, true)  (línea del listener)
+    //   · HARD_SYNC dirigido    -> importGameState(state)
+    g.socket = {
+        id: 'sock_' + quienSoy,
+        emit: (ev, data) => {
+            (g.__emitidos = g.__emitidos || []).push(data);
+            const par = g.__par;
+            if (!par) return;
+            if (data.action === 'VISUAL_SEARCH_CONFIRM') par.resolveVisualSearch(data.ids, true);
+            else if (data.action === 'HARD_SYNC') { par.importGameState(JSON.parse(JSON.stringify(data.state))); }
+        },
+    };
     return { ctx, g };
+}
+
+const dormir = (ms) => new Promise(r => setTimeout(r, ms));
+
+// Primera diferencia real entre dos estados, para que un fallo diga QUÉ divergió y no solo que
+// divergió (si no, depurar una desincronización desde aquí es imposible).
+// `_dslPasN` es bookkeeping interno del trigger PASIVA_CONTINUA (cuánto aportó la pasiva en la
+// última pasada, solo para decidir si anunciar activación/desactivación). Nunca lo lee el motor
+// ni ninguna carta, y difiere aquí porque importGameState llama a updatePassives() al terminar:
+// cada cliente recalcula desde un punto distinto del ciclo. La batería de regresión ya lo trata
+// como diff INERTE en todo el proyecto (ver esDiffInerte en harness.js), y aquí se aplica el
+// mismo criterio en vez de dar por bueno un estado que no lo es.
+const INERTES = /\._dslPas(Hp)?\d+$/;
+
+function primeraDif(gA, gB) {
+    const lim = (g) => { const s = JSON.parse(JSON.stringify(g.exportGameState())); delete s.logHistory; return s; };
+    const out = [];
+    const rec = (x, y, ruta) => {
+        if (out.length) return;
+        if (JSON.stringify(x) === JSON.stringify(y)) return;
+        if (typeof x !== 'object' || typeof y !== 'object' || !x || !y) {
+            if (INERTES.test(ruta)) return;
+            out.push(`${ruta}: A=${JSON.stringify(x)} B=${JSON.stringify(y)}`); return;
+        }
+        new Set([...Object.keys(x), ...Object.keys(y)]).forEach(k => rec(x[k], y[k], ruta + '.' + k));
+    };
+    rec(lim(gA), lim(gB), 'estado');
+    return out[0] || 'sin diferencias';
 }
 
 (async () => {
     console.log('--- Ayuda dirigida (Manzanahoria): el rival recarga antes de que se elija objetivo ---');
 
-    const A = await cliente('p1'); // elector: juega la Ayuda y elegirá objetivo
-    const B = await cliente('p2'); // rival
+    const A = await cliente('p1', ESC_AYUDA); // elector: juega la Ayuda y elegirá objetivo
+    const B = await cliente('p2', ESC_AYUDA); // rival
 
     // En online, playCard(!isRemote) solo EMITE; la ejecución real llega a los dos clientes
     // como replay ordenado. Se reproduce ese reparto tal cual.
@@ -89,7 +137,7 @@ async function cliente(quienSoy) {
           JSON.stringify(estadoDeA.pendingInteraction));
 
     // --- B RECARGA: pestaña nueva, pierde TODO el estado local ---
-    const B2 = await cliente('p2');
+    const B2 = await cliente('p2', ESC_AYUDA);
     B2.g.players.p1.vanguard = []; B2.g.players.p1.hand = []; // arranca en blanco
     B2.g._reconnectRecovery = true;                            // marca de "vengo de reconectar"
     B2.g.importGameState(estadoDeA);
@@ -121,13 +169,59 @@ async function cliente(quienSoy) {
 
     // Comparación final de estado, que es lo que de verdad importa: si diverge, la partida
     // queda rota aunque cada paso suelto pareciera correcto.
-    const limpio = (g) => {
-        const s = JSON.parse(JSON.stringify(g.exportGameState()));
-        delete s.logHistory; // los logs privados (logError) no viajan y no son estado de juego
-        return JSON.stringify(s);
-    };
-    check('ESTADO DE PARTIDA IDÉNTICO en ambos clientes', limpio(A.g) === limpio(B2.g),
-          'divergen tras la jugada');
+    check('ESTADO DE PARTIDA IDÉNTICO en ambos clientes', primeraDif(A.g, B2.g) === 'sin diferencias',
+          primeraDif(A.g, B2.g));
+
+
+    // ------------------------------------------------------------------------------------
+    console.log('\n--- Equipo con pick de tablero (Poder Legado): recarga EL QUE ELIGE ---');
+    // Este es el caso peor: el elector reconectado recupera sus rebordes verdes, pero su clic
+    // no tiene ninguna Promise local que resolver -su corrutina murió al recargar-. Quien lo
+    // ejecuta es la corrutina VIVA del rival, que por tanto le debe el estado resultante. Ese
+    // volcado solo estaba cableado a los modales de reacción (executeChoice), no a las
+    // elecciones visuales: el elector clicaba, "no pasaba nada" en su pantalla, y sí se
+    // equipaba en la del rival. Desincronización PERMANENTE, no lenta.
+    {
+        const P = await cliente('p1', ESC_EQUIPO); // elector (juega el equipo) - recargará
+        const Q = await cliente('p2', ESC_EQUIPO); // rival estable, con la corrutina viva
+
+        await P.g.playCard(P.g.players.p1.hand[0].instanceId, true); await asentar(P.ctx);
+        await Q.g.playCard(Q.g.players.p1.hand[0].instanceId, true); await asentar(Q.ctx);
+
+        check('el elector tiene el pick de tablero abierto', !!P.g.dslPick, 'sin dslPick');
+        check('el rival NO monta picker local, solo espera la resolución',
+              !Q.g.dslPick && !!Q.g.currentVisualResolve, 'dslPick=' + !!Q.g.dslPick);
+
+        // --- P RECARGA. El rival estable atiende su REQUEST_SYNC y entra en MODO ESPEJO ---
+        const P2 = await cliente('p1', ESC_EQUIPO);
+        P2.g.players.p1.vanguard = []; P2.g.players.p1.hand = [];
+        P2.g._reconnectRecovery = true;
+        Q.g.__par = P2.g;                    // a partir de aquí, lo que emita Q le llega a P2
+        Q.g._atenderRequestSync({ requesterId: 'sock_p1' });
+
+        check('el rival estable entra en modo espejo', Q.g._espejandoReaccion === true, 'no entró');
+        check('el elector reconectado recupera sus rebordes verdes', !!P2.g.dslPick, 'sin dslPick');
+
+        // --- P2 clica su objetivo: sin Promise local, dirige la corrutina viva de Q ---
+        P2.g.__par = Q.g;
+        const karlos = P2.g.players.p1.vanguard[0];
+        P2.g._dslPickClick(karlos);
+        await asentar(Q.ctx);
+        await dormir(400);                   // deja asentar el poller del espejo (60 ms/sondeo)
+        await asentar(Q.ctx); await asentar(P2.ctx);
+
+        const eqQ = (Q.g.players.p1.vanguard[0].equippedCards || []).length;
+        const eqP = (P2.g.players.p1.vanguard[0].equippedCards || []).length;
+        check('el equipo se anexa en el rival (su corrutina hizo el trabajo)', eqQ === 1, 'equipos=' + eqQ);
+        check('...y el volcado del espejo lo devuelve al elector reconectado', eqP === 1, 'equipos=' + eqP);
+        check('el modo espejo se apaga tras asentar', Q.g._espejandoReaccion === false, 'sigue encendido');
+        check('los stats bloqueados a 9 llegan a los dos',
+              P2.g.players.p1.vanguard[0].currentAtk === 9 && Q.g.players.p1.vanguard[0].currentAtk === 9,
+              `P=${P2.g.players.p1.vanguard[0].currentAtk} Q=${Q.g.players.p1.vanguard[0].currentAtk}`);
+
+        check('ESTADO DE PARTIDA IDÉNTICO en ambos clientes', primeraDif(P2.g, Q.g) === 'sin diferencias',
+              primeraDif(P2.g, Q.g));
+    }
 
     console.log(fallos === 0
         ? `\nSUITE reconexion_cliente: ${comprobaciones}/${comprobaciones} comprobaciones — CLIENTES SINCRONIZADOS`
