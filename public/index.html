@@ -349,6 +349,28 @@
             #mod-arrows-layer line, #viewer-lift-arrows line { animation: karlosDashMod 0.9s linear infinite; }
             @keyframes karlosDashAnexo { to { stroke-dashoffset: -10; } }
             @keyframes karlosDashMod { to { stroke-dashoffset: -12; } }
+            /* "Afectado por:" / "Efectos actuales:" — jerarquía tipográfica (Toto, 31-jul-2026).
+               Antes era un párrafo de viñetas del mismo tamaño y color: con varias afecciones, o
+               con una sola larga, no había por dónde entrar. Ahora cada entrada es un bloque con
+               franja lateral, el efecto manda y lo accesorio (turnos, coletilla, fuente) baja de
+               peso. Las dos secciones se distinguen por color -cian la entrante, ámbar la
+               saliente- para saber de un vistazo cuál se está leyendo. */
+            .pe-tit { font-size: .58rem; font-weight: 700; letter-spacing: .09em; text-transform: uppercase;
+                      color: #7dd3fc; padding-bottom: 3px; margin-bottom: 5px; border-bottom: 1px solid rgba(125,211,252,.28); }
+            #cp-effects-out .pe-tit { color: #fcd34d; border-bottom-color: rgba(252,211,77,.28); }
+            .pe-item { border-left: 2px solid rgba(125,211,252,.45); padding: 1px 0 1px 6px; margin-bottom: 5px; line-height: 1.34; }
+            #cp-effects-out .pe-item { border-left-color: rgba(252,211,77,.45); }
+            .pe-item:last-child { margin-bottom: 0; }
+            .pe-efe { color: #e2e8f0; font-weight: 600; }
+            .pe-pos { color: #4ade80; font-weight: 700; }   /* +N: mejora */
+            .pe-neg { color: #f87171; font-weight: 700; }   /* -N: perjuicio */
+            .pe-turnos { display: inline-block; font-size: .57rem; font-weight: 700; color: #cbd5e1;
+                         background: rgba(148,163,184,.2); border-radius: 999px; padding: 0 5px; margin-left: 4px; vertical-align: 1px; }
+            .pe-hab { color: #fbbf24; font-weight: 600; }   /* ámbar: el color de Habilidades del panel */
+            .pe-nota { display: block; color: #a5b4fc; font-style: italic; font-size: .68rem; margin-top: 1px; }
+            .pe-src { display: block; color: #94a3b8; font-size: .66rem; margin-top: 1px; }
+            .pe-src b { color: #cbd5e1; font-weight: 600; }
+            .pe-src i { font-style: normal; opacity: .65; }  /* la etiqueta "fuente:"/"objetivo:" pesa menos que la carta */
             /* Secciones del detalle de Eventos (título amarillo unificado; fondos/bordes distintivos) */
             .ev-req { background: rgba(248,113,113,.12); border-left: 3px solid #f87171; }
             .ev-antes { background: rgba(251,146,60,.12); border-left: 3px solid #fb923c; }
@@ -2217,8 +2239,60 @@
                 // mano) se quedaba sin contarlo, o lo contaba en una SEGUNDA línea escrita a mano
                 // que acababa duplicando la información. La nota la declara la plantilla en
                 // `notaEfecto` y se resuelve al pintar, así que no viaja en el estado.
-                const n = nota ? `, ${nota}` : '';
+                // Va con " · " y no con coma a propósito: la afección YA lleva comas propias
+                // ("+3 VIDA MÁX., +3 DEF y +4 ATQ"), así que con coma no habría forma de saber
+                // dónde acaba el efecto y empieza la coletilla — ni al leer ni al maquetar
+                // (_htmlLineaEfecto la pinta en su propio renglón).
+                const n = nota ? ` · ${nota}` : '';
                 return `${afeccion}${t}${h}${n}, ${comoObjetivo ? 'objetivo' : 'fuente'}: ${ref}`;
+            }
+
+            // Maqueta UNA línea ya construida (por lineaEfecto o escrita a mano por una carta) en
+            // el panel de detalle. Trabaja sobre el TEXTO final y no sustituye a lineaEfecto a
+            // propósito: hay código que inspecciona esas cadenas (el dedupe de líneas de stats,
+            // el "curado" de Oculto/Silenciado…), así que la gramática se mantiene en texto plano
+            // y el HTML se genera solo al pintar. Si una línea no sigue la gramática -las que
+            // algunas cartas escriben a mano- se pinta entera como efecto, sin romperse.
+            // Reparto: el EFECTO manda (claro y en negrita, con los deltas en verde/rojo), los
+            // turnos van en píldora, la Habilidad en ámbar -el color de habilidades del panel-, y
+            // la coletilla y la fuente bajan a su propio renglón, atenuadas. Con muchas entradas
+            // eso es lo que convierte el bloque en una lista legible en vez de un párrafo.
+            _htmlLineaEfecto(texto) {
+                const s = String(texto);
+                let cabeza = s, etiqueta = null, ref = null;
+                const mRef = /,\s(fuente|objetivo):\s/.exec(s);
+                if (mRef) {
+                    cabeza = s.slice(0, mRef.index);
+                    etiqueta = mRef[1];
+                    ref = s.slice(mRef.index + mRef[0].length);
+                }
+                let nota = null;
+                const iNota = cabeza.indexOf(' · ');
+                if (iNota !== -1) { nota = cabeza.slice(iNota + 3); cabeza = cabeza.slice(0, iNota); }
+                let turnos = null;
+                cabeza = cabeza.replace(/\s*\((\d+)\s+(turnos?)\s+restantes?\)/, (m, n, pal) => { turnos = `${n} ${pal}`; return ''; });
+                // El nombre de Habilidad va SIEMPRE en mayúsculas en este proyecto, y se exige
+                // aquí para no confundirlo con un " por " que forme parte de la propia afección
+                // (el estado "Daño por tiempo" es exactamente ese caso).
+                let hab = null;
+                cabeza = cabeza.replace(/\spor\s([A-ZÁÉÍÓÚÜÑ][A-ZÁÉÍÓÚÜÑ0-9 .'\-]*)$/, (m, g) => { hab = g.trim(); return ''; });
+                const efe = cabeza.replace(/([+-]\d+(?:[.,]\d+)?)/g,
+                    (m) => `<span class="${m[0] === '+' ? 'pe-pos' : 'pe-neg'}">${m}</span>`);
+                let html = `<span class="pe-efe">${efe}</span>`;
+                if (turnos) html += `<span class="pe-turnos">${turnos}</span>`;
+                if (hab) html += `<span class="pe-hab"> por ${hab}</span>`;
+                if (nota) html += `<span class="pe-nota">${nota}</span>`;
+                if (ref) {
+                    // "<Nombre> de <JX (Nick)>" -> el nombre resalta y el dueño queda atenuado;
+                    // "esta carta" (o cualquier fuente sin dueño) entra entera como nombre.
+                    // Se ancla en el " de JX (" FINAL y no en el primer " de ": hay nombres de
+                    // carta que lo llevan dentro ("Chaqueta metálica defensiva de la muerte"), y
+                    // partir por el primero se comía media carta.
+                    const mn = /^(.*)\sde\s(J\d\s\(.+)$/.exec(ref);
+                    const cuerpo = mn ? `<b>${mn[1]}</b> de ${mn[2]}` : `<b>${ref}</b>`;
+                    html += `<span class="pe-src"><i>${etiqueta}:</i> ${cuerpo}</span>`;
+                }
+                return `<div class="pe-item">${html}</div>`;
             }
 
             // Coletilla declarada por la plantilla de la carta ORIGEN de un modificador, para
@@ -3933,14 +4007,19 @@
                         });
                     });
 
+                    // Cada entrada es un bloque con su propia franja lateral (ver _htmlLineaEfecto),
+                    // no un "• " dentro de un párrafo: con varias afecciones a la vez, o con una
+                    // sola muy larga, el bloque anterior se leía como un muro (Toto, 31-jul-2026).
                     if (outContainer && _salientes.length > 0) {
-                        outContainer.innerHTML = 'Efectos actuales:<br>• ' + _salientes.join('<br>• ');
+                        outContainer.innerHTML = '<div class="pe-tit">Efectos actuales</div>'
+                            + _salientes.map(l => this._htmlLineaEfecto(l)).join('');
                         outContainer.style.display = 'block';
                     } else if (outContainer) {
                         outContainer.style.display = 'none';
                     }
                     if (effects.length > 0) {
-                        effectsContainer.innerHTML = (card.location === 'hand' ? 'Si lo colocas, se verá afectado por:' : 'Afectado por:') + '<br>• ' + effects.join('<br>• ');
+                        effectsContainer.innerHTML = `<div class="pe-tit">${card.location === 'hand' ? 'Si lo colocas, se verá afectado por' : 'Afectado por'}</div>`
+                            + effects.map(l => this._htmlLineaEfecto(l)).join('');
                         effectsContainer.style.display = 'block';
                     } else {
                         effectsContainer.style.display = 'none';
