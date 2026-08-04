@@ -349,16 +349,17 @@
             #mod-arrows-layer line, #viewer-lift-arrows line { animation: karlosDashMod 0.9s linear infinite; }
             @keyframes karlosDashAnexo { to { stroke-dashoffset: -10; } }
             @keyframes karlosDashMod { to { stroke-dashoffset: -12; } }
-            /* Serie de la carta: informativa, nunca protagonista. Va anclada abajo a la derecha
-               en vez de flotada (Toto, 31-jul-2026): con `float` se pegaba ARRIBA del bloque, así
-               que con dos líneas de tipo quedaba junto a la primera y con una sola se montaba
-               sobre la raya de debajo del nombre. Anclándola al fondo cae siempre a la altura de
-               la ÚLTIMA línea, tenga las que tenga. El hueco reservado a la derecha evita que el
-               texto de tipo se le meta debajo. El relleno lleva 1px más abajo que arriba porque
-               la caja se veía cargada hacia arriba: las mayúsculas y los números no bajan de la
-               línea base, y sin ese píxel el texto no queda ópticamente centrado. */
+            /* Serie de la carta: informativa, nunca protagonista. Segundo intento (Toto,
+               31-jul-2026): el primero anclaba la caja al FONDO del bloque de tipo -bien con una
+               sola línea, pero con dos quedaba pegada a la de abajo en vez de centrada respecto a
+               las dos juntas-. `top:50% + translateY(-50%)` centra la caja en el punto medio de
+               TODO el bloque, salga una línea o dos: no depende de cuántas haya, a diferencia de
+               anclar a un borde. El hueco a la derecha evita que el texto de tipo se le meta
+               debajo. El relleno sigue con 1px más abajo que arriba dentro de la propia cajita
+               -eso es centrar el TEXTO en su caja, un ajuste aparte de centrar la CAJA en el
+               bloque, y ya estaba bien-. */
             .preview-type { position: relative; padding-right: 58px; }
-            .preview-serie { position: absolute; right: 0; bottom: 0;
+            .preview-serie { position: absolute; right: 0; top: 50%; transform: translateY(-50%);
                              font-style: normal; font-size: .62rem; letter-spacing: .04em; line-height: 1.25;
                              color: #64748b; background: rgba(100,116,139,.16); border-radius: 4px;
                              padding: 1px 5px 2px; }
@@ -5594,20 +5595,26 @@
                         if (!isRemote) this.logError("Ya has colocado un aliado este turno.");
                         return;
                     }
+                    // JUGAR requisitos / diagnóstico propio (Némesis, y ahora Neo, 31-jul-2026): se
+                    // comprueba ANTES que el límite genérico de 2 Personajes, no después. Antes
+                    // iba después, y una carta con su propio canPlayCard (Neo: "no se coloca de
+                    // forma normal", con su diagnóstico de quién no cualifica como cebo) nunca
+                    // llegaba a ejecutarse si la vanguardia ya tenía 2 Personajes — el jugador solo
+                    // veía el aviso genérico del límite, sin ninguna pista sobre Neo en concreto.
+                    // El orden no cambia la DECISIÓN final (las dos comprobaciones son AND: hace
+                    // falta pasar las dos), solo cuál mensaje se ve primero cuando ya se sabe que
+                    // no se puede jugar. Las únicas cartas con canPlayCard propio en Personaje/
+                    // Esbirro (Wolfgang, Arthas, Limo crecido) no dependían del orden: Limo crecido
+                    // ya está exento del límite (isEvolution), y las otras dos comprueban una
+                    // condición independiente que el límite igualmente aplicaría después.
+                    if (typeof template.canPlayCard === 'function') {
+                        if (!template.canPlayCard(card, this, p)) return;
+                    }
                     const vanguardChars = p.vanguard.filter(c => c.type === 'Personaje').length;
                     const vanguardFull = p.vanguard.length >= 4;
                     if (!template.isEvolution && !vanguardFull && card.type === 'Personaje' && vanguardChars >= 2) {
-                        if (!isRemote) this.logError("Límite de Personajes en Vanguardia alcanzado (máx. 2). No puedes jugar otro hasta llenarla con Esbirros.");
+                        if (!isRemote) this.logError("Límite de Personajes en Vanguardia alcanzado (máx. 2). No puedes colocar otro hasta que haya menos de 2 en vanguardia.");
                         return;
-                    }
-                    // JUGAR requisitos (Némesis, 31-jul-2026): a diferencia de Ayuda/Evento (arriba),
-                    // esta rama nunca llamaba a canPlayCard -las cartas de Personaje/Esbirro con
-                    // requisito de colocación lo comprobaban a mano dentro de onBeforePlayAsync,
-                    // devolviendo false-. El compilador SÍ genera canPlayCard desde `JUGAR
-                    // requisitos` para cualquier tipo, pero el motor nunca lo invocaba aquí: gap
-                    // real, no específico de esta carta.
-                    if (typeof template.canPlayCard === 'function') {
-                        if (!template.canPlayCard(card, this, p)) return;
                     }
                 }
 

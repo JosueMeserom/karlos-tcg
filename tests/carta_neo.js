@@ -105,6 +105,37 @@ const declinaNeo = (g) => { g.openChoiceModal = (t, ch) => ch[1].action(); };
         check('una carta con requisitos de colocación no es cebo',
               ultimoError(g).includes('tuvo requisitos para colocarse'), ultimoError(g));
     }
+    {
+        // Límite de sitio en el DIAGNÓSTICO (Toto, 31-jul-2026, betasteo con Karlos+Zoe+Incluso
+        // En El KG en vanguardia): un Esbirro cebo que por lo demás cualificaría puede topar con
+        // el máximo de 2 Personajes -Neo lo es, así que sustituirlo AÑADE uno-, y eso debe salir
+        // como razón EXTRA, distinta de "es un Animal salvaje". Un cebo Personaje no tiene este
+        // problema (reemplazarlo no cambia el recuento), así que Karlos/Zoe siguen cualificando.
+        const { ctx, g } = await mesa({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: ['Karlos', 'Zoe', 'Incluso En El KG'], mano: [NEO] }, p2: {},
+        });
+        await g.playCard(g.players.p1.hand[0].instanceId, true); await asentar(ctx);
+        const txt = ultimoError(g);
+        check('con 2 Personajes ya puestos, ELLOS siguen cualificando (reemplazarlos no suma)',
+              !txt.includes('Karlos') && !txt.includes('Zoe'), txt);
+        check('el Esbirro gana la razón EXTRA de sitio, sin perder la suya propia',
+              txt.includes('es un Animal salvaje') && txt.includes('no cabría (ya hay 2 Personajes en vanguardia)'), txt);
+    }
+    {
+        // El mensaje GENÉRICO de la vanguardia llena, con la redacción corregida y NO
+        // interponiéndose al de una carta con diagnóstico propio (ver el orden en playCard).
+        const { ctx, g } = await mesa({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: ['Karlos', 'Zoe'], mano: ['Karolina'] }, p2: {},
+        });
+        // isRemote=false a propósito: el aviso genérico va detrás de `!isRemote` (no debe
+        // repetirse en el replay del rival), a diferencia del de Neo, que es incondicional.
+        await g.playCard(g.players.p1.hand[0].instanceId); await asentar(ctx);
+        check('el mensaje genérico ya no habla de "llenarla con Esbirros"',
+              ultimoError(g) === 'Límite de Personajes en Vanguardia alcanzado (máx. 2). No puedes colocar otro hasta que haya menos de 2 en vanguardia.',
+              ultimoError(g));
+    }
 
     console.log('\n--- Sustitución al DECLARAR un ataque (hereda equipos) ---');
     {

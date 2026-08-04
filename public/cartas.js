@@ -6655,6 +6655,17 @@ const NEO = {
         if (c._haAtacado) razones.push('atacó');
         if (c._haRecibidoDano) razones.push('sufrió daño');
         if (c._haUsadoActiva) razones.push('usó su Activa');
+        // Límite de sitio (Toto, 31-jul-2026): Neo ES un Personaje, así que sustituir un cebo EN
+        // VANGUARDIA le añade uno a la cuenta. Un cebo que ya sea Personaje no tiene este problema
+        // -al reemplazarlo el recuento no cambia, Neo ocupa exactamente su hueco-, pero un Esbirro
+        // que por lo demás cualificara puede topar con el máximo de 2. Mismo recuento que usa el
+        // motor para el límite de colocación (game.players[...].vanguard.filter(tipo Personaje)):
+        // si algún día un Personaje deja de contar para ese límite, hay que tocar los dos sitios.
+        if (c.location === 'vanguard') {
+            const otrosPersonajes = game.players[c.owner].vanguard
+                .filter(x => x.type === 'Personaje' && x.instanceId !== c.instanceId).length;
+            if (otrosPersonajes >= 2) razones.push('no cabría (ya hay 2 Personajes en vanguardia)');
+        }
         return razones;
     },
 
@@ -6685,15 +6696,11 @@ const NEO = {
 
     // Además de ser cebo, hay un límite de sitio: Neo es un Personaje, así que si el cebo está en
     // vanguardia y ya hay DOS Personajes MÁS, no cabría (el motor solo admite 2 por vanguardia).
+    // El límite de sitio ya vive DENTRO de esCebo/razonesNoCebo (así el diagnóstico del log y la
+    // comprobación real en el momento de la reacción usan el MISMO cómputo; antes estaban
+    // duplicados y podían desincronizarse en silencio).
     puedeSustituir(neo, cebo, game) {
-        if (!cebo || cebo.owner !== neo.owner) return false;
-        if (!this.esCebo(cebo, game)) return false;
-        if (cebo.location === 'vanguard') {
-            const otros = game.players[cebo.owner].vanguard
-                .filter(c => c.type === 'Personaje' && c.instanceId !== cebo.instanceId).length;
-            if (otros >= 2) return false;
-        }
-        return true;
+        return !!cebo && cebo.owner === neo.owner && this.esCebo(cebo, game);
     },
 
     preguntar(neo, cebo, game, titulo) {
