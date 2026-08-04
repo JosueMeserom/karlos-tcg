@@ -6566,7 +6566,11 @@ const CARD_DB = [
     {
         name: "Neo", hp: 3, def: 8, atk: 6, type: "Personaje", subtype: "Ser vivo",
         tags: ["Usuaria de semblanza", "mafia"], gender: "F", rarity: "A", series: "R",
-        text: "P: IMAGINACIÓN HIPERACTIVA: No se coloca de forma normal. Desde tu mano, cuando un aliado 'cebo' declare un ataque o vaya a recibir daño, puedes cambiarlo por Neo: el cebo vuelve a tu mano y Neo ocupa su hueco con sus equipos y bonos, y da o recibe el golpe. Cebo: aliado Personaje/Esbirro que no sea Máquina, Ser mágico, Animal salvaje ni Cosa, que no tuviera requisitos para colocarse y que no haya atacado, sufrido daño ni usado su Activa. A: PARED FALSA (4F): Pon un contador en Neo. El próximo ataque que reciba, normal o especial, queda anulado con todos sus efectos y se retira el contador. No acumulable.",
+        // "Requisito: ..." al inicio (Toto, 31-jul-2026): el cliente ya sabe formatear ese prefijo
+        // en su propia caja tipo stats (misma norma Coste/Requisito de siempre) — no hace falta
+        // nada nuevo, solo escribirlo. Es un REQUISITO y no un Coste porque no se paga/pierde
+        // nada al colocarla: es solo la condición que dispara la reacción.
+        text: "Requisito: Un 'cebo' que ataque o vaya a sufrir daño. P: IMAGINACIÓN HIPERACTIVA: No se coloca de forma normal. Desde tu mano, cuando un aliado 'cebo' declare un ataque o vaya a recibir daño, puedes cambiarlo por Neo: el cebo vuelve a tu mano y Neo ocupa su hueco con sus equipos y bonos, y da o recibe el golpe. Cebo: aliado Personaje/Esbirro que no sea Máquina, Ser mágico, Animal salvaje ni Cosa, que no tuviera requisitos para colocarse y que no haya atacado, sufrido daño ni usado su Activa. A: PARED FALSA (4F): Pon un contador en Neo. El próximo ataque que reciba, normal o especial, queda anulado con todos sus efectos y se retira el contador. No acumulable.",
         passiveName: "IMAGINACIÓN HIPERACTIVA", activeName: "PARED FALSA", activeCost: 4,
 
         // PARED FALSA es 100% declarativa y no necesitó ninguna pieza nueva: el op ESQUIVAR ya
@@ -6691,7 +6695,11 @@ const NEO = {
             .map(x => `${game.nCarta(x.c)} ${this._enumerar(x.razones)}`)
             .join('; ');
         const todos = fallan.length === colocados.length;
-        return `${base} ${todos ? 'Ninguno cualifica' : 'No cualifica'}: ${detalle}.`;
+        // "No cualifican" (plural), no "cualifica": la frase anterior habla de Neo, y en singular
+        // se leía como si el sujeto siguiera siendo ella. El plural deja claro que habla de los
+        // aliados listados a continuación (Toto, 31-jul-2026). "Ninguno cualifica" se queda en
+        // singular a propósito: "ninguno" ya es un pronombre singular sin ambigüedad posible.
+        return `${base} ${todos ? 'Ninguno cualifica' : 'No cualifican'}: ${detalle}.`;
     },
 
     // Además de ser cebo, hay un límite de sitio: Neo es un Personaje, así que si el cebo está en

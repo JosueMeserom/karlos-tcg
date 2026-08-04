@@ -359,10 +359,18 @@
                -eso es centrar el TEXTO en su caja, un ajuste aparte de centrar la CAJA en el
                bloque, y ya estaba bien-. */
             .preview-type { position: relative; padding-right: 58px; }
-            .preview-serie { position: absolute; right: 0; top: 50%; transform: translateY(-50%);
+            .preview-serie { position: absolute; right: 0; top: 50%; transform: translateY(calc(-50% + 2px));
                              font-style: normal; font-size: .62rem; letter-spacing: .04em; line-height: 1.25;
                              color: #64748b; background: rgba(100,116,139,.16); border-radius: 4px;
                              padding: 1px 5px 2px; }
+            /* El +2px de arriba es un ajuste ÓPTICO, no una corrección de las matemáticas del
+               centrado (Toto, 31-jul-2026): con una sola línea seguía viéndose un pelín alta. El
+               centro GEOMÉTRICO de la caja de texto no coincide con el centro VISUAL de la tinta
+               -las mayúsculas y la ausencia de descendentes en la mayoría de las palabras dejan
+               más "aire" arriba que abajo dentro de esa caja-, así que centrar matemáticamente
+               deja la caja un poco por encima de donde el ojo espera el centro. Con dos líneas el
+               efecto se diluye (el hueco entre ambas ya marca un centro visual más fiable) y el
+               empujón de 2px es imperceptible sobre un bloque bastante más alto. */
             /* "Afectado por:" / "Efectos actuales:" — jerarquía tipográfica (Toto, 31-jul-2026).
                Antes era un párrafo de viñetas del mismo tamaño y color: con varias afecciones, o
                con una sola larga, no había por dónde entrar. Ahora cada entrada es un bloque con
