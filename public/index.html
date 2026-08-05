@@ -2379,6 +2379,22 @@
                 return false;
             }
 
+            // ¿Hay algún Evento activo (propio o rival) que fuerce este stat a otro valor para
+            // ESTA carta en concreto? (Toto, 5-ago-2026). Genérico y sin nombrar ninguna carta:
+            // reutiliza el mismo interceptor de GLOBAL_ANTES_DE_CAMBIO_STAT que ya aplica el
+            // cambio real, sondeando con +1 -si vuelve distinto, algo lo está reescribiendo-. Lo
+            // consultan el badge rojo de Furor y cualquier otro sitio que necesite saber "¿esto
+            // está bloqueado ahora mismo?" sin duplicar la lógica de inmunidad (Eris/Kami).
+            _statForzadoPorEvento(card, stat) {
+                for (const pid of ['p1', 'p2']) {
+                    const ev = this.players[pid] && this.players[pid].activeEvent;
+                    if (ev && typeof getCardTemplate(ev.id).onGlobalBeforeStatChange === 'function') {
+                        if (getCardTemplate(ev.id).onGlobalBeforeStatChange(ev, card, stat, 1, null, this) !== 1) return true;
+                    }
+                }
+                return false;
+            }
+
             modifyStat(card, stat, amount, offsetY = 0, source = null, opts = null) {
                 if (amount === 0) return;
 
@@ -2418,12 +2434,13 @@
                         setTimeout(() => showFloatingText(card.instanceId, "REVELADO", "ft-gray", 20), 400);
                     }
                 } else if (stat === 'furor') {
-                    // --- Bloqueo de Bancarrota ---
-                    const isBankrupt = this.players.p1.activeEvent?.name === 'Bancarrota' || this.players.p2.activeEvent?.name === 'Bancarrota';
-                    if (isBankrupt && source !== 'bancarrota_restore') {
-                        return; // Nadie gana ni pierde Furor si hay Bancarrota
-                    }
-
+                    // El bloqueo de Bancarrota YA NO vive aquí (Toto, 5-ago-2026): este bloque
+                    // hardcodeado por NOMBRE de carta comprobaba "¿hay una Bancarrota en juego?"
+                    // sin mirar si ESTA carta es inmune -por eso Eris y Kami se congelaban igual-.
+                    // El interceptor genérico de arriba (onGlobalBeforeStatChange, líneas ~2398)
+                    // ya deja `amount` en 0 para quien SÍ deba congelarse, y ya sale por el
+                    // `if (amount === 0) return;` de justo después: este bloque era una segunda
+                    // puerta redundante y, a diferencia de la primera, ciega a la inmunidad.
                     if (amount > 0) {
                         const template = getCardTemplate(card.id);
                         if (typeof template.onBeforeGainFuror === 'function') {
@@ -3781,7 +3798,13 @@
                             }
                         });
                     } else {
-                        parts = _txtBase.split(/\s*\b(P:|A:)\s*/);
+                        // Ojo con \b aquí: en JS no reconoce vocales acentuadas como parte de la
+                        // palabra, así que "SABIDURÍA:" cuela una frontera falsa justo antes de la
+                        // "A" final y el parser la confundía con el marcador "A:" de la Activa
+                        // (Toto, 5-ago-2026, betasteo de Wolfgang: "SABIDURÍ" + dos Activas). La
+                        // condición correcta es Unicode-consciente: el carácter anterior no puede
+                        // ser NINGUNA letra o dígito (\p{L}\p{N}, con el flag 'u'), acentuada o no.
+                        parts = _txtBase.split(/\s*(?<![\p{L}\p{N}])(P:|A:)(?=\s)\s*/u);
                     }
                     
                     for (let part of parts) {
@@ -7521,6 +7544,13 @@
                 card.tempEffects = [];
                 card.counters = {};
                 card.hasAttackedThisTurn = false;
+                // stealth (Oculto): mismo criterio que el resto de esta lista -una carta que
+                // deja de estar en juego se limpia de todo lo transitorio- (Toto, 5-ago-2026,
+                // betasteo: la Zoe vieja se veía Oculta y agotada en los descartes tras
+                // evolucionar). Con guard (createCardInstance NUNCA inicializa `stealth`, así
+                // que sin el `if` esto le crea el campo A TODAS las cartas -incluidas Ayudas
+                // que nunca lo tocan- ensuciando el estado exportado sin necesidad).
+                if (card.stealth) card.stealth = false;
                 delete card.bankruptStoredFuror; // <--- Vaciamos el bolsillo del furor
                 
                 // 3. Desechar equipos a la basura si los hubiera
@@ -8889,8 +8919,8 @@
 
                     // SOLO dibujamos el Furor si está FÍSICAMENTE en el campo (y no es un modal visual)
                     if (!inHand && !isVisualOnly && (card.location === 'vanguard' || card.location === 'rearguard')) {
-                        const isBankrupt = this.players?.p1?.activeEvent?.name === 'Bancarrota' || this.players?.p2?.activeEvent?.name === 'Bancarrota';
-                        
+                        const isBankrupt = this._statForzadoPorEvento(card, 'furor');
+
                         if (isBankrupt) {
                             // Muestra el Furor original que guardamos en el bolsillo (o 0 si entró al campo durante la Bancarrota)
                             const shownFuror = card.bankruptStoredFuror !== undefined ? card.bankruptStoredFuror : card.furor;

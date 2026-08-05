@@ -1560,7 +1560,12 @@ const CARD_DB = [
     },
     {
         name: "Entrenamiento arduo", type: "Evento", rarity: "A", cost: 0, duration: 3, series: 1,
-        text: "3 turnos. Requiere a Zoe en el campo. Al colocarla, oculta y agota a Zoe. Mientras esté en juego, si Zoe muere, esta carta se destruye. Al expirar, cura a Zoe, busca a Zoe (calcinante) en tu mazo y la evoluciona.",
+        // Reestructurado (Toto, 5-ago-2026): "oculta y agota" no es algo que pase SOLO al
+        // colocarla, es una condición que dura TODO el tiempo que el Evento está en juego (así lo
+        // hace onUpdatePassive, más abajo: se reaplica en cada pasada) — el "Al colocarla:" viejo
+        // sugería un efecto puntual y era engañoso. El "Al expirar" también se detalla más: qué se
+        // cura exactamente y que los bonos de Vida/Atq/Def acumulados sobreviven a la evolución.
+        text: "3 turnos. Requiere a Zoe en el campo. Mientras esté en juego, oculta y agota a Zoe; si Zoe muere, esta carta se destruye. Al expirar, cura la Vida y los estados alterados de Zoe, busca a Zoe (calcinante) en tu mano o mazo, y la evoluciona, conservando sus bonos.",
         abilities: [
             { trigger: "PREVIEW_GLOBAL", lineas: [ { quien: "ALIADO", filtros: [ { campo: "name", op: "==", valor: "Zoe" } ], texto: "{genero?Oculto y agotado|Oculta y agotada} por el entrenamiento; si muere, el Evento se destruye" } ] }
         ], 
@@ -1609,7 +1614,11 @@ const CARD_DB = [
                     calcinante.maxHp += (zoe.maxHp - baseZoe.hp);
                     calcinante.currentHp = calcinante.maxHp;
                     calcinante.furor = zoe.furor;
-                    calcinante.status = { ...zoe.status };
+                    // SIN copiar zoe.status (Toto, 5-ago-2026): "cura los estados alterados de
+                    // Zoe" significa que la calcinante empieza LIMPIA, no que hereda el DoT o la
+                    // Confusión que Zoe tuviera encima. createCardInstance ya la deja con
+                    // status:{} por defecto -no hace falta tocar nada aquí, la línea vieja era
+                    // justo lo que lo rompía-.
                     // Las MARCAS TEMPORALES también viajan (Toto, 31-jul-2026, barrido tras el bug
                     // de SABIDURÍA). Sin esto, el `+=` de arriba copiaba el bono como un número
                     // suelto sobre currentAtk/currentDef, y updatePassives lo borra en la primera
@@ -1623,6 +1632,13 @@ const CARD_DB = [
                     if (zoe.equippedCards && zoe.equippedCards.length) {
                         calcinante.equippedCards = zoe.equippedCards;
                         calcinante.equippedCards.forEach(eq => { eq.equippedTo = calcinante.instanceId; });
+                        // Rompe la referencia compartida (Toto, 5-ago-2026): calcinante.equippedCards
+                        // apunta al MISMO array que zoe.equippedCards -no una copia-. El resetCard()
+                        // de más abajo, al descartar a la Zoe vieja, llama a unequipAll(zoe), que
+                        // desequiparía (y descartaría) esos mismos equipos TAMBIÉN de la calcinante
+                        // por compartir los objetos. Vaciar aquí el array de zoe deja intacto el de
+                        // calcinante (la reasignación no muta el array original).
+                        zoe.equippedCards = [];
                     }
 
                     calcinante.location = zoe.location;
@@ -1633,11 +1649,17 @@ const CARD_DB = [
                         const idx = p.rearguard.findIndex(c => c.instanceId === zoe.instanceId);
                         p.rearguard[idx] = calcinante;
                     }
-                    
-                    game.render(); 
+
+                    game.render();
                     try { await animateEvolution(calcinante.instanceId); } catch(e) {}
-                    
+
+                    // Limpieza universal (Toto, 5-ago-2026, betasteo: la Zoe vieja se veía Oculta,
+                    // agotada y todavía afectada por Wolfgang en los descartes). Mismo patrón que
+                    // ya usan Sadame/Limo primario al evolucionar -resetCard ANTES de descartar-;
+                    // aquí faltaba. Va DESPUÉS de haber extraído todo lo que la calcinante necesita
+                    // (diffs de stats, marcas, equipo), nunca antes.
                     zoe.location = 'discard';
+                    if (typeof game.resetCard === 'function') game.resetCard(zoe);
                     p.discard.push(zoe);
                     if (fromZone === 'hand') p.hand = p.hand.filter(c => c.instanceId !== calcinante.instanceId);
                 }
@@ -1814,7 +1836,7 @@ const CARD_DB = [
     },
     {
         name: "Wolfgang", hp: 5, def: 3, atk: 3, type: "Personaje", subtype: "Ser mágico", tags: ["Invocación", "Bestia animal"], gender: "F", rarity: "B",
-        text: "Requisito: Aniceto en tu campo o bien Coste: Manzanahoria de tu mano. P: Al colocar: +1 Def y Atq a vanguardia aliada. A: TENTAR A LA SUERTE (1F): 3 monedas. Ataca 1 vez por cada Cara.",
+        text: "Requisito: Aniceto en tu campo o bien Coste: Manzanahoria de tu mano. P: SABIDURÍA: Al colocar, +1 Def y Atq a vanguardia aliada. A: TENTAR A LA SUERTE (1F): 3 monedas. Ataca 1 vez por cada Cara.",
         passiveName: "SABIDURÍA", activeName: "TENTAR A LA SUERTE", activeCost: 1, series: 1,
         
         canPlayCard: function(card, game, p) {
@@ -9156,10 +9178,14 @@ const DSL = {
         const globalStat = abs.find(a => a.trigger === 'GLOBAL_ANTES_DE_CAMBIO_STAT');
         if (globalStat && typeof tmpl.onGlobalBeforeStatChange !== 'function') {
             tmpl.onGlobalBeforeStatChange = function (ev, target, stat, amount, source, game) {
+                const _tt = getCardTemplate(target.id) || {};
+                // Kami es intocable SIEMPRE (Toto, 5-ago-2026): a diferencia de
+                // `immuneToEnemyEvents` -que solo protege del Evento RIVAL-, el "Inmune a TODO"
+                // de un Avatar no depende de quién lo lanzó, ni siquiera de su propio dueño.
+                if (_tt.isAvatar) return amount;
                 // Mismo veto que las líneas del detalle (ver onGlobalGetPreviewEffects): un
                 // enemigo inmune a Eventos no se entera de este interceptor (Eris).
-                const _tt = getCardTemplate(target.id) || {};
-                if (target.owner !== ev.owner && (_tt.immuneToEnemyEvents || _tt.isAvatar)) return amount;
+                if (target.owner !== ev.owner && _tt.immuneToEnemyEvents) return amount;
                 for (const r of (globalStat.reglas || [])) {
                     if (r.stat && r.stat !== stat) continue;
                     if (r.quien === 'ALIADO' && target.owner !== ev.owner) continue;
@@ -9170,6 +9196,18 @@ const DSL = {
                 }
                 return amount;
             };
+            // Ancla visual de la flecha del detalle (Toto, 5-ago-2026): sin esto, cualquier carta
+            // afectada por este interceptor apunta al CENTRO de la carta en vez de a la píldora
+            // del stat en cuestión — mismo hueco que ya se cubrió para GLOBAL_MODIFICAR_FUROR
+            // (ver onGlobalGetPreviewBadges más abajo), pero ese vive en OTRO trigger y Bancarrota
+            // usa este. Reutiliza EXACTAMENTE la lógica de onGlobalBeforeStatChange -probando con
+            // una cantidad de sondeo- para no duplicar la inmunidad ni las reglas por triplicado.
+            if (typeof tmpl.onGlobalGetPreviewBadges !== 'function') {
+                tmpl.onGlobalGetPreviewBadges = function (ev, target, game) {
+                    if (tmpl.onGlobalBeforeStatChange(ev, target, 'furor', 1, null, game) !== 1) return ['furor'];
+                    return [];
+                };
+            }
         }
 
         const previewG = abs.find(a => a.trigger === 'PREVIEW_GLOBAL');
