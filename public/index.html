@@ -359,11 +359,15 @@
                -eso es centrar el TEXTO en su caja, un ajuste aparte de centrar la CAJA en el
                bloque, y ya estaba bien-. */
             .preview-type { position: relative; padding-right: 58px; }
-            .preview-serie { position: absolute; right: 0; top: 50%; transform: translateY(calc(-50% + 2px));
+            .preview-serie { position: absolute; right: 0; top: 50%; transform: translateY(calc(-50% + 1px));
                              font-style: normal; font-size: .62rem; letter-spacing: .04em; line-height: 1.25;
                              color: #64748b; background: rgba(100,116,139,.16); border-radius: 4px;
                              padding: 1px 5px 2px; }
-            /* El +2px de arriba es un ajuste ÓPTICO, no una corrección de las matemáticas del
+            /* EL MANDO DE AJUSTE: el "+1px" del translateY de arriba. Súbelo (2px, 3px) para
+               bajar la cajita, bájalo (0px, -1px) para subirla; el 0 es el centro geométrico
+               exacto. El otro mando, más fino, es el `padding: 1px 5px 2px` de la propia caja:
+               ese centra el TEXTO DENTRO de la cajita, no la cajita en el bloque.
+               El +1px de arriba es un ajuste ÓPTICO, no una corrección de las matemáticas del
                centrado (Toto, 31-jul-2026): con una sola línea seguía viéndose un pelín alta. El
                centro GEOMÉTRICO de la caja de texto no coincide con el centro VISUAL de la tinta
                -las mayúsculas y la ausencia de descendentes en la mayoría de las palabras dejan
@@ -4076,6 +4080,12 @@
                         [...(otra.tempEffects || []), ...(otra.activeEffects || [])].forEach(eff => {
                             const t = getCardTemplate(eff.sourceId);
                             if (t && t.tempEffectSinLinea) return; // p. ej. Súper Evolución: los +ATQ/+DEF ya salen vía _statMods, esta línea era redundante y sin info (sin duración real)
+                            // Misma redundancia, pero detectada por la propia marca en vez de
+                            // carta a carta (Toto, 5-ago-2026): si la marca lleva `stats`, su
+                            // efecto YA sale arriba como "+1 DEF y +1 ATQ ... por SABIDURÍA".
+                            // Esta línea solo repetía el nombre de la carta origen sin aportar
+                            // nada (el "Wolfgang" suelto bajo cada aliado inspirado).
+                            if (eff.stats) return;
                             if (eff.sourceInstanceId ? eff.sourceInstanceId === card.instanceId : (t && t.name === card.name)) {
                                 _salientes.push(this.lineaEfecto(t ? t.name : 'Efecto', { turnos: eff.duration, ref: _obj, comoObjetivo: true }));
                             }
@@ -4367,6 +4377,19 @@
                 this.resolveVisualSearch(sel);
             }
 
+            // ¿El cupo POR FILA de la elección en curso ya está lleno para la fila de esta
+            // carta? (Toto, 5-ago-2026). Lo consultan los dos sitios que tienen que coincidir: el
+            // clic (que la rechaza) y el render (que ya no le pinta el reborde verde) — si solo
+            // lo supiera el clic, el jugador seguiría viendo como elegibles cartas que no lo son.
+            _dslZonaLlena(card) {
+                const ctx = this.dslPick;
+                if (!ctx || !ctx.maxPorZona) return false;
+                const z = card.location === 'rearguard' ? 'retaguardia' : 'vanguardia';
+                const tope = ctx.maxPorZona[z];
+                if (typeof tope !== 'number') return false;
+                return ctx.targets.filter(t => (t.location === 'rearguard' ? 'retaguardia' : 'vanguardia') === z).length >= tope;
+            }
+
             _dslPickClick(card) {
                 const ctx = this.dslPick;
                 if (!ctx) return;
@@ -4379,16 +4402,10 @@
                 if (ctx.targets.some(t => t.instanceId === card.instanceId)) return;
                 // maxPorZona (AL-FÉNIX, 31-jul-2026): cupo POR FILA además del total. El cupo
                 // global (ctx.n) no puede expresar "hasta 3 en vanguardia y 1 en retaguardia".
-                if (ctx.maxPorZona) {
+                if (this._dslZonaLlena(card)) {
                     const _z = card.location === 'rearguard' ? 'retaguardia' : 'vanguardia';
-                    const _tope = ctx.maxPorZona[_z];
-                    if (typeof _tope === 'number') {
-                        const _ya = ctx.targets.filter(t => (t.location === 'rearguard' ? 'retaguardia' : 'vanguardia') === _z).length;
-                        if (_ya >= _tope) {
-                            if (_soyElChooser) this.logError(`Ya has elegido el máximo de ${_tope} en ${_z}.`);
-                            return;
-                        }
-                    }
+                    if (_soyElChooser) this.logError(`Ya has elegido el máximo de ${ctx.maxPorZona[_z]} en ${_z}.`);
+                    return;
                 }
                 ctx.targets.push(ctx.byId[card.instanceId]);
                 if (ctx.targets.length >= ctx.n) {
@@ -5090,6 +5107,13 @@
                     });
                 });
 
+                // Reponer las Pasivas ANTES de pintar nada (Toto, 5-ago-2026): el bucle de arriba
+                // acaba de desagotar a TODO el mundo, incluidas las cartas que están agotadas por
+                // una Pasiva ajena y no por haber actuado (Zoe bajo Entrenamiento arduo). Sin esta
+                // pasada, esa carta se veía despierta durante todo el arranque del turno y solo
+                // volvía a agotarse en el updatePassives de la Fase Principal.
+                this.updatePassives();
+
                 this.updatePhaseDisplay('ROBO');
                 await showPhaseBanner(`${pName}: FASE DE ROBO`);
 
@@ -5511,8 +5535,14 @@
                                 if (typeof template.onUpdateTempEffect === 'function') {
                                     const antes = _foto();
                                     template.onUpdateTempEffect(card, eff, this);
-                                    // Efecto temporal dejado por una Ayuda/Evento: sin "por HABILIDAD",
-                                    // pero CON su cuenta atrás. La carta origen casi siempre está ya en
+                                    // Efecto temporal dejado por otra carta, CON su cuenta atrás. La
+                                    // firma ("por SABIDURÍA") sale de la propia marca: el DSL la estampa
+                                    // al crearla (ver MARCAR_TEMPORAL). Antes iba SIEMPRE en null porque
+                                    // solo las Ayudas y los Eventos dejaban marcas -y ahí la gramática
+                                    // omite el "por HABILIDAD"-, pero hoy también las dejan las Pasivas
+                                    // de unidad, y esas sí tienen que firmar. Sin marca (Ayuda/Evento),
+                                    // sigue saliendo null: mismo resultado de siempre.
+                                    // La carta origen casi siempre está ya en
                                     // el descarte (la Ayuda se consume al usarse); findCard la localiza
                                     // ahí y refCarta añade ", en su pila de descartes". Como respaldo,
                                     // si no aparece, se busca por id de plantilla en ambos descartes.
@@ -5523,25 +5553,14 @@
                                             if (_hit) { _srcTemp = _hit; break; }
                                         }
                                     }
-                                    _anota(antes, template.name, eff.sourceInstanceId || null, null, null, null, _srcTemp, eff.duration);
+                                    _anota(antes, template.name, eff.sourceInstanceId || null, null, null, eff.habilidad || null, _srcTemp, eff.duration);
                                 }
                             });
                         }
                     });
 
                     const antesCaps = _foto();
-                    [...p.vanguard, ...p.rearguard].forEach(card => {
-                        const template = getCardTemplate(card.id);
-                        if (!template.ignoreStatCaps) { 
-                            if (card.currentAtk > 9) card.currentAtk = 9;
-                            if (card.currentAtk < 0) card.currentAtk = 0;
-                            
-                            if (card.currentDef > 9) card.currentDef = 9;
-                            if (card.currentDef < 0) card.currentDef = 0;
-                            
-                            if (card.maxHp > 9) card.maxHp = 9;
-                        }
-                    });
+                    this.aplicarTopesStats([...p.vanguard, ...p.rearguard]);
                     _anota(antesCaps, 'Límite de características (0-9)', null, null, null);
 
                     // SUELO/TECHO DE STATS ("no bajan de base" / "máxima X"): CLAMP FINAL, después
@@ -5590,6 +5609,24 @@
                             card._sueloAvisado = false; // ya nada intenta saltarse el límite: se rearma el aviso
                         }
                     });
+                });
+            }
+
+            // Tope de características 0-9 (y Vida máxima 9). Vive en su propio método porque se
+            // aplica en DOS momentos: al final de updatePassives -donde siempre estuvo- y al
+            // PINTAR. Entre una pasada y la siguiente puede haber estados transitorios fuera de
+            // rango que el jugador llega a ver: la evolución de Zoe suma el bono de la Zoe
+            // anterior sobre una base que ya era 9 y enseñaba "10/9" hasta el siguiente recálculo
+            // (Toto, 5-ago-2026). `ignoreStatCaps` en la plantilla sigue siendo la puerta para
+            // cualquier carta futura que deba poder rebasarlo.
+            aplicarTopesStats(cards) {
+                cards.forEach(card => {
+                    if ((getCardTemplate(card.id) || {}).ignoreStatCaps) return;
+                    if (card.currentAtk > 9) card.currentAtk = 9;
+                    if (card.currentAtk < 0) card.currentAtk = 0;
+                    if (card.currentDef > 9) card.currentDef = 9;
+                    if (card.currentDef < 0) card.currentDef = 0;
+                    if (card.maxHp > 9) card.maxHp = 9;
                 });
             }
 
@@ -7965,6 +8002,10 @@
 
             // --- RENDERING ---
             render() {
+                // Ninguna carta se pinta nunca con una característica fuera del 0-9 (ver
+                // aplicarTopesStats): entre pasadas de updatePassives puede haber transitorios.
+                this.aplicarTopesStats([...this.players.p1.vanguard, ...this.players.p1.rearguard,
+                                        ...this.players.p2.vanguard, ...this.players.p2.rearguard]);
                 document.getElementById('turn-counter').innerText = this.turn;
 
                 const uiLayer = document.getElementById('ui-layer');
@@ -8064,8 +8105,15 @@
                 eventEl.onmouseenter = null;
                 eventEl.onmouseleave = null;
 
-                // 2. CAPA FRONTAL: Si hay evento, creamos la carta superpuesta
-                if (p.activeEvent) {
+                // 2. CAPA FRONTAL: Si hay evento, creamos la carta superpuesta.
+                // `duration <= 0` = está EXPIRANDO ahora mismo: su animación de desvanecido ya
+                // corrió, pero la carta sigue en `activeEvent` hasta que termine todo su onExpire
+                // (que puede ser largo: la evolución de Zoe dura varios segundos). Cualquier
+                // render de por medio la repintaba de vuelta en su hueco, con "0 turnos", para
+                // desaparecer luego de golpe y sin animación (betasteo de Toto, 5-ago-2026).
+                // Ojo: `undefined <= 0` es false, así que los Eventos sin duración (Cogorza,
+                // Caza del tesoro) no se ven afectados.
+                if (p.activeEvent && !(p.activeEvent.duration <= 0)) {
                     const evCard = p.activeEvent;
                     
                     const eventCardEl = document.createElement('div');
@@ -8697,7 +8745,8 @@
                 // ser el RIVAL del jugador activo (ACERTIJO en cruz), y es a ÉL a quien
                 // debe salirle el reborde verde, no al jugador activo.
                 const _dslSoyChooser = this.gameMode === 'local' || this.myPlayerId === ((this.dslPick && this.dslPick.chooserId) || this.activePlayerId);
-                if (_dslSoyChooser && this.inputState === 'SELECT_DSL_TARGETS' && this.dslPick && this.dslPick.pool.has(card.instanceId) && !this.dslPick.targets.some(t => t.instanceId === card.instanceId)) {
+                if (_dslSoyChooser && this.inputState === 'SELECT_DSL_TARGETS' && this.dslPick && this.dslPick.pool.has(card.instanceId) && !this.dslPick.targets.some(t => t.instanceId === card.instanceId)
+                    && !this._dslZonaLlena(card)) {
                     el.classList.add('valid-target');
                 }
 
@@ -9208,7 +9257,17 @@
                     // con `pendingInteraction`, porque quien pone SELECT_ABILITY_TARGETS es CADA
                     // carta imperativa por su cuenta (una veintena de sitios): se DERIVA aquí, que
                     // es el único punto por el que pasa todo lo que se envía.
-                    pendingAbilityTarget: this._descriptorAbilityTarget()
+                    pendingAbilityTarget: this._descriptorAbilityTarget(),
+                    // Targeting de ATAQUE/RETIRADA normal (SELECT_TARGET: has clicado tu carta y
+                    // estás viendo los rebordes de los objetivos). Es el caso MÁS común de todos y
+                    // era el único que faltaba: como `ayudaTarget` y `pendingAbilityTarget`, la
+                    // elección no la resuelve ninguna corrutina, sino el replay del segundo clic
+                    // (SELECT_CARD) que la cola entrega a los dos clientes -y ese replay solo
+                    // encaja si AMBOS siguen en SELECT_TARGET con la misma carta seleccionada-.
+                    // Quien recargaba aquí perdía inputState/selectedCard (estado LOCAL) y ya no
+                    // espejaba el ataque. Se deriva aquí, como el de Activa.
+                    pendingAttackTarget: (this.inputState === 'SELECT_TARGET' && this.selectedCard)
+                        ? { sourceId: this.selectedCard.instanceId, chooserId: this.activePlayerId } : null
                 };
             }
 
@@ -9413,6 +9472,19 @@
                 // motivo que `ayudaTarget` — la elección no la resuelve una Promise viva sino el
                 // replay del clic (SELECT_CARD), y el no elector necesita el mismo
                 // inputState/selectedCard/abilityContext para que ese replay vuelva a encajar.
+                // Targeting de ataque/retirada: idéntico razonamiento, y también en LOS DOS
+                // clientes. importGameState acaba de dejar inputState en 'IDLE', así que el guard
+                // solo deja pasar el caso real (nadie ha reconstruido nada todavía).
+                const pt = state.pendingAttackTarget;
+                if (pt && !yaTengoUI && this.inputState === 'IDLE') {
+                    const _atk = this.findCard(pt.sourceId);
+                    if (_atk) {
+                        this.selectedCard = _atk;
+                        this.inputState = 'SELECT_TARGET';
+                        this.render();
+                    }
+                }
+
                 const pat = state.pendingAbilityTarget;
                 if (pat && !yaTengoUI && this.inputState !== 'SELECT_ABILITY_TARGETS') {
                     const _src = this.findCard(pat.sourceId);

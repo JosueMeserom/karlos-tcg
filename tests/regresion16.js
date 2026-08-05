@@ -201,6 +201,12 @@ const escenarios = [
             { contiene: 'estado.p1.vanguard.0.maxHp', motivo: 'la vieja no expande el máximo (rechazó el objetivo); la nueva lo expande a 6' },
             { contiene: 'estado.p1.discard', motivo: 'la vieja no descarta Manzanahoria (no llegó a usarse); la nueva sí' },
             { contiene: 'estado.p1.cardCounts', motivo: 'consecuencia del mismo desajuste: la nueva asigna copyId al descartar, la vieja no llega a esa rama' },
+            // Aflora al añadir `pendingAttackTarget` al estado exportado (reanudar-perfecto del
+            // targeting de ataque, 5-ago-2026): no es un cambio de comportamiento, es la MISMA
+            // divergencia de arriba hecha visible. Al rechazar el objetivo de la Ayuda, la vieja
+            // deja el clic sobre Limo primario cayendo en la rama de "seleccionar carta para
+            // atacar" y se queda en SELECT_TARGET; la nueva consume la Ayuda y no llega ahí.
+            { contiene: 'estado.pendingAttackTarget', motivo: 'la vieja acaba en SELECT_TARGET (el clic rechazado por la Ayuda cae en la rama de ataque); la nueva usa la Manzanahoria y termina en IDLE' },
         ],
     },
 ];

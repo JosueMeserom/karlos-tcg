@@ -16,10 +16,12 @@
 // AL_DESTRUIR repite el efecto de AL_CADUCAR: si la destruyen antes de tiempo (Giro de guion), el
 // Furor tiene que volver igual. La imperativa lo resolvía llamando a su propio onExpire.
 //
-// INCOHERENCIA DE LA CARTA que se replica TAL CUAL, sin arreglarla: el secuestro y el bloqueo
-// alcanzan a todas las cartas, incluidas las inmunes a Eventos enemigos (Kami), pero la línea del
-// detalle SÍ las excluye. Ya estaba así en la imperativa; unificarlo es una decisión de diseño de
-// Toto, no un efecto colateral de una migración.
+// INCOHERENCIA DE LA CARTA, UNIFICADA a petición de Toto (5-ago-2026): el secuestro y el bloqueo
+// alcanzaban a TODAS las cartas, incluidas las inmunes a Eventos enemigos, mientras que la línea
+// del detalle SÍ las excluía — la carta decía "no te afecto" y te vaciaba el Furor igual. Ahora
+// el veto vive en DSL._pool (punto único por el que pasan todos los objetivos de un Evento) y en
+// el interceptor GLOBAL_ANTES_DE_CAMBIO_STAT, así que vale para cualquier Evento, presente o
+// futuro, sin que cada carta tenga que acordarse. Ver el escenario de Eris.
 
 'use strict';
 const { correrSuite } = require('./harness');
@@ -62,6 +64,23 @@ const escenarios = [
         // debe volver igual que al expirar (AL_DESTRUIR repite el mismo efecto que AL_CADUCAR).
         // Giro de guion exige tener ya un Evento propio, de ahí el Apagón de p2: es solo el
         // billete de entrada, lo que se prueba es que la Bancarrota de p1 suelte el Furor.
+        // INCOHERENCIA UNIFICADA (Toto, 5-ago-2026), ya no replicada: Eris declara "Inmune a
+        // Eventos enemigos" y la vieja se lo congelaba igual — solo la línea del detalle la
+        // respetaba, o sea que la carta decía "no te afecto" mientras le vaciaba el Furor. El
+        // veto se ha puesto en DSL._pool (todo target de un Evento pasa por ahí) y en el
+        // interceptor GLOBAL_ANTES_DE_CAMBIO_STAT, así que alcanza a cualquier Evento futuro,
+        // no solo a esta carta. El Oso, que no es inmune, sí se congela: es el control.
+        nombre: 'Bancarrota NO congela a un enemigo inmune a Eventos enemigos (Eris)',
+        turno: 2, turnoDe: 'p1', empieza: 'p2',
+        p1: { vanguardia: [{ carta: 'Karlos', furor: 3 }], mano: ['Bancarrota'] },
+        p2: { vanguardia: [{ carta: 'Eris', furor: 2 }, { carta: 'Oso con armadura', furor: 2 }] },
+        pasos: [ { jugar: 'Bancarrota' } ],
+        diferenciasEsperadas: [
+            { contiene: 'p2.vanguard.0.furor', motivo: 'la vieja congelaba a Eris a 0 pese a su inmunidad a Eventos enemigos; la nueva se la respeta' },
+            { contiene: 'p2.vanguard.0.bankruptStoredFuror', motivo: 'ídem: la vieja le guardaba el Furor en el bolsillo, la nueva ni la toca' },
+        ],
+    },
+    {
         nombre: 'Bancarrota: si la destruyen antes de tiempo, el Furor vuelve igualmente',
         turno: 2, turnoDe: 'p2', empieza: 'p1',
         p1: { vanguardia: [{ carta: 'Karlos', furor: 3 }], evento: 'Bancarrota' },

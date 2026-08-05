@@ -1646,7 +1646,11 @@ const CARD_DB = [
     },
     {
         name: "Zoe (calcinante)", hp: 3, def: 5, atk: 9, type: "Personaje", subtype: "Ser vivo", tags: ['Usuaria de VP'], gender: 'F', rarity: "S",
-        text: "P: Sólo se coloca por Entrenamiento arduo. DoT la cura y da +2 DEF. Aplica DoT (2T) a sí misma y al rival tras combatir. A: AL-FÉNIX (4F): Ataca a máx 3 en Van. y 1 en Ret.", 
+        // "Sólo se coloca por Entrenamiento arduo" era una condición de colocación redactada como
+        // si fuera parte de la Pasiva; con el prefijo Requisito: sale en su propia caja del
+        // detalle, como el resto de cartas condicionadas (Toto, 5-ago-2026). No es un Coste: no
+        // pierdes nada al colocarla, es el Evento el que la trae.
+        text: "Requisito: Completar 'Entrenamiento arduo'. P: DoT la cura y da +2 DEF. Aplica DoT (2T) a sí misma y al rival tras combatir. A: AL-FÉNIX (4F): Ataca a máx 3 en Van. y 1 en Ret.",
         passiveName: "JUSTICIERA ABRASADORA", activeName: "AL-FÉNIX", activeCost: 4, series: 2,
         
         onBeforePlayAsync: async function(card, game, p) {
@@ -6773,6 +6777,15 @@ const DSL = {
                  : DSL._zone(game, ownerId, spec.zona);
         if (spec.excludeSelf && selfCard) pool = pool.filter(c => c.instanceId !== selfCard.instanceId);
         if (!spec.permitirAvatar) pool = pool.filter(c => !((getCardTemplate(c.id) || {}).isAvatar)); // Kami: intocable por defecto
+        // Inmunidad a Eventos enemigos (Eris; Toto, 5-ago-2026): si la carta fuente es un
+        // EVENTO, sus efectos no alcanzan a los enemigos que la declaren. Va aquí, en el punto
+        // único por el que pasan TODOS los targets del DSL, y no en cada carta: hasta ahora la
+        // inmunidad solo se respetaba en las líneas del detalle (onGlobalGetPreviewEffects), así
+        // que Bancarrota decía "no te afecto" y te congelaba el Furor igual. Mismo criterio de
+        // default-on que el filtro de Avatar de la línea de arriba.
+        if (selfCard && (getCardTemplate(selfCard.id) || {}).type === 'Evento') {
+            pool = pool.filter(c => !(c.owner !== selfCard.owner && (getCardTemplate(c.id) || {}).immuneToEnemyEvents));
+        }
         if (spec.algunEstado) pool = pool.filter(c => c.status && spec.algunEstado.some(k => c.status[k])); // mismo criterio que canPlayCard (JUGAR)
         (spec.filtros || []).forEach(f => { pool = pool.filter(c => DSL._match(c, f)); });
         // algunFiltro (Karlitos, 31-jul-2026): OR de filtros, como ya aceptaban ELEGIR y BUSCAR.
@@ -7803,6 +7816,12 @@ const DSL = {
         if (e.op === 'MARCAR_TEMPORAL') {
             if (!target.tempEffects) target.tempEffects = [];
             const marca = { sourceId: sourceCard.id, sourceInstanceId: sourceCard.instanceId };
+            // habilidad (Toto, 5-ago-2026): QUÉ Pasiva/Activa dejó la marca, para que el detalle
+            // pueda decir "por SABIDURÍA" igual que ya hace con estados alterados y contadores.
+            // El nombre llega hasta aquí por el mismo parámetro que ya usaba APLICAR_ESTADO; la
+            // marca es lo único que sobrevive a la ejecución, así que tiene que viajar EN ELLA
+            // (es serializable: un string, sin problema para exportGameState).
+            if (habilidad) marca.habilidad = habilidad;
             if (e.conOwner) marca.ownerId = ownerId;
             if (e.hastaFinDeTurnoPropio) marca.hastaFinDeTurnoPropio = true; // se limpia al acabar el turno del dueño de la carta marcada
             // duracion (Poción revitalizante, 27-jul-2026): opt-in — solo las cartas que la
@@ -8089,6 +8108,16 @@ const DSL = {
         if (!DSL.validate(tmpl)) return false;
         const abs = tmpl.abilities || [];
 
+        // Atribución por defecto de una habilidad de UNIDAD (Toto, 5-ago-2026). El "por
+        // NOMBREHABILIDAD" del detalle depende de que el nombre llegue hasta el efecto, y varios
+        // disparadores no lo pasaban: SABIDURÍA (AL_JUGAR) dejaba su bono sin firmar. Se hace en
+        // el compilador y no carta a carta porque es la regla de siempre: la firma es la Pasiva
+        // salvo que la habilidad declare otra en `nombre`. Solo para Personajes/Esbirros: en
+        // Eventos y Ayudas la gramática OMITE el "por HABILIDAD" (basta la carta), así que ahí
+        // devuelve null a propósito.
+        const _esUnidad = tmpl.type === 'Personaje' || tmpl.type === 'Esbirro';
+        const _habDeCarta = (a) => (a && a.nombre) || (_esUnidad ? (tmpl.passiveName || null) : null);
+
         const passives = abs.filter(a => a.trigger === 'PASIVA_CONTINUA');
         // SUELO_STAT / TECHO_STAT -> se declaran en la plantilla para que updatePassives los
         // aplique como CLAMP FINAL ("sus stats no pueden bajar/subir de tal valor, bajo ningún
@@ -8279,7 +8308,7 @@ const DSL = {
                 // ELEGIR de ANTES_DE_JUGAR, como el deudor de Deuda con la mafia).
                 const varsJ = (DSL._vars && DSL._vars[card.instanceId]) || {};
                 if (alJugar.log) game.logMsg(DSL._fill(alJugar.log, Object.assign({}, varsJ, { carta: card.name, jugador: (typeof game.getDisplayName === 'function' ? game.getDisplayName(card.owner) : card.owner) })), alJugar.logTipo || 'ability');
-                const res = await DSL._runEffectList(alJugar.efectos || [], card, game, card.owner, null);
+                const res = await DSL._runEffectList(alJugar.efectos || [], card, game, card.owner, null, _habDeCarta(alJugar));
                 // logSiAplicado (Ángel/Serafín, 27-jul-2026): mismo campo que ya tenía AL_CADUCAR,
                 // ahora también en AL_JUGAR — anuncia solo si algún efecto (p. ej. un CURAR
                 // soloSiHerido en grupo) de verdad hizo algo, como el `if (healed)` a mano.
@@ -8891,7 +8920,7 @@ const DSL = {
                 if (alMorir.floating && typeof showFloatingText === 'function') {
                     showFloatingText(card.instanceId, DSL._fill(alMorir.floating.texto || relleno.pasiva, relleno), alMorir.floating.estilo || 'ft-ability', alMorir.floating.offset !== undefined ? alMorir.floating.offset : -30);
                 }
-                await DSL._runEffectList(alMorir.efectos || [], card, game, card.owner, [card]);
+                await DSL._runEffectList(alMorir.efectos || [], card, game, card.owner, [card], _habDeCarta(alMorir));
                 return !!alMorir.gestionada;
             };
         }
@@ -8909,7 +8938,7 @@ const DSL = {
                 if (si.deadCardDe === 'PROPIO' && deadCard.owner !== card.owner) return;
                 if (si.deadCardDe === 'RIVAL' && deadCard.owner === card.owner) return;
                 if (alMorirAliado.log) game.logMsg(DSL._fill(alMorirAliado.log.msg, { carta: card.name, muerto: DSL._nombre(game, deadCard) }), alMorirAliado.log.tipo || 'ability');
-                await DSL._runEffectList(alMorirAliado.efectos || [], card, game, card.owner, null);
+                await DSL._runEffectList(alMorirAliado.efectos || [], card, game, card.owner, null, _habDeCarta(alMorirAliado));
                 if (alMorirAliado.destruirseEvento) await game.destroyEvent(card.owner);
             };
         }
@@ -9127,6 +9156,10 @@ const DSL = {
         const globalStat = abs.find(a => a.trigger === 'GLOBAL_ANTES_DE_CAMBIO_STAT');
         if (globalStat && typeof tmpl.onGlobalBeforeStatChange !== 'function') {
             tmpl.onGlobalBeforeStatChange = function (ev, target, stat, amount, source, game) {
+                // Mismo veto que las líneas del detalle (ver onGlobalGetPreviewEffects): un
+                // enemigo inmune a Eventos no se entera de este interceptor (Eris).
+                const _tt = getCardTemplate(target.id) || {};
+                if (target.owner !== ev.owner && (_tt.immuneToEnemyEvents || _tt.isAvatar)) return amount;
                 for (const r of (globalStat.reglas || [])) {
                     if (r.stat && r.stat !== stat) continue;
                     if (r.quien === 'ALIADO' && target.owner !== ev.owner) continue;
@@ -9301,7 +9334,7 @@ const DSL = {
                 // FIN_TURNO, que ya lo tienen — necesario para anunciar un coste de colocación
                 // ANTES de que la carta se coloque (p. ej. "aniquila su propia vanguardia").
                 if (antesJugar.log) game.logMsg(DSL._fill(antesJugar.log, { carta: card.name }), antesJugar.logTipo || 'ability');
-                const res = await DSL._runEffectList(antesJugar.efectos || [], card, game, card.owner, null);
+                const res = await DSL._runEffectList(antesJugar.efectos || [], card, game, card.owner, null, _habDeCarta(antesJugar));
                 return !(res && res.ok === false);
             };
         }
@@ -9407,7 +9440,7 @@ const DSL = {
                 if (finTurno.soloTurnoPropio !== false && card.owner !== game.activePlayerId) return;
                 const pid = playerId || card.owner;
                 if (finTurno.log) game.logMsg(DSL._fill(finTurno.log, { carta: card.name, jugador: (typeof game.getDisplayName === 'function' ? game.getDisplayName(pid) : pid) }), finTurno.logTipo || 'ability');
-                await DSL._runEffectList(finTurno.efectos, card, game, pid, null);
+                await DSL._runEffectList(finTurno.efectos, card, game, pid, null, _habDeCarta(finTurno));
             };
         }
 

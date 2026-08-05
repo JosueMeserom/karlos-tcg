@@ -719,6 +719,13 @@ function esDiffInerte(ruta, a, b) {
     if (ruta.endsWith('.counters') && b && typeof b === 'object' && Object.keys(b).length === 0) return true;
     if (ruta.endsWith('.hasAttackedThisTurn') && b === false) return true;
     if (ruta.includes('.tempEffects.') && ruta.endsWith('.sourceInstanceId') && typeof b === 'string') return true;
+    // habilidad (Toto, 5-ago-2026): la marca del DSL firma QUÉ Pasiva/Activa la dejó, para que
+    // el detalle pueda decir "+1 DEF y +1 ATQ por SABIDURÍA" -la vieja nunca lo guardaba, así
+    // que la línea salía sin firmar-. Es metadato PURO: nadie en el motor ni en ninguna carta
+    // lee este campo para decidir nada, solo lo pinta el panel de detalle. Va aquí y no como
+    // diferencia declarada suite a suite porque aparece en TODA marca dejada por una unidad;
+    // declararlo escenario por escenario sería ruido en cada suite presente y futura.
+    if (ruta.includes('.tempEffects.') && ruta.endsWith('.habilidad') && typeof b === 'string') return true;
     // hastaFinDeTurnoPropio: la nueva declara explícitamente en la marca que se
     // limpia al terminar el turno del dueño; la vieja lograba lo mismo con un
     // onStartTurnTempEffect que devolvía false sin condiciones. Verificado

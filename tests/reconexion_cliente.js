@@ -56,6 +56,14 @@ const ESC_ACTIVA = {
     p2: { vanguardia: [{ carta: 'Mini-tigre', vida: 20 }, { carta: 'Oso con armadura', vida: 20 }] },
 };
 
+// Ataque normal corriente: Karlos con Furor de sobra y un enemigo al que pegarle. La Vida alta
+// del objetivo es para que el golpe se note sin matarlo (así el estado final compara mejor).
+const ESC_ATAQUE = {
+    turno: 2, turnoDe: 'p1', empieza: 'p2',
+    p1: { vanguardia: [{ carta: 'Karlos', furor: 3 }] },
+    p2: { vanguardia: [{ carta: 'Oso con armadura', vida: 20 }] },
+};
+
 // Poder Legado exige un Karlos con 1 de Vida o menos; al equiparse le fija los stats a 9.
 const ESC_EQUIPO = {
     turno: 2, turnoDe: 'p1', empieza: 'p2',
@@ -287,6 +295,57 @@ function primeraDif(gA, gB) {
         check('...y exactamente igual en el rival reconectado', vidasR === vidasS, `R=${vidasR} S=${vidasS}`);
         check('ESTADO DE PARTIDA IDÉNTICO en ambos clientes', primeraDif(R.g, S2.g) === 'sin diferencias',
               primeraDif(R.g, S2.g));
+    }
+
+    // ------------------------------------------------------------------------------------
+    console.log('\n--- Ataque normal: recarga el rival viendo los rebordes de objetivo ---');
+    // El caso MÁS común de los cuatro y el último en cubrirse (betasteo de Toto, 5-ago-2026):
+    // clicas tu carta para atacar, y mientras eliges enemigo el otro cliente recarga. Mismo
+    // mecanismo exacto que `ayudaTarget` y que el targeting de Activa -el ataque se consuma con
+    // el replay del segundo clic (SELECT_CARD), que solo encaja si AMBOS siguen en
+    // 'SELECT_TARGET' con la misma carta seleccionada-, y mismo arreglo: un descriptor derivado
+    // en exportGameState (`pendingAttackTarget`) que se re-monta en LOS DOS al importar.
+    {
+        const V = await cliente('p1', ESC_ATAQUE); // ataca
+        const W = await cliente('p2', ESC_ATAQUE); // rival, que recargará
+
+        // Primer clic: seleccionar al atacante. Se replica a los dos, como en una partida real.
+        await V.g.selectCard(V.g.players.p1.vanguard[0].instanceId); await asentar(V.ctx);
+        await W.g.selectCard(W.g.players.p1.vanguard[0].instanceId, true); await asentar(W.ctx);
+        check('el atacante entra en el targeting de ataque', V.g.inputState === 'SELECT_TARGET', V.g.inputState);
+        check('...y el rival lo espeja (sin haber recargado todavía)', W.g.inputState === 'SELECT_TARGET', W.g.inputState);
+
+        const estadoV = JSON.parse(JSON.stringify(V.g.exportGameState()));
+        check('exportGameState describe el targeting de ataque en curso',
+              !!estadoV.pendingAttackTarget
+              && estadoV.pendingAttackTarget.sourceId === V.g.players.p1.vanguard[0].instanceId,
+              JSON.stringify(estadoV.pendingAttackTarget));
+
+        // --- W RECARGA justo aquí, viendo los rebordes ---
+        const W2 = await cliente('p2', ESC_ATAQUE);
+        W2.g.players.p1.vanguard = []; W2.g.players.p2.vanguard = [];
+        W2.g._reconnectRecovery = true;
+        W2.g.importGameState(estadoV);
+
+        check('el rival reconectado recupera el targeting de ataque',
+              W2.g.inputState === 'SELECT_TARGET', W2.g.inputState);
+        check('...con el MISMO atacante seleccionado',
+              !!W2.g.selectedCard && W2.g.selectedCard.name === 'Karlos',
+              W2.g.selectedCard && W2.g.selectedCard.name);
+
+        // --- Segundo clic: el golpe se consuma en los dos ---
+        const vidaAntes = W2.g.players.p2.vanguard[0].currentHp;
+        await V.g.selectCard(V.g.players.p2.vanguard[0].instanceId); await asentar(V.ctx);
+        await W2.g.selectCard(W2.g.players.p2.vanguard[0].instanceId, true); await asentar(W2.ctx);
+        await dormir(200); await asentar(V.ctx); await asentar(W2.ctx);
+
+        const vidaV = V.g.players.p2.vanguard[0].currentHp;
+        const vidaW = W2.g.players.p2.vanguard[0].currentHp;
+        check('el ataque se ejecuta en el atacante', vidaV < vidaAntes, `antes=${vidaAntes} despues=${vidaV}`);
+        check('...y EL RIVAL RECONECTADO lo espeja (era justo lo que se perdía)',
+              vidaW === vidaV, `V=${vidaV} W=${vidaW}`);
+        check('ESTADO DE PARTIDA IDÉNTICO en ambos clientes', primeraDif(V.g, W2.g) === 'sin diferencias',
+              primeraDif(V.g, W2.g));
     }
 
     // ------------------------------------------------------------------------------------
