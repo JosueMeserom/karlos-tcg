@@ -229,3 +229,40 @@ que es donde estaban los fallos.
 Las suites de regresión NO comparan el `text` de las cartas (solo logs, flotantes y estado), así
 que un cambio de redacción no las rompe — pero sí puede romper el PARSEO del detalle, que es
 cliente puro. Ahí la verificación es visual.
+
+---
+
+## 9. Familias: cartas que hacen lo mismo se redactan igual
+
+La consistencia que las secciones anteriores NO alcanzan: dos frases pueden cumplir todas las
+reglas por separado y aun así no parecerse en nada. El ejemplo que lo destapó (Toto, 5-ago-2026)
+son **Águila y Xanadu**, cuyas Pasivas hacen casi lo mismo -evitar un ataque normal- y lo decían
+con verbos distintos, estructura distinta y hasta con y sin artículo.
+
+Comparar las 148 cartas entre sí son 10.878 parejas: inviable. **Pero no hace falta, porque el
+DSL ya es el índice semántico**: dos cartas que hacen lo mismo tienen la misma firma de
+disparadores y ops (y las imperativas, la misma firma de hooks). Agrupar por firma es mecánico y
+gratis; solo hay que leer los textos DENTRO de cada grupo, que es donde la comparación significa
+algo. De 10.878 parejas se baja a unas decenas, ya clasificadas por tema.
+
+```
+node tests/familias_textos.js          # familias con 2+ cartas
+node tests/familias_textos.js --todas  # incluye las de una sola carta
+```
+
+A 5-ago-2026: **178 familias, 40 con dos o más cartas.** Esas 40 son el trabajo pendiente de
+consistencia, y se pueden ir cerrando de una en una sin releer nada más.
+
+**La regla**: antes de redactar una carta nueva, mira su familia. Si ya hay cartas que hacen eso,
+copia su estructura y cambia solo lo que de verdad sea distinto. Si al hacerlo ves que la
+redacción existente es peor que la tuya, arregla las dos — pero que acaben iguales.
+
+Ejemplo ya cerrado, la familia `hook:onBeforeDefend`:
+
+```
+Águila: Al recibir un ataque normal, moneda: con cara lo evita con todos sus efectos.
+Xanadu: Al recibir un ataque normal, puede pagar 1 de Furor para evitarlo con todos sus efectos.
+```
+
+Misma apertura, mismo verbo (evitar, no "esquivar"), misma coletilla. Lo único que cambia es lo
+único que de verdad difiere: cómo se paga.

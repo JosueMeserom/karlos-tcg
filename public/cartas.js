@@ -2254,7 +2254,7 @@ const CARD_DB = [
     },
     {
         name: "Xanadu", hp: 6, def: 4, atk: 7, type: "Personaje", subtype: "Ser vivo", tags: ["Poder heredado"], gender: "M", rarity: "S", series: 1,
-        text: "Requisito: 'Una buena razón' activo en cualquier campo. P: REPULSIÓN ABSOLUTA: Al recibir ataque normal, puede usar 1 de Furor para esquivar el ataque y sus efectos. A: ESTORNUDO DEVASTADOR (2F): Intercambia un enemigo de vanguardia por uno de retaguardia. Si no hay retaguardia enemiga, lo devuelve a su mano.",
+        text: "Requisito: 'Una buena razón' activo en cualquier campo. P: REPULSIÓN ABSOLUTA: Al recibir un ataque normal, puede pagar 1 de Furor para evitarlo con todos sus efectos. A: ESTORNUDO DEVASTADOR (2F): Intercambia un enemigo de vanguardia por uno de retaguardia. Si no hay retaguardia enemiga, lo devuelve a su mano.",
         passiveName: "REPULSIÓN ABSOLUTA", activeName: "ESTORNUDO DEVASTADOR", activeCost: 2,
 
         onBeforePlayAsync: async function(card, game, p) {
@@ -2454,11 +2454,34 @@ const CARD_DB = [
             }
             return true;
         },
-        onAfterPlayAsync: async function(card, game, p) {
-            game.modifyStat(card, 'furor', 1);
-            game.modifyCounters(card, 'diego_timer', 3, 'Turnos de Cólera', card, '⏳', 'CÓLERA INFINITA');
-            game.logMsg(`¡${card.passiveName}! ${card.name} entra con 3 contadores de Cólera.`, 'ability');
-        },
+        // Migrado el RELOJ (5-ago-2026): la entrada (Furor + contadores), el tic de cada turno y
+        // la muerte al agotarse, más PACIFISMO, que es justo lo que congela ese tic. Estrena el op
+        // `CUENTA_ATRAS`, compartido con Meca EBA. Lo que se queda imperativo y por qué: el veto de
+        // colocación mira un EVENTO en juego ('Una buena razón'), y los `requisitos` del DSL solo
+        // saben contar CARTAS en zonas; y la inversión de daño (onBeforeTakeDamage) no tiene
+        // trigger — es la única carta del juego que la usa, así que no compensa inventarlo.
+        abilities: [
+            { trigger: "AL_JUGAR",
+              log: "¡CÓLERA INFINITA! {carta} entra con 3 contadores de Cólera.",
+              efectos: [
+                { op: "MODIFICAR_STAT", target: { quien: "SELF" }, stat: "furor", delta: 1 },
+                { op: "MODIFICAR_CONTADORES", target: { quien: "SELF" }, contador: "diego_timer",
+                  delta: 3, nombreContador: "Turnos de Cólera", icono: "⏳" } ] },
+            { trigger: "FIN_TURNO",
+              efectos: [
+                { if: { campo: "location", op: "==", valor: "vanguard" },
+                  op: "CUENTA_ATRAS", target: { quien: "SELF" },
+                  contador: "diego_timer", nombreContador: "Turnos de Cólera", icono: "⏳",
+                  salvoSi: { campo: "pacifismoActive", op: "truthy" }, consumirTrasSaltar: "pacifismoActive",
+                  logSalto: "¡PACIFISMO! {carta} no pierde contador de Cólera este turno.",
+                  logCero: "¡El tiempo de {carta} se ha agotado!",
+                  alLlegarACero: [
+                    { op: "MODIFICAR_STAT", stat: "currentHp", vaciar: true,
+                      comprobarMuerte: true, sinRetribucion: true } ] } ] },
+            { trigger: "ACTIVA", nombre: "PACIFISMO", coste: { furor: 3 }, sinObjetivo: true,
+              log: "{carta} activa PACIFISMO. Su contador se congela este turno.",
+              efectos: [ { op: "MARCAR", target: { quien: "SELF" }, campo: "pacifismoActive", valor: true } ] }
+        ],
         onBeforeTakeDamage: async function(defender, attacker, dmg, isSpecial, game) {
             if (!isSpecial) {
                 showFloatingText(defender.instanceId, "INVERSIÓN", "ft-ability", -30);
@@ -2478,36 +2501,6 @@ const CARD_DB = [
             }
             return dmg;
         },
-        onEndTurn: async function(card, game) {
-            if (card.location === 'vanguard' && card.owner === game.activePlayerId) {
-                if (card.pacifismoActive) {
-                    game.logMsg(`¡PACIFISMO! ${card.name} no pierde contador de Cólera este turno.`, 'ability');
-                    card.pacifismoActive = false;
-                } else if (card.counters && card.counters['diego_timer']) {
-                    game.modifyCounters(card, 'diego_timer', -1, 'Turnos de Cólera', card, '⏳', 'CÓLERA INFINITA');
-                    const left = card.counters['diego_timer'].count;
-                    if (left <= 0) {
-                        game.logMsg(`¡El tiempo de ${card.name} se ha agotado!`, 'ability');
-                        card.currentHp = 0;
-                        await game.checkDeath(card, false);
-                    }
-                }
-            }
-        },
-        canActivateAbility: function(card, game) {
-            if (card.furor < 3) { game.logMsg("Falta Furor (3).", 'system'); return false; }
-            return true;
-        },
-        onExecuteAbility: function(card, game) {
-            game.modifyStat(card, 'furor', -3);
-            card.pacifismoActive = true;
-            showFloatingText(card.instanceId, "PACIFISMO", "ft-ability", -30);
-            game.logMsg(`${card.name} activa PACIFISMO. Su contador se congela este turno.`, 'ability');
-            card.exhausted = true;
-            game.isActionLocked = false;
-            game.cancelAction();
-            game.render();
-        }
     },
     {
         name: "Silhouette", hp: 7, def: 1, atk: 1, type: "Personaje", subtype: "Ser vivo", tags: ["Draconiana", "otaku", "usuaria de VP"], gender: "F", rarity: "S", series: 1,
@@ -4744,11 +4737,28 @@ const CARD_DB = [
         
         maxFuror: 2, // El motor ya se encarga de capar el límite con esta propiedad
         
-        onAfterPlayAsync: async function(card, game, p) {
-            game.modifyStat(card, 'furor', 1);
-            showFloatingText(card.instanceId, "CONSUMO DESMESURADO", "ft-ability", -30);
-            game.logMsg(`${card.name} entra al campo y gana 1 de Furor inicial.`, 'ability');
-        },
+        // Migrada la BATERÍA (5-ago-2026): el Furor inicial y el consumo de cada turno que la
+        // desploma al llegar a 0. Usa el mismo op `CUENTA_ATRAS` que Diego Antonio, en su variante
+        // sobre un STAT en vez de un contador: aquí el reloj ES el Furor. Se queda imperativo el
+        // veto de ganancia pasiva (onBeforeGainFuror, sin trigger) y EMPLAZAR PILOTO, que
+        // intercambia posiciones — la familia "swap", irreducible por §6 del doc de diseño.
+        abilities: [
+            { trigger: "AL_JUGAR",
+              log: "{carta} entra al campo y gana 1 de Furor inicial.",
+              efectos: [
+                { op: "MODIFICAR_STAT", target: { quien: "SELF" }, stat: "furor", delta: 1,
+                  floating: { texto: "CONSUMO DESMESURADO", estilo: "ft-ability", offset: -30 } } ] },
+            { trigger: "FIN_TURNO",
+              efectos: [
+                { op: "CUENTA_ATRAS", target: { quien: "SELF" }, stat: "furor",
+                  salvoSi: { campo: "pilotoEmplazado", op: "truthy" },
+                  floating: { texto: "-1 FUR (Consumo)", estilo: "ft-red-stat", offset: -30 },
+                  logCero: "¡A {carta} se le agotó la energía por completo y se desploma!",
+                  alLlegarACero: [
+                    { op: "MODIFICAR_STAT", stat: "currentHp", vaciar: true,
+                      comprobarMuerte: true, sinRetribucion: true } ] } ] }
+        ],
+
         
         onBeforeGainFuror: function(card, amount, source, game) {
             if (source === 'fase_furor' && !card.pilotoEmplazado) {
@@ -4756,21 +4766,6 @@ const CARD_DB = [
                 return 0; // Anula la ganancia pasiva en la fase de furor
             }
             return amount;
-        },
-        
-        onEndTurn: async function(card, game) {
-            if (card.owner === game.activePlayerId && (card.location === 'vanguard' || card.location === 'rearguard')) {
-                if (!card.pilotoEmplazado) {
-                    game.modifyStat(card, 'furor', -1);
-                    showFloatingText(card.instanceId, "-1 FUR (Consumo)", "ft-red-stat", -30);
-                    // Solo muere si baja a 0 exactamente en este momento
-                    if (card.furor === 0) {
-                        game.logMsg(`¡A ${card.name} se le agotó la energía por completo y se desploma!`, 'ability');
-                        card.currentHp = 0;
-                        await game.checkDeath(card, false);
-                    }
-                }
-            }
         },
         
         canActivateAbility: function(card, game) {
@@ -6709,7 +6704,7 @@ const DSL = {
     // DSL._runReaccion, no _doEffect): controlan el resultado que la reacción
     // devuelve al motor de combate (redirigir el ataque, cancelarlo, drenar Furor
     // tras él, fijar el daño, autoataque del atacante).
-    OPS_EFECTO: ['MODIFICAR_STAT', 'CURAR', 'DAÑO', 'APLICAR_ESTADO', 'MODIFICAR_CONTADORES', 'ATACAR', 'MONEDA', 'ROBAR', 'BUSCAR', 'MARCAR', 'VER_MANO', 'LIMPIAR_ESTADOS', 'ELEGIR', 'DESTRUIR_EVENTO', 'MARCAR_TEMPORAL', 'DESCARTAR', 'EQUIPAR', 'MARCAR_JUGADOR', 'FLOTANTE', 'FIJAR_STAT', 'REDIRIGIR', 'CANCELAR_ATAQUE', 'MARCAR_DRENAJE', 'FIJAR_DAÑO', 'ATACANTE_SE_AUTOATACA', 'VOLVER_A_MANO', 'RETRIBUCION', 'SUELO_STAT', 'TECHO_STAT', 'NO_CONSUMIR', 'BONO_ATAQUE', 'MARCAR_PARTIDA', 'ESQUIVAR', 'DESEQUIPAR', 'DAÑO_ATAQUE', 'REDIRIGIR_ATAQUE', 'SECUESTRAR_STAT', 'DEVOLVER_STAT'],
+    OPS_EFECTO: ['MODIFICAR_STAT', 'CURAR', 'DAÑO', 'APLICAR_ESTADO', 'MODIFICAR_CONTADORES', 'ATACAR', 'MONEDA', 'ROBAR', 'BUSCAR', 'MARCAR', 'VER_MANO', 'LIMPIAR_ESTADOS', 'ELEGIR', 'DESTRUIR_EVENTO', 'MARCAR_TEMPORAL', 'DESCARTAR', 'EQUIPAR', 'MARCAR_JUGADOR', 'FLOTANTE', 'FIJAR_STAT', 'REDIRIGIR', 'CANCELAR_ATAQUE', 'MARCAR_DRENAJE', 'FIJAR_DAÑO', 'ATACANTE_SE_AUTOATACA', 'VOLVER_A_MANO', 'RETRIBUCION', 'SUELO_STAT', 'TECHO_STAT', 'NO_CONSUMIR', 'BONO_ATAQUE', 'MARCAR_PARTIDA', 'ESQUIVAR', 'DESEQUIPAR', 'DAÑO_ATAQUE', 'REDIRIGIR_ATAQUE', 'SECUESTRAR_STAT', 'DEVOLVER_STAT', 'CUENTA_ATRAS'],
     OPS_CMP: ['==', '!=', '<=', '>=', '<', '>', 'includes', 'contieneTexto', 'includesCI', 'truthy', 'falsy'],
     QUIEN: ['SELF', 'ALIADO', 'ENEMIGO', 'TODOS', 'ATACANTE', 'DEFENSOR'], // ATACANTE/DEFENSOR: solo en GLOBAL_TRAS_ATAQUE y REACCION
 
@@ -7540,6 +7535,44 @@ const DSL = {
                 target[e.stat] = target[e.guardadoEn];
                 delete target[e.guardadoEn];
             }
+            return true;
+        }
+        // CUENTA_ATRAS (Toto, 5-ago-2026): el reloj propio de una carta. Baja UNA unidad de un
+        // contador (o de un stat) y, si llega a 0, dispara efectos. Es el patrón compartido por
+        // las tres cartas que llevaban su propia cuenta atrás a mano — Diego Antonio (Turnos de
+        // Cólera), Meca EBA (su Furor como batería) y K.I.N.O. (Contadores de paciencia) —, cada
+        // una con su copia del mismo bucle: bajar, mirar si es 0, matar.
+        //
+        // No se confunde con `cuentaAtras` de MARCAR_TEMPORAL: aquel cuenta la vida de una MARCA
+        // puesta por OTRA carta (los equipos con temporizador) y lo gestionan los hooks genéricos
+        // de marcas. Este cuenta algo que vive en la PROPIA carta y lo dispara ella, típicamente
+        // desde FIN_TURNO.
+        //
+        //   contador: 'diego_timer'   -> baja un contador con nombre (el que ve el jugador)
+        //   stat: 'furor'             -> ...o un stat, para las que usan su energía como reloj
+        //   salvoSi: <condición>      -> este turno NO baja (PACIFISMO congela el reloj)
+        //   consumirTrasSaltar: campo -> y la bandera que lo congeló se gasta al usarse
+        //   alLlegarACero: [efectos]  -> lo que pasa al agotarse
+        if (e.op === 'CUENTA_ATRAS') {
+            if (e.salvoSi && DSL._cond(target, game, e.salvoSi)) {
+                if (e.logSalto) game.logMsg(DSL._fill(e.logSalto, { carta: DSL._nombre(game, target) }), e.logSaltoTipo || 'ability');
+                // La bandera es de UN turno: se consume al gastarla, no se queda encendida.
+                if (e.consumirTrasSaltar) target[e.consumirTrasSaltar] = false;
+                return true;
+            }
+            const _leer = () => e.stat ? (target[e.stat] || 0)
+                : ((target.counters && target.counters[e.contador]) ? target.counters[e.contador].count : 0);
+            if (_leer() <= 0) return 'skip'; // ya estaba agotado: nada que bajar
+            if (e.stat) game.modifyStat(target, e.stat, -1, e.offsetY || 0, sourceCard);
+            else game.modifyCounters(target, e.contador, -1, e.nombreContador, sourceCard, e.icono, habilidad || null);
+            const quedan = _leer();
+            if (e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, target), quedan }), e.logTipo || 'ability');
+            if (e.floating && typeof showFloatingText === 'function') {
+                showFloatingText(target.instanceId, DSL._fill(e.floating.texto || e.floating, { quedan }), e.floating.estilo || 'ft-red-stat', e.floating.offset !== undefined ? e.floating.offset : 0);
+            }
+            if (quedan > 0) return true;
+            if (e.logCero) game.logMsg(DSL._fill(e.logCero, { carta: DSL._nombre(game, target) }), e.logCeroTipo || 'ability');
+            if (Array.isArray(e.alLlegarACero)) await DSL._runEffectList(e.alLlegarACero, sourceCard, game, ownerId, [target], habilidad);
             return true;
         }
         if (e.op === 'MARCAR_PARTIDA') {

@@ -379,7 +379,15 @@ function crearCartaEn(ctx, inst, pid, spec, location) {
         // padre: enlaza este token/clon con otra carta por NOMBRE; construirEstado
         // resuelve el parentId tras colocarlo todo (el padre puede estar en cualquier zona).
         if (spec.padre) carta._padreRef = spec.padre;
-        if (spec.campos) Object.assign(carta, spec.campos); // campos arbitrarios (estado propio de la carta)
+        // campos arbitrarios (estado propio de la carta). CLONADO EN PROFUNDIDAD, igual que
+        // `estado` justo arriba y por el mismo motivo (Toto, 5-ago-2026): `Object.assign` copia
+        // la REFERENCIA, así que un valor-objeto (p. ej. `campos: {counters: {...}}`) quedaba
+        // COMPARTIDO entre la pasada vieja y la nueva del mismo escenario -y también entre
+        // escenarios, porque el literal vive en el fichero de la suite-. La vieja lo mutaba y la
+        // nueva arrancaba con el valor ya tocado, así que la comparación mentía: parecía que la
+        // nueva contaba de más cuando lo que pasaba es que empezaba más abajo. Lo destapó la
+        // migración de Diego Antonio, la primera suite que mete contadores por `campos`.
+        if (spec.campos) Object.assign(carta, JSON.parse(JSON.stringify(spec.campos)));
     }
     return carta;
 }
