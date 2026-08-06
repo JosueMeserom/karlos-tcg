@@ -28,6 +28,10 @@ const { correrSuite } = require('./harness');
 const escenarios = [
     {
         nombre: 'YOLOLO: ataque normal contra Achmay se pincha con la barrera (daño verdadero al atacante)',
+        flotantesIntencionados: [
+            { de: '-1 VIDA ·', a: '-1 VIDA (Achmay) ·',
+              motivo: 'el flotante automatico nombra ahora la carta origen cuando el cambio lo causa OTRA carta (Toto, 5-ago-2026): un "-N" suelto no decia de donde salia. No afecta al dano de combate (dealDamage no pasa fuente) ni al coste de tu propia Habilidad' },
+        ],
         turno: 2, turnoDe: 'p1', empieza: 'p2',
         p1: { vanguardia: [{ carta: 'Mini-tigre', vida: 10 }] },
         p2: { vanguardia: [{ carta: 'Achmay', vida: 8 }] },
@@ -81,6 +85,10 @@ const escenarios = [
         // también dispara YOLOLO -Achmay se pincha dos veces, la provocación y su propia
         // Pasiva son mecanismos independientes que coinciden en el mismo golpe-.
         nombre: 'PÉGAME, PERRA: al pasar turno, el motor ejecuta el ataque forzado (y dispara YOLOLO)',
+        flotantesIntencionados: [
+            { de: '-1 VIDA ·', a: '-1 VIDA (Achmay) ·',
+              motivo: 'el flotante automatico nombra ahora la carta origen cuando el cambio lo causa OTRA carta (Toto, 5-ago-2026): un "-N" suelto no decia de donde salia. No afecta al dano de combate (dealDamage no pasa fuente) ni al coste de tu propia Habilidad' },
+        ],
         turno: 2, turnoDe: 'p1', empieza: 'p2',
         p1: { vanguardia: [{ carta: 'Achmay', furor: 2, vida: 8 }] },
         p2: { vanguardia: [{ carta: 'Mini-tigre', vida: 20 }] },

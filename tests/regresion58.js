@@ -131,6 +131,10 @@ const escenarios = [
         // El aura (EQUIPO_ANTES_DE_DEFENDER): quien ataque al portador pierde 1 de Furor. Se
         // monta jugando el equipo y pasando turno, que es como ocurre en una partida real.
         nombre: 'Poder Legado: quien ataca al portador pierde 1 de Furor por el aura',
+        flotantesIntencionados: [
+            { de: '-1 FUR ·', a: '-1 FUR (Poder Legado) ·',
+              motivo: 'el flotante automatico nombra ahora la carta origen cuando el cambio lo causa OTRA carta (Toto, 5-ago-2026): un "-N" suelto no decia de donde salia. No afecta al dano de combate (dealDamage no pasa fuente) ni al coste de tu propia Habilidad' },
+        ],
         turno: 2, turnoDe: 'p1', empieza: 'p2',
         p1: { vanguardia: [KARLOS_A_1], mano: [PODER_LEGADO] },
         p2: { vanguardia: [{ carta: 'Mini-tigre', furor: 3, vida: 20 }] },

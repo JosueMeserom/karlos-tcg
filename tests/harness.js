@@ -806,6 +806,13 @@ function compararCapturas(esc, vieja, nueva) {
     // Flotantes que SOLO la VIEJA emitía (simétrico de logsSoloVieja): p. ej. un anuncio
     // de pasiva escrito a mano que la migración sustituye por el genérico del trigger.
     let flotantesViejos = vieja.flotantes;
+    // Reescrituras intencionadas del TEXTO de un flotante (gemelo de logsIntencionados, que
+    // existía solo para los logs; 5-ago-2026). Se aplican sobre la salida VIEJA (de → a), o sea
+    // que el escenario declara "la vieja decía X y la nueva dice Y, y es a propósito".
+    for (const regla of (esc.flotantesIntencionados || [])) {
+        if (!regla.motivo) throw new Error(`escenario "${esc.nombre}": flotantesIntencionados sin "motivo" documentado`);
+        flotantesViejos = flotantesViejos.map(l => l.split(regla.de).join(regla.a));
+    }
     for (const regla of (esc.flotantesSoloVieja || [])) {
         if (!regla.motivo) throw new Error(`escenario "${esc.nombre}": flotantesSoloVieja sin "motivo" documentado`);
         const antes = flotantesViejos.length;

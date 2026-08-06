@@ -29,6 +29,10 @@ const LOGS_SISTEMA_VIEJA = [
 const escenarios = [
     {
         nombre: 'Garret: coloca pagando el tributo con Aniceto (-4 Furor)',
+        flotantesIntencionados: [
+            { de: '-4 FUR ·', a: '-4 FUR (Garret) ·',
+              motivo: 'el flotante automatico nombra ahora la carta origen cuando el cambio lo causa OTRA carta (Toto, 5-ago-2026): un "-N" suelto no decia de donde salia. No afecta al dano de combate (dealDamage no pasa fuente) ni al coste de tu propia Habilidad' },
+        ],
         p1: { mano: ['Garret'], vanguardia: [ { carta: 'Aniceto', furor: 4 } ] },
         p2: { vanguardia: ['Mini-tigre'] },
         pasos: [

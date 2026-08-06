@@ -50,6 +50,10 @@ const escenarios = [
     },
     {
         nombre: 'ACERTIJO: el ELEGIR de cara ya no es cancelable tras pagar Furor y lanzar la moneda',
+        flotantesIntencionados: [
+            { de: '-2 FUR ·', a: '-2 FUR (Alumno con VP) ·',
+              motivo: 'el flotante automatico nombra ahora la carta origen cuando el cambio lo causa OTRA carta (Toto, 5-ago-2026): un "-N" suelto no decia de donde salia. No afecta al dano de combate (dealDamage no pasa fuente) ni al coste de tu propia Habilidad' },
+        ],
         monedas: ['cara'],
         p1: { vanguardia: [{ carta: 'Alumno con VP', furor: 1 }] },
         p2: { vanguardia: [{ carta: 'Mini-tigre', furor: 2 }, 'Droide antidisturbios'] },

@@ -2395,6 +2395,29 @@
                 return false;
             }
 
+            // ¿Debe el flotante automático decir de DÓNDE viene el cambio? (Toto, 5-ago-2026).
+            // Idea suya del betasteo de Achmay: un "-1 VIDA" suelto no dice nada cuando la causa
+            // no es el golpe que acabas de ver, sino una Pasiva ajena, un Evento o un equipo que
+            // salta solo. La regla, en una frase: SE NOMBRA LA FUENTE CUANDO ES OTRA CARTA.
+            //   · Sin fuente (null) o fuente-etiqueta ('fase_furor', 'healing'…) -> nada. Aquí
+            //     caen TODOS los ataques: dealDamage llama a modifyStat sin `source`, así que el
+            //     daño de combate se queda limpio por construcción, sin necesidad de excluirlo.
+            //   · La fuente ES el objetivo -> nada: es el coste de tu propia Habilidad, y acabas
+            //     de clicarla tú.
+            //   · Una Ayuda que está EN LA MANO -> nada: se está jugando en este preciso momento
+            //     (el motor no la manda al descarte hasta después de resolver sus efectos), o sea
+            //     que el jugador tiene el dedo puesto en ella. Un equipo o una Ayuda ya consumida
+            //     que dispara turnos más tarde SÍ se nombra: ahí no hay nada obvio.
+            //   · Todo lo demás -> "(Nombre de la carta)". Nombre de CARTA, no de Habilidad: es
+            //     la misma referencia que usa el detalle ("fuente: X"), y es lo que el jugador
+            //     necesita para saber sobre qué pasar el ratón.
+            _fuenteFlotante(card, source) {
+                if (!source || typeof source !== 'object' || !source.name) return '';
+                if (source.instanceId === card.instanceId) return '';
+                if (source.type === 'Ayuda' && source.location === 'hand') return '';
+                return source.name;
+            }
+
             modifyStat(card, stat, amount, offsetY = 0, source = null, opts = null) {
                 if (amount === 0) return;
 
@@ -2489,6 +2512,10 @@
                 // silent (DESTRUIDO/A, 31-jul-2026): el llamador va a mostrar su propio
                 // flotante en su lugar (p. ej. "destrucción" sin Retribución) — el resto de la
                 // función (interceptores, oculto revelado, el cambio de stat en sí) sigue igual.
+                if (text) {
+                    const _fte = this._fuenteFlotante(card, source);
+                    if (_fte) text += ` (${_fte})`;
+                }
                 if (!(opts && opts.silent)) showFloatingText(card.instanceId, text, color, offsetY);
             }
 
