@@ -98,6 +98,15 @@ function cajasDe(c) {
     return out;
 }
 
+// Todos los ops BUSCAR de un árbol de habilidades.
+function buscaresDe(nodo, acc = []) {
+    if (!nodo || typeof nodo !== 'object') return acc;
+    if (Array.isArray(nodo)) { nodo.forEach(n => buscaresDe(n, acc)); return acc; }
+    if (nodo.op === 'BUSCAR') acc.push(nodo);
+    for (const k of Object.keys(nodo)) if (k !== 'op') buscaresDe(nodo[k], acc);
+    return acc;
+}
+
 function opsDe(nodo, acc = new Set()) {
     if (!nodo || typeof nodo !== 'object') return acc;
     if (Array.isArray(nodo)) { nodo.forEach(n => opsDe(n, acc)); return acc; }
@@ -173,6 +182,18 @@ for (const c of CARTAS) {
     for (const [bandera, palabras] of Object.entries(BANDERAS)) {
         if (c[bandera] !== true) continue;
         if (!palabras.some(p => tl.includes(p))) add('REGLA-OCULTA', c, `tiene la bandera ${bandera} pero el texto no la menciona`);
+    }
+
+    // --- Invariante que sostiene una afirmación de la rúbrica (§7) ---
+    // §7 permite omitir "y baraja el mazo" de los textos porque barajar tras buscar en el MAZO
+    // pasa SIEMPRE. Pero el motor no lo garantiza: `barajarDespues` es opt-in por carta, así que
+    // hoy es cierto por convención (12 de 12) y mañana podría dejar de serlo en silencio -y
+    // entonces el texto callaría algo que sí importa-. Se comprueba aquí para que no pase.
+    for (const b of buscaresDe(c.abilities)) {
+        const zonas = Array.isArray(b.en) ? b.en : [b.en || 'DESCARTES'];
+        if (zonas.includes('MAZO') && !b.barajarDespues) {
+            add('REGLA-OCULTA', c, 'busca en el MAZO sin declarar `barajarDespues`: o baraja (y se omite del texto, §7) o el texto tiene que avisar de que NO baraja');
+        }
     }
 
     // --- §6 Tipografía ---

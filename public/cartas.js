@@ -447,7 +447,7 @@ const CARD_DB = [
         // no cumplía ninguna de las dos cosas: la Pasiva se mostraba sin nombre y el (2F) de la
         // Activa salía como texto suelto en vez del recuadro verde de coste. Redacción oficial
         // del Excel de Toto, íntegra (antes iba resumida).
-        text: "P: PSEUDO-PREVASIÓN: Cada vez que Águila es atacado por un ataque normal, echa una moneda. Si es cara, evita dicho ataque y sus efectos. A: ESPÍA (2F): Elige un tipo de carta y mira la mano de tu rival: un enemigo pierde tanto Furor como cartas de ese tipo haya en ella.",
+        text: "P: PSEUDO-PREVASIÓN: Al recibir un ataque normal, moneda: con cara lo evita con todos sus efectos. A: ESPÍA (2F): Elige un tipo de carta y mira la mano de tu rival: un enemigo pierde tanto Furor como cartas de ese tipo haya en ella.",
         passiveName: "PSEUDO-PREVASIÓN", activeName: "ESPÍA", activeCost: 2, series: 1,
 
         // PSEUDO-PREVASIÓN migrada (31-jul-2026): estrena el op `ESQUIVAR`, que convierte la
@@ -2157,7 +2157,7 @@ const CARD_DB = [
     },
     {
         name: "Erasmo", hp: 4, def: 7, atk: 3, type: "Personaje", subtype: "Ser vivo", tags: ["Usuario de VP"], gender: "M", rarity: "S", cost: 1, series: 1,
-        text: "P: SEGUIMIENTO: Tu rival debe tener su mano siempre visible. Además, puedes mirar la primera carta de su mazo (usando el botón). A: DOMINIO (2F): Elige a un enemigo cualquiera; ese enemigo realiza un ataque normal a cualquier objetivo en el campo (aliado o enemigo).",
+        text: "P: SEGUIMIENTO: Tu rival debe tener su mano siempre visible. Además, puedes mirar la primera carta de su mazo. A: DOMINIO (2F): Elige a un enemigo cualquiera; ese enemigo realiza un ataque normal a cualquier objetivo en el campo (aliado o enemigo).",
         passiveName: "SEGUIMIENTO", activeName: "DOMINIO", activeCost: 2,
         
         // 1. Mostrar la mano del rival siempre (Hook de motor)
@@ -2254,7 +2254,7 @@ const CARD_DB = [
     },
     {
         name: "Xanadu", hp: 6, def: 4, atk: 7, type: "Personaje", subtype: "Ser vivo", tags: ["Poder heredado"], gender: "M", rarity: "S", series: 1,
-        text: "Requisito: 'Una buena razón' activo en cualquier campo. P: REPULSIÓN ABSOLUTA: Al recibir ataque normal, puede usar 1 de Furor para esquivar el ataque y sus efectos. A: ESTORNUDO DEVASTADOR (2F): Intercambia un enemigo de vanguardia por uno de retaguardia (si respeta reglas). Si no hay retaguardia enemiga, lo devuelve a su mano.",
+        text: "Requisito: 'Una buena razón' activo en cualquier campo. P: REPULSIÓN ABSOLUTA: Al recibir ataque normal, puede usar 1 de Furor para esquivar el ataque y sus efectos. A: ESTORNUDO DEVASTADOR (2F): Intercambia un enemigo de vanguardia por uno de retaguardia. Si no hay retaguardia enemiga, lo devuelve a su mano.",
         passiveName: "REPULSIÓN ABSOLUTA", activeName: "ESTORNUDO DEVASTADOR", activeCost: 2,
 
         onBeforePlayAsync: async function(card, game, p) {
@@ -2826,7 +2826,7 @@ const CARD_DB = [
     },
     {
         name: "Shichishito", type: "Ayuda", subtype: "Arma legendaria", tags: ["Equipable", "melé"], rarity: "A", cost: 0, series: 1,
-        text: "Requisito: un Personaje 'Karlos' en tu vanguardia. Anéxala a dicho Personaje: +2 Atq y +2 Def mientras esté equipada. Sólo puedes usar esta carta una vez por partida.",
+        text: "Requisito: un Personaje 'Karlos' en tu vanguardia. Anéxasela: +2 de Atq y +2 de Def mientras la lleve. Sólo puedes usar esta carta una vez por partida.",
         abilities: [
             { trigger: "JUGAR", requisitos: [
                 { de: "JUGADOR", campo: "hasUsedShichishito", op: "falsy", msg: "Ya has usado Shichishito en esta partida." },
@@ -3068,7 +3068,7 @@ const CARD_DB = [
     },
     {
         name: "Espada V", type: "Ayuda", subtype: "Arma", tags: ["melé"], cost: 1, rarity: "B", series: 1,
-        text: "Requisito: un Personaje aliado 'Karlos' o 'Agah'. Anéxala a dicho Personaje: +2 Atq mientras esté equipada. Sólo puedes usar esta carta una vez por partida.",
+        text: "Requisito: un Personaje aliado 'Karlos' o 'Agah'. Anéxasela: +2 de Atq mientras la lleve. Sólo puedes usar esta carta una vez por partida.",
         abilities: [
             { trigger: "JUGAR", requisitos: [
                 { de: "JUGADOR", campo: "espadaV_Used", op: "falsy", msg: "Ya has empuñado la Espada V en esta partida." },
@@ -3801,7 +3801,7 @@ const CARD_DB = [
     },
     {
         name: "Chaqueta metálica defensiva de la muerte", type: "Ayuda", subtype: "Vestimenta", tags: ["Equipable"], rarity: "C", cost: 1, series: 1,
-        text: "Requisito: un aliado sin la etiqueta 'Cosa'. Anéxala a dicho aliado: +3 Def y -3 Atq mientras esté equipada.",
+        text: "Requisito: un aliado sin la etiqueta 'Cosa'. Anéxasela: +3 de Def y -3 de Atq mientras la lleve.",
         abilities: [
             { trigger: "JUGAR", requisitos: [
                 { count: { filtros: [ { no: true, campo: "tags", op: "includes", valor: "Cosa" } ] }, op: ">=", valor: 1, msg: "No tienes aliados válidos (sin etiqueta 'Cosa')." } ] },
@@ -6107,7 +6107,7 @@ const CARD_DB = [
     },
     {
         name: "Hiposaurio", hp: 6, def: 4, atk: 2, type: "Esbirro", subtype: "Ser vivo", tags: ["Bestia salvaje"], rarity: "B", cost: 1, series: 2,
-        text: "P: ECOSISTEMA VIVIENTE: Al sufrir Daño por tiempo, pierde 3 de Vida en vez de 1. A: CABREO (3F): Realiza un ataque normal subiendo en 2 puntos su Atq durante dicho ataque.",
+        text: "P: ECOSISTEMA VIVIENTE: Al sufrir Daño por tiempo, pierde 3 de Vida en vez de 1. A: CABREO (3F): Ataque normal con +2 de Atq durante el golpe.",
         passiveName: "ECOSISTEMA VIVIENTE", activeName: "CABREO", activeCost: 3,
         // ECOSISTEMA VIVIENTE se queda imperativa (27-jul-2026, tanda de volumen): no hay
         // trigger DSL para "modificar el tick de Daño por tiempo", y no compensa crear uno
@@ -6131,7 +6131,7 @@ const CARD_DB = [
     {
         name: "Lolita", hp: 2, def: 2, atk: 2, type: "Esbirro", subtype: "Ser vivo", tags: ["Otaku"], rarity: "A", cost: 1, series: 2,
         isToken: true, // Esto le quita la retribución al morir automáticamente en checkDeath
-        text: "P: PRESTIGIO: Esta carta no te otorga retribución cuando su Vida llega a 0. A: NOCIONES DE OCULTISMO (1F): Realiza un ataque especial subiendo el Atq de esta carta en 2 durante dicho ataque.",
+        text: "P: PRESTIGIO: Esta carta no te otorga retribución cuando su Vida llega a 0. A: NOCIONES DE OCULTISMO (1F): Ataque especial con +2 de Atq durante el golpe.",
         passiveName: "PRESTIGIO", activeName: "NOCIONES DE OCULTISMO", activeCost: 1,
         // Migrada por completo (27/28-jul-2026, tanda de volumen #2). Mismo patrón que
         // Hechicero/CHIRIBITA: ATACAR especial:true. CORRECCIÓN igual que allí: la vieja
@@ -6274,7 +6274,7 @@ const CARD_DB = [
     },
     {
         name: "Hechicero", hp: 3, def: 3, atk: 4, type: "Esbirro", subtype: "Ser vivo", tags: ["Usuario de magia"], rarity: "B", cost: 1, series: 2,
-        text: "A: CHIRIBITA (1F): Realiza un ataque especial, aumentando en 1 el Atq de esta carta durante dicho ataque.",
+        text: "A: CHIRIBITA (1F): Ataque especial con +1 de Atq durante el golpe.",
         activeName: "CHIRIBITA", activeCost: 1,
         // Migrada por completo (27-jul-2026, tanda de volumen). Estrena `especial: true` en el
         // op ATACAR: la fórmula de daño de un ataque especial (Atq-Def, suelo 0.5/1 para
