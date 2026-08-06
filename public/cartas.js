@@ -447,7 +447,7 @@ const CARD_DB = [
         // no cumplía ninguna de las dos cosas: la Pasiva se mostraba sin nombre y el (2F) de la
         // Activa salía como texto suelto en vez del recuadro verde de coste. Redacción oficial
         // del Excel de Toto, íntegra (antes iba resumida).
-        text: "P: PSEUDO-PREVASIÓN: Cada vez que Águila es atacado por un ataque normal, echa una moneda. Si es cara, evita dicho ataque y sus efectos. A: ESPÍA (2F): Elige un tipo de carta (Personaje, Esbirro, Ayuda o Evento), luego, echa un vistazo a la mano de tu rival; elimina Furor de un enemigo equivalente a la cantidad de cartas del tipo que elegiste que haya en la mano del rival.",
+        text: "P: PSEUDO-PREVASIÓN: Cada vez que Águila es atacado por un ataque normal, echa una moneda. Si es cara, evita dicho ataque y sus efectos. A: ESPÍA (2F): Elige un tipo de carta y mira la mano de tu rival: un enemigo pierde tanto Furor como cartas de ese tipo haya en ella.",
         passiveName: "PSEUDO-PREVASIÓN", activeName: "ESPÍA", activeCost: 2, series: 1,
 
         // PSEUDO-PREVASIÓN migrada (31-jul-2026): estrena el op `ESQUIVAR`, que convierte la
@@ -2440,7 +2440,7 @@ const CARD_DB = [
     },
     {
         name: "Diego Antonio", hp: 7, def: 9, atk: 9, type: "Personaje", subtype: "Ser vivo", tags: ["Usuario de VP", "mafia"], gender: "M", rarity: "S", series: 1,
-        text: "Requisito: 'Una buena razón' activo en cualquier campo. P: CÓLERA INFINITA: Al colocar: +1 de Furor y 3 Contadores (pierde 1/turno en Van; a 0 muere). No puede retirarse normal. Al recibir ataque normal, invierte el cálculo: Diego no recibe daño y daña al atacante. A: PACIFISMO (3F): Este turno no baja su contador.",
+        text: "Requisito: 'Una buena razón' activo en cualquier campo. P: CÓLERA INFINITA: Al colocar: +1 de Furor y 3 Contadores; en vanguardia pierde 1 por turno y a 0 muere. No puede retirarse de forma normal. Al recibir un ataque normal invierte el cálculo: no sufre daño y daña al atacante. A: PACIFISMO (3F): Este turno no baja su contador.",
         passiveName: "CÓLERA INFINITA", activeName: "PACIFISMO", activeCost: 3,
         uncopyable: true, // Requiere los contadores exclusivos de Diego
         
@@ -3202,7 +3202,7 @@ const CARD_DB = [
     },
     {
         name: "Unmei", hp: 5, def: 7, atk: 4, type: "Personaje", subtype: "Ser vivo", tags: ["Ninja"], gender: "M", rarity: "B", cost: 1, series: 1,
-        text: "A: MULTIPLICACIÓN DE CUERPO (4F): Crea un 'Clon de Unmei' (Esbirro) en el campo. Copia el Atq y Def de Unmei en todo momento. Si Unmei muere, el clon también (sin dar retribución). El clon tiene Vida propia pero no puede ganar Furor.",
+        text: "A: MULTIPLICACIÓN DE CUERPO (4F): Crea un 'Clon de Unmei' en el campo: copia su Atq y Def en todo momento, tiene Vida propia y no gana Furor. Si Unmei muere, el clon se desvanece sin dar Retribución.",
         activeName: "MULTIPLICACIÓN DE CUERPO", activeCost: 4,
         canActivateAbility: function(card, game) {
             if (card.furor < 4) { game.logError("Falta Furor (4)."); return false; }
@@ -3264,7 +3264,7 @@ const CARD_DB = [
         id: 900, name: "Clon de Unmei", hp: 5, def: 7, atk: 4, type: "Esbirro", subtype: "Ser vivo", tags: ["Ninja"], gender: "M", rarity: "B", cost: 0, series: 1,
         isToken: true, // Etiqueta clave para el motor
         reverseArrow: true, // <--- Hace que la flecha vaya del Clon hacia Unmei
-        text: "Este clon copia el Atq y Def de Unmei en todo momento. Tiene su propia Vida, pero no puede ganar Furor ni usar habilidades. Si el Unmei original muere o abandona el campo, este clon se desvanece instantáneamente.",
+        text: "Copia el Atq y Def de Unmei en todo momento. Tiene Vida propia, no gana Furor y no puede usar Habilidades. Si Unmei deja el campo, se desvanece.",
         // Migrado a DSL (trigger ESPEJO, 21-jul-2026). Unmei sigue creando el clon de
         // forma imperativa (MULTIPLICACIÓN DE CUERPO) y le fija parentId; el clon en sí
         // ya es declarativo.
@@ -3930,7 +3930,7 @@ const CARD_DB = [
         // +ATQ/+DEF ya calculados (vía onEquipUpdate/_statMods) -redundante y sin info real, ya
         // que el tempEffect a mano no lleva `duration`-.
         tempEffectSinLinea: true,
-        text: "Equipa a un 'Usuario de Súper Evolución' en vanguardia. Sus stats cambian a las de Súper Evolución (restaurando Vida) y elimina estados alterados. Tras 3 turnos tuyos, se destruye y restaura sus stats originales (restaurando Vida) eliminando estados.",
+        text: "Equipa a un 'Usuario de Súper Evolución' de tu vanguardia: adopta las stats de Súper Evolución, recupera toda su Vida y pierde sus estados alterados. Tras 3 turnos tuyos se destruye y le devuelve sus stats, la Vida y la limpieza de estados.",
         // Migrada por completo (31-jul-2026). Tres piezas nuevas, las tres compartidas con las
         // otras dos cartas de la tanda (Poder Legado y Milkor MGL):
         //   · `mientrasEquipado: {superStats:true}` — el bono NO es un delta fijo sino la
@@ -4535,7 +4535,7 @@ const CARD_DB = [
     },
     {
         name: "Poder Legado", type: "Ayuda", subtype: "Técnica", tags: ["Equipable"], rarity: "S", cost: 1, series: 2,
-        text: "Anexa a vanguardia con 'Karlos' y 1 de Vida o menos. Sus stats pasan a ser 9 (inamovible). Quien le ataque pierde 1 de Furor. Al inicio de tu próximo turno, destruye este equipo y devuelve el personaje a tu mano.",
+        text: "Requisito: un 'Karlos' de tu vanguardia con 1 de Vida o menos. Equípaselo: sus stats pasan a 9 y quedan fijas, y quien le ataque pierde 1 de Furor. Al inicio de tu próximo turno el equipo se destruye y Karlos vuelve a tu mano.",
         // Migrada (31-jul-2026), segunda de la tanda de equipos con vida propia. Reutiliza
         // `cuentaAtras` de Súper Evolución (aquí de UN solo turno) y estrena dos piezas:
         //   · `mientrasEquipado: {fijar:{...}, ignorarTopes:true}` — stats BLOQUEADOS a un valor
@@ -4903,7 +4903,7 @@ const CARD_DB = [
     {
         name: "Arthas", hp: 2, def: 3, atk: 6, type: "Personaje", subtype: "Arma legendaria", tags: ["Equipable", "melé"], rarity: "B", cost: 4, series: 2,
         isDual: true, // <--- LA PALANCA PARA QUE EL MOTOR PINTE EL DEGRADADO
-        text: "P: HERRERO LEGENDARIO: Carta dual (Personaje / Ayuda equipable). No usable si Karolina está en tu vanguardia (se autodestruye si ella entra). Si está como Personaje: puedes equiparlo a un aliado sin coste en tu turno (deja su hueco). Si su portador muere o deja el campo, Arthas cae de nuevo al campo si hay cupo válido (si no, va a los Descartes). Al usar como Ayuda equipable: Anexa a un aliado (NO 'Animal salvaje', NO 'Cosa', NO Karolina). +3 Atq.",
+        text: "Requisito: Karolina no está en tu vanguardia; si entra, Arthas se autodestruye. P: HERRERO LEGENDARIO: Carta dual. Como Personaje: equípalo gratis a un aliado en tu turno, dejando su hueco; si el portador cae, vuelve al campo, o a descartes si no hay sitio. Como Ayuda: anexa a un aliado que no sea 'Animal salvaje', 'Cosa' ni Karolina, y le da +3 de Atq.",
         passiveName: "HERRERO LEGENDARIO",
         
         canPlayCard: function(card, game, p) {
@@ -5225,7 +5225,7 @@ const CARD_DB = [
         id: 901, name: "Clon de NoName", hp: 3, def: 3, atk: 6, type: "Esbirro", subtype: "Máquina", tags: ["Con conciencia"], gender: "M", rarity: "S", cost: 0, series: 1,
         isToken: true, // Etiqueta clave para ocultarlo
         reverseArrow: true, 
-        text: "Este clon copia el Atq y Def de NoName en todo momento. Tiene su propia Vida, pero no puede ganar Furor ni usar habilidades. Si el NoName original muere o abandona el campo, este clon se desvanece instantáneamente.",
+        text: "Copia el Atq y Def de NoName en todo momento. Tiene Vida propia, no gana Furor y no puede usar Habilidades. Si NoName deja el campo, se desvanece.",
         // Migrado a DSL (trigger ESPEJO, 21-jul-2026). Idéntico al Clon de Unmei.
         abilities: [{ trigger: "ESPEJO", de: "parentId", copiar: ["currentAtk", "currentDef"], furorCero: true, muerteSiSinPadre: true }]
     },
@@ -5361,7 +5361,7 @@ const CARD_DB = [
     },
     {
         name: "Gladiador", hp: 5, def: 4, atk: 5, type: "Personaje", subtype: "Ser vivo", tags: ["Mercenario", "Draconiano", "Maleante"], rarity: "C", cost: 1, series: 2,
-        text: "P: OBSESIÓN DE VENGANZA: Al colocar, puedes anexar un aliado en tu campo a él. Mientras la unión esté activa, Gladiador aumenta en 1 su Vida, Def y Atq. (Su Vida no puede llegar a 0 tras perderlo).",
+        text: "P: OBSESIÓN DE VENGANZA: Al colocar: puedes anexarle un aliado de tu campo. Mientras la unión dure, gana +1 de Vida, Def y Atq. Al romperse, su Vida nunca baja a 0 por ello.",
         passiveName: "OBSESIÓN DE VENGANZA",
         // Sin annexEffectText: igual que Kazuo, el +1 lo recibe Gladiador y su propia línea de
         // stats ya lo declara ("+1 VIDA MÁX., +1 DEF y +1 ATQ por OBSESIÓN DE VENGANZA").
@@ -5476,7 +5476,7 @@ const CARD_DB = [
     },
     {
         name: "Feria del cómic", type: "Evento", rarity: "A", cost: 1, duration: 2, series: 2,
-        text: "2 turnos. Mientras esté en juego, TODOS los aliados y enemigos en el campo que NO tengan la etiqueta 'Otaku' están Silenciados (no pueden usar Habilidades), y al final de tu turno echas una moneda: con cara, buscas una carta 'Otaku' en tu mazo, la añades a tu mano y barajas.",
+        text: "2 turnos. Mientras esté en juego, todo el campo sin la etiqueta 'Otaku' queda Silenciado. Al final de tu turno, moneda: con cara, busca una carta 'Otaku' en tu mazo y añádela a tu mano.",
         // Migrada al DSL (fase interceptores). Fidelidad: el AURA no exime a los
         // Avatares (la imperativa silenciaba también a Kami); se baraja aunque la
         // compra se cancele (la búsqueda ya revolvió el mazo); silencio si no hay
@@ -5559,7 +5559,7 @@ const CARD_DB = [
     },
     {
         name: "Guardaespaldas", hp: 4, def: 4, atk: 3, type: "Esbirro", subtype: "Ser vivo", tags: ["Mafia"], rarity: "B", cost: 1, series: 2,
-        text: "P: YO SIEMPRE TE AMARÉ: Cuando un aliado vaya a recibir un ataque letal (0 Vida), puedes destruir a Guardaespaldas en su lugar. El rival consigue el premio y se activan los efectos de muerte.",
+        text: "P: YO SIEMPRE TE AMARÉ: Cuando un aliado vaya a recibir un ataque letal, puedes destruir a Guardaespaldas en su lugar. El rival se lleva la Retribución y se activan los efectos de muerte.",
         passiveName: "YO SIEMPRE TE AMARÉ",
         onLethalDamageIntercept: async function(card, defender, attacker, game) {
             const pName = card.owner === 'p1' ? 'JUGADOR 1' : 'JUGADOR 2';
@@ -5665,7 +5665,7 @@ const CARD_DB = [
     },
     {
         name: "Milkor MGL", type: "Ayuda", subtype: "Arma", tags: ["Equipable", "a distancia"], rarity: "B", cost: 1, series: 2,
-        text: "Equípala a un aliado (NO 'Animal salvaje'). Al atacar normal: +1 contador y lanza moneda. Cara: Aumenta su Atq en 4 durante el ataque (máximo 8). Cruz: Rival elige el objetivo y reduce el daño en 3. Se destruye con 2 contadores.",
+        text: "Equípala a un aliado que no sea 'Animal salvaje'. Al atacar normal, moneda - Cara: +4 de Atq durante el golpe, hasta un máximo de 8. Cruz: el rival elige el objetivo y el daño baja en 3. Se destruye al segundo uso.",
         // Migrada (31-jul-2026), tercera y última de la tanda de equipos con vida propia. Es la
         // que tenía el trozo delicado: su interceptor DEVUELVE un valor al motor
         // ({dmgMod, newDefender}) y, en la rama de cruz, hace elegir al RIVAL a mitad del ataque.
@@ -6517,7 +6517,7 @@ const CARD_DB = [
         // en su propia caja tipo stats (misma norma Coste/Requisito de siempre) — no hace falta
         // nada nuevo, solo escribirlo. Es un REQUISITO y no un Coste porque no se paga/pierde
         // nada al colocarla: es solo la condición que dispara la reacción.
-        text: "Requisito: Un 'cebo' que ataque o vaya a sufrir daño. P: IMAGINACIÓN HIPERACTIVA: No se coloca de forma normal. Desde tu mano, cuando un aliado 'cebo' declare un ataque o vaya a recibir daño, puedes cambiarlo por Neo: el cebo vuelve a tu mano y Neo ocupa su hueco con sus equipos y bonos, y da o recibe el golpe. Cebo: aliado Personaje/Esbirro que no sea Máquina, Ser mágico, Animal salvaje ni Cosa, que no tuviera requisitos para colocarse y que no haya atacado, sufrido daño ni usado su Activa. A: PARED FALSA (4F): Pon un contador en Neo. El próximo ataque que reciba, normal o especial, queda anulado con todos sus efectos y se retira el contador. No acumulable.",
+        text: "Requisito: Un 'cebo' que ataque o vaya a sufrir daño. P: IMAGINACIÓN HIPERACTIVA: No se coloca de forma normal. Cuando un 'cebo' declare un ataque o vaya a recibir daño, cámbialo por Neo desde tu mano: el cebo vuelve a tu mano y Neo ocupa su hueco, con sus equipos y bonos, y da o recibe el golpe. Cebo: Personaje o Esbirro aliado sin requisitos de colocación, que no sea Máquina, Ser mágico, Animal salvaje ni Cosa, y que no haya atacado, recibido daño ni usado su Activa. A: PARED FALSA (4F): Pon un contador en Neo. El próximo ataque que reciba, normal o especial, queda anulado con todos sus efectos y se retira el contador. No acumulable.",
         passiveName: "IMAGINACIÓN HIPERACTIVA", activeName: "PARED FALSA", activeCost: 4,
 
         // PARED FALSA es 100% declarativa y no necesitó ninguna pieza nueva: el op ESQUIVAR ya

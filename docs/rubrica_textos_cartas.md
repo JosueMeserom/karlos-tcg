@@ -164,25 +164,67 @@ mezclan ("un rival" queriendo decir una carta enemiga), y son cosas distintas: u
 
 ---
 
-## 7. Longitud
+## 7. Longitud: se mide POR CAJA, no por carta
 
-**Fuera del alcance de la rúbrica por ahora** [Toto, 5-ago-2026]. Hay 22 cartas por encima de 240
-caracteres (Neo 666, Arthas 451, Águila 375) y acortarlas es reescribirlas de verdad: decidir qué
-matiz de regla se sacrifica. Eso merece su propia pasada con criterio de diseño, no ir de propina
-en una tanda de terminología.
+El panel de detalle son 260px a 12px de fuente: **unos 37 caracteres por línea**. Lo que satura
+la vista no es el total de la carta, sino una caja de habilidad larga. Una carta con Requisito +
+Coste + Pasiva + Activa necesita legítimamente más total que una vainilla, y medir el total
+castigaba a las bien escritas mientras dejaba pasar cartas con UNA caja enorme.
 
-Consecuencia asumida: aplicar §4 (nada de abreviaturas) hace que unas pocas cartas **crezcan**.
-Es el precio de la claridad y está aceptado.
+**Objetivo: 185 caracteres por caja (5 líneas).** Es un objetivo, no un veto: el verificador lo
+lista como informativo, no como problema. Una carta compleja de verdad puede pasarse; una que se
+pasa por perífrasis, no.
+
+### Qué se recorta (y qué no)
+
+Lo que se va, por orden de rentabilidad:
+
+1. **Reglas generales del juego repetidas en cada carta.** "Baraja el mazo" después de buscar
+   pasa siempre; "(no pueden usar Habilidades)" es la definición de Silenciado. Eso pertenece a
+   las reglas, no a la carta.
+2. **Enumeraciones que no informan.** Águila decía "elige un tipo de carta (Personaje, Esbirro,
+   Ayuda o Evento)" — la lista completa de tipos que existen. 100 caracteres a cambio de nada.
+3. **Lo que la interfaz ya enseña.** Los contadores tienen su propia insignia en la carta, así
+   que no hay que narrar que suben y bajan; "(usando el botón)" sobra.
+4. **Aclaraciones defensivas entre paréntesis** que no cambian la regla: "(si respeta reglas)",
+   "(si puede)".
+5. **Perífrasis.** "Cada vez que Águila es atacado por un ataque normal, echa una moneda; si es
+   cara, evita dicho ataque y sus efectos" -> "Al recibir un ataque normal, moneda: con cara lo
+   evita con todos sus efectos".
+
+Lo que **NUNCA** se recorta: los calificadores son el contrato de la carta. `normal`/`especial`,
+`aliado`/`enemigo`, `vanguardia`/`retaguardia`, `puedes`/`debes`, los topes y los máximos. Ante la
+duda entre una caja larga y un matiz perdido, gana la caja larga.
+
+### Reubicar en vez de recortar
+
+A menudo la caja no sobra: está en el sitio equivocado. Una condición de colocación metida dentro
+de la Pasiva es un `Requisito:` con su propia caja (así se sacó de Arthas la exclusión de Karolina
+y de Poder Legado la condición del portador). Ojo: la caja de `Requisito:`/`Coste:` la parsea una
+expresión que corta en el PRIMER punto, así que solo cabe UNA frase.
+
+### Las que se quedan largas a propósito
+
+Tras la pasada del 5-ago-2026 quedan seis cajas por encima del objetivo, y las seis lo están
+porque la carta dice mucho de verdad: **Neo** (416: la definición de "cebo" son 175 caracteres de
+contrato puro), **Arthas** (272: es una carta dual, con dos modos que explicar), **Súper
+Evolución** (240: describe la ida y la vuelta), **Diego Antonio** (221: tres reglas sin relación
+en una sola Pasiva), **Milkor MGL** (214: moneda con dos ramas) y **Unmei** (196). Bajarlas más
+exige o sacrificar contrato o partir la caja, que hoy el parser no sabe hacer.
 
 ---
 
 ## 8. Cómo verificar
 
-`node <scratchpad>/auditar.js cartas.json` contrasta a máquina texto vs comportamiento y señala:
-nombres de Habilidad que no coinciden con la plantilla, costes que el texto declara y la carta no
-(o al revés), duraciones de Evento desalineadas, momentos prometidos sin disparador que los
-respalde, guion largo y textos sobre el límite. **No arregla nada: señala.** Conviene pasarlo
-después de añadir cartas nuevas.
+`node tests/auditar_textos.js` contrasta a máquina texto vs comportamiento y señala: nombres de
+Habilidad que no coinciden con la plantilla, costes que el texto declara y la carta no (o al
+revés), duraciones de Evento desalineadas, momentos prometidos sin disparador que los respalde,
+banderas de plantilla que el texto calla, vocabulario fuera de rúbrica, guion largo y cajas por
+encima del objetivo. **No arregla nada: señala.** Con `--todo` incluye las informativas.
+
+Lo que el verificador **no** puede ver: si la descripción de un efecto es correcta EN SU CONTENIDO
+(que "cura 2" cure 2 y no 3). Eso sigue siendo lectura humana; aquí se comprueba la ESTRUCTURA,
+que es donde estaban los fallos.
 
 Las suites de regresión NO comparan el `text` de las cartas (solo logs, flotantes y estado), así
 que un cambio de redacción no las rompe — pero sí puede romper el PARSEO del detalle, que es

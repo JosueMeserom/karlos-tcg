@@ -73,6 +73,31 @@ const BANDERAS = {
     isEvolution: ['evolucion', 'evolución', 'sustituy', 'sustituir', 'requisito'],
 };
 
+const CHARS_LINEA = 37;   // 260px de panel menos paddings, a 12px de fuente
+const MAX_LINEAS = 5;     // más de 5 líneas seguidas ya se leen como un muro
+const TOPE_CAJA = CHARS_LINEA * MAX_LINEAS;
+
+// Trocea un texto en las CAJAS que el detalle pintará por separado.
+function cajasDe(c) {
+    let t = c.text || '';
+    const out = [];
+    const corta = (re, etq) => { const m = t.match(re); if (m) { out.push([etq, m[0].trim().length]); t = t.slice(m[0].length); } };
+    corta(/^Requisito:\s*[^.]+\.\s*/i, 'Requisito');
+    corta(/^Coste:\s*[^.]+\.\s*/i, 'Coste');
+    corta(/^\d+\s*turnos?\.\s*/i, 'Duración');
+    if (c.type === 'Evento') {
+        return out.concat(t.split(/(?=Antes de colocarla, |Al colocarla, |Mientras esté en juego, |Al expirar, )/)
+            .filter(p => p.trim())
+            .map(p => [(p.match(/^(Antes de colocarla|Al colocarla|Mientras esté en juego|Al expirar)/) || [, 'cuerpo'])[1], p.trim().length]));
+    }
+    const trozos = t.split(/\s*(?<![\p{L}\p{N}])(P:|A:)(?=\s)\s*/u).filter(x => x && x.trim());
+    for (let i = 0; i < trozos.length; i++) {
+        if (trozos[i] === 'P:' || trozos[i] === 'A:') { out.push([trozos[i] === 'P:' ? 'Pasiva' : 'Activa', (trozos[i + 1] || '').trim().length]); i++; }
+        else out.push(['cuerpo', trozos[i].trim().length]);
+    }
+    return out;
+}
+
 function opsDe(nodo, acc = new Set()) {
     if (!nodo || typeof nodo !== 'object') return acc;
     if (Array.isArray(nodo)) { nodo.forEach(n => opsDe(n, acc)); return acc; }
@@ -166,8 +191,14 @@ for (const c of CARTAS) {
         [/\bVanguardia\b/, 'Vanguardia -> vanguardia'], [/\bRetaguardia\b/, 'Retaguardia -> retaguardia']];
     for (const [re, msg] of caps) if (re.test(sinNombres)) add('VOCABULARIO', c, `§5: ${msg}`);
 
-    // --- §7 Longitud (informativa: fuera del alcance de la rúbrica por ahora) ---
-    if (t.length > 240) add('LONGITUD', c, `${t.length} caracteres`);
+    // --- §7 Longitud, medida POR CAJA del detalle, no por carta ---
+    // El panel son 260px a 12px de fuente: ~37 caracteres por línea. Lo que satura la vista es
+    // una caja de habilidad larga, no el total: una carta con Requisito + Coste + Pasiva +
+    // Activa necesita legítimamente más total que una vainilla, y medir el total castigaba a
+    // las bien escritas y dejaba pasar cartas con UNA caja enorme (Toto, 5-ago-2026).
+    for (const [etq, largo] of cajasDe(c)) {
+        if (largo > TOPE_CAJA) add('LONGITUD', c, `caja "${etq}": ${largo} caracteres (tope ${TOPE_CAJA} = ${MAX_LINEAS} líneas)`);
+    }
 }
 
 // ---------- salida ----------
