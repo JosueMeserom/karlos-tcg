@@ -6676,6 +6676,89 @@ const CARD_DB = [
             { trigger: "AL_CADUCAR", log: "Se acaba el espectáculo.", logTipo: "system" }
         ],
     },
+    {
+        name: "Quema de maná", type: "Ayuda", subtype: "Mágico", tags: ["Consumible"], rarity: "C", series: 1,
+        text: "Quita 2 de Furor a un enemigo.",
+        abilities: [
+            { trigger: "AL_CONSUMIR",
+              efectos: [
+                { op: "ELEGIR", de: "ENEMIGOS", cantidad: 1, titulo: "Elige a quién quemarle el maná",
+                  efectos: [
+                    { op: "MODIFICAR_STAT", stat: "furor", delta: -2, floating: { texto: "-2 FUR", estilo: "ft-red-stat", offset: -20 },
+                      log: "{carta} quema el maná de {objetivo}." } ] } ] }
+        ],
+    },
+    {
+        name: "Cóctel molotov", type: "Ayuda", subtype: "Arma", tags: ["Consumible"], rarity: "C", series: 1,
+        text: "Quita 1 de Vida a un enemigo y le inflige Daño por tiempo durante 2 turnos.",
+        abilities: [
+            { trigger: "AL_CONSUMIR",
+              efectos: [
+                { op: "ELEGIR", de: "ENEMIGOS", cantidad: 1, titulo: "Elige el objetivo del Cóctel molotov",
+                  efectos: [
+                    { op: "MODIFICAR_STAT", stat: "currentHp", delta: -1, comprobarMuerte: true,
+                      animacion: "DANO_VERDADERO",
+                      log: "¡{carta} estalla sobre {objetivo}!" },
+                    { op: "APLICAR_ESTADO", estado: "dot", duracion: 2 } ] } ] }
+        ],
+    },
+    {
+        name: "Consagración", type: "Evento", rarity: "A", cost: 0, duration: 3, series: 1,
+        text: "3 turnos. Cura 1 de Vida a cada aliado al final de tu turno. Al expirar, se descarta y cura 1 de Vida a cada aliado.",
+        abilities: [
+            { trigger: "FIN_TURNO",
+              efectos: [
+                { op: "CURAR", valor: 1, conBeforeHealed: false, soloSiHerido: true,
+                  floating: "+1 VIDA", floatingStyle: "ft-green", offsetY: -20, fuente: "healing",
+                  target: { quien: "ALIADO" } } ] },
+            { trigger: "AL_CADUCAR", log: "Consagración se desvanece con una última bendición.", logTipo: "ability",
+              efectos: [
+                { op: "CURAR", valor: 1, conBeforeHealed: false, soloSiHerido: true,
+                  floating: "+1 VIDA", floatingStyle: "ft-green", offsetY: -20, fuente: "healing",
+                  target: { quien: "ALIADO" } } ] }
+        ],
+    },
+    {
+        name: "Robot de asalto AU", hp: 5, def: 5, atk: 5, type: "Esbirro", subtype: "Máquina", tags: ["Controlable"], gender: "N", rarity: "C", series: 1,
+        text: "P: SOBRECALENTAMIENTO: Al final de cada turno en el que tenga 2 o más de Furor, pierde 3 de Vida.",
+        passiveName: "SOBRECALENTAMIENTO",
+        abilities: [
+            { trigger: "FIN_TURNO",
+              efectos: [
+                { if: { campo: "furor", op: ">=", valor: 2 },
+                  op: "MODIFICAR_STAT", target: { quien: "SELF" }, stat: "currentHp", delta: -3, comprobarMuerte: true,
+                  log: "¡SOBRECALENTAMIENTO! {carta} pierde 3 de Vida." } ] }
+        ],
+    },
+    {
+        name: "Nigromántica", hp: 3, def: 4, atk: 2, type: "Esbirro", subtype: "Ser vivo", tags: ["Usuaria de magia"], gender: "F", rarity: "B", series: 1,
+        text: "A: ARTES PROHIBIDAS (1 de Furor): Elige de tu pila de descartes un Personaje o Esbirro 'Ser vivo' o 'No-muerto' que no requiera coste ni condiciones extra para colocarse y colócalo en tu campo. Si tienes un 'Necronomicón' en tu mano, puedes descartarlo para que esta carta gane 1 de Furor.",
+        activeName: "ARTES PROHIBIDAS",
+        abilities: [
+            { trigger: "ACTIVA", nombre: "ARTES PROHIBIDAS", coste: { furor: 1 }, sinObjetivo: true, costeDiferido: true,
+              requisitos: [
+                { count: { zona: "DESCARTES",
+                    filtros: [ { o: [ [ { campo: "type", op: "==", valor: "Personaje" } ], [ { campo: "type", op: "==", valor: "Esbirro" } ] ] },
+                               { o: [ [ { campo: "subtype", op: "==", valor: "Ser vivo" } ], [ { campo: "subtype", op: "==", valor: "No-muerto" } ] ] } ] },
+                  op: ">=", valor: 1, msg: "No hay ningún caído apto en tu pila de descartes." } ],
+              efectos: [
+                { op: "FLOTANTE", target: { quien: "SELF" }, texto: "ARTES PROHIBIDAS", estilo: "ft-ability", offset: -30 },
+                { op: "BUSCAR", en: "DESCARTES", cantidad: 1, destino: "RETAGUARDIA", animacionResurrect: true, sinAnimacion: true,
+                  filtros: [ { o: [ [ { campo: "type", op: "==", valor: "Personaje" } ], [ { campo: "type", op: "==", valor: "Esbirro" } ] ] },
+                             { o: [ [ { campo: "subtype", op: "==", valor: "Ser vivo" } ], [ { campo: "subtype", op: "==", valor: "No-muerto" } ] ] } ],
+                  plantillaSin: ["onBeforePlayAsync", "canPlayCard"],
+                  abortaSiCancelas: true, abortaSiVacio: true, titulo: "ARTES PROHIBIDAS: ELIGE UN CAÍDO",
+                  log: "¡Artes prohibidas! {carta} resucita a {objetivo} en su campo." },
+                { op: "ELEGIR", de: "MANO", cantidad: 1, opcional: true,
+                  filtros: [ { campo: "name", op: "contieneTexto", valor: "Necronomicón" } ],
+                  titulo: "¿DESCARTAR NECRONOMICÓN? (+1 FUROR)",
+                  efectos: [
+                    { op: "DESCARTAR" },
+                    { op: "MODIFICAR_STAT", target: { quien: "SELF" }, stat: "furor", delta: 1,
+                      floating: { texto: "+1 FUR", estilo: "ft-green", offset: -20 },
+                      log: "{carta} devora el Necronomicón y gana Furor." } ] } ] }
+        ],
+    },
 ];
 
 // ===================================================================

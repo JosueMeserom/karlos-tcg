@@ -4,3 +4,7 @@ antiguos/
 # Andamios servidos por pm2 para validar cambios de cliente en el navegador
 # (p. ej. _preview_detalle.html): útiles en el momento, nunca parte del juego.
 public/_preview_*.html
+# El Excel de Toto (y cualquier export suyo): son SUS ideas de cartas sin publicar.
+# Vive en disco para consultarlo, pero NUNCA se versiona ni sale del servidor.
+*.csv
+docs/Cartas KG.csv
