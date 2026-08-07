@@ -331,9 +331,32 @@ que ya lo elige solo): se ve la pila entera y solo las elegibles llevan reborde 
 elegibles, el visor se abre igual con el aviso y se cierra clicando el fondo.
 
 **Nunca** el modal genérico de selección (`openVisualSearchModal`) para una pila: solo lista las
-válidas y esconde el resto, que es información que el jugador tiene derecho a ver. Ese modal
-queda para la **mano** y para búsquedas **multi-zona** (`en: ["MANO", "MAZO"]`), donde no hay una
-sola pila que enseñar.
+válidas y esconde el resto, que es información que el jugador tiene derecho a ver.
+
+**Multi-zona: NUNCA en un solo modal.** Una búsqueda que abarca varias zonas (`en: ["MAZO",
+"DESCARTES"]`, `["MANO", "MAZO"]`…) se resuelve SIEMPRE con `confirmarPorZona`: primero se
+elige zona, y luego se abre el visor de esa zona. Mezclarlas en un modal común tiene dos
+defectos graves, los dos verificados en partida:
+
+1. **Spoilea el mazo.** Las coincidencias del mazo aparecen sin que el jugador haya decidido
+   mirarlo, así que aprende qué copias le quedan dentro sin pagar por saberlo.
+2. **Obliga a barajar.** Si la carta escogida salió de los descartes, el mazo ni se ha tocado,
+   pero el flujo común lo baraja igual.
+
+**Qué zonas se ofrecen** en esa primera pregunta:
+
+- **MAZO: siempre**, tenga coincidencias o no. Ocultar el botón le diría al jugador que ahí no
+  queda nada, que es justo lo que no puede saber — y a mitad de partida uno no se acuerda de lo
+  que le queda dentro. Si acepta y no hay nada, el visor se abre igual, sin ninguna carta en
+  verde y con el aviso *"No hay cartas elegibles en este mazo"*, y se cierra clicando el fondo.
+- **DESCARTES (y cualquier pila visible): solo si tiene coincidencias.** El jugador ya ve esa
+  pila entera, así que esconder un botón que no puede dar nada no le oculta nada y le ahorra un
+  clic muerto.
+
+Cartas que siguen este patrón: *Karlitos* (PRÁCTICA CONSTANTE), *Berry* (INTERFAZ). Y por la
+misma norma, *Caza del tesoro*, *Llamada del deber* y *Deuda con la mafia* llevan
+`preguntarSiempre: true`: preguntan aunque el mazo no tenga nada, porque saltarse la pregunta
+también delataba.
 
 Y elegir una carta **ya en el campo** es siempre reborde verde en el tablero, nunca un modal
 (ver la norma de targeting en CLAUDE.md).

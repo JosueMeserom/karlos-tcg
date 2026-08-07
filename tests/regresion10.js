@@ -106,7 +106,15 @@ const escenarios = [
             { opcion: 'BUSCAR GUARDIA REAL EN MAZO' },
             { elegir: ['Águila'] },
             { finTurno: true }, // p2→p1: duración 2→1
-            { finTurno: true }, // p1→p2: FIN_TURNO propio, ya no hay Guardia Real en el mazo (sin modal)
+            // FIN_TURNO propio con el mazo ya sin Guardias Reales. La VIEJA se saltaba la
+            // pregunta en silencio; la NUEVA pregunta igual (`preguntarSiempre`) porque no
+            // hacerlo delata que no queda ninguno en el mazo — información que el jugador no
+            // puede tener. Al aceptar se abre el visor vacío con su aviso (Toto, 7-ago-2026).
+            { finTurno: true },
+            // Se DECLINA, para que los dos flujos vuelvan a converger: aceptar barajaría el mazo
+            // una segunda vez y la vieja no lo hace. Que aceptar abra el visor vacío con su aviso
+            // se comprueba en tests/modales_pilas.js, que es donde vive esa norma.
+            { opcion: 'NO BUSCAR', soloEn: 'nueva' },
             { finTurno: true }, // p2→p1: duración 1→0, caduca
         ],
         logsIntencionados: [

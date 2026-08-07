@@ -792,7 +792,10 @@ button.game-btn:disabled { background: #64748b; cursor: not-allowed; opacity: 0.
    distingue dos copias de la misma carta en el detalle (Toto, 31-jul-2026). */
 .preview-id { font-size: 0.95rem; font-weight: 600; color: #7c8ba1; }
 .preview-type { font-size: 0.8rem; color: #94a3b8; margin-bottom: 6px; font-style: italic; }
-.preview-effects { font-size: 0.75rem; color: #22d3ee; margin-bottom: 12px; padding: 5px; border-top: 1px dashed #475569; border-bottom: 1px dashed #475569; background: rgba(0, 0, 0, 0.3); border-radius: 4px; }
+/* margin-top (Toto, 7-ago-2026): la linea discontinua superior quedaba pegadisima a la
+   seccion de tipo/subtipo/tags mientras que abajo sobraba aire. Se anade arriba en vez de
+   recortar abajo, que es lo que pidio. Este 10px es el mando manual de esa separacion. */
+.preview-effects { font-size: 0.75rem; color: #22d3ee; margin-top: 10px; margin-bottom: 12px; padding: 5px; border-top: 1px dashed #475569; border-bottom: 1px dashed #475569; background: rgba(0, 0, 0, 0.3); border-radius: 4px; }
 .preview-text { font-size: 0.8rem; line-height: 1.3; color: white; flex: 1; margin-bottom: 10px; }
 
 /* CAJAS DE HABILIDADES EN LA PREVIEW */

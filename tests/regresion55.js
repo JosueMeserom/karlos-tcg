@@ -186,11 +186,18 @@ const escenarios = [
         flotantesSoloNueva: [ FLOTANTE_PRACTICA ],
     },
     {
-        nombre: 'PRÁCTICA CONSTANTE: sin Súper Evolución en ninguna zona, ni pregunta',
+        // Renombrado (Toto, 7-ago-2026): la nueva SÍ pregunta. El MAZO se ofrece siempre, tenga
+        // o no coincidencias, porque ocultar el botón delataría que ahí no queda nada. Lo que
+        // desaparece es el botón de DESCARTES, y eso no revela nada: esa pila el jugador la ve.
+        nombre: 'PRÁCTICA CONSTANTE: sin Súper Evolución en ninguna zona, el mazo se ofrece igual',
         turno: 2, turnoDe: 'p1', empieza: 'p2',
         p1: { vanguardia: [{ carta: 'Karlitos', furor: 0 }], mazo: ['Longaniza', 'Longaniza', 'Longaniza', 'Longaniza'] },
         p2: {},
-        pasos: [ ...SEIS_TURNOS ],
+        pasos: [ ...SEIS_TURNOS, { opcion: 'NO BUSCAR', soloEn: 'nueva' } ],
+        logsSoloVieja: [
+            { linea: 'No quedan cartas de Súper Evolución en el mazo ni en los descartes.',
+              motivo: 'la vieja se rendía sola y lo anunciaba; la nueva ofrece igualmente mirar el MAZO (ocultar el botón delataría que ahí no queda nada), así que ya no hay nada que anunciar de antemano' },
+        ],
         flotantesSoloNueva: [ FLOTANTE_PRACTICA ],
     },
     {
@@ -200,7 +207,11 @@ const escenarios = [
         turno: 2, turnoDe: 'p1', empieza: 'p2',
         p1: { vanguardia: [{ carta: 'Karlitos', furor: 0 }], mazo: ['Longaniza', 'Longaniza', 'Longaniza', 'Longaniza'] },
         p2: {},
-        pasos: [ ...SEIS_TURNOS, { finTurno: true }, { finTurno: true } ],
+        pasos: [ ...SEIS_TURNOS, { opcion: 'NO BUSCAR', soloEn: 'nueva' }, { finTurno: true }, { finTurno: true } ],
+        logsSoloVieja: [
+            { linea: 'No quedan cartas de Súper Evolución en el mazo ni en los descartes.',
+              motivo: 'la vieja se rendía sola y lo anunciaba; la nueva ofrece igualmente mirar el MAZO (ocultar el botón delataría que ahí no queda nada), así que ya no hay nada que anunciar de antemano' },
+        ],
         flotantesSoloNueva: [ FLOTANTE_PRACTICA ],
     },
 ];

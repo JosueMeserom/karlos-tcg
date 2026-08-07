@@ -1573,7 +1573,7 @@ const CARD_DB = [
         // nada -resetCard ya la lava al mandarla al descarte-. Prometer una curación que no se
         // puede observar es texto muerto. Lo que sí importa, y ahora se dice, es que la
         // sustitución conserva los bonos acumulados durante el entrenamiento.
-        text: "3 turnos. Requiere a Zoe en el campo. Mientras esté en juego, oculta y agota a Zoe; si Zoe muere, esta carta se destruye. Al expirar, busca a Zoe (calcinante) en tu mano o mazo y sustituye a Zoe en su lugar, conservando sus bonos.",
+        text: "3 turnos. Requiere a Zoe en el campo. Mientras esté en juego, oculta y agota a Zoe; si Zoe muere, esta carta se destruye. Al expirar, busca a Zoe (calcinante) en tu mano o mazo, destruye a Zoe y ocupa su lugar, conservando sus bonos.",
         abilities: [
             { trigger: "PREVIEW_GLOBAL", lineas: [ { quien: "ALIADO", filtros: [ { campo: "name", op: "==", valor: "Zoe" } ], texto: "{genero?Oculto y agotado|Oculta y agotada} por el entrenamiento; si muere, el Evento se destruye" } ] }
         ], 
@@ -1967,7 +1967,7 @@ const CARD_DB = [
     },
     {
         name: "Sadame (retornada)", hp: 4, def: 4, atk: 7, type: "Personaje", subtype: "No-muerto", tags: ["Usuaria de magia"], gender: "F", rarity: "S",
-        text: "Requisito: Sadame en tu campo y Erasmo en cualquier campo. P: ÚLTIMA MISIÓN: Sustituye a Sadame. Stats no bajan de base. Restablece Vida al inicio. A: VUELVE A LA VIDA (3F): Revive 2 Personajes/Esbirros, dando igual sus condiciones o costes.",
+        text: "Requisito: Sadame en tu campo y Erasmo en cualquier campo. P: ÚLTIMA MISIÓN: Destruye a Sadame y ocupa su lugar, conservando sus bonos. Sus stats no bajan de las de base y restablece su Vida al colocarse. A: VUELVE A LA VIDA (3F): Revive 2 Personajes/Esbirros, dando igual sus condiciones o costes.",
         passiveName: "ÚLTIMA MISIÓN", activeName: "VUELVE A LA VIDA", activeCost: 3, series: 1,
         isEvolution: true,
         
@@ -3021,6 +3021,7 @@ const CARD_DB = [
                 { op: "BUSCAR", en: "MAZO", deQuien: "AMBOS", cantidad: 1, destino: "MANO", sinAnimacion: true, autoSeleccion: true,
                   filtros: [ { campo: "type", op: "==", valor: "Ayuda" } ],
                   algunFiltro: [ { campo: "subtype", op: "==", valor: "Arma" }, { campo: "subtype", op: "==", valor: "Arma legendaria" }, { campo: "subtype", op: "==", valor: "Vestimenta" } ],
+                  preguntarSiempre: true,
                   confirmar: { titulo: "{jugador}: ¿BUSCAR RECOMPENSA?", si: "SÍ, BUSCAR EN EL MAZO", no: "NO BUSCAR", logNo: "{jugador} decide no buscar recompensa." },
                   titulo: "{jugador}: Elige tu recompensa",
                   log: "{jugador} ha encontrado un tesoro y lo añade a su mano.", logTipo: "system",
@@ -4329,10 +4330,20 @@ const CARD_DB = [
               requisitos: [
                 { count: { quien: "ENEMIGO", zona: "vanguardia" }, op: ">=", valor: 1, msg: "No hay enemigos para atacar." } ],
               efectos: [
+                // confirmarPorZona (Toto, 7-ago-2026): antes mezclaba MANO y MAZO en un mismo
+                // modal, con los dos defectos que eso trae — te enseñaba qué armas te quedaban en
+                // el mazo sin haber decidido mirarlo, y te obligaba a barajar aunque el arma
+                // saliera de la mano. Ahora eliges zona primero. El MAZO se ofrece siempre
+                // (ocultarlo delataría que no queda ninguna); la MANO solo si tiene alguna, que
+                // el jugador ya la está viendo.
                 { op: "BUSCAR", en: ["MANO", "MAZO"], destino: "EQUIPADO", abortaSiCancelas: true, abortaSiVacio: true,
                   filtros: [ { campo: "subtype", op: "==", valor: "Arma" }, { campo: "tags", op: "includes", valor: "melé" } ],
                   titulo: "GENERACIÓN: BUSCAR ARMA MELÉ",
+                  confirmarPorZona: true,
+                  confirmar: { titulo: "GENERACIÓN DE ARMAMENTO MELÉ", no: "NO BUSCAR",
+                               porZona: { MANO: "COGER DE LA MANO", MAZO: "BUSCAR EN EL MAZO" } },
                   logNoValidas: "No hay armas 'melé' válidas en tu mano ni en tu mazo.",
+                  logNoEncontrada: "No hay ningún arma 'melé' ahí.",
                   log: "¡{carta} genera y se equipa con {objetivo} ignorando sus condiciones!",
                   barajarDespues: { log: "Barajando el mazo...", soloSiDelMazo: true } },
                 { op: "FLOTANTE", target: { quien: "SELF" }, texto: "ARMAMENTO MELÉ", estilo: "ft-ability", offset: -40 },
@@ -5214,6 +5225,7 @@ const CARD_DB = [
               efectos: [
                 { op: "BUSCAR", en: "MAZO", cantidad: 1, destino: "MANO",
                   filtros: [ { campo: "tags", op: "includes", valor: "Guardia Real" } ],
+                  preguntarSiempre: true,
                   confirmar: { titulo: "LLAMADA DEL DEBER", si: "BUSCAR GUARDIA REAL EN MAZO", no: "NO BUSCAR" },
                   titulo: "RECLUTAR GUARDIA REAL",
                   log: "{jugador} recluta a {objetivo} desde su cuartel.",
@@ -5468,6 +5480,7 @@ const CARD_DB = [
               efectos: [
                 { op: "BUSCAR", en: "MAZO", deQuien: "AMBOS", cantidad: 1, destino: "MANO",
                   algunFiltro: [ { campo: "tags", op: "includes", valor: "Mafia" }, { campo: "tags", op: "includes", valor: "mafia" } ],
+                  preguntarSiempre: true,
                   confirmar: { titulo: "{jugador}: COBRAR FAVOR A LA MAFIA", si: "BUSCAR MAFIA EN EL MAZO", no: "NO BUSCAR" },
                   titulo: "{jugador}: Llama a un contacto",
                   log: "{jugador} recibe a {objetivo} desde el submundo.", logTipo: "system",
@@ -6116,7 +6129,7 @@ const CARD_DB = [
     {
         name: "Limo crecido", hp: 4, def: 2, atk: 2, type: "Esbirro", subtype: "Ser vivo", tags: ["Creación artificial"], rarity: "B", cost: 1, series: 2,
         isEvolution: true,
-        text: "P: AUMENTO: Puedes sustituir cualquier 'Limo artificial' en tu campo por esta carta. Las bonificaciones se transfieren. A: ABRAZO VISCOSO (2F): Ataque normal. Si tiene éxito, confunde 2 turnos.",
+        text: "P: AUMENTO: Puedes destruir un 'Limo artificial' de tu campo y ocupar su lugar, conservando sus bonos. A: ABRAZO VISCOSO (2F): Ataque normal. Si tiene éxito, confunde 2 turnos.",
         passiveName: "AUMENTO", activeName: "ABRAZO VISCOSO", activeCost: 2,
         canPlayCard: function() { return true; }, 
         onBeforePlayAsync: async function(card, game, p) {
@@ -6232,7 +6245,7 @@ const CARD_DB = [
     {
         name: "Megalimo", hp: 6, def: 3, atk: 2, type: "Esbirro", subtype: "Ser vivo", tags: ["Creación artificial"], rarity: "S", cost: 1, series: 2,
         isEvolution: true,
-        text: "P: EVOLUCIÓN: Sólo colocable sustituyendo un 'Limo crecido'. Hereda stats. Botón Extra: Puedes consumir la cantidad de Furor que quieras para curar esa misma cantidad de Vida. A: ABRAZO PERTURBADOR (3F): Ataque normal con +4 Atq. Si tiene éxito, confunde 2 turnos.",
+        text: "P: EVOLUCIÓN: Solo se coloca destruyendo un 'Limo crecido' de tu campo y ocupando su lugar, conservando sus bonos. Botón Extra: Consume el Furor que quieras para curar esa misma Vida. A: ABRAZO PERTURBADOR (3F): Ataque normal con +4 Atq. Si tiene éxito, confunde 2 turnos.",
         passiveName: "EVOLUCIÓN", activeName: "ABRAZO PERTURBADOR", activeCost: 3,
         onBeforePlayAsync: async function(card, game, p) {
             const limos = [...p.vanguard, ...p.rearguard].filter(c => c.name === 'Limo crecido');
@@ -6386,7 +6399,7 @@ const CARD_DB = [
         abilities: [
             { trigger: "AL_JUGAR",
               efectos: [ { op: "CURAR", valor: 1, conBeforeHealed: false, soloSiHerido: true,
-                           floating: "+1 VIDA", floatingStyle: "ft-green", offsetY: -20, fuente: "healing",
+                           offsetY: -20, fuente: "healing",
                            target: { quien: "ALIADO", zona: "VANGUARDIA" } } ],
               logSiAplicado: { msg: "¡La luz del Ángel sana a la vanguardia!", tipo: "healing" } },
             { trigger: "ACTIVA", nombre: "SANCIÓN", coste: { furor: 2 },
@@ -6651,12 +6664,12 @@ const CARD_DB = [
             { trigger: "FIN_TURNO",
               efectos: [
                 { op: "CURAR", valor: 1, conBeforeHealed: false, soloSiHerido: true,
-                  floating: "+1 VIDA", floatingStyle: "ft-green", offsetY: -20, fuente: "healing",
+                  offsetY: -20, fuente: "healing",
                   target: { quien: "ALIADO" } } ] },
             { trigger: "AL_CADUCAR", log: "Consagración se desvanece con una última bendición.", logTipo: "ability",
               efectos: [
                 { op: "CURAR", valor: 1, conBeforeHealed: false, soloSiHerido: true,
-                  floating: "+1 VIDA", floatingStyle: "ft-green", offsetY: -20, fuente: "healing",
+                  offsetY: -20, fuente: "healing",
                   target: { quien: "ALIADO" } } ] }
         ],
     },
@@ -7230,7 +7243,12 @@ const DSL = {
             if (e.conBeforeHealed === false) {
                 // Variante simple (grupal): sin passthrough ni tope manual (el motor capa la vida); salta ilesos.
                 if (e.soloSiHerido && target.currentHp >= target.maxHp) return 'skip';
-                if (typeof showFloatingText === 'function') showFloatingText(target.instanceId, e.floating || 'CURADO', e.floatingStyle || 'ft-green', e.offsetFloating !== undefined ? e.offsetFloating : -40);
+                // Flotante propio OPT-IN (Toto, 7-ago-2026): `modifyStat` ya pinta el "+N VIDA"
+                // automático de cualquier cambio de Vida, así que este de aquí SOLO tiene sentido
+                // si aporta algo distinto (una etiqueta como "CURADO"). Antes salía siempre -por
+                // el `|| 'CURADO'`- y las cartas que declaraban "+1 VIDA" mostraban el número dos
+                // veces seguidas, porque los flotantes van en COLA de 400 ms por carta.
+                if (e.floating && typeof showFloatingText === 'function') showFloatingText(target.instanceId, e.floating, e.floatingStyle || 'ft-green', e.offsetFloating !== undefined ? e.offsetFloating : -40);
                 game.modifyStat(target, 'currentHp', amount, e.offsetY !== undefined ? e.offsetY : 0, e.fuente !== undefined ? e.fuente : sourceCard);
                 if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: DSL._nombre(game, target) }), 'ability');
                 return true;
@@ -7480,24 +7498,50 @@ const DSL = {
                 // inspeccionado); cualquier otra zona (descartes: el orden no importa) coge la
                 // PRIMERA coincidencia sin modal y no toca el mazo para nada.
                 if (e.confirmarPorZona && e.confirmar) {
-                    if (lista.length === 0) {
+                    const _labels = e.confirmar.porZona || {};
+                    // QUÉ ZONAS SE OFRECEN (Toto, 7-ago-2026). No se tratan igual una pila que el
+                    // jugador ve y una que no:
+                    //   · MAZO se ofrece SIEMPRE, haya coincidencias o no. Ocultar el botón sería
+                    //     contarle que su mazo no tiene nada — justo lo que no puede saber. Que
+                    //     pueda mirar y no encontrar es parte del juego (y a mitad de partida uno
+                    //     no se acuerda de lo que le queda dentro).
+                    //   · Las demás (descartes) el jugador ya las ve enteras, así que un botón
+                    //     que no puede dar nada solo estorba: se oculta, y no revela nada nuevo.
+                    const _casa = (x) => (e.filtros || []).every(f => DSL._match(x, f)) &&
+                                         (!e.algunFiltro || e.algunFiltro.some(f => DSL._match(x, f)));
+                    const _ofrecidas = _zonasNombre.filter((zn, i) => zn === 'MAZO' || zonas[i].some(_casa));
+                    if (!_ofrecidas.length) {
                         if (e.logNoValidas) game.logMsg(F(e.logNoValidas), 'system');
                         continue;
                     }
-                    const _labels = e.confirmar.porZona || {};
                     const elegida = await new Promise(resolve => {
                         game.openChoiceModal(F(e.confirmar.titulo), [
-                            ..._zonasNombre.map(zn => ({ label: _labels[zn] || `BUSCAR EN ${zn}`, action: () => resolve(zn) })),
+                            ..._ofrecidas.map(zn => ({ label: _labels[zn] || `BUSCAR EN ${zn}`, action: () => resolve(zn) })),
                             { label: e.confirmar.no || 'NO BUSCAR', action: () => resolve(null) },
                         ], pid);
                     });
-                    if (!elegida) { if (e.confirmar.logNo) game.logMsg(F(e.confirmar.logNo), 'system'); continue; }
+                    if (!elegida) {
+                        if (e.confirmar.logNo) game.logMsg(F(e.confirmar.logNo), 'system');
+                        // Declinar la ZONA es declinar la búsqueda entera, así que honra
+                        // `abortaSiCancelas` igual que cerrar el visor (Toto, 7-ago-2026): en una
+                        // cadena "busca un arma -> equípala -> ataca", decir que no y seguir
+                        // atacando sin arma no tiene sentido. Sin el flag se sigue como antes.
+                        if (e.abortaSiCancelas) return false;
+                        continue;
+                    }
                     const zIdx = _zonasNombre.indexOf(elegida);
                     const poolZona = zonas[zIdx].filter(x => (e.filtros || []).every(f => DSL._match(x, f)) &&
                                                              (!e.algunFiltro || e.algunFiltro.some(f => DSL._match(x, f))));
                     if (e.logIntro) game.logMsg(F(e.logIntro), e.logIntroTipo || 'ability');
                     if (elegida === 'MAZO' && typeof game.openDeckSearchViewer === 'function') {
-                        const r = await game.openDeckSearchViewer(pid, poolZona, F(e.titulo || 'ELIGE UNA CARTA'), null, e.cantidad || 1);
+                        // Con el mazo vacío de coincidencias el visor se abre IGUAL, y con el
+                        // aviso puesto (Toto, 7-ago-2026): aquí se pasaba `null` siempre, así que
+                        // el jugador veía su mazo sin nada en verde y sin una sola palabra que se
+                        // lo explicara. Mismo texto que `visorVacio` usa en el camino de una zona.
+                        const _aviso = poolZona.length ? null
+                            : (e.barajarDespues ? 'No hay cartas elegibles en este mazo. Se barajará al cerrar el visor.'
+                                                : 'No hay cartas elegibles en este mazo.');
+                        const r = await game.openDeckSearchViewer(pid, poolZona, F(e.titulo || 'ELIGE UNA CARTA'), _aviso, e.cantidad || 1, 'deck');
                         const elegidas = Array.isArray(r) ? r : (r ? [r] : []);
                         if (elegidas.length > 0) { for (const t of elegidas) await aMano(t); algunExito = true; }
                         else if (e.logSinEleccion) game.logMsg(F(e.logSinEleccion), 'system');
@@ -7511,9 +7555,18 @@ const DSL = {
                             game.shuffle(p.deck);
                         }
                     } else {
-                        // Zona sin orden relevante: la PRIMERA coincidencia, sin modal, sin tocar
-                        // el mazo -ni para barajarlo ni para que el jugador aprenda nada de él-.
-                        if (poolZona.length > 0) { await aMano(poolZona[0]); algunExito = true; }
+                        // Zona ya visible para el jugador (mano, descartes): NO se toca el mazo ni
+                        // para barajarlo ni para que aprenda nada de él.
+                        // Con varias coincidencias DISTINTAS hay que dejar elegir (Honsow puede
+                        // tener dos armas melé diferentes en la mano); con una sola, o con varias
+                        // copias de la misma carta, se coge directamente -es lo que hacía Karlitos
+                        // y no hay nada que decidir-.
+                        const _distintas = new Set(poolZona.map(x => x.id)).size;
+                        if (_distintas > 1) {
+                            const r = await game.openVisualSearchModal(F(e.titulo || 'ELIGE UNA CARTA'), poolZona, e.cantidad || 1, !!e.autoSeleccion, pid);
+                            if (r && r.length > 0) { for (const x of r) await aMano(x); algunExito = true; }
+                            else if (e.abortaSiCancelas) return false;
+                        } else if (poolZona.length > 0) { await aMano(poolZona[0]); algunExito = true; }
                         else if (e.logNoEncontrada) game.logMsg(F(e.logNoEncontrada), 'system');
                     }
                     continue;

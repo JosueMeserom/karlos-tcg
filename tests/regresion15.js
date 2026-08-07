@@ -79,6 +79,10 @@ const escenarios = [
         p2: { vanguardia: ['Droide antidisturbios'], mazo: ['Guardaespaldas', 'Longaniza'] },
         pasos: [
             { finTurno: true },
+            // p1 NO tiene Mafias en el mazo. La vieja se saltaba su pregunta en silencio -y con
+            // eso le contaba que no le quedaba ninguna-; la nueva se la hace igual
+            // (`preguntarSiempre`) y él declina (Toto, 7-ago-2026).
+            { opcion: 'NO BUSCAR', soloEn: 'nueva' },
             { opcion: 'BUSCAR MAFIA EN EL MAZO' }, // p2 (único con Mafias)
             { elegir: ['Guardaespaldas'] },
         ],

@@ -70,7 +70,10 @@ const BANDERAS = {
     canAttackStealth: ['oculto', 'oculta'], treatAttacksAsSpecial: ['especial'],
     ignoreStatCaps: ['límite', 'limite', 'rebasa', 'super'], isAvatar: ['avatar', 'inmune'],
     canGainFurorFromRearguard: ['retaguardia'], cannotRetreat: ['retirar'],
-    isEvolution: ['evolucion', 'evolución', 'sustituy', 'sustituir', 'requisito'],
+    // "ocupa/ocupar su lugar" es la forma canónica de la familia evolución desde la §9.bis
+    // (7-ago-2026): sustituye a las tres redacciones sueltas que había ("sustituye a X", "las
+    // bonificaciones se transfieren", "hereda stats"), así que cuenta como mención de la bandera.
+    isEvolution: ['evolucion', 'evolución', 'sustituy', 'sustituir', 'requisito', 'ocupa su lugar', 'ocupar su lugar'],
 };
 
 const CHARS_LINEA = 37;   // 260px de panel menos paddings, a 12px de fuente

@@ -2091,6 +2091,22 @@
                 });
             }
 
+            // Espera (acotada) a que se vacíen las colas de flotantes. Cada flotante ocupa 400 ms
+            // de cola por carta (ver processFtQueue) y NADIE la esperaba: la Fase de efectos
+            // finales emitía los suyos y cambiaba de turno en el mismo tick, así que la cola
+            // seguía drenando con el cartel de turno ya encima y el jugador los veía "en el turno
+            // del rival" (Toto, 7-ago-2026, con Consagración). El tope evita quedarse colgado si
+            // una cola no se vacía; el sleep es crudo -no game.sleep()- para que un skip en
+            // marcha no convierta esto en un bucle ocupado.
+            async esperarFlotantes(maxMs = 2500) {
+                const t0 = Date.now();
+                const pendientes = () => Object.values(window.ftQueues || {})
+                    .some(q => q && (q.processing || (q.items && q.items.length)));
+                while (pendientes() && Date.now() - t0 < maxMs) {
+                    await new Promise(r => setTimeout(r, 120));
+                }
+            }
+
             skipAllAnimations() {
                 if (this.activeAnimResolvers.length === 0) return;
                 
@@ -5465,6 +5481,13 @@
                 // de Poción, el efecto "Liderazgo"), así que se arregla aquí, en el único punto
                 // por el que pasan todos: justo tras procesar los tempEffects de esta fase.
                 this.updatePassives();
+
+                // Que dé tiempo a VER lo que acaba de pasar. Sin esto, los flotantes de la Fase
+                // de efectos finales (curaciones de Consagración, tics de veneno, contadores…)
+                // se emitían y el turno cambiaba en el mismo tick: aparecían por detrás del
+                // cartel de turno. No es un `sleep` fijo: espera a que la cola se vacíe, así que
+                // una fase sin nada visible no cuesta ni un milisegundo (Toto, 7-ago-2026).
+                await this.esperarFlotantes();
 
                 this.activePlayerId = this.activePlayerId === 'p1' ? 'p2' : 'p1';
                 if (this.activePlayerId === this.startingPlayerId) this.turn++;

@@ -49,7 +49,11 @@ const escenarios = [
         p2: { vanguardia: [{ carta: 'Mini-tigre', vida: 20 }] },
         pasos: [
             { habilidad: 'Honsow' }, { confirmar: true },
-            { busqueda: ['Espada V'] }, { elegir: ['Mini-tigre'] },
+            // La NUEVA pregunta primero en qué zona buscar (confirmarPorZona, 7-ago-2026): antes
+            // mezclaba mano y mazo en un modal, spoileando el mazo y forzando el barajado.
+            { opcion: 'COGER DE LA MANO', soloEn: 'nueva' },
+            { busqueda: ['Espada V'], soloEn: 'vieja' },   // la nueva coge la única arma sin modal
+            { elegir: ['Mini-tigre'] },
         ],
         logsSoloVieja: [ AVISO_RAW_VIEJA ],
         logsIntencionados: [
@@ -65,7 +69,11 @@ const escenarios = [
         p2: { vanguardia: [{ carta: 'Mini-tigre', vida: 20 }] },
         pasos: [
             { habilidad: 'Honsow' }, { confirmar: true },
-            { busqueda: ['Espada V'] }, { elegir: ['Mini-tigre'] },
+            // La NUEVA pregunta primero en qué zona buscar (confirmarPorZona, 7-ago-2026): antes
+            // mezclaba mano y mazo en un modal, spoileando el mazo y forzando el barajado.
+            { opcion: 'BUSCAR EN EL MAZO', soloEn: 'nueva' },
+            { elegir: ['Espada V'] },   // vieja: modal de búsqueda · nueva: visor del mazo
+            { elegir: ['Mini-tigre'] },
         ],
         logsSoloVieja: [ AVISO_RAW_VIEJA ],
         logsIntencionados: [
@@ -85,14 +93,18 @@ const escenarios = [
         turno: 2, turnoDe: 'p1', empieza: 'p2',
         p1: { vanguardia: [{ carta: 'Honsow', furor: 1 }], mano: ['Longaniza'] },
         p2: { vanguardia: [{ carta: 'Mini-tigre', vida: 20 }] },
-        pasos: [ { habilidad: 'Honsow' }, { confirmar: true } ],
+        // Sin armas en ninguna zona la nueva OFRECE el mazo igual (ocultarlo delataría que no
+        // queda ninguna); se declina para que el flujo vuelva a converger con la vieja.
+        pasos: [ { habilidad: 'Honsow' }, { confirmar: true }, { opcion: 'NO BUSCAR', soloEn: 'nueva' } ],
         logsSoloVieja: [
             { linea: '¡No puedes cancelar esta acción!',
               motivo: 'la vieja llamaba a cancelAction() con el candado puesto, así que el motor respondía con este aviso en vez de abortar limpiamente; la nueva aborta la lista de efectos con abortaSiVacio y no necesita cancelar nada' },
         ],
         logsSoloNueva: [
-            { linea: "No hay armas 'melé' válidas en tu mano ni en tu mazo.",
-              motivo: 'la vieja lo decía con logError (privado, no entra en el historial); la nueva usa logNoValidas, público, coherente con el resto de búsquedas migradas' },
+            // Ya NO aparece (Toto, 7-ago-2026): `logNoValidas` solo salta cuando no queda NINGUNA
+            // zona que ofrecer, y el MAZO se ofrece siempre. Anunciar "no hay armas en tu mano ni
+            // en tu mazo" sería, además, contarle exactamente lo que la norma dice que no puede
+            // saber. Ahora se le ofrece mirar y decide él.
         ],
     },
     {

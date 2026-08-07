@@ -133,6 +133,37 @@ const enCampo = (g, pid) => [...g.players[pid].vanguard, ...g.players[pid].rearg
             JSON.stringify(enCampo(g, 'p1')));
     }
 
+    console.log('\n--- El MAZO se ofrece SIEMPRE, tenga o no coincidencias ---');
+    // Norma de Toto: "si una carta puede buscar en mazo, siempre tienes la posibilidad aunque el
+    // juego sepa internamente que NO tienes nada compatible". Ocultar el botón es contarle al
+    // jugador lo que hay en su mazo -que es justo lo que no puede saber-, y a mitad de partida
+    // uno no se acuerda de lo que le queda dentro. Con los DESCARTES es al revés: esa pila la ve
+    // entera, así que un botón que no puede dar nada solo estorba y se oculta.
+    {
+        const { ctx, g, paso } = await mesa({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            // Ni en el mazo ni en los descartes hay nada que INTERFAZ pueda encontrar.
+            p1: { vanguardia: ['Mini-tigre', 'Oso con armadura', 'Droide antidisturbios', 'Guardia'],
+                  retaguardia: [{ carta: 'Berry', furor: 1 }],
+                  mazo: ['Mini-tigre', 'Mini-tigre'], descartes: ['Longaniza'] },
+            p2: { vanguardia: ['Mini-tigre'] },
+        });
+        await paso({ habilidad: 'Berry' });
+        await paso({ confirmar: true });
+        const pend = ctx.pendientes[0] || {};
+        check('sin NADA compatible, INTERFAZ pregunta igual', pend.tipo === 'opcion', 'tipo=' + pend.tipo);
+        const etq = (pend.etiquetas || []).join(' | ');
+        check('...ofrece el MAZO', /MAZO/.test(etq), etq);
+        check('...y NO ofrece los DESCARTES (esa pila el jugador ya la ve)', !/DESCARTES/.test(etq), etq);
+        await paso({ opcion: 'BUSCAR EN EL MAZO' });
+        const visor = ctx.pendientes[0] || {};
+        check('mirar el mazo vacío abre el visor igualmente', visor.tipo === 'visorMazo', 'tipo=' + visor.tipo);
+        check('...sin ninguna carta elegible', (visor.elegibles || []).length === 0);
+        check('...y CON el aviso que lo explica', /No hay cartas elegibles/.test(visor.aviso || ''),
+            'aviso=' + JSON.stringify(visor.aviso));
+        await paso({ cancelar: true });
+    }
+
     console.log(`\nSUITE modales_pilas: ${comprobaciones - fallos}/${comprobaciones} comprobaciones`
         + (fallos ? ` — ${fallos} FALLOS` : ' — MODALES CORRECTOS'));
     if (fallos) process.exit(1);
