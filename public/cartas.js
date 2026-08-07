@@ -6665,12 +6665,21 @@ const CARD_DB = [
               efectos: [
                 { op: "CURAR", valor: 1, conBeforeHealed: false, soloSiHerido: true,
                   offsetY: -20, fuente: "healing",
-                  target: { quien: "ALIADO" } } ] },
+                  target: { quien: "ALIADO" },
+                  // logResumen (Toto, 7-ago-2026): SOLO si curó a alguien -si todos estaban a
+                  // Vida llena no sale nada-. `delta` es lo que de verdad ocurrió, no el `valor`
+                  // declarado, así que sigue siendo correcto si algún día algo lo cambia a 0.5.
+                  logResumen: { msg: "La luz de Consagración cura +{delta} de Vida a {lista}.",
+                                msgVariado: "La luz de Consagración recorre el campo, curando a {lista}.",
+                                tipo: "healing" } } ] },
             { trigger: "AL_CADUCAR", log: "Consagración se desvanece con una última bendición.", logTipo: "ability",
               efectos: [
                 { op: "CURAR", valor: 1, conBeforeHealed: false, soloSiHerido: true,
                   offsetY: -20, fuente: "healing",
-                  target: { quien: "ALIADO" } } ] }
+                  target: { quien: "ALIADO" },
+                  logResumen: { msg: "Antes de apagarse del todo, cura +{delta} de Vida a {lista}.",
+                                msgVariado: "Antes de apagarse del todo, cura a {lista}.",
+                                tipo: "healing" } } ] }
         ],
     },
     {
@@ -8227,6 +8236,15 @@ const DSL = {
             if (e.animacion === 'DANO_VERDADERO' && targets.length && !(opts && opts.sinAnimacion) && typeof animateTrueDamage === 'function') {
                 await animateTrueDamage(DSL._lanzador(sourceCard), targets.map(t => t.instanceId));
             }
+            // logResumen (Consagración, 7-ago-2026): UN log agregado para un efecto que se aplica
+            // a TODO un grupo, en vez de silencio o un log por carta. Genérico -no es cosa de
+            // CURAR- porque cualquier efecto de grupo puede querer lo mismo el día de mañana.
+            // El delta se lee del `campo` ANTES/DESPUÉS de verdad (currentHp por defecto), nunca
+            // del `valor` declarado: así el número que sale es el que de verdad ocurrió, aunque
+            // algún día un interceptor lo cambie a un carga a medias (0.5) — y si en algún target
+            // se queda en 0, ese no entra en la lista (pedido de Toto).
+            const _resumen = e.logResumen ? [] : null;
+            const _campoResumen = (e.logResumen && e.logResumen.campo) || 'currentHp';
             for (const t of targets) {
                 // ifObjetivo (Imp mayor, 31-jul-2026): condición evaluada sobre EL OBJETIVO en
                 // vez de la carta fuente -complementa a `e.if`, que mira la fuente-. Hacía falta
@@ -8234,9 +8252,25 @@ const DSL = {
                 // quien defiende, el objetivo es quien ataca). `continue`, no abortar la lista:
                 // un objetivo sin cumplir la condición simplemente se salta.
                 if (e.ifObjetivo && !DSL._match(t, e.ifObjetivo)) continue;
+                const _antesResumen = _resumen ? DSL._field(t, _campoResumen) : null;
                 const r = await DSL._doEffect(e, sourceCard, t, game, ownerId, habilidad);
                 if (r === false) return { ok: false, anyApplied };
                 if (r === true) anyApplied = true;
+                if (_resumen && r === true) {
+                    const delta = DSL._field(t, _campoResumen) - _antesResumen;
+                    if (delta > 0) _resumen.push({ nombre: DSL._nombre(game, t), delta });
+                }
+            }
+            if (_resumen && _resumen.length) {
+                const mismos = _resumen.every(x => x.delta === _resumen[0].delta);
+                // "A, B y C" (NEO._enumerar hace lo mismo, pero vive en otro objeto del fichero).
+                const _enum = (xs) => xs.length <= 1 ? (xs[0] || '') : xs.slice(0, -1).join(', ') + ' y ' + xs[xs.length - 1];
+                const lista = mismos ? _enum(_resumen.map(x => x.nombre))
+                                      : _enum(_resumen.map(x => `${x.nombre} (+${x.delta})`));
+                const msg = mismos ? (e.logResumen.msg || e.logResumen.msgVariado)
+                                    : (e.logResumen.msgVariado || e.logResumen.msg);
+                game.logMsg(DSL._fill(msg, { carta: sourceCard.name, delta: _resumen[0].delta, lista, n: _resumen.length }),
+                    e.logResumen.tipo || 'ability');
             }
         }
         return { ok: true, anyApplied };

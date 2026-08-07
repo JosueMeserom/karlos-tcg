@@ -97,17 +97,64 @@ const buscar = (g, pid, nombre) => [...g.players[pid].vanguard, ...g.players[pid
             buscar(g, 'p1', 'Oso con armadura').currentHp === 2, 'vida=' + buscar(g, 'p1', 'Oso con armadura').currentHp);
         check('...y el aliado sano no revienta el tope ni casca nada',
             buscar(g, 'p1', 'Mini-tigre').currentHp === buscar(g, 'p1', 'Mini-tigre').maxHp);
+        // logResumen (Toto, 7-ago-2026): UN log agregado, solo con quien de verdad se curó.
+        check('...y el log anuncia la curación con el número real',
+            g.logHistory.some(l => /cura \+1 de Vida a/.test(l.msg) && /Oso con armadura/.test(l.msg)),
+            JSON.stringify(g.logHistory.map(l => l.msg)));
+        check('...sin mencionar a quien ya estaba a Vida llena (nunca se curó)',
+            !g.logHistory.some(l => /cura \+1 de Vida a/.test(l.msg) && /Mini-tigre/.test(l.msg)));
 
         await paso({ finTurno: true }); // turno del rival: no cuenta
         await paso({ finTurno: true }); // 2º tic propio
         check('...y NO cura en el turno del rival, solo en el tuyo (2 tics propios = +2, no +3)',
             buscar(g, 'p1', 'Oso con armadura').currentHp === 3, 'vida=' + buscar(g, 'p1', 'Oso con armadura').currentHp);
 
+        const _logAntesDeExpirar = g.logHistory.length;
         for (let i = 0; i < 6 && g.players.p1.activeEvent; i++) await paso({ finTurno: true });
         check('al expirar (3 turnos), se descarta', !g.players.p1.activeEvent);
         check('...y cura una última vez antes de irse',
             buscar(g, 'p1', 'Oso con armadura').currentHp === buscar(g, 'p1', 'Oso con armadura').maxHp,
             'vida=' + buscar(g, 'p1', 'Oso con armadura').currentHp);
+        // A estas alturas ya está a Vida llena (se curó del todo en los tics anteriores): el
+        // AL_CADUCAR no tiene a quién curar, así que su logResumen NO debe sonar (silencio total,
+        // no un "+0 de Vida a nadie"). El aviso de despedida estático sí sigue sonando siempre.
+        const _logsFinal = g.logHistory.slice(_logAntesDeExpirar).map(l => l.msg);
+        check('...pero sin logResumen (no había nadie que curar)',
+            !_logsFinal.some(m => /Antes de apagarse del todo, cura/.test(m)), JSON.stringify(_logsFinal));
+        check('...la despedida estática sí suena siempre', _logsFinal.some(m => /se desvanece con una última bendición/.test(m)),
+            JSON.stringify(_logsFinal));
+    }
+    {
+        // Y el camino contrario: si SÍ queda alguien herido cuando expira, el AL_CADUCAR cura y
+        // el logResumen de despedida SÍ suena (con su propio flavor text, distinto del de cada
+        // turno). Ojo al reloj real del Evento (comprobado con un probe): la DURACIÓN baja al
+        // INICIO de cada turno propio (no al final), mientras que el tic de curación es al
+        // FINAL — van desfasados. Con duración 3: fin de turno2 (tic, cura), inicio turno3
+        // (duración 3->2), fin de turno3 (tic, ya a Vida llena), inicio turno4 (2->1), fin de
+        // turno4 (tic sin efecto, ya lleno), inicio turno5 (1->0: EXPIRA). Se hiere a Oso justo
+        // antes de ese último paso para que el AL_CADUCAR tenga a quién curar.
+        const { g, paso } = await mesa({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'Oso con armadura', vida: 1 }], mano: ['Consagración'] },
+            p2: { vanguardia: ['Mini-tigre'] },
+        });
+        await paso({ jugar: 'Consagración' });
+        await paso({ finTurno: true }); // fin turno2 (p1): tic, 1 -> 2
+        await paso({ finTurno: true }); // fin turno2 (p2) / inicio turno3 (p1): duración 3 -> 2
+        await paso({ finTurno: true }); // fin turno3 (p1): tic, 2 -> 3 (a Vida llena)
+        await paso({ finTurno: true }); // fin turno3 (p2) / inicio turno4 (p1): duración 2 -> 1
+        await paso({ finTurno: true }); // fin turno4 (p1): tic sin efecto (ya lleno)
+        // Se hiere DESPUÉS del último tic periódico, para que solo el AL_CADUCAR pueda curarlo.
+        buscar(g, 'p1', 'Oso con armadura').currentHp = 1;
+        const _logAntes = g.logHistory.length;
+        await paso({ finTurno: true }); // fin turno4 (p2) / inicio turno5 (p1): duración 1 -> 0, expira
+        check('el Evento expira en este fin de turno', !g.players.p1.activeEvent);
+        check('AL_CADUCAR cura al que seguía herido', buscar(g, 'p1', 'Oso con armadura').currentHp === 2,
+            'vida=' + buscar(g, 'p1', 'Oso con armadura').currentHp);
+        const _logs = g.logHistory.slice(_logAntes).map(l => l.msg);
+        check('...y esta vez SÍ suena el logResumen de despedida',
+            _logs.some(m => /Antes de apagarse del todo, cura \+1 de Vida a/.test(m) && /Oso con armadura/.test(m)),
+            JSON.stringify(_logs));
     }
 
     console.log('\n--- Robot de asalto AU: SOBRECALENTAMIENTO, -3 Vida si acaba el turno con 2+ de Furor ---');
