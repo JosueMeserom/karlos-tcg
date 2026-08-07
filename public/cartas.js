@@ -6572,6 +6572,110 @@ const CARD_DB = [
             return { nuevoObjetivo: handCard };
         },
     },
+
+    // ===================================================================
+    //  TANDA 1 DE CARTAS NUEVAS (7-ago-2026) — los Eventos que OTRAS CARTAS
+    //  YA BUSCAN. Se hacen primero a propósito: no son cartas nuevas sueltas,
+    //  son las que arreglan cartas ya implementadas que hoy no funcionan.
+    // ===================================================================
+    {
+        // LA MÁS BLOQUEANTE DEL EXCEL: la exigen ocho cartas (Xanadu, Diego Antonio,
+        // Silhouette, sus tres versiones KL, y Reimu y Marisa jugables). De esas, Xanadu y
+        // Diego Antonio YA ESTÁN IMPLEMENTADAS y eran INCOLOCABLES: su canPlayCard busca
+        // este Evento por nombre y no existía en CARD_DB. Con solo añadir la carta, las dos
+        // vuelven a jugarse sin tocarles una línea.
+        //
+        // "No puedes volver a usarla el resto de la partida (pero tu rival sí)": NO necesita
+        // pieza nueva. Es el patrón que ya usan Espada V y Shichishito -MARCAR_JUGADOR al
+        // jugarla + un requisito sobre ese campo del JUGADOR-, y por vivir en el jugador y no
+        // en la carta, sale gratis que sea por jugador y no global.
+        name: "Una buena razón", type: "Evento", rarity: "A", cost: 0, duration: 2, series: 1,
+        text: "2 turnos. Requisito: tu rival no tiene ningún Evento en juego. Al expirar, se destruye y no puedes volver a jugarla en toda la partida.",
+        abilities: [
+            { trigger: "JUGAR", requisitos: [
+                { de: "JUGADOR", campo: "usadaUnaBuenaRazon", op: "falsy",
+                  msg: "Ya has jugado 'Una buena razón' en esta partida." },
+                { eventoActivoRival: true, op: "==", valor: 0,
+                  msg: "No puedes jugarla mientras tu rival tenga un Evento en juego." } ] },
+            { trigger: "AL_JUGAR", log: "{jugador} tiene una buena razón para todo esto.", logTipo: "ability",
+              efectos: [ { op: "MARCAR_JUGADOR", campo: "usadaUnaBuenaRazon", valor: true } ] },
+            { trigger: "AL_CADUCAR", log: "La buena razón se ha desvanecido, y no volverá.", logTipo: "system" }
+        ],
+    },
+    {
+        // La busca La Bestia (CATÁSTROFE), que YA está implementada: su Activa buscaba esta
+        // carta en el mazo y nunca podía encontrarla.
+        //
+        // Lo que el texto del Excel pide -"los Esbirros 'Monstruo' que pidan tributo de Furor
+        // sólo requieren la mitad"- NO se implementa todavía: el tributo lo resuelve
+        // DSL.tributoFuror con la cantidad fija que cada carta le pasa, así que rebajarlo
+        // exige un punto de consulta que hoy no existe. Se deja anotado como la pieza
+        // "descuento de tributo" y la carta entra con lo demás funcionando, que es lo que
+        // desbloquea a La Bestia. Ojo: NO se inventa nada, el texto lo dice y está pendiente.
+        name: "Fusión de planos", type: "Evento", rarity: "S", cost: 0, duration: 3, series: 1,
+        text: "3 turnos. Al expirar, se destruye y todos los enemigos pierden 2 de Furor.",
+        abilities: [
+            { trigger: "AL_CADUCAR", log: "¡Los planos se separan de nuevo, drenando a los enemigos!", logTipo: "ability",
+              efectos: [
+                { op: "MODIFICAR_STAT", target: { quien: "ENEMIGO" }, stat: "furor", delta: -2 } ] }
+        ],
+    },
+    {
+        // Berry (INTERFAZ) busca 'Rebobinar', 'Cambio de canal' o 'Publicidad mental'. Solo
+        // existía la primera, así que su Activa ofrecía un tercio de lo que promete su texto.
+        name: "Cambio de canal", type: "Evento", rarity: "C", cost: 0, duration: 3, series: 1,
+        text: "3 turnos. Al expirar, se descarta y robas 3 cartas.",
+        abilities: [
+            { trigger: "AL_CADUCAR", log: "Cambio de canal: {jugador} se pone al día y roba 3 cartas.", logTipo: "ability",
+              efectos: [ { op: "ROBAR", cantidad: 3 } ] }
+        ],
+    },
+    {
+        // La otra que buscaba Berry. Pareja de Exhibicionismo (que baja Def en vez de Atq):
+        // se hacen juntas porque comparten estructura EXACTA, que es justo el criterio de
+        // familias de la §9 de la rúbrica — misma mecánica, misma redacción.
+        name: "Publicidad mental", type: "Evento", rarity: "C", cost: 0, duration: 2, series: 1,
+        text: "2 turnos. Al colocarla, elige un aliado de tu vanguardia: mientras esté en juego, ese aliado y todos los enemigos pierden 2 de Atq.",
+        abilities: [
+            { trigger: "PREVIEW_GLOBAL", lineas: [
+                { campoSelfId: "objetivoPublicidad", texto: "-2 de Atq por la publicidad" },
+                { quien: "ENEMIGO", texto: "-2 de Atq por la publicidad" } ] },
+            { trigger: "JUGAR", requisitos: [
+                { count: { zona: "VANGUARDIA" }, op: ">=", valor: 1,
+                  msg: "Necesitas un aliado en vanguardia al que anunciar." } ] },
+            { trigger: "ANTES_DE_JUGAR", efectos: [
+                { op: "ELEGIR", de: "ALIADOS", zona: "vanguardia", cantidad: 1,
+                  titulo: "¿A QUIÉN LE PONEMOS LOS ANUNCIOS?",
+                  guardaIdEnSelf: "objetivoPublicidad", guardaEn: "anunciado" } ] },
+            { trigger: "AL_JUGAR", log: "¡Publicidad mental! {anunciado} y todos los enemigos se distraen." },
+            { trigger: "AURA", quien: "ALIADO", soloSelfId: "objetivoPublicidad", stats: { atk: -2 } },
+            { trigger: "AURA", quien: "ENEMIGO", stats: { atk: -2 } },
+            { trigger: "AL_CADUCAR", log: "Se acaban los anuncios.", logTipo: "system" }
+        ],
+    },
+    {
+        // Gemela de Publicidad mental: misma estructura, Def en vez de Atq. No la busca
+        // ninguna carta, pero entra aquí porque escribirla aparte habría costado más que
+        // copiar la de al lado, y así las dos nacen redactadas igual (rúbrica §9).
+        name: "Exhibicionismo", type: "Evento", rarity: "C", cost: 0, duration: 2, series: 1,
+        text: "2 turnos. Al colocarla, elige un aliado de tu vanguardia: mientras esté en juego, ese aliado y todos los enemigos pierden 2 de Def.",
+        abilities: [
+            { trigger: "PREVIEW_GLOBAL", lineas: [
+                { campoSelfId: "objetivoExhibicion", texto: "-2 de Def por la exhibición" },
+                { quien: "ENEMIGO", texto: "-2 de Def por la exhibición" } ] },
+            { trigger: "JUGAR", requisitos: [
+                { count: { zona: "VANGUARDIA" }, op: ">=", valor: 1,
+                  msg: "Necesitas un aliado en vanguardia que se exhiba." } ] },
+            { trigger: "ANTES_DE_JUGAR", efectos: [
+                { op: "ELEGIR", de: "ALIADOS", zona: "vanguardia", cantidad: 1,
+                  titulo: "¿QUIÉN SE EXHIBE?",
+                  guardaIdEnSelf: "objetivoExhibicion", guardaEn: "exhibido" } ] },
+            { trigger: "AL_JUGAR", log: "¡Exhibicionismo! {exhibido} y todos los enemigos bajan la guardia." },
+            { trigger: "AURA", quien: "ALIADO", soloSelfId: "objetivoExhibicion", stats: { def: -2 } },
+            { trigger: "AURA", quien: "ENEMIGO", stats: { def: -2 } },
+            { trigger: "AL_CADUCAR", log: "Se acaba el espectáculo.", logTipo: "system" }
+        ],
+    },
 ];
 
 // ===================================================================
@@ -8335,6 +8439,10 @@ const DSL = {
                         val = pool.length;
                     } else if (r.eventoActivo !== undefined) {
                         val = p.activeEvent ? 1 : 0;
+                    // eventoActivoRival ('Una buena razón', 7-ago-2026): hermano del de arriba
+                    // pero mirando el campo del RIVAL. Hasta ahora ninguna carta lo necesitaba.
+                    } else if (r.eventoActivoRival !== undefined) {
+                        val = game.players[card.owner === 'p1' ? 'p2' : 'p1'].activeEvent ? 1 : 0;
                     } else if (r.mano) {
                         val = p.hand.length;
                     } else if (r.manoRival) {
