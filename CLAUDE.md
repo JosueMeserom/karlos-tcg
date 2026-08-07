@@ -68,7 +68,16 @@ La batería histórica (r1–r23 + humo) se perdió con los transcripts de chat 
   `<afección> [(N turnos restantes)] [por HABILIDAD], fuente: [evento ]<Nombre>[ [copyId]] de <JX (Nick)>[, en su pila de descartes]` · o `fuente: esta carta`.
   Los turnos se omiten si no procede (auras/permanentes); el `por HABILIDAD` **solo** si lo causa una Pasiva/Activa (se omite en Eventos y Ayudas). `Efectos actuales:` es la vista inversa: idéntica pero con `objetivo:`. Orden de stats **VIDA → DEF → ATQ** (como en la cara de la carta). Construir SIEMPRE con los helpers `refCarta()` y `lineaEfecto()` de `index.html`; nunca concatenar el nombre a mano. Los **anexos** usan esta misma gramática (`Anexo:` / `Anexado a:` en el hueco de la afección): ver §13.3.bis.
 - **Nombrar una carta en el log**: SIEMPRE `getCardNameWithOwner()` → `<Nombre>[ [copyId]] de <JX (Nick)>` (mismo formato que `refCarta`, sin paréntesis anidados). Nunca `card.name` a secas, y **nunca envolver ese nombre entre paréntesis** — ya los lleva dentro. Al añadir una línea de log, comprobar que no queda `(... (...))`.
+- **Buscar en una PILA (mazo o descartes) usa SIEMPRE su visor completo**, nunca el modal genérico de selección. `openDeckSearchViewer(pid, elegibles, titulo, aviso, maxCount, zona)` con `zona: 'deck'|'discard'` — o, en el DSL, un `BUSCAR` con `en: "MAZO"` / `"DESCARTES"`, que ya lo elige solo. Se ve la pila ENTERA y solo las elegibles llevan reborde verde; sin elegibles, el visor se abre igual con el aviso y se cierra clicando el fondo. `openVisualSearchModal` solo lista las válidas y esconde el resto: queda para la **mano** y para búsquedas **multi-zona** (`en: ["MANO","MAZO"]`), donde no hay una sola pila que enseñar.
 - **Guion corto (`-`), nunca guion largo (`—`)**, en TODO lo que el jugador pueda ver: logs, detalle, modales, títulos, textos de carta. El guion largo se queda solo en los comentarios del código.
+
+## Al añadir o tocar una carta (leer ANTES de escribir el `text`)
+El Excel de Toto (`docs/Cartas KG.csv`, **ignorado por git a propósito: son sus ideas sin publicar, no se versiona ni se sube a ninguna parte**) es la fuente de la MECÁNICA, nunca de la REDACCIÓN. Copiar su texto tal cual es el error más repetido de esta fase; el CSV arrastra formulaciones viejas de antes de fijar la rúbrica.
+1. Escribir el `text` aplicando `docs/rubrica_textos_cartas.md`, no copiándolo del CSV.
+2. **Los Eventos tienen su propia gramática** (§10 de la rúbrica): `N turnos.` + `Requiere X.` (nunca `Requisito:`) + marcadores literales con coma y mayúscula inicial (`Mientras esté en juego, …`). Un marcador mal escrito no da error: el detalle lo pinta como párrafo plano y no se nota hasta verlo en el navegador.
+3. Un Evento **no anuncia su propia destrucción al expirar**. Y "descartar" es solo desde la MANO; desde el campo es "destruir" (§11).
+4. `node tests/auditar_textos.js` tiene que salir en 0 problemas. Comprueba en máquina todo lo anterior — si añades una regla nueva, mira que de verdad falle al romperla antes de fiarte.
+5. Si la carta busca en una pila o elige algo del campo, repasar las dos normas de UX de arriba: son las que más se saltan al replicar patrones.
 
 ## Preferencias de Toto
 - Español siempre. Honestidad ante todo: si algo no se puede verificar, decirlo en vez de improvisar.

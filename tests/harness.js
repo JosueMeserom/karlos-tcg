@@ -277,13 +277,17 @@ function crearJuego(ctx) {
             ctx.pendientes.push({ tipo: 'busqueda', titulo, cartas, exactCount, autoSelectMax, resolver: resolve });
         });
 
-    // Visor de mazo completo (búsquedas con elección sobre el MAZO). Contrato:
+    // Visor de PILA completa (búsquedas con elección sobre el MAZO o los DESCARTES). Contrato:
     // resuelve UNA carta o null (cierre sin elegir / sin elegibles).
-    inst.openDeckSearchViewer = (playerId, elegibles, titulo = null, aviso = null, maxCount = 1) =>
+    // `zona` (7-ago-2026): el visor dejó de ser solo del mazo — buscar en descartes también lo
+    // usa, así que `cartas` debe reflejar la pila REAL o el escenario mentiría sobre lo que el
+    // jugador está viendo.
+    inst.openDeckSearchViewer = (playerId, elegibles, titulo = null, aviso = null, maxCount = 1, zona = 'deck') =>
         new Promise(resolve => {
             ctx.pendientes.push({
-                tipo: 'visorMazo', jugador: playerId, titulo, aviso, maxCount,
-                cartas: [...inst.players[playerId].deck], elegibles: elegibles || [], resolver: resolve,
+                tipo: 'visorMazo', jugador: playerId, titulo, aviso, maxCount, zona,
+                cartas: [...(zona === 'discard' ? inst.players[playerId].discard : inst.players[playerId].deck)],
+                elegibles: elegibles || [], resolver: resolve,
             });
         });
 

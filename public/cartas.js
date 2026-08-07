@@ -1565,7 +1565,12 @@ const CARD_DB = [
         // hace onUpdatePassive, más abajo: se reaplica en cada pasada) — el "Al colocarla:" viejo
         // sugería un efecto puntual y era engañoso. El "Al expirar" también se detalla más: qué se
         // cura exactamente y que los bonos de Vida/Atq/Def acumulados sobreviven a la evolución.
-        text: "3 turnos. Requiere a Zoe en el campo. Mientras esté en juego, oculta y agota a Zoe; si Zoe muere, esta carta se destruye. Al expirar, cura la Vida y los estados alterados de Zoe, busca a Zoe (calcinante) en tu mano o mazo, y la evoluciona, conservando sus bonos.",
+        // La curación de Zoe se cayó del texto Y del código (Toto, 7-ago-2026): Zoe se DESTRUYE
+        // acto seguido, así que curarle la Vida y limpiarle los estados no lo ve nadie ni cambia
+        // nada -resetCard ya la lava al mandarla al descarte-. Prometer una curación que no se
+        // puede observar es texto muerto. Lo que sí importa, y ahora se dice, es que la
+        // sustitución conserva los bonos acumulados durante el entrenamiento.
+        text: "3 turnos. Requiere a Zoe en el campo. Mientras esté en juego, oculta y agota a Zoe; si Zoe muere, esta carta se destruye. Al expirar, busca a Zoe (calcinante) en tu mano o mazo y sustituye a Zoe en su lugar, conservando sus bonos.",
         abilities: [
             { trigger: "PREVIEW_GLOBAL", lineas: [ { quien: "ALIADO", filtros: [ { campo: "name", op: "==", valor: "Zoe" } ], texto: "{genero?Oculto y agotado|Oculta y agotada} por el entrenamiento; si muere, el Evento se destruye" } ] }
         ], 
@@ -1588,9 +1593,12 @@ const CARD_DB = [
             const p = game.players[playerId];
             const zoe = [...p.vanguard, ...p.rearguard].find(c => c.name === 'Zoe');
             if (zoe) {
-                game.logMsg("¡Entrenamiento arduo completado! Restableciendo Vida de Zoe...", 'ability');
-                zoe.currentHp = zoe.maxHp;
-                
+                game.logMsg("¡Entrenamiento arduo completado!", 'ability');
+                // Ya NO se cura a Zoe (Toto, 7-ago-2026). Estaba `zoe.currentHp = zoe.maxHp`, pero
+                // Zoe se destruye unas líneas más abajo y resetCard la lava entera antes de tocar
+                // los descartes: la curación era inobservable. Lo que la calcinante hereda son los
+                // BONOS (diffs de stats + marcas temporales), no el estado de Vida de Zoe; ella
+                // entra a su Vida máxima por ser una carta que acaba de colocarse.
                 let calcinante = p.hand.find(c => c.name === 'Zoe (calcinante)');
                 let fromZone = 'hand';
                 
@@ -1740,99 +1748,51 @@ const CARD_DB = [
     },
     {
         name: "Necronomicón", type: "Ayuda", subtype: "Mágico", tags: ["Consumible"], rarity: "B",
-        text: "Coste: 2 de Furor y la acción de un aliado. Revive un 'Ser vivo' o 'No-muerto' del descarte, sin coste extra.", cost: 0, series: 1,
-        
-        canPlayCard: function(card, game, p) {
-            const validPayers = [...p.vanguard, ...p.rearguard].filter(c => c.furor >= 2 && !c.exhausted);
-            if (validPayers.length === 0) {
-                game.logError("Necesitas un aliado sin agotar y con al menos 2 de Furor.");
-                return false;
-            }
-
-            const currentVanCount = p.vanguard.length;
-            const currentVP = p.vanguard.filter(c => c.type === 'Personaje').length;
-            
-            let validTargets = p.discard.filter(c => (c.subtype === 'Ser vivo' || c.subtype === 'No-muerto') && !getCardTemplate(c.id).onBeforePlayAsync && (c.type === 'Personaje' || c.type === 'Esbirro'));
-            
-            if (currentVanCount < 4 && currentVP >= 2) {
-                validTargets = validTargets.filter(c => c.type !== 'Personaje'); 
-            }
-
-            if (validTargets.length === 0) {
-                game.logError("No hay objetivos válidos en el descarte. (Requiere 'Ser vivo' o 'No-muerto'. Al tener 2 Personajes en Vanguardia, los Personajes del descarte se ignoran).");
-                return false;
-            }
-            return true;
-        },
-        onPlay: async function(card, game) {
-            const p = game.players[card.owner];
-            const validPayers = [...p.vanguard, ...p.rearguard].filter(c => c.furor >= 2 && !c.exhausted);
-            
-            const payer = await new Promise(resolve => {
-                const choices = validPayers.map(c => ({
-                    label: `USAR A ${c.name.toUpperCase()} (-2 FUROR, AGOTAR)`,
-                    action: () => resolve(c)
-                }));
-                choices.push({ label: 'CANCELAR CARTA', action: () => resolve(null) });
-                game.openChoiceModal('¿QUIÉN USA EL NECRONOMICÓN?', choices);
-            });
-
-            if (!payer) { game.cancelAction(); return; }
-
-            // LÓGICA ESTRICTA DE VANGUARDIA (Máx 4 cartas, Máx 2 Personajes)
-            const currentVanCount = p.vanguard.length;
-            const currentVP = p.vanguard.filter(c => c.type === 'Personaje').length;
-            
-            let validTargets = p.discard.filter(c => (c.subtype === 'Ser vivo' || c.subtype === 'No-muerto') && !getCardTemplate(c.id).onBeforePlayAsync && (c.type === 'Personaje' || c.type === 'Esbirro'));
-            
-            if (currentVanCount < 4 && currentVP >= 2) {
-                validTargets = validTargets.filter(c => c.type !== 'Personaje'); 
-            }
-
-            if (validTargets.length === 0) {
-                game.logError("No hay cartas válidas en el descarte que cumplan las reglas de posicionamiento.");
-                game.cancelAction();
-                return;
-            }
-
-            // Ojo al "false" al final, impide cancelar el modal tras pagar
-            const chosen = await game.openVisualSearchModal('REVIVIR CARTA (Auto-posicionamiento)', validTargets, 1, false);
-            if (!chosen) { game.cancelAction(); return; }
-
-            game.modifyStat(payer, 'furor', -2);
-            payer.exhausted = true;
-            game.logMsg(`${payer.name} lee el Necronomicón y se agota...`, 'ability');
-
-            const idx = p.discard.findIndex(c => c.instanceId === chosen.instanceId);
-            const recovered = p.discard.splice(idx, 1)[0];
-            
-            const placeChoice = p.vanguard.length < 4 ? 'vanguard' : 'rearguard';
-            const placeText = placeChoice === 'vanguard' ? 'vanguardia' : 'retaguardia'; // <--- TRADUCCIÓN
-            
-            recovered.location = placeChoice;
-            if (placeChoice === 'vanguard') p.vanguard.push(recovered);
-            else p.rearguard.push(recovered);
-            
-            const template = getCardTemplate(recovered.id);
-            recovered.currentHp = template.hp;
-            recovered.currentDef = template.def;
-            recovered.currentAtk = template.atk;
-            recovered.furor = 0;
-            recovered.exhausted = false;
-            
-            game.logMsg(`¡${recovered.name} vuelve a la vida automáticamente en tu ${placeText}!`, 'ability'); // <--- TRADUCCIÓN
-
-            const handIdx = p.hand.findIndex(c => c.instanceId === card.instanceId);
-            if (handIdx !== -1) {
-                p.hand.splice(handIdx, 1);
-                p.discard.push(card);
-                card.location = 'discard';
-            }
-            
-            game.cancelAction();
-            game.render();
-            try { await animateResurrect(card.owner, recovered.instanceId); } catch(e){}
-        }
+        text: "Coste: 2 de Furor y la acción de un aliado. Coloca en tu campo un \'Ser vivo\' o \'No-muerto\' de tu pila de descartes que no pida coste ni condiciones para colocarse.", cost: 0, series: 1,
+        // Migrada al DSL (Toto, 7-ago-2026). Era imperativa y arrastraba TRES fallos, los tres
+        // por no haber pasado nunca por la normalización del resto de cartas:
+        //   1. El pagador se elegía con openChoiceModal (lista de botones de texto) en vez de en
+        //      el tablero, violando la norma de targeting sobre cartas ya en campo.
+        //   2. La búsqueda en descartes usaba openVisualSearchModal en vez del visor de la pila.
+        //   3. **Corrupción de estado**: `const chosen = await openVisualSearchModal(...)` trataba
+        //      el resultado como carta suelta cuando el motor devuelve un ARRAY. Cancelar daba
+        //      `[]`, que es TRUTHY, así que el `if (!chosen)` no lo paraba; luego
+        //      `findIndex(c => c.instanceId === undefined)` daba -1 y `splice(-1, 1)` arrancaba
+        //      **la última carta del descarte**. Cancelar resucitaba una carta al azar -y sin
+        //      respetar filtros: Toto lo pilló reviviendo a Xanadu-. Es el mismo bug latente ya
+        //      documentado en Líquido mortal (ver tests/regresion2.js), que allí sí se corrigió
+        //      al migrar y aquí seguía vivo porque la carta nunca se migró.
+        // Además, el filtro de "sin condiciones extra" solo miraba `onBeforePlayAsync`, así que
+        // dejaba pasar a los que se vetan por `canPlayCard` (Xanadu, Diego Antonio).
+        //
+        // ORDEN de los efectos: se elige pagador PRIMERO pero se cobra al FINAL, con la búsqueda
+        // en medio. Así cancelar el visor no cuesta ni Furor ni la acción del aliado (la
+        // imperativa también cobraba al final, a propósito; se conserva ese contrato).
+        abilities: [
+            { trigger: "JUGAR", requisitos: [
+                { count: { filtros: [ { campo: "furor", op: ">=", valor: 2 }, { campo: "exhausted", op: "falsy" } ] }, op: ">=", valor: 1,
+                  msg: "Necesitas un aliado sin agotar y con al menos 2 de Furor." },
+                { count: { zona: "DESCARTES",
+                    filtros: [ { o: [ [ { campo: "type", op: "==", valor: "Personaje" } ], [ { campo: "type", op: "==", valor: "Esbirro" } ] ] },
+                               { o: [ [ { campo: "subtype", op: "==", valor: "Ser vivo" } ], [ { campo: "subtype", op: "==", valor: "No-muerto" } ] ] } ],
+                    plantillaSin: ["onBeforePlayAsync", "canPlayCard"] },
+                  op: ">=", valor: 1, msg: "No hay ningún caído apto en tu pila de descartes." } ] },
+            { trigger: "AL_CONSUMIR",
+              efectos: [
+                { op: "ELEGIR", de: "ALIADOS", cantidad: 1,
+                  filtros: [ { campo: "furor", op: ">=", valor: 2 }, { campo: "exhausted", op: "falsy" } ],
+                  titulo: "¿QUIÉN LEE EL NECRONOMICÓN? (-2 FUROR, GASTA SU ACCIÓN)",
+                  guardaIdsEnSelf: "necroLector", guardaEn: "lector" },
+                { op: "BUSCAR", en: "DESCARTES", cantidad: 1, destino: "CAMPO", animacionResurrect: true, sinAnimacion: true,
+                  filtros: [ { o: [ [ { campo: "type", op: "==", valor: "Personaje" } ], [ { campo: "type", op: "==", valor: "Esbirro" } ] ] },
+                             { o: [ [ { campo: "subtype", op: "==", valor: "Ser vivo" } ], [ { campo: "subtype", op: "==", valor: "No-muerto" } ] ] } ],
+                  plantillaSin: ["onBeforePlayAsync", "canPlayCard"],
+                  abortaSiCancelas: true, abortaSiVacio: true, titulo: "NECRONOMICÓN: ELIGE UN CAÍDO",
+                  log: "¡{objetivo} vuelve del mundo de los muertos!" },
+                { op: "MODIFICAR_STAT", target: { selfLista: "necroLector" }, stat: "furor", delta: -2 },
+                { op: "MARCAR", target: { selfLista: "necroLector" }, campo: "exhausted", valor: true,
+                  log: "{objetivo} lee el Necronomicón y se agota..." } ] }
+        ],
     },
     {
         name: "Wolfgang", hp: 5, def: 3, atk: 3, type: "Personaje", subtype: "Ser mágico", tags: ["Invocación", "Bestia animal"], gender: "F", rarity: "B",
@@ -6590,7 +6550,7 @@ const CARD_DB = [
         // jugarla + un requisito sobre ese campo del JUGADOR-, y por vivir en el jugador y no
         // en la carta, sale gratis que sea por jugador y no global.
         name: "Una buena razón", type: "Evento", rarity: "A", cost: 0, duration: 2, series: 1,
-        text: "2 turnos. Requisito: tu rival no tiene ningún Evento en juego. Al expirar, se destruye y no puedes volver a jugarla en toda la partida.",
+        text: "2 turnos. Requiere que tu rival no tenga Evento en juego. Al expirar, no puedes volver a jugarla en toda la partida.",
         abilities: [
             { trigger: "JUGAR", requisitos: [
                 { de: "JUGADOR", campo: "usadaUnaBuenaRazon", op: "falsy",
@@ -6613,7 +6573,7 @@ const CARD_DB = [
         // "descuento de tributo" y la carta entra con lo demás funcionando, que es lo que
         // desbloquea a La Bestia. Ojo: NO se inventa nada, el texto lo dice y está pendiente.
         name: "Fusión de planos", type: "Evento", rarity: "S", cost: 0, duration: 3, series: 1,
-        text: "3 turnos. Al expirar, se destruye y todos los enemigos pierden 2 de Furor.",
+        text: "3 turnos. Al expirar, todos los enemigos pierden 2 de Furor.",
         abilities: [
             { trigger: "AL_CADUCAR", log: "¡Los planos se separan de nuevo, drenando a los enemigos!", logTipo: "ability",
               efectos: [
@@ -6624,7 +6584,7 @@ const CARD_DB = [
         // Berry (INTERFAZ) busca 'Rebobinar', 'Cambio de canal' o 'Publicidad mental'. Solo
         // existía la primera, así que su Activa ofrecía un tercio de lo que promete su texto.
         name: "Cambio de canal", type: "Evento", rarity: "C", cost: 0, duration: 3, series: 1,
-        text: "3 turnos. Al expirar, se descarta y robas 3 cartas.",
+        text: "3 turnos. Al expirar, robas 3 cartas.",
         abilities: [
             { trigger: "AL_CADUCAR", log: "Cambio de canal: {jugador} se pone al día y roba 3 cartas.", logTipo: "ability",
               efectos: [ { op: "ROBAR", cantidad: 3 } ] }
@@ -6635,7 +6595,7 @@ const CARD_DB = [
         // se hacen juntas porque comparten estructura EXACTA, que es justo el criterio de
         // familias de la §9 de la rúbrica — misma mecánica, misma redacción.
         name: "Publicidad mental", type: "Evento", rarity: "C", cost: 0, duration: 2, series: 1,
-        text: "2 turnos. Al colocarla, elige un aliado de tu vanguardia: mientras esté en juego, ese aliado y todos los enemigos pierden 2 de Atq.",
+        text: "2 turnos. Al colocarla, elige un aliado de tu vanguardia. Mientras esté en juego, ese aliado y todos los enemigos pierden 2 de Atq.",
         abilities: [
             { trigger: "PREVIEW_GLOBAL", lineas: [
                 { campoSelfId: "objetivoPublicidad", texto: "-2 de Atq por la publicidad" },
@@ -6658,7 +6618,7 @@ const CARD_DB = [
         // ninguna carta, pero entra aquí porque escribirla aparte habría costado más que
         // copiar la de al lado, y así las dos nacen redactadas igual (rúbrica §9).
         name: "Exhibicionismo", type: "Evento", rarity: "C", cost: 0, duration: 2, series: 1,
-        text: "2 turnos. Al colocarla, elige un aliado de tu vanguardia: mientras esté en juego, ese aliado y todos los enemigos pierden 2 de Def.",
+        text: "2 turnos. Al colocarla, elige un aliado de tu vanguardia. Mientras esté en juego, ese aliado y todos los enemigos pierden 2 de Def.",
         abilities: [
             { trigger: "PREVIEW_GLOBAL", lineas: [
                 { campoSelfId: "objetivoExhibicion", texto: "-2 de Def por la exhibición" },
@@ -6704,7 +6664,7 @@ const CARD_DB = [
     },
     {
         name: "Consagración", type: "Evento", rarity: "A", cost: 0, duration: 3, series: 1,
-        text: "3 turnos. Cura 1 de Vida a cada aliado al final de tu turno. Al expirar, se descarta y cura 1 de Vida a cada aliado.",
+        text: "3 turnos. Mientras esté en juego, cura 1 de Vida a cada aliado al final de tu turno. Al expirar, cura 1 de Vida a cada aliado.",
         abilities: [
             { trigger: "FIN_TURNO",
               efectos: [
@@ -6732,30 +6692,37 @@ const CARD_DB = [
     },
     {
         name: "Nigromántica", hp: 3, def: 4, atk: 2, type: "Esbirro", subtype: "Ser vivo", tags: ["Usuaria de magia"], gender: "F", rarity: "B", series: 1,
-        text: "A: ARTES PROHIBIDAS (1 de Furor): Elige de tu pila de descartes un Personaje o Esbirro 'Ser vivo' o 'No-muerto' que no requiera coste ni condiciones extra para colocarse y colócalo en tu campo. Si tienes un 'Necronomicón' en tu mano, puedes descartarlo para que esta carta gane 1 de Furor.",
+        text: "A: ARTES PROHIBIDAS (1 de Furor): Coloca en tu campo un 'Ser vivo' o 'No-muerto' de tu pila de descartes que no pida coste ni condiciones para colocarse. Puedes descartar un 'Necronomicón' de tu mano para ganar 1 de Furor.",
         activeName: "ARTES PROHIBIDAS",
         abilities: [
             { trigger: "ACTIVA", nombre: "ARTES PROHIBIDAS", coste: { furor: 1 }, sinObjetivo: true, costeDiferido: true,
               requisitos: [
                 { count: { zona: "DESCARTES",
                     filtros: [ { o: [ [ { campo: "type", op: "==", valor: "Personaje" } ], [ { campo: "type", op: "==", valor: "Esbirro" } ] ] },
-                               { o: [ [ { campo: "subtype", op: "==", valor: "Ser vivo" } ], [ { campo: "subtype", op: "==", valor: "No-muerto" } ] ] } ] },
+                               { o: [ [ { campo: "subtype", op: "==", valor: "Ser vivo" } ], [ { campo: "subtype", op: "==", valor: "No-muerto" } ] ] } ],
+                    plantillaSin: ["onBeforePlayAsync", "canPlayCard"] },
                   op: ">=", valor: 1, msg: "No hay ningún caído apto en tu pila de descartes." } ],
               efectos: [
-                { op: "FLOTANTE", target: { quien: "SELF" }, texto: "ARTES PROHIBIDAS", estilo: "ft-ability", offset: -30 },
-                { op: "BUSCAR", en: "DESCARTES", cantidad: 1, destino: "RETAGUARDIA", animacionResurrect: true, sinAnimacion: true,
+                // El BUSCAR va PRIMERO y el flotante DESPUÉS (Toto, 7-ago-2026): con
+                // `costeDiferido` la Activa se puede cancelar mientras eliges, y el flotante que
+                // el rival ve es su único aviso de que ha pasado algo. Anunciándolo antes, cerrar
+                // el visor dejaba al rival creyendo que se había usado una Habilidad que en
+                // realidad nunca llegó a ocurrir.
+                { op: "BUSCAR", en: "DESCARTES", cantidad: 1, destino: "CAMPO", animacionResurrect: true, sinAnimacion: true,
                   filtros: [ { o: [ [ { campo: "type", op: "==", valor: "Personaje" } ], [ { campo: "type", op: "==", valor: "Esbirro" } ] ] },
                              { o: [ [ { campo: "subtype", op: "==", valor: "Ser vivo" } ], [ { campo: "subtype", op: "==", valor: "No-muerto" } ] ] } ],
                   plantillaSin: ["onBeforePlayAsync", "canPlayCard"],
                   abortaSiCancelas: true, abortaSiVacio: true, titulo: "ARTES PROHIBIDAS: ELIGE UN CAÍDO",
-                  log: "¡Artes prohibidas! {carta} resucita a {objetivo} en su campo." },
+                  log: "¡Artes prohibidas! {carta} devuelve a {objetivo} al campo de batalla." },
+                { op: "FLOTANTE", target: { quien: "SELF" }, texto: "ARTES PROHIBIDAS", estilo: "ft-ability", offset: -30 },
                 { op: "ELEGIR", de: "MANO", cantidad: 1, opcional: true,
                   filtros: [ { campo: "name", op: "contieneTexto", valor: "Necronomicón" } ],
                   titulo: "¿DESCARTAR NECRONOMICÓN? (+1 FUROR)",
                   efectos: [
                     { op: "DESCARTAR" },
+                    // Sin `floating`: modifyStat ya pinta su "+1 FUR" automático para cualquier
+                    // cambio de Furor. Declararlo aquí salía DOS veces (Toto, 7-ago-2026).
                     { op: "MODIFICAR_STAT", target: { quien: "SELF" }, stat: "furor", delta: 1,
-                      floating: { texto: "+1 FUR", estilo: "ft-green", offset: -20 },
                       log: "{carta} devora el Necronomicón y gana Furor." } ] } ] }
         ],
     },
@@ -7449,6 +7416,17 @@ const DSL = {
                 let lista = _todas.filter(x => (e.filtros || []).every(f => DSL._match(x, f)) &&
                                              (!e.algunFiltro || e.algunFiltro.some(f => DSL._match(x, f))));
                 if (e.plantillaSin) lista = lista.filter(x => { const t = getCardTemplate(x.id); return t && !e.plantillaSin.some(hk => typeof t[hk] === 'function'); });
+                // destino CAMPO: un Personaje que NO cabría no se ofrece siquiera. Mismas dos
+                // reglas que playCard (index.html): la vanguardia admite 4 cartas y como mucho 2
+                // Personajes, y con la vanguardia a medias un 3er Personaje se RECHAZA (no baja a
+                // retaguardia). Si la vanguardia está llena todo va atrás, y entonces el límite de
+                // Personajes ya no pinta nada.
+                if (e.destino === 'CAMPO') {
+                    const _vanLlena = p.vanguard.length >= 4;
+                    const _persEnVan = p.vanguard.filter(c => c.type === 'Personaje').length;
+                    if (!_vanLlena && _persEnVan >= 2) lista = lista.filter(x => x.type !== 'Personaje');
+                    if (_vanLlena && p.rearguard.length >= 4) lista = [];
+                }
                 let _sacadaDelMazo = false; // para barajarDespues.soloSiDelMazo
                 const aMano = async (t) => {
                     // Se saca de la zona REAL en la que estuviera (con una sola zona esto es
@@ -7473,12 +7451,21 @@ const DSL = {
                         t.location = 'equipped';
                         t.equippedTo = sourceCard.instanceId;
                         if (typeof game.updatePassives === 'function') game.updatePassives();
-                    } else if (e.destino === 'RETAGUARDIA') {
+                    } else if (e.destino === 'RETAGUARDIA' || e.destino === 'CAMPO') {
                         const tpl = getCardTemplate(t.id);
                         t.currentHp = tpl.hp; t.currentDef = tpl.def; t.currentAtk = tpl.atk;
                         t.furor = 0; t.exhausted = false;
-                        t.location = 'rearguard';
-                        p.rearguard.push(t);
+                        // CAMPO (Toto, 7-ago-2026): "colócalo en tu campo" = las MISMAS reglas de
+                        // colocación que jugar la carta a mano (playCard): a la vanguardia si
+                        // queda hueco, y a la retaguardia solo cuando está llena. RETAGUARDIA se
+                        // queda para las cartas que dicen literalmente "en retaguardia" (Cápsula
+                        // de bio-regeneración, que además EXIGE la vanguardia llena).
+                        // El límite de 2 Personajes NO se resuelve aquí sino filtrando el pool
+                        // (ver _dslPilaFiltrada): un Personaje que no cabe no debe ni ofrecerse,
+                        // igual que playCard lo rechaza de plano en vez de mandarlo atrás.
+                        const _aVanguardia = e.destino === 'CAMPO' && p.vanguard.length < 4;
+                        t.location = _aVanguardia ? 'vanguard' : 'rearguard';
+                        (_aVanguardia ? p.vanguard : p.rearguard).push(t);
                         if (e.animacionResurrect && typeof animateResurrect === 'function') {
                             game.render();
                             try { await animateResurrect(pid, t.instanceId); } catch (err) {}
@@ -7564,17 +7551,23 @@ const DSL = {
                         { label: e.confirmar.no || 'IGNORAR', action: () => resolve(false) }
                     ], pid);
                 });
-                // Las búsquedas CON ELECCIÓN sobre el MAZO usan el visor de mazo completo
-                // (pedido por Toto): se ve todo el mazo y solo las elegibles llevan el
-                // reborde verde. Las de otras zonas (o multi-elección) siguen con modal.
-                // El visor de mazo completo solo tiene sentido con UNA zona y que sea el mazo
-                // (enseña el mazo entero con las elegibles resaltadas). Una búsqueda multi-zona
-                // cae al modal visual, que es justo lo que usaban Karlitos y Honsow a mano.
-                const esVisorMazo = e.en === 'MAZO' && typeof game.openDeckSearchViewer === 'function';
+                // NORMA (Toto, 7-ago-2026): buscar en una PILA -mazo o descartes- SIEMPRE usa su
+                // visor completo, nunca el modal genérico de selección. Se ve la pila entera y
+                // solo las elegibles llevan el reborde verde; si no hay ninguna, el visor se abre
+                // igual con el aviso y se cierra clicando el fondo. Hasta hoy esto solo valía para
+                // el MAZO, así que las búsquedas en descartes (Líquido mortal, Cápsula de
+                // bio-regeneración, Nigromántica) caían al modal de "cartas disponibles", que solo
+                // lista las válidas y esconde el resto de la pila.
+                // Sigue sin aplicar a la MANO ni a las búsquedas MULTI-ZONA (`en` como array):
+                // ahí no hay una sola pila que enseñar, y caen al modal visual a propósito.
+                const _zonaVisor = e.en === 'MAZO' ? 'deck' : e.en === 'DESCARTES' ? 'discard' : null;
+                const esVisorPila = !!_zonaVisor && typeof game.openDeckSearchViewer === 'function';
+                const _nombrePila = _zonaVisor === 'discard' ? 'esta pila de descartes' : 'este mazo';
                 const visorVacio = async (barajara) => {
-                    if (!esVisorMazo) return;
+                    if (!esVisorPila) return;
                     await game.openDeckSearchViewer(pid, [], F(e.titulo || 'ELIGE UNA CARTA'),
-                        barajara ? 'No hay cartas elegibles en este mazo. Se barajará al cerrar el visor.' : 'No hay cartas elegibles en este mazo.');
+                        barajara ? `No hay cartas elegibles en ${_nombrePila}. Se barajará al cerrar el visor.` : `No hay cartas elegibles en ${_nombrePila}.`,
+                        1, _zonaVisor);
                 };
                 let confirmado = false;
                 if (e.preguntarSiempre && e.confirmar) {
@@ -7615,10 +7608,10 @@ const DSL = {
                     if (!(await pregunta())) { if (e.confirmar.logNo) game.logMsg(F(e.confirmar.logNo), 'system'); continue; }
                 }
                 let elegidas;
-                if (esVisorMazo) {
+                if (esVisorPila) {
                     // maxCount = e.cantidad: single (1) devuelve una carta o null; multi (>1)
                     // devuelve un array (Inspiración: hasta 2, mín. 1).
-                    const r = await game.openDeckSearchViewer(pid, lista, F(e.titulo || 'ELIGE UNA CARTA'), null, e.cantidad || 1);
+                    const r = await game.openDeckSearchViewer(pid, lista, F(e.titulo || 'ELIGE UNA CARTA'), null, e.cantidad || 1, _zonaVisor);
                     elegidas = Array.isArray(r) ? r : (r ? [r] : []);
                 } else {
                     elegidas = await game.openVisualSearchModal(F(e.titulo || 'ELIGE UNA CARTA'), lista, e.cantidad || 1, !!e.autoSeleccion, pid);

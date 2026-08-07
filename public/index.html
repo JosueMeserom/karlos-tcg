@@ -1676,12 +1676,19 @@
 
             // Función auxiliar para saltar localmente
             executeSkipAnimations() {
-                if (bannerResolve) {
-                    skipPhaseBanner();
-                } else {
-                    // El banner aún no ha aparecido en esta pantalla: guardamos el skip para cuando llegue
-                    this.pendingBannerSkip = true;
-                }
+                // Un clic sobre un BANNER DE FASE lo consume ÉL y NADA MÁS (Toto, 7-ago-2026).
+                // Saltar el rótulo no puede saltar además lo que esa misma fase va a ejecutar
+                // justo después. Antes el mismo clic hacía las dos cosas y, peor, `skipAllAnimations`
+                // dejaba `isSkippingAnim` puesto 50 ms: como `sleep()` devuelve al instante
+                // mientras esa bandera está en alto, los primeros compases de la fase se
+                // atropellaban. En EFECTOS FINALES eso significaba que los flotantes de los
+                // efectos no se llegaban a ver -salían y morían dentro de esa ventana- y la
+                // partida parecía irse de golpe al turno del rival.
+                // Con el rótulo fuera, un SEGUNDO clic sí salta ya las animaciones de la fase:
+                // quien quiera correr sigue pudiendo, pero paso a paso y sin perderse nada.
+                if (bannerResolve) { skipPhaseBanner(); return; }
+                // El banner aún no ha aparecido en esta pantalla: guardamos el skip para cuando llegue
+                this.pendingBannerSkip = true;
                 if (furorResolve) {
                     skipFurorAnimation();
                 } else {
@@ -4595,8 +4602,13 @@
             // devuelve UNA carta o null. Con maxCount > 1 (p. ej. Inspiración: hasta 2), el
             // clic marca/desmarca (mín. 1 obligatoria), aparece un botón CONFIRMAR y la
             // promesa devuelve un ARRAY de cartas.
-            openDeckSearchViewer(playerId, elegibles, titulo = null, aviso = null, maxCount = 1) {
+            // Visor de PILA completa (mazo o descartes). Nació solo para el mazo; `zona` lo
+            // generaliza (Toto, 7-ago-2026) porque la norma es la misma para las dos: buscar
+            // en una pila SIEMPRE enseña la pila entera con las elegibles en verde, nunca el
+            // modal genérico de selección -que solo lista las válidas y no deja ver el resto-.
+            openDeckSearchViewer(playerId, elegibles, titulo = null, aviso = null, maxCount = 1, zona = 'deck') {
                 const multi = maxCount > 1;
+                const _esDescartes = zona === 'discard';
                 return new Promise(resolveRaw => {
                     this.currentVisualResolve = (cards) => {
                         this._deckSearchActivo = false;
@@ -4606,7 +4618,7 @@
 
                     this._interaccionChooser = playerId; // quién busca (para la recuperación por reconexión)
                     // Descriptor serializable (reanudar-perfecto): si el buscador reconecta, se re-monta el visor.
-                    this.pendingInteraction = { tipo: 'deckViewer', chooserId: playerId, playerId, elegiblesIds: (elegibles || []).map(c => c.instanceId), titulo: titulo || null, aviso: aviso || null, maxCount };
+                    this.pendingInteraction = { tipo: 'deckViewer', chooserId: playerId, playerId, elegiblesIds: (elegibles || []).map(c => c.instanceId), titulo: titulo || null, aviso: aviso || null, maxCount, zona };
 
                     if (this.gameMode === 'online' && this.activePlayerId !== 'setup' && this.myPlayerId !== playerId) {
                         // No-elector: si le debo el estado al otro (reconectó, en espejo o mientras
@@ -4616,7 +4628,7 @@
                             this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'PENDING_INTERACTION', pi: this.pendingInteraction });
                         }
                         const banner = document.getElementById('action-banner');
-                        banner.innerText = `Esperando a que ${this.getDisplayName(playerId)} busque en su mazo...`;
+                        banner.innerText = `Esperando a que ${this.getDisplayName(playerId)} busque en ${_esDescartes ? 'su pila de descartes' : 'su mazo'}...`;
                         banner.style.display = 'block';
                         return; // sin visor local: lo resuelve el replay remoto
                     }
@@ -4627,7 +4639,7 @@
                     const content = document.getElementById('discard-content');
                     const idsElegibles = new Set((elegibles || []).map(c => c.instanceId));
 
-                    title.innerText = titulo || `MAZO DE ${this.getDisplayName(playerId).toUpperCase()}`;
+                    title.innerText = titulo || `${_esDescartes ? 'DESCARTES' : 'MAZO'} DE ${this.getDisplayName(playerId).toUpperCase()}`;
                     let avisoEl = document.getElementById('deck-search-notice');
                     if (!avisoEl) {
                         avisoEl = document.createElement('div');
@@ -4687,7 +4699,9 @@
                     }
 
                     content.innerHTML = '';
-                    const deckCopy = [...p.deck].reverse(); // como el visor de debug: la cima primero
+                    // La cima primero, en las dos pilas: el mazo se roba por el final y en los
+                    // descartes lo último en caer es lo que está arriba del montón.
+                    const deckCopy = [...(_esDescartes ? p.discard : p.deck)].reverse();
                     if (deckCopy.length === 0) {
                         content.innerHTML = '<div style="color:white;">Vacío.</div>';
                     } else {
@@ -9591,7 +9605,7 @@
                     const elegibles = (pi.elegiblesIds || []).map(id => this.findCard(id)).filter(Boolean);
                     // openDeckSearchViewer, con playerId === yo, monta el visor real; sus clics
                     // ya emiten VISUAL_SEARCH_CONFIRM. La Promise que crea queda huérfana (inocua).
-                    this.openDeckSearchViewer(pi.playerId, elegibles, pi.titulo, pi.aviso, pi.maxCount || 1);
+                    this.openDeckSearchViewer(pi.playerId, elegibles, pi.titulo, pi.aviso, pi.maxCount || 1, pi.zona || 'deck');
                 } else if (pi.tipo === 'coin') {
                     // Re-monto la moneda (soy quien lanza). Se REANUDA en la fase exacta que trae
                     // el descriptor: si la tirada ya había caído, NO se vuelve a lanzar -eso

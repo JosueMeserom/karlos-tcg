@@ -154,6 +154,34 @@ for (const c of CARTAS) {
         if (mDur && c.duration !== undefined && Number(mDur[1]) !== c.duration) add('DURACION', c, `texto dice ${mDur[1]} turnos · duration=${c.duration}`);
     }
 
+    // --- §14 GRAMÁTICA DEL EVENTO (Toto, 7-ago-2026) ---
+    // Las tres reglas de aquí abajo YA se cumplían en los 30 Eventos antiguos: se rompieron al
+    // añadir cartas nuevas copiando el texto del Excel en vez de aplicar la rúbrica. Se
+    // comprueban en máquina precisamente por eso — una norma que solo vive en un documento se
+    // vuelve a saltar la próxima vez.
+    if (c.type === 'Evento') {
+        // (a) Un Evento NO anuncia su propia destrucción al expirar: es lo primero que pasa
+        //     SIEMPRE, así que decirlo gasta caja y no informa de nada.
+        const mAuto = t.match(/Al expirar,[^.]*\b(se destruye|se descarta|destruye esta carta|descarta esta carta)/i);
+        if (mAuto) add('EVENTO-AUTODESTRUCCION', c, `"${mAuto[1]}" — al expirar el Evento se va solo; no se escribe`);
+        // (b) El requisito de un Evento se escribe "Requiere X.", no "Requisito: X." — la caja
+        //     REQUISITO del detalle solo reconoce la primera forma (las Ayudas usan la segunda).
+        if (/Requisito:/.test(t)) add('EVENTO-REQUISITO', c, 'usa "Requisito:" (forma de Ayuda); un Evento pide "Requiere X."');
+        // (c) Todo lo que un Evento hace va bajo un MARCADOR de sección; sin él el parser lo pinta
+        //     como párrafo plano, sin caja ni color.
+        const MARCAS = /^(Antes de colocarla, |Al colocarla, |Mientras esté en juego, |Al expirar, )/;
+        const _cuerpo = t.replace(/^\s*\d+\s*turnos?\.\s*/, '').replace(/^Requiere\s+[^.]+\.\s*/, '');
+        _cuerpo.split(/(?=Antes de colocarla, |Al colocarla, |Mientras esté en juego, |Al expirar, )/)
+            .map(x => x.trim()).filter(Boolean)
+            .forEach(seg => { if (!MARCAS.test(seg)) add('EVENTO-SIN-MARCADOR', c, `"${seg.slice(0, 45)}…" no cuelga de ningún marcador (queda como párrafo plano)`); });
+    }
+
+    // --- §15 DESCARTAR vs DESTRUIR (Toto, 7-ago-2026) ---
+    // "Descartar" es SOLO ir de la MANO a los descartes. Desde cualquier otro sitio (campo,
+    // Evento en juego, equipo anexado) la palabra es "destruir", aunque acabe en la misma pila.
+    const mDesc = t.match(/\b(se descarta|descarta esta carta)\b/i);
+    if (mDesc && c.type !== 'Ayuda') add('DESCARTAR-VS-DESTRUIR', c, `"${mDesc[1]}" — solo se "descarta" lo que está en la MANO; en el campo es "destruir"`);
+
     // --- §2 Momentos ---
     const diceColocar = /\bal colocar/i.test(tl);
     const diceMientras = /mientras est|mientras siga|mientras haya|mientras teng/i.test(tl);
@@ -224,14 +252,22 @@ for (const c of CARTAS) {
 
 // ---------- salida ----------
 const INFORMATIVAS = ['LONGITUD'];
+// `orden` solo fija la PRELACIÓN de salida, no qué se informa: cualquier categoría que no esté
+// aquí se imprime igual, detrás. Antes el bucle iteraba únicamente sobre esta lista, así que una
+// regla nueva se recogía en `hallazgos` y NUNCA se imprimía ni contaba — el auditor daba "0
+// problemas" con violaciones delante (encontrado el 7-ago-2026 al añadir las reglas de §14/§15,
+// probando a reintroducir a propósito los fallos que acababa de corregir). Un verificador que
+// puede callarse en silencio es peor que no tenerlo: parece que cubre lo que ya no cubre.
 const orden = ['NOMBRE-PASIVA', 'NOMBRE-ACTIVA', 'COSTE-ACTIVA', 'DURACION', 'MOMENTO',
+    'EVENTO-AUTODESTRUCCION', 'EVENTO-REQUISITO', 'EVENTO-SIN-MARCADOR', 'DESCARTAR-VS-DESTRUIR',
     'REGLA-OCULTA', 'REACTIVO-MUDO', 'VOCABULARIO', 'TIPOGRAFIA', 'SIN-TEXTO', 'LONGITUD'];
 const todo = process.argv.includes('--todo');
 const porCat = {};
 for (const h of hallazgos) (porCat[h.cat] = porCat[h.cat] || []).push(h);
+const categorias = [...orden, ...Object.keys(porCat).filter(c => !orden.includes(c))];
 
 let problemas = 0;
-for (const cat of orden) {
+for (const cat of categorias) {
     const list = porCat[cat] || [];
     if (!list.length) continue;
     const informativa = INFORMATIVAS.includes(cat);

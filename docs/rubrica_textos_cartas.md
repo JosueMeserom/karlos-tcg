@@ -266,3 +266,74 @@ Xanadu: Al recibir un ataque normal, puede pagar 1 de Furor para evitarlo con to
 
 Misma apertura, mismo verbo (evitar, no "esquivar"), misma coletilla. Lo único que cambia es lo
 único que de verdad difiere: cómo se paga.
+
+### 9.bis Familia «evolución» (Toto, 7-ago-2026)
+
+Es el mismo caso que Águila/Xanadu, dentro de la familia de las que sustituyen a otra carta:
+tres formas distintas de decir exactamente lo mismo.
+
+```
+Sadame (retornada):  Sustituye a Sadame.
+Limo crecido:        Puedes sustituir cualquier 'Limo artificial'... Las bonificaciones se transfieren.
+Megalimo:            Sólo colocable sustituyendo un 'Limo crecido'. Hereda stats.
+```
+
+"Las bonificaciones se transfieren" y "hereda stats" son la misma frase escrita de dos maneras,
+y Sadame directamente se la calla. Forma canónica:
+
+> **Sustituye a `<carta>` en su lugar, conservando sus bonos.**
+
+Lo que SÍ distingue a unas de otras se escribe aparte, porque es distinto de verdad: si además
+restablece la Vida (Sadame: "Restablece Vida al inicio") o si hay condición de colocación. Ya
+aplicada en *Entrenamiento arduo*; las tres de arriba quedan pendientes de unificar.
+
+---
+
+## 10. Gramática del Evento (el parser del detalle la exige)
+
+Un Evento **no se escribe como una Ayuda**. El detalle lo trocea con marcadores literales, y lo
+que no encaje se pinta como párrafo plano, sin caja ni color. La forma es:
+
+```
+<N> turnos. [Requiere <condición>.] [Antes de colocarla, …] [Al colocarla, …]
+[Mientras esté en juego, …] [Al expirar, …]
+```
+
+Cuatro reglas que se saltan solas si uno copia el texto del Excel en vez de aplicar esto:
+
+1. **`Requiere X.`, nunca `Requisito: X.`** — la caja REQUISITO de un Evento solo reconoce la
+   primera forma; `Requisito:` es de las Ayudas y además solo funciona al PRINCIPIO del texto,
+   posición que en un Evento ya ocupa la duración. Ejemplos correctos ya en el juego: *Giro de
+   guion* ("Requiere que tengas un Evento activo."), *Época de estudio*, *Plan de equipo*.
+2. **Los marcadores llevan coma y van en mayúscula inicial**: `Mientras esté en juego, …`. Con
+   dos puntos o en minúscula (`…de tu vanguardia: mientras esté en juego, …`) el parser no los
+   ve y toda la sección cae en la caja anterior.
+3. **Todo lo que hace el Evento cuelga de un marcador.** Una frase suelta se queda sin caja.
+4. **Un Evento NO anuncia su propia destrucción al expirar.** Es lo primero que pasa siempre.
+   `Al expirar, se descarta y robas 3 cartas.` → `Al expirar, robas 3 cartas.`
+
+## 11. Descartar vs destruir
+
+- **Descartar**: ir de la **MANO** a la pila de descartes. Solo eso.
+- **Destruir**: irse desde **cualquier otro sitio** — campo, Evento en juego, equipo anexado —
+  aunque acabe en la misma pila.
+
+En el Excel hay Eventos que dicen "al expirar la duración, descarta esta carta". Es un residuo de
+antes de fijar esta norma: se traduce a "destruir" (y por la regla 4 de arriba, en un Evento
+directamente no se escribe).
+
+## 12. Buscar en una pila: SIEMPRE su visor
+
+No es una norma de texto sino de comportamiento, pero se audita junto a las demás porque se
+rompe igual de fácil. Si una carta busca en el **mazo** o en los **descartes**, se usa el visor
+de pila completo (`openDeckSearchViewer`, o en el DSL un `BUSCAR` con `en: "MAZO"` / `"DESCARTES"`,
+que ya lo elige solo): se ve la pila entera y solo las elegibles llevan reborde verde; sin
+elegibles, el visor se abre igual con el aviso y se cierra clicando el fondo.
+
+**Nunca** el modal genérico de selección (`openVisualSearchModal`) para una pila: solo lista las
+válidas y esconde el resto, que es información que el jugador tiene derecho a ver. Ese modal
+queda para la **mano** y para búsquedas **multi-zona** (`en: ["MANO", "MAZO"]`), donde no hay una
+sola pila que enseñar.
+
+Y elegir una carta **ya en el campo** es siempre reborde verde en el tablero, nunca un modal
+(ver la norma de targeting en CLAUDE.md).

@@ -144,14 +144,36 @@ const buscar = (g, pid, nombre) => [...g.players[pid].vanguard, ...g.players[pid
         await paso({ elegir: ['Mini-tigre'] });
         // Sin Necronomicón en mano, la pregunta opcional ni siquiera se abre (pool vacío = 'skip'
         // silencioso, sin modal): no hace falta declinar nada.
-        check('el aliado resucitado aparece en RETAGUARDIA', g.players.p1.rearguard.some(c => c.name === 'Mini-tigre'));
+        // "Colócalo en tu campo" = las reglas de playCard: a VANGUARDIA mientras quepa (Toto,
+        // 7-ago-2026). Antes bajaba siempre a retaguardia, que no lo pedía ningún texto.
+        check('el caído vuelve a la VANGUARDIA, que tiene hueco', g.players.p1.vanguard.some(c => c.name === 'Mini-tigre'),
+            'vanguardia=' + JSON.stringify(g.players.p1.vanguard.map(c => c.name)));
         check('...ya no está en descartes', !g.players.p1.discard.some(c => c.name === 'Mini-tigre'));
         check('se cobra 1 de Furor', buscar(g, 'p1', 'Nigromántica').furor === 0,
             'furor=' + buscar(g, 'p1', 'Nigromántica').furor);
     }
     {
+        // Vanguardia LLENA (4): entonces sí baja a retaguardia, como al jugarlo desde la mano.
+        const { g, paso } = await mesa({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            // La propia Nigromántica cuenta como 4ª: la vanguardia queda llena. (No vale ponerla
+            // en retaguardia — desde ahí no puede usar su Activa.)
+            p1: { vanguardia: ['Mini-tigre', 'Oso con armadura', 'Guardia', { carta: 'Nigromántica', furor: 1 }],
+                  descartes: ['Limo artificial'] },
+            p2: { vanguardia: ['Mini-tigre'] },
+        });
+        await paso({ habilidad: 'Nigromántica' });
+        await paso({ confirmar: true });
+        await paso({ elegir: ['Limo artificial'] });
+        check('con la vanguardia llena, baja a retaguardia', g.players.p1.rearguard.some(c => c.name === 'Limo artificial'),
+            'retaguardia=' + JSON.stringify(g.players.p1.rearguard.map(c => c.name)));
+    }
+    {
         // El filtro "sin coste ni condiciones extra": Xanadu tiene canPlayCard (requiere 'Una
-        // buena razón' en juego) y debe quedar EXCLUIDO de lo que Nigromántica puede ofrecer.
+        // buena razón' en juego) y NO debe poder elegirse.
+        // OJO al contrato del visor de pila: `cartas` es la pila ENTERA (se ve todo el descarte)
+        // y `elegibles` son las que llevan el reborde verde. Comprobar sobre `cartas` sería
+        // comprobar que la pila existe, no que el filtro funciona.
         const { ctx, g, paso } = await mesa({
             turno: 2, turnoDe: 'p1', empieza: 'p2',
             p1: { vanguardia: [{ carta: 'Nigromántica', furor: 1 }], descartes: ['Xanadu', 'Mini-tigre'] },
@@ -159,10 +181,32 @@ const buscar = (g, pid, nombre) => [...g.players[pid].vanguard, ...g.players[pid
         });
         await paso({ habilidad: 'Nigromántica' });
         await paso({ confirmar: true });
-        const ofrecidas = (ctx.pendientes[0] || {}).cartas || [];
-        const nombres = ofrecidas.map(c => c.name);
-        check('Xanadu (canPlayCard con condiciones) NO se ofrece', !nombres.includes('Xanadu'), JSON.stringify(nombres));
-        check('...pero Mini-tigre (sin condiciones) SÍ', nombres.includes('Mini-tigre'), JSON.stringify(nombres));
+        const pend = ctx.pendientes[0] || {};
+        check('se abre el VISOR DE PILA, no el modal genérico', pend.tipo === 'visorMazo' && pend.zona === 'discard',
+            'tipo=' + pend.tipo + ' zona=' + pend.zona);
+        check('...y enseña el descarte ENTERO, Xanadu incluido',
+            (pend.cartas || []).map(c => c.name).sort().join(',') === 'Mini-tigre,Xanadu',
+            JSON.stringify((pend.cartas || []).map(c => c.name)));
+        const elegibles = (pend.elegibles || []).map(c => c.name);
+        check('Xanadu (canPlayCard con condiciones) NO es elegible', !elegibles.includes('Xanadu'), JSON.stringify(elegibles));
+        check('...pero Mini-tigre (sin condiciones) SÍ', elegibles.includes('Mini-tigre'), JSON.stringify(elegibles));
+        await paso({ elegir: ['Mini-tigre'] });
+    }
+    {
+        // Límite de 2 Personajes en vanguardia (misma regla que playCard): con 2 ya puestos y la
+        // vanguardia a medias, un Personaje del descarte NO se ofrece — no "baja a retaguardia".
+        const { ctx, g, paso } = await mesa({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: ['Karlos', 'Agah', { carta: 'Nigromántica', furor: 1 }],
+                  descartes: ['Goodman', 'Mini-tigre'] },
+            p2: { vanguardia: ['Mini-tigre'] },
+        });
+        await paso({ habilidad: 'Nigromántica' });
+        await paso({ confirmar: true });
+        const elegibles = ((ctx.pendientes[0] || {}).elegibles || []).map(c => c.name);
+        check('con 2 Personajes en vanguardia, un Personaje del descarte NO es elegible',
+            !elegibles.includes('Goodman'), JSON.stringify(elegibles));
+        check('...pero un Esbirro sí', elegibles.includes('Mini-tigre'), JSON.stringify(elegibles));
         await paso({ elegir: ['Mini-tigre'] });
     }
     {
