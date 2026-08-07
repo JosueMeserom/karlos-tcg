@@ -1352,7 +1352,10 @@ const CARD_DB = [
                 const rearguardAllies = p.rearguard;
                 
                 if (rearguardAllies.length > 0) {
-                    const chosen = await game.openVisualSearchModal('POCA PACIENCIA (FORZAR INTERCAMBIO)', rearguardAllies, 1, true, card.owner);
+                    // Selección en TABLERO (Toto, 7-ago-2026): elegir una carta ya en el campo
+                    // es reborde verde, nunca el modal genérico. cancelable:false porque el
+                    // intercambio no es opcional -el contador ya llegó a 0-.
+                    const chosen = await game.pickBoardTargets(rearguardAllies, 1, 'POCA PACIENCIA: elige con quién intercambiarte', card, card.owner, false);
                     if (chosen && chosen.length > 0) {
                         const ally = chosen[0];
                         const vIdx = p.vanguard.findIndex(c => c.instanceId === card.instanceId);
@@ -2081,7 +2084,14 @@ const CARD_DB = [
                     break;
                 }
                 
-                const chosen = await game.openVisualSearchModal(`REVIVIR CARTA (${i+1}/2)`, validTargets, 1, false);
+                // Visor de la pila de descartes (Toto, 7-ago-2026). Antes usaba el modal
+                // genérico y, como Necronomicón, trataba su resultado como carta suelta cuando es
+                // un ARRAY: cancelar devolvía [] -truthy, así que el `if (!chosen)` no cortaba- y
+                // el `findIndex` de abajo daba -1, con lo que `splice(-1, 1)` arrancaba la ÚLTIMA
+                // carta del descarte saltándose todos los filtros. Y dos veces, por el bucle.
+                // El visor en modo single devuelve UNA carta o null, que es lo que este código
+                // ya suponía: con él, el `if (!chosen)` corta de verdad.
+                const chosen = await game.openDeckSearchViewer(card.owner, validTargets, `VUELVE A LA VIDA (${i+1}/2): ELIGE UN CAÍDO`, null, 1, 'discard');
                 if (!chosen) break; 
                 
                 const placeChoice = p.vanguard.length < 4 ? 'vanguard' : 'rearguard';
@@ -3305,7 +3315,10 @@ const CARD_DB = [
                 game.logError(`Necesitas un aliado con al menos 4 de Furor para invocar a ${card.name}.`);
                 return false;
             }
-            const chosen = await game.openVisualSearchModal(`${card.name}: Elige aliado para tributar 4 Furor`, validAllies, 1, true, card.owner);
+            // Tributo elegido en el TABLERO (Toto, 7-ago-2026), como DSL.tributoFuror y el
+            // resto de tributos. El cobro sigue siendo del motor vía tributeSourceId: aquí solo
+            // cambia CÓMO se elige al pagador, no cuándo se le cobra.
+            const chosen = await game.pickBoardTargets(validAllies, 1, `${card.name}: elige quién tributa 4 de Furor`, card, card.owner, true);
             if (chosen && chosen.length > 0) {
                 card.tributeSourceId = chosen[0].instanceId;
                 return true;
@@ -3354,7 +3367,8 @@ const CARD_DB = [
                 game.logError(`Necesitas un aliado con al menos 4 de Furor para invocar al ${card.name}.`);
                 return false;
             }
-            const chosen = await game.openVisualSearchModal(`${card.name}: Elige aliado para tributar 4 Furor`, validAllies, 1, true, card.owner);
+            // Tributo en TABLERO (Toto, 7-ago-2026); gemela de la de Valafar, misma redacción.
+            const chosen = await game.pickBoardTargets(validAllies, 1, `${card.name}: elige quién tributa 4 de Furor`, card, card.owner, true);
             if (chosen && chosen.length > 0) {
                 card.tributeSourceId = chosen[0].instanceId;
                 return true;
@@ -4048,58 +4062,30 @@ const CARD_DB = [
         // silencioso: la vieja nunca anunciaba esta pasiva (solo marcaba el campo).
         abilities: [
             { trigger: "PASIVA_CONTINUA", nombre: "IDOL A DISTANCIA", silencioso: true,
-              then: [ { op: "MARCAR", campo: "stealth", valor: true, badge: "oculto" } ] }
+              then: [ { op: "MARCAR", campo: "stealth", valor: true, badge: "oculto" } ] },
+            // INTERFAZ migrada (Toto, 7-ago-2026). Era imperativa y mezclaba las coincidencias de
+            // MAZO y DESCARTES en un mismo modal genérico: enseñaba qué copias tenías en el mazo
+            // sin que hubieras decidido mirarlo, y barajaba siempre aunque la carta saliera del
+            // descarte. Es exactamente lo que ya se corrigió en Karlitos, así que usa la misma
+            // pieza -`confirmarPorZona`-: primero eliges ZONA, el mazo abre su visor completo (y
+            // se baraja, porque ya lo has inspeccionado) y los descartes no lo tocan para nada.
+            { trigger: "ACTIVA", nombre: "INTERFAZ", coste: { furor: 1 }, sinObjetivo: true,
+              efectos: [
+                { op: "BUSCAR", en: ["MAZO", "DESCARTES"], destino: "MANO",
+                  algunFiltro: [
+                    { campo: "name", op: "==", valor: "Rebobinar" },
+                    { campo: "name", op: "==", valor: "Cambio de canal" },
+                    { campo: "name", op: "==", valor: "Publicidad mental" } ],
+                  titulo: "INTERFAZ: ELIGE UNA CARTA",
+                  confirmarPorZona: true,
+                  confirmar: { titulo: "INTERFAZ", no: "NO BUSCAR",
+                               porZona: { MAZO: "BUSCAR EN EL MAZO", DESCARTES: "BUSCAR EN LOS DESCARTES" } },
+                  log: "¡Berry teclea velozmente y te consigue {objetivo}!",
+                  logNoValidas: "Error 404: no quedan cartas compatibles con la Interfaz en tu mazo ni en los descartes.",
+                  logNoEncontrada: "Error 404: no hay ninguna carta compatible ahí.",
+                  barajarDespues: { log: "Barajando el mazo de {jugador}..." } } ] }
         ],
         
-        canActivateAbility: function(card, game) {
-            if (card.furor < 1) { game.logError("Falta Furor (1)."); return false; }
-            return true;
-        },
-        
-        onExecuteAbility: async function(card, game) {
-            game.modifyStat(card, 'furor', -1);
-            showFloatingText(card.instanceId, card.activeName, "ft-ability", -30);
-            
-            const p = game.players[card.owner];
-            const validNames = ["Rebobinar", "Cambio de canal", "Publicidad mental"];
-            
-            const inDeck = p.deck.filter(c => validNames.includes(c.name));
-            const inDiscard = p.discard.filter(c => validNames.includes(c.name));
-            const allValid = [...inDeck, ...inDiscard];
-            
-            if (allValid.length > 0) {
-                const chosen = await game.openVisualSearchModal('INTERFAZ: BUSCAR CARTA', allValid, 1, false, card.owner);
-                if (chosen && chosen.length > 0) {
-                    const target = chosen[0];
-                    
-                    let idx = p.deck.findIndex(c => c.instanceId === target.instanceId);
-                    if (idx !== -1) {
-                        p.deck.splice(idx, 1);
-                        await animateStackToHand(`${p.id}-deck-stack`, p.id, target.id);
-                    } else {
-                        idx = p.discard.findIndex(c => c.instanceId === target.instanceId);
-                        p.discard.splice(idx, 1);
-                        await animateStackToHand(`${p.id}-discard-stack`, p.id, target.id);
-                    }
-                    
-                    target.location = 'hand';
-                    p.hand.push(target);
-                    game.logMsg(`¡Berry teclea velozmente y te consigue ${target.name}!`, 'ability');
-                }
-            } else {
-                game.logError("Error 404: No quedan cartas compatibles con la Interfaz en tu mazo ni en los descartes.");
-            }
-            
-            // BARAJEADO OBLIGATORIO: Siempre que se "busca" en el mazo, se baraja después.
-            game.logError("Barajando el mazo...");
-            if (typeof animateShuffle === 'function') await animateShuffle(p.id);
-            game.shuffle(p.deck);
-            
-            card.exhausted = true;
-            game.isActionLocked = false;
-            game.cancelAction();
-            game.render();
-        }
     },
     {
         name: "Achmay", hp: 8, def: 2, atk: 0, type: "Personaje", subtype: "Ser mágico", tags: ["Cosa"], gender: "M", rarity: "S", cost: 3, series: 1,
@@ -4423,18 +4409,12 @@ const CARD_DB = [
                 return true;
             }
 
-            const validTributes = [...p.vanguard, ...p.rearguard].filter(c => c.furor >= 2 && !getCardTemplate(c.id).isAvatar);
-            if (validTributes.length === 0) {
-                game.logError("No tienes a Karolina/Karlitos/Igniz, ni aliados con 2 de Furor para pagarle.");
-                return false;
-            }
-
-            const chosen = await game.openVisualSearchModal('DAME TRABAJOS: PAGA 2 FUROR', validTributes, 1, true, card.owner);
-            if (chosen && chosen.length > 0) {
-                game.modifyStat(chosen[0], 'furor', -2);
-                return true;
-            }
-            return false;
+            // DSL.tributoFuror (Toto, 7-ago-2026): hacía a mano exactamente lo que el helper ya
+            // hace -mismo filtro (Furor suficiente y no-Avatar), mismo cobro-, pero con el modal
+            // genérico en vez del reborde verde en tablero.
+            return await DSL.tributoFuror(card, game, p, 2, {
+                msgSinPagador: "No tienes a Karolina/Karlitos/Igniz, ni aliados con 2 de Furor para pagarle.",
+                titulo: 'DAME TRABAJOS: ELIGE QUIÉN PAGA (-2 FUROR)' });
         },
         canActivateAbility: function(card, game) {
             if (card.furor < 2) { game.logError("Falta Furor (2)."); return false; }
@@ -6149,7 +6129,8 @@ const CARD_DB = [
                     ], card.owner);
                 });
                 if (choice) {
-                    const chosen = await game.openVisualSearchModal('ELIGE LIMO PARA EVOLUCIONAR', limos, 1, false, card.owner);
+                    // En tablero (Toto, 7-ago-2026): el limo a sustituir ya está en el campo.
+                    const chosen = await game.pickBoardTargets(limos, 1, 'ELIGE EL LIMO ARTIFICIAL A EVOLUCIONAR', card, card.owner, true);
                     if (chosen && chosen.length > 0) {
                         const oldLimo = chosen[0];
                         card.location = oldLimo.location;
@@ -6259,8 +6240,9 @@ const CARD_DB = [
                 game.logError("Necesitas un Limo crecido para evolucionarlo a Megalimo.");
                 return false;
             }
-            // Cambiado el 4º parámetro a 'true' para que se pueda cancelar la selección
-            const chosen = await game.openVisualSearchModal('ELIGE LIMO CRECIDO', limos, 1, true, card.owner);
+            // En tablero (Toto, 7-ago-2026): el limo a sustituir ya está en el campo. Cancelable:
+            // no se ha cobrado nada todavía.
+            const chosen = await game.pickBoardTargets(limos, 1, 'ELIGE EL LIMO CRECIDO A EVOLUCIONAR', card, card.owner, true);
             if (chosen && chosen.length > 0) {
                 const oldLimo = chosen[0];
                 card.location = oldLimo.location;

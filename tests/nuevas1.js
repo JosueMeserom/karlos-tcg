@@ -151,11 +151,23 @@ const buscar = (g, pid, nombre) => [...g.players[pid].vanguard, ...g.players[pid
         });
         await paso({ habilidad: 'Berry' });
         await paso({ confirmar: true });
-        const ofrecidas = (ctx.pendientes[0] || {}).elegibles || (ctx.pendientes[0] || {}).cartas || [];
-        const nombres = ofrecidas.map(c => c.name);
+        // INTERFAZ migrada a `confirmarPorZona` (7-ago-2026): antes mezclaba mazo y descartes en
+        // un modal genérico -que revelaba qué copias tenías en el mazo sin haber decidido
+        // mirarlo-. Ahora pregunta primero la ZONA, y el mazo abre su visor completo.
+        const zona = ctx.pendientes[0] || {};
+        check('INTERFAZ pregunta primero en qué zona buscar', zona.tipo === 'opcion',
+            'tipo=' + zona.tipo);
+        await paso({ opcion: 'BUSCAR EN EL MAZO' });
+        const pend = ctx.pendientes[0] || {};
+        check('...y el mazo se enseña con su visor, no con el modal genérico', pend.tipo === 'visorMazo',
+            'tipo=' + pend.tipo);
+        const nombres = (pend.elegibles || []).map(c => c.name);
         check('INTERFAZ ofrece las dos cartas nuevas como elegibles',
             nombres.includes('Cambio de canal') && nombres.includes('Publicidad mental'),
             JSON.stringify(nombres));
+        await paso({ elegir: ['Cambio de canal'] });
+        check('la elegida acaba en la mano', g.players.p1.hand.some(c => c.name === 'Cambio de canal'),
+            JSON.stringify(g.players.p1.hand.map(c => c.name)));
     }
     {
         // Cambio de canal: lo único que hace es robar 3 al expirar.

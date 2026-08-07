@@ -39,12 +39,25 @@ function cartaDe(idx) {
     return '(?)';
 }
 
+// Dos usos del modal genérico que SÍ son correctos, y por qué. Se acotan lo justo para que no
+// tapen infracciones de verdad (Toto, 7-ago-2026):
+//
+//  · SOLO LECTURA (`exactCount` 0): el modal no elige nada, enseña. Erasmo destapa LA CARTA
+//    SUPERIOR del mazo rival; abrir ahí el visor de pila enseñaría el mazo ENTERO del rival,
+//    que es justo lo contrario de lo que hace la carta.
+//  · POOL MIXTO campo + MANO: Meca EBA busca su piloto entre vanguardia, retaguardia y mano a
+//    la vez. El reborde verde no puede pintarse sobre una carta de la mano, así que el modal es
+//    lo único que puede ofrecer las dos zonas en una sola elección.
+const esSoloLectura = (linea) => /,\s*0\s*,\s*true\s*[,)]/.test(linea);
+const poolMixtoConMano = (ventana) => /\.hand\b/.test(ventana) && /\.(vanguard|rearguard)\b/.test(ventana);
+
 const NORMAS = [
     { id: 'PILA-CON-MODAL-GENERICO',
       // Solo cuenta si el pool que se le pasa sale de una PILA (deck/discard). Con la mano es legítimo.
       re: /openVisualSearchModal\s*\(/,
       filtro: (linea, idx) => {
           const ventana = LINEAS.slice(Math.max(0, idx - 14), idx + 2).join('\n');
+          if (esSoloLectura(linea)) return false;
           return /\.(deck|discard)\b/.test(ventana);
       },
       msg: 'busca en mazo/descartes con el modal genérico; debe usar el visor de pila' },
@@ -52,6 +65,7 @@ const NORMAS = [
       re: /openVisualSearchModal\s*\(/,
       filtro: (linea, idx) => {
           const ventana = LINEAS.slice(Math.max(0, idx - 14), idx + 2).join('\n');
+          if (esSoloLectura(linea) || poolMixtoConMano(ventana)) return false;
           return /\.(vanguard|rearguard)\b/.test(ventana) && !/\.(deck|discard)\b/.test(ventana);
       },
       msg: 'elige una carta YA EN EL CAMPO con modal; debe ser reborde verde en el tablero' },
