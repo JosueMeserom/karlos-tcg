@@ -2411,8 +2411,20 @@
             _statForzadoPorEvento(card, stat) {
                 for (const pid of ['p1', 'p2']) {
                     const ev = this.players[pid] && this.players[pid].activeEvent;
-                    if (ev && typeof getCardTemplate(ev.id).onGlobalBeforeStatChange === 'function') {
-                        if (getCardTemplate(ev.id).onGlobalBeforeStatChange(ev, card, stat, 1, null, this) !== 1) return true;
+                    if (!ev) continue;
+                    const tpl = getCardTemplate(ev.id);
+                    if (typeof tpl.onGlobalBeforeStatChange === 'function') {
+                        if (tpl.onGlobalBeforeStatChange(ev, card, stat, 1, null, this) !== 1) return true;
+                    }
+                    // onGlobalBeforeGainFuror (Toto, 7-ago-2026): hook GEMELO del de arriba pero
+                    // solo para GANANCIAS de Furor -el que usa Deuda con la mafia, que bloquea
+                    // "no gana Furor" sin también inmunizar al deudor contra un drenaje enemigo,
+                    // cosa que el interceptor "cualquier cambio" de arriba SÍ haría-. El badge
+                    // rojo tiene que reconocer los dos caminos, no solo el de Bancarrota. Se
+                    // sondea con la MISMA fuente que la fase real de Furor ('fase_furor'), que es
+                    // la única que Deuda intercepta -con null no vería nada y el badge no saldría-.
+                    if (stat === 'furor' && typeof tpl.onGlobalBeforeGainFuror === 'function') {
+                        if (tpl.onGlobalBeforeGainFuror(ev, card, 1, this, 'fase_furor') !== 1) return true;
                     }
                 }
                 return false;
