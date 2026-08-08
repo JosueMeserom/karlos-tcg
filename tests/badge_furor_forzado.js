@@ -53,9 +53,13 @@ const buscar = (g, pid, nombre) => [...g.players[pid].vanguard, ...g.players[pid
         });
         await paso({ jugar: 'Deuda con la mafia' });
         await paso({ elegir: ['Oso con armadura'] });
-        check('el deudor SÍ está forzado (badge rojo)', g._statForzadoPorEvento(buscar(g, 'p1', 'Oso con armadura'), 'furor') === true);
-        check('el resto de aliados NO lo está', g._statForzadoPorEvento(buscar(g, 'p1', 'Mini-tigre'), 'furor') === false);
-        check('un enemigo tampoco (Deuda no le afecta)', g._statForzadoPorEvento(g.players.p2.vanguard[0], 'furor') === false);
+        // 'ganancia', NO 'total': Deuda solo corta la ENTRADA de Furor, así que el badge lleva
+        // su propia marca (un "+" tachado ámbar) y el número se ve normal — lo que la carta ya
+        // tiene lo puede gastar. Distinguirlos es justo lo que pidió Toto.
+        check('el deudor está bloqueado SOLO en la ganancia',
+            g._statForzadoPorEvento(buscar(g, 'p1', 'Oso con armadura'), 'furor') === 'ganancia');
+        check('el resto de aliados no está bloqueado', g._statForzadoPorEvento(buscar(g, 'p1', 'Mini-tigre'), 'furor') === null);
+        check('un enemigo tampoco (Deuda no le afecta)', g._statForzadoPorEvento(g.players.p2.vanguard[0], 'furor') === null);
     }
 
     console.log('\n--- Bancarrota sigue intacta (no se tocó su camino) ---');
@@ -66,7 +70,8 @@ const buscar = (g, pid, nombre) => [...g.players[pid].vanguard, ...g.players[pid
             p2: { vanguardia: [{ carta: 'Mini-tigre', furor: 2 }] },
         });
         await paso({ jugar: 'Bancarrota' });
-        check('Bancarrota fuerza a AMBOS bandos', g._statForzadoPorEvento(g.players.p2.vanguard[0], 'furor') === true);
+        check('Bancarrota bloquea en TOTAL (X roja, número apagado)',
+            g._statForzadoPorEvento(g.players.p2.vanguard[0], 'furor') === 'total');
     }
 
     console.log('\n--- Sin ningún Evento activo, nadie está forzado ---');
@@ -76,7 +81,7 @@ const buscar = (g, pid, nombre) => [...g.players[pid].vanguard, ...g.players[pid
             p1: { vanguardia: ['Mini-tigre'] },
             p2: { vanguardia: ['Mini-tigre'] },
         });
-        check('sin Eventos, el badge normal (no forzado)', g._statForzadoPorEvento(g.players.p1.vanguard[0], 'furor') === false);
+        check('sin Eventos, el badge normal (no forzado)', g._statForzadoPorEvento(g.players.p1.vanguard[0], 'furor') === null);
     }
 
     console.log(`\nSUITE badge_furor_forzado: ${comprobaciones - fallos}/${comprobaciones} comprobaciones`

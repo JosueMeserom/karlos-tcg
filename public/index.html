@@ -2408,13 +2408,22 @@
             // cambio real, sondeando con +1 -si vuelve distinto, algo lo está reescribiendo-. Lo
             // consultan el badge rojo de Furor y cualquier otro sitio que necesite saber "¿esto
             // está bloqueado ahora mismo?" sin duplicar la lógica de inmunidad (Eris/Kami).
+            // Devuelve QUÉ CLASE de bloqueo hay, no un simple sí/no (Toto, 7-ago-2026):
+            //   'total'    -> ningún cambio de este stat pasa (Bancarrota). El valor que se ve
+            //                 ni siquiera es utilizable: está secuestrado.
+            //   'ganancia' -> solo se corta la GANANCIA de la fase de Furor (Deuda con la mafia).
+            //                 Lo que la carta ya tiene es suyo y lo puede gastar; simplemente no
+            //                 entra más. Un drenaje enemigo sigue funcionando.
+            //   null       -> nada lo bloquea.
+            // Los dos valores son truthy, así que quien solo quiera saber "¿está bloqueado?"
+            // puede seguir usándolo como condición.
             _statForzadoPorEvento(card, stat) {
                 for (const pid of ['p1', 'p2']) {
                     const ev = this.players[pid] && this.players[pid].activeEvent;
                     if (!ev) continue;
                     const tpl = getCardTemplate(ev.id);
                     if (typeof tpl.onGlobalBeforeStatChange === 'function') {
-                        if (tpl.onGlobalBeforeStatChange(ev, card, stat, 1, null, this) !== 1) return true;
+                        if (tpl.onGlobalBeforeStatChange(ev, card, stat, 1, null, this) !== 1) return 'total';
                     }
                     // onGlobalBeforeGainFuror (Toto, 7-ago-2026): hook GEMELO del de arriba pero
                     // solo para GANANCIAS de Furor -el que usa Deuda con la mafia, que bloquea
@@ -2424,10 +2433,10 @@
                     // sondea con la MISMA fuente que la fase real de Furor ('fase_furor'), que es
                     // la única que Deuda intercepta -con null no vería nada y el badge no saldría-.
                     if (stat === 'furor' && typeof tpl.onGlobalBeforeGainFuror === 'function') {
-                        if (tpl.onGlobalBeforeGainFuror(ev, card, 1, this, 'fase_furor') !== 1) return true;
+                        if (tpl.onGlobalBeforeGainFuror(ev, card, 1, this, 'fase_furor') !== 1) return 'ganancia';
                     }
                 }
-                return false;
+                return null;
             }
 
             // ¿Debe el flotante automático decir de DÓNDE viene el cambio? (Toto, 5-ago-2026).
@@ -4336,7 +4345,12 @@
                     this.currentVisualResolve = (sel) => { resolve(sel && sel.length ? sel : null); };
                     this._interaccionChooser = chooserId; // quién debe elegir (para la recuperación por reconexión)
                     // Descriptor serializable (reanudar-perfecto): si el elector reconecta, se re-monta este picker.
-                    this.pendingInteraction = { tipo: 'boardPick', chooserId, cardsIds: cards.map(c => c.instanceId), n, prompt: prompt || null, sourceId: sourceCard ? sourceCard.instanceId : null, cancelable, permitirParar: !!opts.permitirParar, maxPorZona: opts.maxPorZona || null };
+                    // `mano` (Toto, 7-ago-2026): la elección va sobre una MANO, no sobre el
+                    // tablero. Mismo picker -mismo chooser, mismo cancelado, misma reconexión-,
+                    // solo cambia dónde se pinta: se oscurece todo menos esa mano. Sirve para la
+                    // PROPIA (ves las caras, reborde verde en las elegibles) y para la del RIVAL
+                    // (ves los dorsos y eliges a ciegas, sin reborde: son todas elegibles).
+                    this.pendingInteraction = { tipo: 'boardPick', chooserId, cardsIds: cards.map(c => c.instanceId), n, prompt: prompt || null, sourceId: sourceCard ? sourceCard.instanceId : null, cancelable, permitirParar: !!opts.permitirParar, maxPorZona: opts.maxPorZona || null, mano: !!opts.mano };
 
                     if (this.gameMode === 'online' && this.myPlayerId !== 'spectator' && this.myPlayerId !== chooserId) {
                         // No-elector: si le debo el estado al otro (reconectó, sea en modo espejo o
@@ -4351,7 +4365,7 @@
                         return; // sin picker local: lo resuelve el replay remoto (VISUAL_SEARCH_CONFIRM)
                     }
 
-                    this.dslPick = { pool: new Set(cards.map(c => c.instanceId)), n: n, targets: [], byId: {}, chooserId, cancelable, permitirParar: !!opts.permitirParar, maxPorZona: opts.maxPorZona || null };
+                    this.dslPick = { pool: new Set(cards.map(c => c.instanceId)), n: n, targets: [], byId: {}, chooserId, cancelable, permitirParar: !!opts.permitirParar, maxPorZona: opts.maxPorZona || null, mano: !!opts.mano, manoDe: opts.mano ? (cards[0] && cards[0].owner) : null };
                     this.selectedCard = sourceCard; // la Ayuda origen: el render la necesita
                     cards.forEach(c => this.dslPick.byId[c.instanceId] = c);
                     this.inputState = 'SELECT_DSL_TARGETS';
@@ -4466,6 +4480,17 @@
             // carta? (Toto, 5-ago-2026). Lo consultan los dos sitios que tienen que coincidir: el
             // clic (que la rechaza) y el render (que ya no le pinta el reborde verde) — si solo
             // lo supiera el clic, el jugador seguiría viendo como elegibles cartas que no lo son.
+            // ¿La elección en curso abarca la mano ENTERA? Entonces el reborde verde no
+            // discrimina nada y solo mete ruido, así que no se pinta (Toto, 7-ago-2026). Con la
+            // mano del rival esto es siempre cierto -se elige a ciegas entre todas-, y con la
+            // propia solo cuando de verdad valen todas las cartas que tienes.
+            _manoEnteraElegible() {
+                const p = this.dslPick;
+                if (!p || !p.mano || !p.manoDe) return false;
+                const mano = (this.players[p.manoDe] || {}).hand || [];
+                return mano.length > 0 && mano.every(c => p.pool.has(c.instanceId));
+            }
+
             _dslZonaLlena(card) {
                 const ctx = this.dslPick;
                 if (!ctx || !ctx.maxPorZona) return false;
@@ -8264,6 +8289,12 @@
 
                 const handEl = document.getElementById(`${pid}-hand`);
                 handEl.innerHTML = '';
+                // Oscurecido de todo menos LA mano de la que se elige. La clase la lleva el body
+                // (una sola regla CSS) y la mano elegible se marca aparte para exceptuarla.
+                const _pkMano = this.dslPick && this.dslPick.mano && this.inputState === 'SELECT_DSL_TARGETS'
+                    && (this.gameMode === 'local' || this.myPlayerId === (this.dslPick.chooserId || this.activePlayerId));
+                document.body.classList.toggle('eligiendo-mano', !!_pkMano);
+                handEl.classList.toggle('mano-eligible', !!_pkMano && this.dslPick.manoDe === pid);
 
                 const cardCount = p.hand.length;
                 const containerWidth = handEl.offsetWidth;
@@ -8312,6 +8343,19 @@
                         back.setAttribute('data-id', card.instanceId); 
                         if (index < cardCount - 1 && overlap > 0) back.style.marginRight = `-${overlap}px`;
                         elToAppend = back;
+                    }
+                    // Elección DE MANO en curso: esta carta responde al PICK y no a jugarse.
+                    // Se engancha sobre `elToAppend`, que puede ser la CARA o el DORSO -de ahí que
+                    // la elección a ciegas sobre la mano del rival funcione sin revelar nada-.
+                    const _pk = this.dslPick;
+                    const _pickMano = this.inputState === 'SELECT_DSL_TARGETS' && _pk && _pk.mano && _pk.pool.has(card.instanceId)
+                        && !_pk.targets.some(t => t.instanceId === card.instanceId)
+                        && (this.gameMode === 'local' || this.myPlayerId === (_pk.chooserId || this.activePlayerId));
+                    if (_pickMano) {
+                        elToAppend.style.cursor = 'pointer';
+                        elToAppend.onclick = (e) => { e.stopPropagation(); this._dslPickClick(card); };
+                        handEl.appendChild(elToAppend);
+                        return;
                     }
                     // QoL: si hay un ataque directo disponible, la mano del rival es clicable y lo ejecuta
                     const iCanAttack = this.gameMode === 'local' || this.activePlayerId === this.myPlayerId;
@@ -8852,7 +8896,7 @@
                 // debe salirle el reborde verde, no al jugador activo.
                 const _dslSoyChooser = this.gameMode === 'local' || this.myPlayerId === ((this.dslPick && this.dslPick.chooserId) || this.activePlayerId);
                 if (_dslSoyChooser && this.inputState === 'SELECT_DSL_TARGETS' && this.dslPick && this.dslPick.pool.has(card.instanceId) && !this.dslPick.targets.some(t => t.instanceId === card.instanceId)
-                    && !this._dslZonaLlena(card)) {
+                    && !this._dslZonaLlena(card) && !this._manoEnteraElegible()) {
                     el.classList.add('valid-target');
                 }
 
@@ -8995,14 +9039,25 @@
 
                     // SOLO dibujamos el Furor si está FÍSICAMENTE en el campo (y no es un modal visual)
                     if (!inHand && !isVisualOnly && (card.location === 'vanguard' || card.location === 'rearguard')) {
-                        const isBankrupt = this._statForzadoPorEvento(card, 'furor');
+                        const bloqueoFuror = this._statForzadoPorEvento(card, 'furor');
 
-                        if (isBankrupt) {
-                            // Muestra el Furor original que guardamos en el bolsillo (o 0 si entró al campo durante la Bancarrota)
+                        if (bloqueoFuror === 'total') {
+                            // Bancarrota: el Furor está SECUESTRADO. Se enseña el original que
+                            // guardamos en el bolsillo (o 0 si entró al campo ya bancarrotada),
+                            // apagado y tachado — ese número no se puede usar para nada.
                             const shownFuror = card.bankruptStoredFuror !== undefined ? card.bankruptStoredFuror : card.furor;
                             html += `<div class="furor-container" data-badge="furor" style="background: #450a0a; border-color: #dc2626; display: flex; justify-content: center; align-items: center;">
                                         <span style="position: absolute; color: #ef4444; font-size: 1.5rem; font-weight: 900; opacity: 0.5;">X</span>
                                         <span style="color: #cbd5e1; font-weight: bold; z-index: 1; text-shadow: 1px 1px 3px black; opacity: 0.5;">${shownFuror}</span>
+                                     </div>`;
+                        } else if (bloqueoFuror === 'ganancia') {
+                            // Deuda con la mafia: solo se corta la ENTRADA de Furor. Lo que tiene
+                            // sigue siendo suyo y lo puede gastar, así que el número va NORMAL
+                            // (nada de apagarlo como en Bancarrota: mentiría). La marca es un "+"
+                            // tachado en la esquina, ámbar en vez de roja y fuera del número:
+                            // "no entra más", no "esto no vale" (Toto, 7-ago-2026).
+                            html += `<div class="furor-container" data-badge="furor" style="border-color: #f59e0b;">${card.furor}
+                                        <span title="No gana Furor" style="position: absolute; top: -5px; right: -5px; width: 13px; height: 13px; line-height: 11px; text-align: center; border-radius: 50%; background: #1e293b; border: 1px solid #f59e0b; color: #f59e0b; font-size: 0.6rem; font-weight: 900; text-decoration: line-through;">+</span>
                                      </div>`;
                         } else {
                             html += `<div class="furor-container" data-badge="furor">${card.furor}</div>`;
@@ -9628,7 +9683,7 @@
                     const cards = (pi.cardsIds || []).map(id => this.findCard(id)).filter(Boolean);
                     if (!cards.length) return;
                     const source = pi.sourceId ? this.findCard(pi.sourceId) : null;
-                    this.dslPick = { pool: new Set(cards.map(c => c.instanceId)), n: pi.n, targets: [], byId: {}, chooserId: pi.chooserId, cancelable: pi.cancelable, permitirParar: !!pi.permitirParar, maxPorZona: pi.maxPorZona || null };
+                    this.dslPick = { pool: new Set(cards.map(c => c.instanceId)), n: pi.n, targets: [], byId: {}, chooserId: pi.chooserId, cancelable: pi.cancelable, permitirParar: !!pi.permitirParar, maxPorZona: pi.maxPorZona || null, mano: !!pi.mano, manoDe: pi.mano ? (cards[0] && cards[0].owner) : null };
                     cards.forEach(c => this.dslPick.byId[c.instanceId] = c);
                     this.selectedCard = source;      // la Ayuda/origen: el render la resalta
                     this.inputState = 'SELECT_DSL_TARGETS';

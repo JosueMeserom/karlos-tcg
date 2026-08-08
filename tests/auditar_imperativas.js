@@ -45,11 +45,12 @@ function cartaDe(idx) {
 //  · SOLO LECTURA (`exactCount` 0): el modal no elige nada, enseña. Erasmo destapa LA CARTA
 //    SUPERIOR del mazo rival; abrir ahí el visor de pila enseñaría el mazo ENTERO del rival,
 //    que es justo lo contrario de lo que hace la carta.
-//  · POOL MIXTO campo + MANO: Meca EBA busca su piloto entre vanguardia, retaguardia y mano a
-//    la vez. El reborde verde no puede pintarse sobre una carta de la mano, así que el modal es
-//    lo único que puede ofrecer las dos zonas en una sola elección.
+//
+// La excepción de "pool mixto campo + mano" (que tenía Meca EBA) YA NO EXISTE: desde que hay
+// picker de mano, mezclar zonas en un mismo selector no es una limitación técnica sino un fallo
+// -se pregunta por zona y cada una usa su picker-. Se retiró a propósito para que una carta
+// futura que las mezcle vuelva a saltar aquí en vez de colarse por una excepción heredada.
 const esSoloLectura = (linea) => /,\s*0\s*,\s*true\s*[,)]/.test(linea);
-const poolMixtoConMano = (ventana) => /\.hand\b/.test(ventana) && /\.(vanguard|rearguard)\b/.test(ventana);
 
 const NORMAS = [
     { id: 'PILA-CON-MODAL-GENERICO',
@@ -65,7 +66,7 @@ const NORMAS = [
       re: /openVisualSearchModal\s*\(/,
       filtro: (linea, idx) => {
           const ventana = LINEAS.slice(Math.max(0, idx - 14), idx + 2).join('\n');
-          if (esSoloLectura(linea) || poolMixtoConMano(ventana)) return false;
+          if (esSoloLectura(linea)) return false;
           return /\.(vanguard|rearguard)\b/.test(ventana) && !/\.(deck|discard)\b/.test(ventana);
       },
       msg: 'elige una carta YA EN EL CAMPO con modal; debe ser reborde verde en el tablero' },

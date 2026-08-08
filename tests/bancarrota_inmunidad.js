@@ -70,9 +70,11 @@ async function escenario(spec) {
         check('Oso no gana Furor en la fase de Furor', oso.furor === 0, 'furor=' + oso.furor);
         check('Eris SÍ gana Furor con normalidad', eris.furor === 3, 'furor=' + eris.furor);
 
-        check('badge/X: Karlos aparece forzado', g._statForzadoPorEvento(karlos, 'furor') === true);
-        check('badge/X: Oso aparece forzado', g._statForzadoPorEvento(oso, 'furor') === true);
-        check('badge/X: Eris NO aparece forzada (sin X roja)', g._statForzadoPorEvento(eris, 'furor') === false);
+        // 'total' (no un booleano) desde el 7-ago-2026: el helper distingue el bloqueo TOTAL de
+        // Bancarrota del de solo-ganancia de Deuda con la mafia, que llevan badges distintos.
+        check('badge/X: Karlos aparece forzado', g._statForzadoPorEvento(karlos, 'furor') === 'total');
+        check('badge/X: Oso aparece forzado', g._statForzadoPorEvento(oso, 'furor') === 'total');
+        check('badge/X: Eris NO aparece forzada (sin X roja)', g._statForzadoPorEvento(eris, 'furor') === null);
     }
 
     console.log('\n--- Bancarrota: Kami, propia dueña del Evento (Avatar, inmune a TODO) ---');
@@ -88,7 +90,7 @@ async function escenario(spec) {
         check('Kami no se congela aunque sea SU PROPIA Bancarrota', kami.furor === 3, 'furor=' + kami.furor);
         g.modifyStat(kami, 'furor', 1, 0, 'fase_furor');
         check('Kami gana Furor con normalidad', kami.furor === 4, 'furor=' + kami.furor);
-        check('badge/X: Kami NO aparece forzada', g._statForzadoPorEvento(kami, 'furor') === false);
+        check('badge/X: Kami NO aparece forzada', g._statForzadoPorEvento(kami, 'furor') === null);
     }
 
     console.log('\n--- Bancarrota: Kami, ENEMIGA de quien la juega (mismo resultado: Avatar = intocable) ---');

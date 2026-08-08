@@ -794,8 +794,24 @@ button.game-btn:disabled { background: #64748b; cursor: not-allowed; opacity: 0.
 .preview-type { font-size: 0.8rem; color: #94a3b8; margin-bottom: 6px; font-style: italic; }
 /* margin-top (Toto, 7-ago-2026): la linea discontinua superior quedaba pegadisima a la
    seccion de tipo/subtipo/tags mientras que abajo sobraba aire. Se anade arriba en vez de
-   recortar abajo, que es lo que pidio. Este 10px es el mando manual de esa separacion. */
-.preview-effects { font-size: 0.75rem; color: #22d3ee; margin-top: 10px; margin-bottom: 12px; padding: 5px; border-top: 1px dashed #475569; border-bottom: 1px dashed #475569; background: rgba(0, 0, 0, 0.3); border-radius: 4px; }
+   recortar abajo, que es lo que pidio. Ese margin-top es el mando manual de esa separacion (Toto lo dejo en 6px). */
+/* Elección de una carta DE LA MANO (Toto, 7-ago-2026). Mismo lenguaje visual que el reborde
+   verde del tablero, pero al reves: en vez de resaltar lo elegible se APAGA todo lo demas, que
+   es lo unico que funciona cuando lo elegible son cartas de la mano (no se puede rebordear algo
+   que esta tapado por el resto del tablero). Se apaga con opacidad y no con un velo encima
+   porque asi la mano no necesita subir de capa: sin guerra de z-index y sin clonar nada.
+   La regla de .mano-eligible gana por especificidad (dos clases contra una). */
+body.eligiendo-mano .rows-container,
+body.eligiendo-mano .stacks-container,
+body.eligiendo-mano .hand-zone { opacity: .22; pointer-events: none; transition: opacity .15s ease; }
+body.eligiendo-mano .hand-zone.mano-eligible { opacity: 1; pointer-events: auto; }
+body.eligiendo-mano .hand-zone.mano-eligible .card,
+body.eligiendo-mano .hand-zone.mano-eligible .card-back { cursor: pointer; }
+/* Un realce sutil sobre la mano en juego: sin reborde por carta -que solo se pinta cuando de
+   verdad discrimina- pero dejando claro DONDE hay que mirar. */
+body.eligiendo-mano .hand-zone.mano-eligible { filter: drop-shadow(0 0 10px rgba(74, 222, 128, .45)); }
+
+.preview-effects { font-size: 0.75rem; color: #22d3ee; margin-top: 6px; margin-bottom: 12px; padding: 5px; border-top: 1px dashed #475569; border-bottom: 1px dashed #475569; background: rgba(0, 0, 0, 0.3); border-radius: 4px; }
 .preview-text { font-size: 0.8rem; line-height: 1.3; color: white; flex: 1; margin-bottom: 10px; }
 
 /* CAJAS DE HABILIDADES EN LA PREVIEW */

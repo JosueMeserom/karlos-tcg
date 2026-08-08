@@ -360,3 +360,21 @@ también delataba.
 
 Y elegir una carta **ya en el campo** es siempre reborde verde en el tablero, nunca un modal
 (ver la norma de targeting en CLAUDE.md).
+
+## 13. Elegir de una MANO
+
+Desde el 7-ago-2026 la mano tiene su propio picker, hermano del de tablero: se **oscurece todo
+menos esa mano** y se elige clicando la carta. Nada de sacar las cartas a un modal aparte.
+
+- **Reborde verde solo si discrimina.** Si toda la mano es elegible no se pinta ninguno: no
+  distinguiría nada y solo mete ruido.
+- **Sin cartas elegibles, no se abre nada** y se avisa por el log.
+- **Mano del RIVAL: a ciegas.** Se ven los DORSOS, sin reborde (valen todas). Es el caso de
+  *Zoe (SISAR)*, que antes abría un modal que **dibujaba la mano rival entera** — su texto
+  promete descartarle una carta, no leérsela.
+- **Campo y mano NUNCA en un mismo selector.** Si una carta puede tirar de las dos (*Meca EBA*),
+  se pregunta primero por zona y cada una usa su picker. Con opciones en una sola zona se va
+  directo, sin preguntar de más.
+
+Implementado reutilizando `pickBoardTargets` con `{ mano: true }`, no con una función nueva: así
+el chooser, el cancelado, la cola de red y el reanudar-perfecto se heredan ya resueltos.

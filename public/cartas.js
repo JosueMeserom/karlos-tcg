@@ -200,9 +200,12 @@ const CARD_DB = [
             } else {
                 game.logMsg(`¡Zoe usa ${card.activeName} y revisa la mano del rival!`, 'ability');
                 
-                // IMPORTANTE: NO usamos forceReveal. El modal ya nos dibuja las cartas.
-                // Pasamos 'card.owner' al final para que el rival vea el cartel de "Esperando a que J1 busque..."
-                const chosen = await game.openVisualSearchModal(`SISAR: Elige 1 carta para descartar`, enemyP.hand, 1, true, card.owner);
+                // A CIEGAS (Toto, 7-ago-2026): el modal genérico DIBUJABA las cartas, o sea que
+                // SISAR te enseñaba la mano rival entera y de paso elegías con la información
+                // puesta. Su texto no promete eso: promete descartarle una carta. Con el picker
+                // de mano se oscurece todo menos la mano del rival, se ven los DORSOS y se elige
+                // uno — sin reborde verde, porque valen todas y señalar no discriminaría nada.
+                const chosen = await game.pickBoardTargets(enemyP.hand, 1, 'SISAR: elige una carta de la mano rival (a ciegas)', card, card.owner, true, { mano: true });
 
                 if (chosen && chosen.length > 0) {
                     const targetCard = chosen[0];
@@ -4736,9 +4739,29 @@ const CARD_DB = [
         doEmplazarPiloto: async function(card, game, isFree) {
             const p = game.players[card.owner];
             // Buscamos pilotos que no sean el propio Meca
-            const valid = [...p.vanguard, ...p.rearguard, ...p.hand].filter(c => c.tags && c.tags.includes("Energía Adán") && c.instanceId !== card.instanceId); 
+            const _esPiloto = (c) => c.tags && c.tags.includes("Energía Adán") && c.instanceId !== card.instanceId;
+            const enCampo = [...p.vanguard, ...p.rearguard].filter(_esPiloto);
+            const enMano = p.hand.filter(_esPiloto);
 
-            const chosen = await game.openVisualSearchModal('ELIGE PILOTO (ENERGÍA ADÁN)', valid, 1, true, card.owner);
+            // Campo y mano NO se mezclan en un mismo selector (Toto, 7-ago-2026). Era la última
+            // carta que lo hacía: el modal genérico las listaba juntas, sacándolas de su sitio.
+            // Ahora, si hay pilotos en las dos zonas se pregunta primero por CUÁL, y cada una usa
+            // su propio picker -campo con reborde verde en el tablero, mano oscureciendo todo lo
+            // demás-. Con pilotos en una sola zona se va directo a ella, sin preguntar de más.
+            let zona = enCampo.length ? 'CAMPO' : 'MANO';
+            if (enCampo.length && enMano.length) {
+                zona = await new Promise(resolve => {
+                    game.openChoiceModal('¿DE DÓNDE SALE EL PILOTO?', [
+                        { label: 'DEL CAMPO', action: () => resolve('CAMPO') },
+                        { label: 'DE LA MANO', action: () => resolve('MANO') },
+                        { label: 'CANCELAR', action: () => resolve(null) },
+                    ], card.owner);
+                });
+            }
+            const pool = zona === 'MANO' ? enMano : enCampo;
+            const chosen = zona === null ? null
+                : await game.pickBoardTargets(pool, 1, 'ELIGE PILOTO (ENERGÍA ADÁN)', card, card.owner, true,
+                    { mano: zona === 'MANO' });
             if (!chosen || chosen.length === 0) {
                 if (!isFree) game.modifyStat(card, 'furor', 1); // Devolvemos el coste si cancela
                 game.cancelAction();
@@ -7572,7 +7595,11 @@ const DSL = {
                         // y no hay nada que decidir-.
                         const _distintas = new Set(poolZona.map(x => x.id)).size;
                         if (_distintas > 1) {
-                            const r = await game.openVisualSearchModal(F(e.titulo || 'ELIGE UNA CARTA'), poolZona, e.cantidad || 1, !!e.autoSeleccion, pid);
+                            // La MANO usa su picker (oscurece todo menos ella); cualquier otra
+                            // zona visible, el modal.
+                            const r = (elegida === 'MANO' && typeof game.pickBoardTargets === 'function')
+                                ? await game.pickBoardTargets(poolZona, e.cantidad || 1, F(e.titulo || 'ELIGE UNA CARTA') + ' (clic en tu mano)', sourceCard, pid, true, { mano: true })
+                                : await game.openVisualSearchModal(F(e.titulo || 'ELIGE UNA CARTA'), poolZona, e.cantidad || 1, !!e.autoSeleccion, pid);
                             if (r && r.length > 0) { for (const x of r) await aMano(x); algunExito = true; }
                             else if (e.abortaSiCancelas) return false;
                         } else if (poolZona.length > 0) { await aMano(poolZona[0]); algunExito = true; }
@@ -8034,14 +8061,19 @@ const DSL = {
             // se comprometió ANTES de llegar a esta elección concreta (ACERTIJO tras
             // la moneda, el 2º ELEGIR de PEM tras pagar el 1º) — auditado caso a caso,
             // no inferido automáticamente.
-            if (e.de !== 'MANO' && !e.forzarModal && typeof game.pickBoardTargets === 'function') {
-                const _texto = e.cancelable === false ? '' : ' (clic en el tablero; X para cancelar)';
+            // La MANO ya NO cae al modal genérico (Toto, 7-ago-2026): usa el MISMO picker que el
+            // tablero con `mano: true`, que oscurece todo menos la mano y deja elegir clicando la
+            // carta. Mismo lenguaje visual que elegir en campo, y sin el modal que sacaba las
+            // cartas de su sitio. `forzarModal` sigue siendo la vía de escape, a justificar.
+            if (!e.forzarModal && typeof game.pickBoardTargets === 'function') {
+                const _esMano = e.de === 'MANO';
+                const _texto = e.cancelable === false ? '' : (_esMano ? ' (clic en tu mano; X para cancelar)' : ' (clic en el tablero; X para cancelar)');
                 // permitirParar / maxPorZona (AL-FÉNIX, 31-jul-2026): parada anticipada con botón
                 // OK, y cupo por fila además del total. `hastaCantidad` NO servía para esto:
                 // aquel ajusta el cupo a los objetivos disponibles, pero no deja al jugador
                 // plantarse cuando quiera teniendo más objetivos a mano.
                 const sel = await game.pickBoardTargets(pool, n, DSL._fill(e.titulo || 'Elige objetivo', { carta: sourceCard.name }) + _texto, sourceCard, chooserId, e.cancelable !== false,
-                    { permitirParar: !!e.permitirParar, maxPorZona: e.maxPorZona || null });
+                    { permitirParar: !!e.permitirParar, maxPorZona: e.maxPorZona || null, mano: _esMano });
                 if (!sel) {
                     if (e.logCancela && !e.opcional) game.logError(F(e.logCancela));
                     if (e.siNoElegido) { const r = await DSL._runEffectList(e.siNoElegido, sourceCard, game, ownerId, null, habilidad); return !(r && r.ok === false); }
