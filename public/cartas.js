@@ -1769,6 +1769,11 @@ const CARD_DB = [
                   // Sin log propio: el op ATACAR no lo lleva, y no hace falta — performAttack ya
                   // anuncia cada golpe. La imperativa sí ponía uno ("¡Wolfgang ataca (Golpe N)!"),
                   // pero era un copia-pega de otra carta: aquí no interviene ninguna Wolfgang.
+                  // El anuncio va DENTRO de la elección, no en el cierre genérico: por la norma
+                  // del coste (7-ago-2026) esta Activa lo difiere -su primer efecto es un ELEGIR
+                  // cancelable-, así que el flotante automático se silencia y hay que ponerlo en
+                  // el primer instante irreversible, que es cuando ya hay objetivos elegidos.
+                  floatingAntes: { texto: "AL-FÉNIX", estilo: "ft-ability", offset: -30 },
                   efectos: [ { op: "ATACAR" } ] } ] }
         ],
     },
@@ -4759,7 +4764,12 @@ const CARD_DB = [
         },
         
         onExecuteAbility: async function(card, game) {
-            game.modifyStat(card, 'furor', -1);
+            // El coste NO se cobra aquí (Toto, 7-ago-2026). Antes se descontaba nada más
+            // confirmar y, si cancelabas, se "devolvía" con un +1 FUR — un parche que ni
+            // revierte de verdad (la acción ya se había gastado, así que la Activa quedaba
+            // inservible ese turno) ni cumple la norma: el coste y el anuncio solo aparecen
+            // cuando algo ya no se puede deshacer. Ahora lo cobra doEmplazarPiloto, justo
+            // antes de mover al piloto, que es el primer punto irreversible.
             await getCardTemplate(card.id).doEmplazarPiloto(card, game, false);
         },
         
@@ -4791,12 +4801,18 @@ const CARD_DB = [
                 : await game.pickBoardTargets(pool, 1, 'ELIGE PILOTO (ENERGÍA ADÁN)', card, card.owner, true,
                     { mano: zona === 'MANO' });
             if (!chosen || chosen.length === 0) {
-                if (!isFree) game.modifyStat(card, 'furor', 1); // Devolvemos el coste si cancela
+                // Cancelado: NO se ha tocado nada, así que no hay nada que devolver ni que
+                // gastar. La carta se queda con su Furor y con su acción del turno intactos.
+                game.isActionLocked = false;
                 game.cancelAction();
+                game.render();
                 return;
             }
             
             const pilot = chosen[0];
+            // PUNTO IRREVERSIBLE: a partir de aquí el piloto se mueve. Aquí y no antes es donde
+            // se paga y se anuncia.
+            if (!isFree) game.modifyStat(card, 'furor', -1);
             showFloatingText(card.instanceId, "EMPLAZAR PILOTO", "ft-ability", -40);
 
             if (pilot.location === 'hand') {
@@ -8050,7 +8066,18 @@ const DSL = {
                 if (e.siNoElegido) { const r = await DSL._runEffectList(e.siNoElegido, sourceCard, game, ownerId, null, habilidad); return !(r && r.ok === false); }
                 return 'skip';
             }
+            // floatingAntes: flotante que suena UNA sola vez, con la elección ya hecha pero antes
+            // de aplicar nada (Toto, 7-ago-2026). Hermano de `logAntes`. Hace falta porque los
+            // `efectos` de un ELEGIR corren POR OBJETIVO: meter ahí un `op: FLOTANTE` para
+            // anunciar la Habilidad lo repetía tantas veces como objetivos (AL-FÉNIX: cuatro
+            // "AL-FÉNIX" apilados). Va sobre la carta FUENTE, que es quien actúa.
+            const _floatAntes = () => {
+                if (!e.floatingAntes || typeof showFloatingText !== 'function') return;
+                showFloatingText(sourceCard.instanceId, DSL._fill(e.floatingAntes.texto, { carta: sourceCard.name }),
+                    e.floatingAntes.estilo || 'ft-ability', e.floatingAntes.offset !== undefined ? e.floatingAntes.offset : -30);
+            };
             const _logAntes = (lista) => {
+                _floatAntes();
                 if (!e.logAntes) return;
                 const els = lista.map(x => DSL._nombre(game, x)).join(' y ');
                 game.logMsg(DSL._fill(e.logAntes, Object.assign({}, (DSL._vars && DSL._vars[sourceCard.instanceId]) || {}, { carta: sourceCard.name, elegidos: els })), e.logAntesTipo || 'ability');
@@ -8920,6 +8947,18 @@ const DSL = {
             // tampoco se pinta aquí en ese modo: saldría antes de la primera elección, y estas
             // cartas lo quieren junto a su efecto de verdad, así que lo declaran ellas con un op
             // FLOTANTE en el punto que les toque.
+            // NORMA DEL COSTE (Toto, 7-ago-2026): el Furor y el anuncio de una Activa NO se
+            // aplican hasta que algo deja de poder deshacerse. Y NO es una opción por carta -eso
+            // era `costeDiferido`, que había que acordarse de poner-: se DEDUCE. Si el primer
+            // efecto es una elección que el jugador puede cancelar, hay ventana para arrepentirse
+            // y el cobro espera; si no la hay, ese primer efecto ya es irreversible y se cobra al
+            // instante. Con lo cual una Activa instantánea se comporta EXACTAMENTE igual que
+            // antes (mismo orden de flotantes) y las que abren un modal dejan de cobrar por
+            // adelantado, sin tocarlas una a una. El flag sigue existiendo como override
+            // explícito para el caso raro que la heurística no vea.
+            const _p0 = (activa.efectos || [])[0];
+            const _hayVentanaCancelable = !!_p0 && (_p0.op === 'ELEGIR' || _p0.op === 'BUSCAR') && _p0.cancelable !== false;
+            const _diferir = activa.costeDiferido !== undefined ? !!activa.costeDiferido : _hayVentanaCancelable;
             const _cobrarActiva = (card, game) => {
                 // source 'avatar_passive': un Avatar (Kami) es inmune a TODA resta de stats en
                 // modifyStat salvo con esa fuente — inmunidad pensada contra efectos AJENOS, no
@@ -8929,15 +8968,15 @@ const DSL = {
                 // Kami es hoy el único Avatar, así que el cambio no alcanza a ninguna otra carta.
                 if (costeFuror > 0) game.modifyStat(card, 'furor', -costeFuror, 0, 'avatar_passive');
                 if (typeof showFloatingText === 'function') {
-                    if (!activa.costeDiferido) showFloatingText(card.instanceId, card.activeName, 'ft-ability', -30);
+                    if (!_diferir) showFloatingText(card.instanceId, card.activeName, 'ft-ability', -30);
                     (activa.floatingExtra || []).forEach(fe => showFloatingText(card.instanceId, fe.texto, fe.estilo || 'ft-green', fe.offset !== undefined ? fe.offset : -10));
                 }
                 if (activa.log) game.logMsg(DSL._fill(activa.log, { carta: card.name }), activa.logTipo || 'ability');
             };
             const _ejecutarActiva = async (card, game, targets) => {
-                if (!activa.costeDiferido) _cobrarActiva(card, game);
+                if (!_diferir) _cobrarActiva(card, game);
                 const _res = await DSL._runEffectList(activa.efectos, card, game, card.owner, targets, activa.nombre || tmpl.activeName || null);
-                if (activa.costeDiferido && _res && _res.ok === false) {
+                if (_diferir && _res && _res.ok === false) {
                     // Cancelado a mitad de la cadena de elecciones: no se cobra nada y la carta
                     // NO gasta su acción — solo se suelta el candado y se deshace la selección.
                     game.isActionLocked = false;
@@ -8945,7 +8984,7 @@ const DSL = {
                     if (typeof game.render === 'function') game.render();
                     return;
                 }
-                if (activa.costeDiferido) _cobrarActiva(card, game);
+                if (_diferir) _cobrarActiva(card, game);
                 if (!card.exhausted) {
                     // sinAgotar (Achmay, PÉGAME PERRA, 31-jul-2026): "Esta habilidad no gasta
                     // la acción de Achmay" — cierra la acción igual (candado, sync, render)
