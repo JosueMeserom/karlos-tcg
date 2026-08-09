@@ -128,6 +128,12 @@ for (const c of CARTAS) {
 
     if (!t) { if (hooks.length || triggers.length) add('SIN-TEXTO', c, 'tiene comportamiento pero no declara text'); continue; }
 
+    // Cartas A MEDIAS (Toto, 7-ago-2026): entran al juego porque algo las necesita (p. ej. Yuriy
+    // aporta la etiqueta 'Energía Adán' que Meca EBA busca), pero su diseño está incompleto en el
+    // Excel. Se listan como INFORMATIVA para que la deuda esté a la vista y no se olvide, no
+    // como problema: no están mal escritas, están sin terminar.
+    if (c.enConstruccion) { add('EN-CONSTRUCCION', c, 'declarada `enConstruccion`: falta diseño por parte de Toto'); continue; }
+
     // --- §1 Toda Habilidad se nombra ---
     const mP = t.match(/(?:^|\s)P:\s*([^:.]+?)\s*:/);
     const mA = t.match(/(?:^|\s)A:\s*([^:(]+?)\s*(?:\(|:)/);
@@ -254,7 +260,7 @@ for (const c of CARTAS) {
 }
 
 // ---------- salida ----------
-const INFORMATIVAS = ['LONGITUD'];
+const INFORMATIVAS = ['LONGITUD', 'EN-CONSTRUCCION'];
 // `orden` solo fija la PRELACIÓN de salida, no qué se informa: cualquier categoría que no esté
 // aquí se imprime igual, detrás. Antes el bucle iteraba únicamente sobre esta lista, así que una
 // regla nueva se recogía en `hallazgos` y NUNCA se imprimía ni contaba — el auditor daba "0

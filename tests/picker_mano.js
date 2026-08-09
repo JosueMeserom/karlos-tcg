@@ -72,26 +72,48 @@ const MAZO = ['Mini-tigre', 'Mini-tigre', 'Mini-tigre', 'Mini-tigre', 'Mini-tigr
             JSON.stringify(g.players.p1.discard.map(c => c.name)));
     }
 
-    console.log('\n--- Zoe (SISAR): la mano del RIVAL, a ciegas ---');
+    console.log('\n--- Zoe (SISAR): elige EL RIVAL, y solo entre sus Ayudas ---');
     {
+        // Reescrita el 7-ago-2026 contra su texto real: "Tu rival debe declarar si tiene una o
+        // más cartas de Ayuda en la mano, en cuyo caso descarta una QUE ÉL ELIJA". O sea que el
+        // picker apunta a la mano del rival pero el chooser es EL RIVAL, que ve sus propias
+        // cartas. Ya no es una elección a ciegas: eso era el bug, no la carta.
         const { ctx, g, paso } = await mesa({
             turno: 2, turnoDe: 'p1', empieza: 'p2',
-            p1: { vanguardia: [{ carta: 'Zoe', furor: 3 }] },
-            p2: { vanguardia: ['Mini-tigre'], mano: ['Longaniza', 'Oso con armadura', 'Guardia'] },
+            p1: { vanguardia: [{ carta: 'Zoe', furor: 1 }] },
+            p2: { vanguardia: [{ carta: 'Mini-tigre', vida: 20 }], mano: ['Longaniza', 'Espada V', 'Mini-tigre'] },
         }, ['cara']);
+        const zoe = () => g.players.p1.vanguard.find(c => c.name === 'Zoe');
         await paso({ habilidad: 'Zoe' });
         await paso({ confirmar: true });
         const pend = ctx.pendientes[0] || {};
-        check('abre el PICKER sobre la mano rival', pend.tipo === 'elegirTablero' && g.dslPick.mano === true);
-        check('...apuntando a la mano del RIVAL', g.dslPick.manoDe === 'p2', 'manoDe=' + g.dslPick.manoDe);
-        check('...con TODA la mano elegible', (pend.pool || []).length === 3, JSON.stringify((pend.pool || []).map(c => c.name)));
-        // La clave de "a ciegas": con la mano entera elegible no se pinta reborde en ninguna, así
-        // que no hay forma de distinguirlas — que es justo el punto.
-        check('...y por eso NO se pinta reborde verde (se elige a ciegas)', g._manoEnteraElegible() === true);
-        await paso({ elegir: ['Oso con armadura'] });
-        check('la carta elegida sale de la mano rival', !g.players.p2.hand.some(c => c.name === 'Oso con armadura'),
-            JSON.stringify(g.players.p2.hand.map(c => c.name)));
-        check('...y cae a SU pila de descartes', g.players.p2.discard.some(c => c.name === 'Oso con armadura'));
+        check('el picker apunta a la mano del RIVAL', g.dslPick && g.dslPick.mano === true && g.dslPick.manoDe === 'p2',
+            'manoDe=' + (g.dslPick && g.dslPick.manoDe));
+        check('...pero quien ELIGE es el rival', g.dslPick.chooserId === 'p2', 'chooser=' + g.dslPick.chooserId);
+        check('solo se ofrecen AYUDAS (el Esbirro queda fuera)',
+            (pend.pool || []).length === 2 && !(pend.pool || []).some(c => c.type !== 'Ayuda'),
+            JSON.stringify((pend.pool || []).map(c => c.name + ':' + c.type)));
+        check('...y no puede declinar (su texto le obliga a descartar)', g.dslPick.cancelable === false);
+        // El coste NO se ha cobrado todavía: nada irreversible ha pasado aún.
+        check('Zoe conserva su Furor hasta que el descarte ocurre', zoe().furor === 1, 'furor=' + zoe().furor);
+        await paso({ elegir: ['Longaniza'] });
+        check('la Ayuda elegida cae a los descartes del rival', g.players.p2.discard.some(c => c.name === 'Longaniza'));
+        check('...y AHORA sí se cobra el Furor', zoe().furor === 0, 'furor=' + zoe().furor);
+        check('el ataque de la cara NO es cancelable', g.dslPick && g.dslPick.cancelable === false);
+    }
+    {
+        // Sin Ayudas en la mano rival no se abre picker alguno: se declara y a la moneda.
+        const { ctx, g, paso } = await mesa({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'Zoe', furor: 1 }] },
+            p2: { vanguardia: [{ carta: 'Mini-tigre', vida: 20 }], mano: ['Mini-tigre'] },
+        }, ['cruz']);
+        await paso({ habilidad: 'Zoe' });
+        await paso({ confirmar: true });
+        check('sin Ayudas rivales no se abre picker', ctx.pendientes.length === 0,
+            JSON.stringify(ctx.pendientes.map(p => p.tipo)));
+        check('...y se declara por el log', g.logHistory.some(l => /no tiene Ayudas en la mano/.test(l.msg)),
+            JSON.stringify(g.logHistory.map(l => l.msg)));
     }
 
     console.log('\n--- Karlitos (APRENDIZ DE ARMAS): filtra la mano, así que el reborde SÍ discrimina ---');

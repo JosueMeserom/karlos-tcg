@@ -137,7 +137,7 @@ const CARD_DB = [
     },
     {
         id: 2, name: "Zoe", hp: 2, def: 2, atk: 7, type: "Personaje", subtype: "Ser vivo", tags: ['Usuaria de VP'], gender: 'F', rarity: "A",
-        text: "P: JUSTICIERA ARDIENTE: El Daño por tiempo la cura en vez de dañarla, y mientras lo sufra gana +2 de Def. A: SISAR (1F): Tu rival descarta una Ayuda. Moneda - Cara: ataque con Atq-3 sin pasiva.",
+        text: "P: JUSTICIERA ARDIENTE: El Daño por tiempo la cura en vez de dañarla, y mientras lo sufra gana +2 de Def. A: SISAR (1F): Tu rival descarta una Ayuda de su mano, la que él elija. Moneda - Cara: si hay enemigos, ataca a uno con -3 de Atq y sin su Pasiva.",
         passiveName: "JUSTICIERA ARDIENTE", activeName: "SISAR", activeCost: 1, series: 1,
         abilities: [
             { trigger: "PASIVA_CONTINUA", nombre: "JUSTICIERA ARDIENTE",
@@ -186,64 +186,84 @@ const CARD_DB = [
             return true;
         },
 
-        // HOOK 4: Empezar SISAR (Verifica mano rival)
-        // ZOE REPARADA: Todo el proceso se unifica en onExecuteAbility
+        // SISAR, reescrita (Toto, 7-ago-2026). El texto real del Excel es:
+        //   "Tu rival debe declarar si tiene una o más cartas de Ayuda en la mano, en cuyo caso
+        //    descarta una que él elija. Echa una moneda. Si sale cara, realiza un ataque normal
+        //    sin poder aplicar su Habilidad pasiva y bajando en 3 puntos su Atq durante dicho
+        //    ataque."
+        // Lo que había no se parecía: elegía el DUEÑO de Zoe (no el rival), sobre CUALQUIER carta
+        // (no solo Ayudas) y viendo la mano rival entera en un modal. Además cobraba el Furor y
+        // agotaba a Zoe nada más confirmar, así que cerrar el modal te dejaba sin nada.
+        // Ahora: elige el RIVAL, solo entre sus Ayudas, en su propia mano (las ve: son suyas), y
+        // sin poder declinar -su texto dice "descarta una", no "puede descartar"-. El coste se
+        // cobra en el primer punto irreversible, justo antes de la moneda.
         onExecuteAbility: async function(card, game) {
             const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
             const enemyP = game.players[enemyId];
-            
-            game.modifyStat(card, 'furor', -1); // Ajusta el coste a 1 o el que tenga
-            showFloatingText(card.instanceId, card.activeName, "ft-ability", -30);
-            
-            if (enemyP.hand.length === 0) {
-                game.logMsg(`La mano del rival está vacía. ${card.activeName} no tiene efecto.`, 'system');
-            } else {
-                game.logMsg(`¡Zoe usa ${card.activeName} y revisa la mano del rival!`, 'ability');
-                
-                // A CIEGAS (Toto, 7-ago-2026): el modal genérico DIBUJABA las cartas, o sea que
-                // SISAR te enseñaba la mano rival entera y de paso elegías con la información
-                // puesta. Su texto no promete eso: promete descartarle una carta. Con el picker
-                // de mano se oscurece todo menos la mano del rival, se ven los DORSOS y se elige
-                // uno — sin reborde verde, porque valen todas y señalar no discriminaría nada.
-                const chosen = await game.pickBoardTargets(enemyP.hand, 1, 'SISAR: elige una carta de la mano rival (a ciegas)', card, card.owner, true, { mano: true });
+            const cobrar = () => {
+                game.modifyStat(card, 'furor', -1);
+                showFloatingText(card.instanceId, card.activeName, "ft-ability", -30);
+            };
 
-                if (chosen && chosen.length > 0) {
-                    const targetCard = chosen[0];
-                    const handIdx = enemyP.hand.findIndex(c => c.instanceId === targetCard.instanceId);
-                    if (handIdx !== -1) {
-                        enemyP.hand.splice(handIdx, 1);
+            const ayudas = enemyP.hand.filter(c => c.type === 'Ayuda');
+            if (ayudas.length === 0) {
+                game.logMsg(`${game.getDisplayName(enemyId)} declara que no tiene Ayudas en la mano.`, 'system');
+            } else {
+                game.logMsg(`¡${game.getCardNameWithOwner(card)} usa ${card.activeName}! ${game.getDisplayName(enemyId)} debe descartar una Ayuda.`, 'ability');
+                // chooserId = enemyId: elige EL RIVAL, de su propia mano. cancelable:false porque
+                // el texto le obliga a descartar, no le da la opción.
+                const sel = await game.pickBoardTargets(ayudas, 1, `${game.getDisplayName(enemyId)}: elige una Ayuda para descartar`, card, enemyId, false, { mano: true });
+                const elegida = sel && sel[0];
+                if (elegida) {
+                    const idx = enemyP.hand.findIndex(c => c.instanceId === elegida.instanceId);
+                    if (idx !== -1) {
+                        enemyP.hand.splice(idx, 1);
+                        if (typeof game.resetCard === 'function') game.resetCard(elegida);
                         if (!enemyP.discard) enemyP.discard = [];
-                        enemyP.discard.push(targetCard);
-                        targetCard.location = 'discard';
-                        game.logMsg(`${game.getCardNameWithOwner(card)} ha descartado ${targetCard.name} de la mano del rival.`, 'ability');
+                        enemyP.discard.push(elegida);
+                        elegida.location = 'discard';
+                        game.logMsg(`${game.getDisplayName(enemyId)} descarta ${elegida.name}.`, 'ability');
                     }
                 }
             }
-            
+
+            cobrar(); // primer punto irreversible: la moneda que viene ya la ven los dos
             game.updatePassives();
             game.render();
 
-            // HOOK 5: Retomar SISAR tras el descarte (Integrado aquí para que no rompa la ejecución)
             const results = await game.triggerCoinFlips(1, card.owner);
-            if (!results) {
+            if (!results) { game.isActionLocked = false; game.cancelAction(); game.render(); return; }
+
+            if (results[0] !== 'heads') {
+                game.logMsg("Moneda: CRUZ - SISAR termina aquí.", 'neutral');
+                card.exhausted = true;
                 game.isActionLocked = false;
-                game.cancelAction(); 
+                game.cancelAction();
+                game.render();
                 return;
             }
 
-            if (results[0] === 'heads') {
-                game.logMsg("Moneda: CARA - Elige objetivo para ataque debilitado.", 'ability');
-                game.selectedCard = card;
-                game.inputState = 'SELECT_ABILITY_TARGETS'; 
-                game.abilityContext = { targets: [], maxTargets: 1, name: 'SISAR', targetType: 'enemy', isNormalAttack: true };
-                game.isActionLocked = true; 
-            } else {
-                game.logMsg("Moneda: CRUZ - Habilidad termina.", 'neutral');
+            // CARA: ataque normal obligatorio. Solo se salta si de verdad no hay a quién atacar
+            // (Toto: "solamente debería no atacar si por la razón que sea no puede"); si hay
+            // objetivos, la elección NO es cancelable.
+            const objetivos = enemyP.vanguard.filter(c => !c.stealth && !(getCardTemplate(c.id) || {}).isAvatar);
+            if (objetivos.length === 0) {
+                game.logMsg("Moneda: CARA - pero no hay enemigos a los que atacar.", 'system');
                 card.exhausted = true;
-                game.isActionLocked = false; 
+                game.isActionLocked = false;
                 game.cancelAction();
+                game.render();
+                return;
             }
-            game.render();
+            game.logMsg("Moneda: CARA - ¡ataque debilitado! Elige objetivo.", 'ability');
+            const objSel = await game.pickBoardTargets(objetivos, 1, 'SISAR: elige a quién atacar', card, card.owner, false);
+            if (!objSel || !objSel[0]) { // no debería ocurrir (cancelable:false), pero no se deja colgado
+                card.exhausted = true; game.isActionLocked = false; game.cancelAction(); game.render(); return;
+            }
+            game.selectedCard = card;
+            game.abilityContext = { targets: [objSel[0]], maxTargets: 1, name: 'SISAR', targetType: 'enemy', isNormalAttack: true };
+            game.isActionLocked = true;
+            await getCardTemplate(card.id).onTargetsReady(card, game);
         },
 
         // HOOK 6: Ejecutar el ataque de SISAR (Cuando el objetivo ya está fijado)
@@ -3874,7 +3894,12 @@ const CARD_DB = [
                 // condiciones de los efectos siguientes (que lo consultan) dejarían de cumplirse.
                 { if: { campo: "counters.karlitos_entrenamiento.count", op: ">=", valor: 3 },
                   op: "MODIFICAR_CONTADORES", target: { quien: "SELF" }, contador: "karlitos_entrenamiento", delta: -3 } ] },
-            { trigger: "ACTIVA", nombre: "APRENDIZ DE ARMAS", coste: { furor: 1 }, sinObjetivo: true, ataqueNormal: true,
+            // costeDiferido (Toto, 7-ago-2026): hasta que el arma no se equipa NO ha cambiado
+            // nada en el tablero, así que cancelar la elección debe salir gratis. Antes se
+            // cobraba 1 de Furor y se agotaba a Karlitos nada más confirmar la Habilidad, así
+            // que arrepentirse costaba el turno. Como este modo silencia el flotante genérico
+            // del nombre, se declara abajo un FLOTANTE en el punto irreversible (al equipar).
+            { trigger: "ACTIVA", nombre: "APRENDIZ DE ARMAS", coste: { furor: 1 }, sinObjetivo: true, ataqueNormal: true, costeDiferido: true,
               requisitos: [
                 { count: { quien: "ALIADO", zona: "mano", algunFiltro: [ { campo: "subtype", op: "==", valor: "Arma" }, { campo: "subtype", op: "==", valor: "Arma legendaria" } ] },
                   op: ">=", valor: 1, msg: "No tienes armas en la mano." },
@@ -3884,8 +3909,11 @@ const CARD_DB = [
                   titulo: "APRENDIZ: ELIGE ARMA PARA EQUIPAR",
                   algunFiltro: [ { campo: "subtype", op: "==", valor: "Arma" }, { campo: "subtype", op: "==", valor: "Arma legendaria" } ],
                   efectos: [
-                    // Sin `floats`: el cierre genérico de ACTIVA ya pinta el nombre de la
-                    // Habilidad sobre la carta, y declararlo aquí lo duplicaba.
+                    // El anuncio va AQUÍ y no en el cierre genérico: con `costeDiferido` aquel se
+                    // silencia a propósito, porque saldría antes de elegir el arma -o sea, antes
+                    // de que hubiera pasado nada- y el rival vería una Habilidad que aún puede
+                    // cancelarse. Este es el primer instante irreversible.
+                    { op: "FLOTANTE", target: { quien: "SELF" }, texto: "APRENDIZ DE ARMAS", estilo: "ft-ability", offset: -30 },
                     { op: "EQUIPAR", invertido: true,
                       log: "¡{carta} se equipa velozmente con {objetivo} y se prepara para atacar!" } ] },
                 { op: "ELEGIR", de: "ENEMIGOS", zona: "VANGUARDIA", cantidad: 1, cancelable: false,
@@ -6718,6 +6746,18 @@ const CARD_DB = [
         ],
     },
     {
+        // EN CONSTRUCCIÓN (Toto, 7-ago-2026). El Excel le da tipo, stats y etiquetas, pero su
+        // Pasiva "MAYOR GENERAL" está SIN DESCRIPCIÓN — o sea que la carta está a medias. Entra
+        // igualmente porque su etiqueta 'Energía Adán' es la que Meca EBA busca para emplazar
+        // piloto, y sin ella ese camino no se puede ni probar. NO se inventa la Pasiva: cuando
+        // Toto la escriba, se añade aquí y se le quita `enConstruccion`.
+        // `enConstruccion` lo lista tests/auditar_textos.js para que no se olvide.
+        name: "Yuriy", hp: 3, def: 4, atk: 4, type: "Personaje", subtype: "Ser vivo",
+        tags: ["Cyborg", "Energía Adán"], gender: "M", rarity: "B", series: 4,
+        enConstruccion: true,
+        text: "Carta en construcción: todavía no tiene Habilidades.",
+    },
+    {
         name: "Nigromántica", hp: 3, def: 4, atk: 2, type: "Esbirro", subtype: "Ser vivo", tags: ["Usuaria de magia"], gender: "F", rarity: "B", series: 1,
         text: "A: ARTES PROHIBIDAS (1 de Furor): Coloca en tu campo un 'Ser vivo' o 'No-muerto' de tu pila de descartes que no pida coste ni condiciones para colocarse. Puedes descartar un 'Necronomicón' de tu mano para ganar 1 de Furor.",
         activeName: "ARTES PROHIBIDAS",
@@ -6740,8 +6780,8 @@ const CARD_DB = [
                              { o: [ [ { campo: "subtype", op: "==", valor: "Ser vivo" } ], [ { campo: "subtype", op: "==", valor: "No-muerto" } ] ] } ],
                   plantillaSin: ["onBeforePlayAsync", "canPlayCard"],
                   abortaSiCancelas: true, abortaSiVacio: true, titulo: "ARTES PROHIBIDAS: ELIGE UN CAÍDO",
+                  floatingExito: { texto: "ARTES PROHIBIDAS", estilo: "ft-ability", offset: -30 },
                   log: "¡Artes prohibidas! {carta} devuelve a {objetivo} al campo de batalla." },
-                { op: "FLOTANTE", target: { quien: "SELF" }, texto: "ARTES PROHIBIDAS", estilo: "ft-ability", offset: -30 },
                 { op: "ELEGIR", de: "MANO", cantidad: 1, opcional: true,
                   filtros: [ { campo: "name", op: "contieneTexto", valor: "Necronomicón" } ],
                   titulo: "¿DESCARTAR NECRONOMICÓN? (+1 FUROR)",
@@ -7460,7 +7500,16 @@ const DSL = {
                     if (_vanLlena && p.rearguard.length >= 4) lista = [];
                 }
                 let _sacadaDelMazo = false; // para barajarDespues.soloSiDelMazo
+                // floatingExito (Toto, 7-ago-2026): flotante sobre la carta FUENTE en cuanto hay
+                // elección, ANTES de la animación de entrada. Un `op: FLOTANTE` colocado detrás
+                // del BUSCAR no vale: este await la animación, así que el anuncio salía cuando la
+                // carta ya estaba puesta — al revés que el resto de Activas, donde primero se
+                // anuncia y el efecto ocurre a la vez.
                 const aMano = async (t) => {
+                    if (e.floatingExito && typeof showFloatingText === 'function') {
+                        showFloatingText(sourceCard.instanceId, F(e.floatingExito.texto), e.floatingExito.estilo || 'ft-ability',
+                            e.floatingExito.offset !== undefined ? e.floatingExito.offset : -30);
+                    }
                     // Se saca de la zona REAL en la que estuviera (con una sola zona esto es
                     // exactamente lo de antes).
                     let _zIdx = zonas.findIndex(z => z.some(x => x.instanceId === t.instanceId));
