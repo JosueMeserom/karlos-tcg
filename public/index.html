@@ -8197,6 +8197,131 @@
                 setTimeout(() => this.drawConnections(), 0);
                 
                 this.adjustCardHeaders();
+                // Va DESPUÉS de repintar: los clones se colocan sobre los huecos reales, que
+                // solo existen una vez la mano está construida.
+                this._manoLiftRefrescar();
+            }
+
+            // ── Elección DE MANO: velo + capa elevada ────────────────────────────────────────
+            // Mismo lenguaje visual que el resto de overlays (velo negro al 85%, como el visor de
+            // pilas) en vez del apagado por opacidad que tenía antes. Se apoya en el patrón que
+            // ya usaba el resalte de reacción: la carta original NO sube de capa -su contexto de
+            // apilamiento la atrapa- sino que se CLONA sobre el velo y la original se oculta con
+            // visibility:hidden, que conserva el hueco y no provoca reflow.
+            // Los clones salen de cloneNode del elemento REAL, así que una mano rival clonada
+            // sigue siendo dorsos sin tener que decidirlo aquí: se copia lo que ya se pintó.
+            _manoLiftLimpiar() {
+                ['mano-overlay', 'mano-lift'].forEach(id => { const el = document.getElementById(id); if (el) el.remove(); });
+                (this._manoLiftOcultas || []).forEach(id => {
+                    document.querySelectorAll(`[data-id="${id}"]`).forEach(el => { el.style.visibility = ''; });
+                });
+                this._manoLiftOcultas = null;
+            }
+
+            _manoLiftRefrescar() {
+                const p = this.dslPick;
+                const soyChooser = this.gameMode === 'local' || this.myPlayerId === ((p && p.chooserId) || this.activePlayerId);
+                if (!p || !p.mano || this.inputState !== 'SELECT_DSL_TARGETS' || !soyChooser || !p.manoDe) {
+                    this._manoLiftLimpiar();
+                    return;
+                }
+                let velo = document.getElementById('mano-overlay');
+                if (!velo) {
+                    velo = document.createElement('div');
+                    velo.id = 'mano-overlay';
+                    velo.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:4000;';
+                    // Clic en el velo = cancelar, igual que en el visor de pilas. Si la elección
+                    // es obligatoria, cancelAction ya se niega y avisa por el log.
+                    velo.onclick = () => this.cancelAction();
+                    document.body.appendChild(velo);
+                }
+                let capa = document.getElementById('mano-lift');
+                if (!capa) {
+                    capa = document.createElement('div');
+                    capa.id = 'mano-lift';
+                    capa.style.cssText = 'position:fixed; inset:0; pointer-events:none; z-index:4100;';
+                    document.body.appendChild(capa);
+                }
+                capa.innerHTML = '';
+                this._manoLiftOcultas = [];
+                // El reborde verde solo si DISCRIMINA (norma de Toto): con la mano entera
+                // elegible no señala nada y solo mete ruido.
+                const sinReborde = this._manoEnteraElegible();
+
+                const _subir = (carta, opts) => {
+                    const el = document.querySelector(`[data-id="${carta.instanceId}"]`);
+                    if (!el) return;
+                    const r = el.getBoundingClientRect();
+                    if (!r.width) return;
+                    const clon = el.cloneNode(true);       // copia lo que YA se ve: cara o dorso
+                    clon.removeAttribute('data-id');       // que no colisione en querySelector
+                    clon.classList.remove('valid-target', 'selected');
+                    clon.style.position = 'absolute';
+                    clon.style.left = r.left + 'px';
+                    clon.style.top = r.top + 'px';
+                    clon.style.width = r.width + 'px';
+                    clon.style.height = r.height + 'px';
+                    clon.style.margin = '0';
+                    if (opts.elegible) {
+                        clon.style.pointerEvents = 'auto';
+                        clon.style.cursor = 'pointer';
+                        if (!sinReborde) clon.classList.add('valid-target');
+                        clon.onclick = (ev) => { ev.stopPropagation(); this._dslPickClick(carta); };
+                    } else {
+                        clon.style.pointerEvents = 'none';
+                    }
+                    // Hover: el detalle solo tiene sentido en cartas que se ven de cara.
+                    if (!clon.classList.contains('card-back')) {
+                        clon.style.pointerEvents = clon.style.pointerEvents || 'auto';
+                        clon.onmouseenter = () => this.startPreview(carta);
+                        clon.onmouseleave = () => this.stopPreview();
+                    }
+                    if (opts.fuente) clon.classList.add('selected'); // quién está actuando
+                    capa.appendChild(clon);
+                    el.style.visibility = 'hidden';
+                    this._manoLiftOcultas.push(carta.instanceId);
+                };
+
+                // La CARTA QUE ACTÚA también sube (pedido de Toto): sin ella el jugador ve una
+                // mano iluminada y ninguna pista de qué efecto se la está pidiendo. Va primero
+                // para que quede por debajo si algo se solapara.
+                const fuente = this.selectedCard;
+                if (fuente && fuente.instanceId) _subir(fuente, { fuente: true });
+
+                // Y la mano entera de la que se elige: se ve completa, no solo lo elegible.
+                (this.players[p.manoDe].hand || []).forEach(c => {
+                    _subir(c, { enMano: true, elegible: p.pool.has(c.instanceId) && !p.targets.some(t => t.instanceId === c.instanceId) });
+                });
+
+                this._manoLiftTick();
+            }
+
+            // Mantiene los clones pegados a los huecos de sus originales, igual que hace el
+            // resalte de reacción: un resize o un reflow mueve la mano y el clon la sigue. La
+            // única condición de parada es que la capa deje de existir.
+            _manoLiftTick() {
+                if (this._manoLiftLoop) return;
+                this._manoLiftLoop = true;
+                const paso = () => {
+                    const capa = document.getElementById('mano-lift');
+                    if (!capa) { this._manoLiftLoop = false; return; }
+                    const ids = this._manoLiftOcultas || [];
+                    capa.childNodes.forEach((clon, i) => {
+                        const id = ids[i];
+                        if (!id) return;
+                        const orig = document.querySelector(`[data-id="${id}"]`);
+                        if (!orig) return;
+                        if (orig.style.visibility !== 'hidden') orig.style.visibility = 'hidden';
+                        const r = orig.getBoundingClientRect();
+                        if (!r.width) return;
+                        clon.style.left = r.left + 'px';
+                        clon.style.top = r.top + 'px';
+                        clon.style.width = r.width + 'px';
+                        clon.style.height = r.height + 'px';
+                    });
+                    requestAnimationFrame(paso);
+                };
+                requestAnimationFrame(paso);
             }
 
             renderPlayer(pid) {
@@ -8289,12 +8414,7 @@
 
                 const handEl = document.getElementById(`${pid}-hand`);
                 handEl.innerHTML = '';
-                // Oscurecido de todo menos LA mano de la que se elige. La clase la lleva el body
-                // (una sola regla CSS) y la mano elegible se marca aparte para exceptuarla.
-                const _pkMano = this.dslPick && this.dslPick.mano && this.inputState === 'SELECT_DSL_TARGETS'
-                    && (this.gameMode === 'local' || this.myPlayerId === (this.dslPick.chooserId || this.activePlayerId));
-                document.body.classList.toggle('eligiendo-mano', !!_pkMano);
-                handEl.classList.toggle('mano-eligible', !!_pkMano && this.dslPick.manoDe === pid);
+
 
                 const cardCount = p.hand.length;
                 const containerWidth = handEl.offsetWidth;
@@ -8343,19 +8463,6 @@
                         back.setAttribute('data-id', card.instanceId); 
                         if (index < cardCount - 1 && overlap > 0) back.style.marginRight = `-${overlap}px`;
                         elToAppend = back;
-                    }
-                    // Elección DE MANO en curso: esta carta responde al PICK y no a jugarse.
-                    // Se engancha sobre `elToAppend`, que puede ser la CARA o el DORSO -de ahí que
-                    // la elección a ciegas sobre la mano del rival funcione sin revelar nada-.
-                    const _pk = this.dslPick;
-                    const _pickMano = this.inputState === 'SELECT_DSL_TARGETS' && _pk && _pk.mano && _pk.pool.has(card.instanceId)
-                        && !_pk.targets.some(t => t.instanceId === card.instanceId)
-                        && (this.gameMode === 'local' || this.myPlayerId === (_pk.chooserId || this.activePlayerId));
-                    if (_pickMano) {
-                        elToAppend.style.cursor = 'pointer';
-                        elToAppend.onclick = (e) => { e.stopPropagation(); this._dslPickClick(card); };
-                        handEl.appendChild(elToAppend);
-                        return;
                     }
                     // QoL: si hay un ataque directo disponible, la mano del rival es clicable y lo ejecuta
                     const iCanAttack = this.gameMode === 'local' || this.activePlayerId === this.myPlayerId;

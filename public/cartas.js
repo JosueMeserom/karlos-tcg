@@ -2881,7 +2881,11 @@ const CARD_DB = [
         // `cantidad:N` YA recoge los N objetivos antes de ejecutar nada; lo que rompía la regla
         // era encadenar DOS ELEGIR con efectos en el primero, no el mecanismo en sí.
         abilities: [
-            { trigger: "ACTIVA", nombre: "SACRIFICIO EQUIVALENTE", coste: { furor: 1 }, sinObjetivo: true, costeDiferido: true,
+            // Sin `costeDiferido` explícito: la norma del coste lo deduce sola (su primer efecto
+            // es un ELEGIR cancelable). Y sin FLOTANTE a mano: el anuncio automático de la Activa
+            // ya cae en el instante irreversible — declararlo aquí lo pintaba DOS veces
+            // (Toto, 7-ago-2026: "SACRIFICIO EQUIVALENTE LITERALMENTE es el nombre de la Activa").
+            { trigger: "ACTIVA", nombre: "SACRIFICIO EQUIVALENTE", coste: { furor: 1 }, sinObjetivo: true,
               requisitos: [
                 { count: { quien: "ALIADO", zona: "vanguardia" }, op: ">=", valor: 1, msg: "Necesitas otro aliado en la vanguardia para el sacrificio." },
                 { count: { quien: "ENEMIGO" }, op: ">=", valor: 1, msg: "No hay enemigos a los que aniquilar." } ],
@@ -2892,7 +2896,6 @@ const CARD_DB = [
                 { op: "ELEGIR", de: "ENEMIGOS", cantidad: 1,
                   titulo: "PASO 2: Elige un enemigo para aniquilar",
                   efectos: [
-                    { op: "FLOTANTE", target: { quien: "SELF" }, texto: "SACRIFICIO EQUIVALENTE", estilo: "ft-ability", offset: -30 },
                     { op: "MODIFICAR_STAT", target: { selfLista: "kamiSacrificio" }, stat: "currentHp",
                       vaciar: true, sinRetribucion: true, comprobarMuerte: true,
                       log: "¡SACRIFICIO EQUIVALENTE! Kami sacrifica a {objetivo}." },

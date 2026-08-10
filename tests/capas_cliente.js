@@ -94,6 +94,10 @@ function coincide(nodo, sel) {
     const m = sel.match(/^\.card\[data-id="([^"]+)"\]$/);
     if (m) return nodo.classList.contains('card') && nodo.dataset.id === m[1];
     if (sel === '[data-id]') return nodo.dataset.id !== undefined;
+    // `[data-id="X"]` sin exigir .card: lo usa _manoLiftRefrescar, que sube cartas de mano
+    // (cara O dorso: un dorso NO lleva la clase .card sola) y la carta fuente del tablero.
+    const di = sel.match(/^\[data-id="([^"]+)"\]$/);
+    if (di) return nodo.dataset.id === di[1];
     const h = sel.match(/^\[data-badge="([^"]+)"\]$/);
     if (h) return nodo.dataset.badge === h[1];
     const cl = sel.match(/^\.([A-Za-z0-9_-]+)$/); // selector de clase simple
@@ -302,6 +306,66 @@ check('tras purgar, NO queda ninguna carta fantasma con ese data-id',
       !raiz.querySelector('.card[data-id="DOM1"]'), 'sigue en el DOM: cualquier querySelector la cogeria con rect 0');
 check('tras purgar, el contenido del visor queda vacio', contenido.children.length === 0, 'hijos: ' + contenido.children.length);
 check('purgar NO toca las cartas del tablero', board.contains(cartaCampo) && board.contains(elSpencer), 'se perdió algo del tablero');
+
+// ---------- capa elevada de la eleccion DE MANO ----------
+// Migrada al estilo overlay el 7-ago-2026: mlVelo + clones, en vez del apagado por opacidad.
+// El riesgo real de esta capa no es que se vea bonita (eso se valida en el navegador) sino el
+// CONTRATO estructural: que la original quede oculta (conservando el hueco), que el clon salga
+// de cloneNode -y por tanto un dorso siga siendo un dorso, que es lo que permite elegir a ciegas
+// de la mano rival sin revelarla-, que la carta que ACTUA tambien suba, y que limpiar lo deje
+// todo como estaba. Si un refactor rompe algo de eso, salta aqui.
+console.log('\n--- capa elevada de la eleccion DE MANO ---');
+const mlHandEl = Nodo('div'); mlHandEl.setAttribute('id', 'p1-hand'); raiz.appendChild(mlHandEl);
+const mlCara = Nodo('div'); mlCara.classList.add('card'); mlCara.setAttribute('data-id', 'MANO1');
+mlCara.__rect = { left: 300, top: 600, width: 90, height: 130 }; mlHandEl.appendChild(mlCara);
+const mlDorso = Nodo('div'); mlDorso.classList.add('card'); mlDorso.classList.add('card-back');
+mlDorso.setAttribute('data-id', 'MANO2');
+mlDorso.__rect = { left: 400, top: 600, width: 90, height: 130 }; mlHandEl.appendChild(mlDorso);
+
+const _cMano = { instanceId: 'MANO1', owner: 'p1', name: 'CartaMano' };
+const _cDorso = { instanceId: 'MANO2', owner: 'p1', name: 'CartaDorso' };
+game.players.p1.hand = [_cMano, _cDorso];
+game.inputState = 'SELECT_DSL_TARGETS';
+game.gameMode = 'local';
+game.selectedCard = spencer;                       // la carta que ACTUA (esta en el tablero)
+game.dslPick = { pool: new Set(['MANO1']), n: 1, targets: [], byId: {}, chooserId: 'p1',
+                 cancelable: true, mano: true, manoDe: 'p1' };
+game._manoLiftRefrescar();
+
+const mlVelo = documento.getElementById('mano-overlay');
+const mlCapa = documento.getElementById('mano-lift');
+check('se monta el VELO (mismo lenguaje que el resto de overlays)', !!mlVelo, 'no hay #mano-overlay');
+check('...por debajo de los clones', !!mlVelo && mlVelo.style.cssText.includes('z-index:4000')
+      && !!mlCapa && mlCapa.style.cssText.includes('z-index:4100'),
+      (mlVelo && mlVelo.style.cssText) + ' / ' + (mlCapa && mlCapa.style.cssText));
+check('sube la mano ENTERA, no solo lo elegible', mlCapa.children.length === 3,
+      'clones: ' + mlCapa.children.length + ' (esperados 3: fuente + 2 de mano)');
+check('...incluida la carta que ACTUA, marcada', mlCapa.children.some(x => x.classList.contains('selected')),
+      'ninguna lleva .selected');
+check('el DORSO sigue siendo dorso al clonarse (elegir a ciegas no revela nada)',
+      mlCapa.children.some(x => x.classList.contains('card-back')), 'se perdio la clase card-back');
+check('los clones NO llevan data-id (no envenenan querySelector)',
+      !mlCapa.children.some(x => x.dataset && x.dataset.id), 'algun clon conserva data-id');
+check('la original se OCULTA conservando su hueco', mlCara.style.visibility === 'hidden',
+      'visibility=' + mlCara.style.visibility);
+const mlClonEleg = mlCapa.children.find(x => x.classList.contains('valid-target'));
+check('solo la elegible lleva reborde verde (la mano no es entera elegible)', !!mlClonEleg, 'ninguna con valid-target');
+
+// Mano ENTERA elegible -> el reborde no discrimina, asi que no se pinta.
+game.dslPick.pool = new Set(['MANO1', 'MANO2']);
+game._manoLiftRefrescar();
+const mlCapa2 = documento.getElementById('mano-lift');
+check('con la mano entera elegible NO se pinta reborde en ninguna',
+      !mlCapa2.children.some(x => x.classList.contains('valid-target')), 'alguna lleva valid-target');
+
+// Limpieza: fuera mlVelo, fuera clones, y las originales vuelven a verse.
+game.dslPick = null;
+game.inputState = 'IDLE';
+game._manoLiftRefrescar();
+check('al terminar se retira el mlVelo', !documento.getElementById('mano-overlay'), 'sigue el mlVelo puesto');
+check('...y la capa de clones', !documento.getElementById('mano-lift'), 'sigue la capa');
+check('...y las originales vuelven a ser visibles', mlCara.style.visibility === ''
+      && mlDorso.style.visibility === '', 'quedaron ocultas: la mano se veria vacia');
 
 console.log(fallos === 0 ? '\nSUITE capas_cliente: ' + comprobaciones + '/' + comprobaciones + ' comprobaciones — CAPAS CORRECTAS' : '\nSUITE capas_cliente: ' + fallos + ' FALLOS de ' + comprobaciones + ' comprobaciones');
 process.exit(fallos ? 1 : 0);
