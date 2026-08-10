@@ -10037,7 +10037,18 @@
                         // corrutina del reconectado, que murió y no es serializable). Cadencia alta
                         // + dedup: solo se emite/renderiza cuando el estado cambia de verdad, para
                         // minimizar el desfase con J1 sin spam ni parpadeo por renders idénticos.
-                        if (!esperandoOtraInteraccion && this.gameMode === 'online' && this.myPlayerId !== 'spectator') {
+                        // El guard NO es "no haya prompt", es "no haya prompt DEL RIVAL" (Toto,
+                        // 7-ago-2026). Pisar su UI solo puede pasar si el prompt abierto es SUYO;
+                        // si es MÍO, él está mirando sin nada abierto y le conviene ver los
+                        // cambios según ocurren. Con el guard viejo, una Habilidad que encadena
+                        // prompts -Karlitos: elegir arma y acto seguido elegir a quién atacar- no
+                        // dejaba un solo hueco sin prompt, así que el rival no recibía NADA hasta
+                        // el final de toda la cadena: veía el anuncio de la Activa y seguía viendo
+                        // el arma en la mano hasta que se resolvía el ataque.
+                        const _chooserAbierto = (this.pendingInteraction && this.pendingInteraction.chooserId)
+                                             || (this.pendingReaction && this.pendingReaction.chooserId) || null;
+                        const _promptDelRival = !!_chooserAbierto && _chooserAbierto !== this.myPlayerId;
+                        if (!_promptDelRival && !this.coinFlipResolve && this.gameMode === 'online' && this.myPlayerId !== 'spectator') {
                             const snap = this.exportGameState();
                             const firma = JSON.stringify(snap, (k, v) => k === 'logHistory' ? undefined : v);
                             if (firma !== this._ultimoSnapEspejo) {
