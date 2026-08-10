@@ -7323,8 +7323,16 @@
                 // flotante y el siguiente prompt (se los manda quien sí ejecuta) pero no el
                 // efecto. Ahora la obligación se DEDUCE del hecho, no de un flag puesto antes.
                 if (isRemote && _habiaResolver && this.gameMode === 'online' && this.myPlayerId !== 'spectator') {
-                    this._reSyncTrasEleccion = true;   // sin _reSyncTarget: volcado autoritativo a la sala
+                    // Bandera PROPIA, no `_reSyncTrasEleccion` (Toto, 7-ago-2026). Aquella tiene un
+                    // efecto secundario que aquí hace daño: instalarReenvioAnimaciones reenvía cada
+                    // flotante mientras está puesta, y DIRIGIDO solo si además hay `_reSyncTarget`.
+                    // Armarla sin target convertía el reenvío en un broadcast a la sala, así que
+                    // los flotantes -nombre de la Activa, -1 FUR, -2 de daño- salían DUPLICADOS.
+                    // Esta solo pide el volcado de estado al terminar la cadena, que es lo único
+                    // que hacía falta.
+                    this._debeVolcarTrasCadena = true;
                 }
+                if (this._debeVolcarTrasCadena) this._syncTrasCompletarEspejo();
                 // MODO ESPEJO (Toto, 31-jul-2026): el rival reconectado acaba de dirigir MI
                 // corrutina con su clic en el tablero (o en el visor de mazo), así que le debo el
                 // estado resultante. Esto faltaba: el volcado del espejo solo estaba cableado a
@@ -10001,7 +10009,7 @@
             //     nuevas (un ataque rápido) sobre un estado viejo. Ahora ambos esperan al ASENTADO
             //     real y van mandando instantáneas intermedias cada 60 ms.
             _syncTrasCompletarEspejo() {
-                if (!this._espejandoReaccion && !this._reSyncTrasEleccion) return;
+                if (!this._espejandoReaccion && !this._reSyncTrasEleccion && !this._debeVolcarTrasCadena) return;
                 if (this._esperandoSettleEspejo) return; // ya hay un poller en marcha
                 this._esperandoSettleEspejo = true;
                 this._ultimoSnapEspejo = null; // firma del último estado intermedio enviado (dedup)
@@ -10015,7 +10023,7 @@
                     this.socket.emit('gameAction', msg);
                 };
                 const poll = () => {
-                    if (!this._espejandoReaccion && !this._reSyncTrasEleccion) { this._esperandoSettleEspejo = false; return; }
+                    if (!this._espejandoReaccion && !this._reSyncTrasEleccion && !this._debeVolcarTrasCadena) { this._esperandoSettleEspejo = false; return; }
                     const esperandoOtraInteraccion =
                         this.pendingReaction ||          // otra reacción de la cadena (ya empujada por PENDING_REACTION)
                         this.pendingInteraction ||       // interacción visual encadenada (tablero/mazo/moneda)
@@ -10035,6 +10043,7 @@
                         this._esperandoSettleEspejo = false;
                         this._espejandoReaccion = false;
                         this._reSyncTrasEleccion = false;
+                        this._debeVolcarTrasCadena = false;
                         this._dbgRx('poller ASENTADO -> vuelco estado final');
                         _emitirEstado();
                         this._reSyncTarget = null;
