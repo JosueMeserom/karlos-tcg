@@ -5832,7 +5832,10 @@
                 // --- 3. EJECUCIÓN DEL ESTADO ---
                 if (card.type === 'Ayuda') {
                     if (typeof template.onPlay === 'function') {
-                        template.onPlay(card, this); // sin await: la tubería de acciones en red no debe bloquearse
+                        // Sin await (la tubería de acciones en red no debe bloquearse) pero SÍ
+                        // contabilizada: el poller de reconexión necesita saber que esta cadena
+                        // sigue viva. Ver _seguirCorrutina.
+                        this._seguirCorrutina(template.onPlay(card, this));
                     } else {
                         // Pre-chequeo de objetivos: si NINGÚN objetivo en mesa es válido
                         // (p. ej. Manzanahoria con todos los aliados a Vida llena), no se
@@ -7097,6 +7100,25 @@
 
             // Tras completar MI elección, si un rival reconectó durante ella (caso espejo),
             // le reenvío el estado FINAL una vez la acción reanudada ha terminado.
+            // Contador de corrutinas de carta EN VUELO (Toto, 7-ago-2026). `playCard` lanza el
+            // onPlay de una Ayuda sin await a propósito, así que ni `isActionLocked` ni
+            // `inputState` reflejan que la cadena sigue trabajando. El poller de reconexión
+            // necesitaba saberlo y lo estuvo ADIVINANDO: primero por esos banderines (se colaba al
+            // instante) y luego por "quietud sostenida" del estado (se colaba igual, porque entre
+            // robo y robo hay huecos en los que nada cambia mientras corre la animación, y esos
+            // huecos duran más que cualquier ventana razonable). Esto no adivina: cuenta.
+            _seguirCorrutina(promesa) {
+                if (!promesa || typeof promesa.then !== 'function') return promesa;
+                this._corrutinasVivas = (this._corrutinasVivas || 0) + 1;
+                this._dbgRx('corrutina de carta EN VUELO', { vivas: this._corrutinasVivas });
+                const _fin = () => {
+                    this._corrutinasVivas = Math.max(0, (this._corrutinasVivas || 1) - 1);
+                    this._dbgRx('corrutina de carta TERMINADA', { vivas: this._corrutinasVivas });
+                };
+                promesa.then(_fin, _fin);
+                return promesa;
+            }
+
             _reSyncTrasEleccionSiHaceFalta() {
                 // El flag NO se apaga aquí: lo consume el poller al asentar (ver
                 // _syncTrasCompletarEspejo), que es quien decide CUÁNDO está listo el estado.
@@ -9985,34 +10007,19 @@
                         this.currentVisualResolve ||     // búsqueda visual / elección en tablero
                         this.dslPick ||                  // pick DSL en tablero
                         this.coinFlipResolve;            // moneda en vuelo
-                    // QUIETUD SOSTENIDA, no un instante suelto (Toto, 7-ago-2026). Los banderines
-                    // de arriba NO bastan: `playCard` lanza el onPlay de una Ayuda SIN await y SIN
-                    // isActionLocked ("la tubería de acciones en red no debe bloquearse"), así que
-                    // toda la cadena de Dobla la ropa -descartar 3, robar 3 con sus animaciones-
-                    // corre con inputState ya en IDLE y el candado suelto. El poller la daba por
-                    // asentada a mitad, mandaba el estado de ESE instante (descarte hecho, robo
-                    // no) y apagaba los flags: el rival se quedaba con 3 cartas y ya no llegaba
-                    // nada más. Exigiendo que la firma del estado no cambie durante varias
-                    // muestras seguidas, cualquier cadena que siga mutando -tenga o no candado-
-                    // mantiene vivo el poller sin tener que enumerar sus caminos async uno a uno.
-                    const quieto = !esperandoOtraInteraccion &&
+                    // La condición que faltaba: ninguna corrutina de carta EN VUELO. Los
+                    // banderines de arriba no la ven -`playCard` lanza el onPlay de una Ayuda sin
+                    // await- y adivinarlo por "quietud del estado" tampoco vale: entre robo y robo
+                    // hay huecos en los que nada cambia mientras corre la animación, y son más
+                    // largos que cualquier ventana razonable. Por eso Dobla la ropa se volcaba a
+                    // medias una y otra vez. `_corrutinasVivas` lo SABE en vez de estimarlo.
+                    const asentado = !esperandoOtraInteraccion && !this._corrutinasVivas &&
                         this.inputState === 'IDLE' && !this.isActionLocked && !this.isFlipping;
-                    const MUESTRAS_QUIETAS = 4; // x CADENCIA (60ms) = ~240ms de estado inmóvil
-                    let _firmaAhora = null;
-                    if (quieto && this.gameMode === 'online' && this.myPlayerId !== 'spectator') {
-                        _firmaAhora = JSON.stringify(this.exportGameState(), (k, v) => k === 'logHistory' ? undefined : v);
-                    }
-                    this._quietasSeguidas = (_firmaAhora !== null && _firmaAhora === this._firmaQuietaPrev)
-                        ? (this._quietasSeguidas || 0) + 1 : 0;
-                    this._firmaQuietaPrev = _firmaAhora;
-                    const asentado = quieto && this._quietasSeguidas >= MUESTRAS_QUIETAS;
                     if (asentado) {
                         this._esperandoSettleEspejo = false;
                         this._espejandoReaccion = false;
                         this._reSyncTrasEleccion = false;
-                        this._quietasSeguidas = 0;
-                        this._firmaQuietaPrev = null;
-                        this._dbgRx('poller ASENTADO (quietud sostenida) -> vuelco estado final');
+                        this._dbgRx('poller ASENTADO -> vuelco estado final');
                         _emitirEstado();
                         this._reSyncTarget = null;
                     } else {
