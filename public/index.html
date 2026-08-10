@@ -10046,9 +10046,17 @@
                 const poll = () => {
                     if (!this._espejandoReaccion && !this._reSyncTrasEleccion && !this._debeVolcarTrasCadena) { this._esperandoSettleEspejo = false; return; }
                     if (Date.now() > _limite) {
-                        this._dbgRx('poller: TOPE alcanzado, desarmo banderas y vuelco');
+                        // SOLO desarma: NADA de volcar (Toto, 7-ago-2026). El tope existe para que
+                        // las banderas no se queden puestas -si lo hacen, los flotantes se reenvían
+                        // por duplicado el resto de la partida-, no para mandar estado. Volcar aquí
+                        // es activamente peligroso: son 15 s DESPUÉS, con un HARD_SYNC autoritativo
+                        // y sin destinatario, o sea a toda la sala. Si en ese rato el otro cliente
+                        // cargó un escenario de debug -o simplemente avanzó-, este volcado tardío se
+                        // lo pisa con una foto vieja. Es justo lo que Toto vio: "a los X segundos la
+                        // partida carga otro estado diferente". Si a estas alturas el estado no ha
+                        // llegado por los cauces normales, mandar una foto rancia lo empeora.
+                        this._dbgRx('poller: TOPE alcanzado, desarmo banderas (sin volcar)');
                         this._purgarBanderasSync();
-                        _emitirEstado();
                         this._reSyncTarget = null;
                         return;
                     }
