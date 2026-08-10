@@ -1773,7 +1773,6 @@ const CARD_DB = [
                   // del coste (7-ago-2026) esta Activa lo difiere -su primer efecto es un ELEGIR
                   // cancelable-, así que el flotante automático se silencia y hay que ponerlo en
                   // el primer instante irreversible, que es cuando ya hay objetivos elegidos.
-                  floatingAntes: { texto: "AL-FÉNIX", estilo: "ft-ability", offset: -30 },
                   efectos: [ { op: "ATACAR" } ] } ] }
         ],
     },
@@ -3918,7 +3917,6 @@ const CARD_DB = [
                     // silencia a propósito, porque saldría antes de elegir el arma -o sea, antes
                     // de que hubiera pasado nada- y el rival vería una Habilidad que aún puede
                     // cancelarse. Este es el primer instante irreversible.
-                    { op: "FLOTANTE", target: { quien: "SELF" }, texto: "APRENDIZ DE ARMAS", estilo: "ft-ability", offset: -30 },
                     { op: "EQUIPAR", invertido: true,
                       log: "¡{carta} se equipa velozmente con {objetivo} y se prepara para atacar!" } ] },
                 { op: "ELEGIR", de: "ENEMIGOS", zona: "VANGUARDIA", cantidad: 1, cancelable: false,
@@ -4382,7 +4380,6 @@ const CARD_DB = [
                   logNoEncontrada: "No hay ningún arma 'melé' ahí.",
                   log: "¡{carta} genera y se equipa con {objetivo} ignorando sus condiciones!",
                   barajarDespues: { log: "Barajando el mazo...", soloSiDelMazo: true } },
-                { op: "FLOTANTE", target: { quien: "SELF" }, texto: "ARMAMENTO MELÉ", estilo: "ft-ability", offset: -40 },
                 { op: "ELEGIR", de: "ENEMIGOS", zona: "VANGUARDIA", cantidad: 1, cancelable: false,
                   titulo: "Elige un enemigo para atacarlo con tu nueva arma",
                   efectos: [ { op: "ATACAR" } ] } ] }
@@ -6796,7 +6793,6 @@ const CARD_DB = [
                              { o: [ [ { campo: "subtype", op: "==", valor: "Ser vivo" } ], [ { campo: "subtype", op: "==", valor: "No-muerto" } ] ] } ],
                   plantillaSin: ["onBeforePlayAsync", "canPlayCard"],
                   abortaSiCancelas: true, abortaSiVacio: true, titulo: "ARTES PROHIBIDAS: ELIGE UN CAÍDO",
-                  floatingExito: { texto: "ARTES PROHIBIDAS", estilo: "ft-ability", offset: -30 },
                   log: "¡Artes prohibidas! {carta} devuelve a {objetivo} al campo de batalla." },
                 { op: "ELEGIR", de: "MANO", cantidad: 1, opcional: true,
                   filtros: [ { campo: "name", op: "contieneTexto", valor: "Necronomicón" } ],
@@ -7114,6 +7110,15 @@ const DSL = {
         let s = String(txt).replace(/\{(\w+)\?([^|{}]*)\|([^}]*)\}/g, (_, k, m, f) => ((ctx || {})[k] === 'F' ? f : m));
         for (const [k, val] of Object.entries(ctx || {})) s = s.split('{' + k + '}').join(val !== undefined && val !== null ? val : '');
         return s;
+    },
+    // Dispara el cobro+anuncio ARMADO de una Activa en el primer instante irreversible (ver
+    // _ejecutarActiva). Lo llaman las elecciones al resolverse. El instanceId evita que una
+    // cadena anidada cobre por la Activa equivocada; si no hay nada armado, no hace nada.
+    _dispararCobro(sourceCard) {
+        const cp = DSL._cobroPendiente;
+        if (!cp || !sourceCard || cp.id !== sourceCard.instanceId) return;
+        DSL._cobroPendiente = null;
+        cp.fn();
     },
     _nombre(game, c) { return (game && typeof game.getCardNameWithOwner === 'function') ? game.getCardNameWithOwner(c) : c.name; },
 
@@ -7522,6 +7527,7 @@ const DSL = {
                 // carta ya estaba puesta — al revés que el resto de Activas, donde primero se
                 // anuncia y el efecto ocurre a la vez.
                 const aMano = async (t) => {
+                    DSL._dispararCobro(sourceCard);
                     if (e.floatingExito && typeof showFloatingText === 'function') {
                         showFloatingText(sourceCard.instanceId, F(e.floatingExito.texto), e.floatingExito.estilo || 'ft-ability',
                             e.floatingExito.offset !== undefined ? e.floatingExito.offset : -30);
@@ -8077,6 +8083,7 @@ const DSL = {
                     e.floatingAntes.estilo || 'ft-ability', e.floatingAntes.offset !== undefined ? e.floatingAntes.offset : -30);
             };
             const _logAntes = (lista) => {
+                DSL._dispararCobro(sourceCard);
                 _floatAntes();
                 if (!e.logAntes) return;
                 const els = lista.map(x => DSL._nombre(game, x)).join(' y ');
@@ -8968,15 +8975,31 @@ const DSL = {
                 // Kami es hoy el único Avatar, así que el cambio no alcanza a ninguna otra carta.
                 if (costeFuror > 0) game.modifyStat(card, 'furor', -costeFuror, 0, 'avatar_passive');
                 if (typeof showFloatingText === 'function') {
-                    if (!_diferir) showFloatingText(card.instanceId, card.activeName, 'ft-ability', -30);
+                    // SIEMPRE, difiera o no (Toto, 7-ago-2026): el anuncio viaja pegado al cobro,
+                    // y el cobro ya cae en el instante irreversible en los dos casos. Este `if`
+                    // existía cuando diferir significaba "al final de todo" y el nombre habría
+                    // salido tras los efectos; entonces había que apagarlo y declararlo a mano
+                    // carta por carta. Ya no: el automático funciona en ambos caminos.
+                    showFloatingText(card.instanceId, card.activeName, 'ft-ability', -30);
                     (activa.floatingExtra || []).forEach(fe => showFloatingText(card.instanceId, fe.texto, fe.estilo || 'ft-green', fe.offset !== undefined ? fe.offset : -10));
                 }
                 if (activa.log) game.logMsg(DSL._fill(activa.log, { carta: card.name }), activa.logTipo || 'ability');
             };
             const _ejecutarActiva = async (card, game, targets) => {
                 if (!_diferir) _cobrarActiva(card, game);
+                // Cobro ARMADO, no aplazado al final (Toto, 7-ago-2026). Antes "diferir"
+                // significaba "cobrar después de TODOS los efectos", y eso arrastraba el anuncio
+                // de la Habilidad con él: el nombre salía después de los cuatro ataques de
+                // AL-FÉNIX, así que había que silenciarlo y declararlo a mano en cada carta.
+                // Ahora se deja aquí un gatillo que dispara la PRIMERA elección al resolverse
+                // -que es exactamente el instante en que se deja de poder cancelar-, así que
+                // cobro y anuncio caen en su sitio SOLOS, sin que ninguna carta declare nada.
+                if (_diferir) DSL._cobroPendiente = { id: card.instanceId, fn: () => _cobrarActiva(card, game) };
                 const _res = await DSL._runEffectList(activa.efectos, card, game, card.owner, targets, activa.nombre || tmpl.activeName || null);
-                if (_diferir && _res && _res.ok === false) {
+                // ¿Sigue sin cobrarse? Entonces no llegó a pasar nada irreversible.
+                const _sinCobrar = !!(DSL._cobroPendiente && DSL._cobroPendiente.id === card.instanceId);
+                if (_diferir && _res && _res.ok === false && _sinCobrar) {
+                    DSL._cobroPendiente = null;
                     // Cancelado a mitad de la cadena de elecciones: no se cobra nada y la carta
                     // NO gasta su acción — solo se suelta el candado y se deshace la selección.
                     game.isActionLocked = false;
@@ -8984,7 +9007,11 @@ const DSL = {
                     if (typeof game.render === 'function') game.render();
                     return;
                 }
-                if (_diferir) _cobrarActiva(card, game);
+                // Pendiente todavía = la Activa no tenía ninguna elección por medio (o ninguna
+                // llegó a resolverse pero sí hubo efectos): se cobra aquí, al cerrar.
+                if (DSL._cobroPendiente && DSL._cobroPendiente.id === card.instanceId) {
+                    const _cp = DSL._cobroPendiente; DSL._cobroPendiente = null; _cp.fn();
+                }
                 if (!card.exhausted) {
                     // sinAgotar (Achmay, PÉGAME PERRA, 31-jul-2026): "Esta habilidad no gasta
                     // la acción de Achmay" — cierra la acción igual (candado, sync, render)

@@ -36,9 +36,16 @@ const AVISO_RAW_VIEJA = {
 
 // costeDiferido cobra el Furor al FINAL (para que cancelar el modal no cueste nada), así que el
 // "-1 FUR" pasa del principio al final. Mismo texto en ambas bases: se retira como PAR.
+// El "-1 FUR" vuelve a caer donde siempre: la norma del coste (7-ago-2026) cobra y anuncia
+// JUNTOS en el instante irreversible -aquí, al elegir el arma-, no al terminar la Habilidad
+// entera como hacía el `costeDiferido` de la primera versión. Lo único que queda distinto es
+// el TEXTO del anuncio: la vieja pintaba a mano uno abreviado y la nueva usa el automático de
+// la Activa, que lleva el activeName completo.
 const FUR_AL_FINAL = {
-    flotantesSoloVieja: [ { linea: '-1 FUR', motivo: 'orden vieja: cobra nada más elegir el arma' } ],
-    flotantesSoloNueva: [ { linea: '-1 FUR', motivo: 'orden nueva: costeDiferido cobra al terminar toda la Habilidad' } ],
+    flotantesIntencionados: [
+        { de: 'ARMAMENTO MELÉ', a: 'GENERACIÓN DE ARMAMENTO MELÉ',
+          motivo: 'la vieja declaraba su propio flotante abreviado; la nueva usa el anuncio AUTOMÁTICO de la Activa (activeName completo), que es el que ahora tienen todas sin declararlo' },
+    ],
 };
 
 const escenarios = [

@@ -86,13 +86,11 @@ const escenarios = [
             { de: 'ataca a Mini-tigre con su nueva arma', a: 'ataca a Mini-tigre [1] de J2 (Jugador 2) con su nueva arma',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba target.name a secas' },
         ],
-        // El coste pasa a cobrarse al FINAL (`costeDiferido`, Toto 7-ago-2026): hasta que el arma
-        // no se equipa no ha cambiado nada, así que cancelar la elección debe salir gratis. Efecto
-        // colateral esperado: el flotante "-1 FUR" ya no abre la secuencia, la cierra. Los mismos
-        // flotantes, en otro orden.
-        diferenciasEsperadas: COPY_ID_NACE.concat([
-            { contiene: 'flotante[', motivo: 'costeDiferido: el "-1 FUR" del coste se pinta al final y no al principio; mismos flotantes, distinto orden' },
-        ]),
+        // El coste se cobra al ELEGIR el arma, no al confirmar la Habilidad (norma del coste,
+        // 7-ago-2026): cancelar sale gratis. El ORDEN de flotantes vuelve a ser el de siempre
+        // -"-1 FUR" y luego el nombre- porque cobro y anuncio caen juntos en el instante
+        // irreversible, así que aquí no queda ninguna diferencia que declarar.
+        diferenciasEsperadas: COPY_ID_NACE,
     },
     {
         nombre: 'APRENDIZ DE ARMAS: también sirve un Arma legendaria (ignora sus condiciones)',
@@ -114,9 +112,7 @@ const escenarios = [
             { de: 'ataca a Mini-tigre con su nueva arma', a: 'ataca a Mini-tigre [1] de J2 (Jugador 2) con su nueva arma',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño)' },
         ],
-        diferenciasEsperadas: COPY_ID_NACE.concat([
-            { contiene: 'flotante[', motivo: 'costeDiferido (ver escenario anterior): el "-1 FUR" se pinta al final, no al principio' },
-        ]),
+        diferenciasEsperadas: COPY_ID_NACE,
     },
     {
         nombre: 'APRENDIZ DE ARMAS rechazada: no hay armas en la mano',
