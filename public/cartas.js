@@ -9036,7 +9036,16 @@ const DSL = {
                     game.isActionLocked = true;
                     game.inputState = 'EXECUTING';
                     game.render();
-                    _ejecutarActiva(card, game, [card]).then(() => game.forceSync());
+                    // CONTABILIZADA (Toto, 7-ago-2026): esta promesa NO se espera -es el patrón
+                    // de siempre para no bloquear la tubería de red- así que, sin registrarla, el
+                    // poller de reconexión no sabe que la Habilidad sigue trabajando y vuelca el
+                    // estado a medias. Es el mismo agujero que ya se tapó en playCard, pero por
+                    // el camino de las Activas: `onExecuteAbility` SÍ se espera arriba, solo que
+                    // aquí devuelve al instante y el trabajo real se queda flotando en el .then.
+                    // Karlitos lo destapó: el rival veía el anuncio de la Activa pero nunca el
+                    // arma equipada ni salir de su mano.
+                    const _pr = _ejecutarActiva(card, game, [card]).then(() => game.forceSync());
+                    if (typeof game._seguirCorrutina === 'function') game._seguirCorrutina(_pr);
                     return;
                 }
                 game.selectedCard = card;

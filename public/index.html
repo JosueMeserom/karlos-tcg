@@ -6782,7 +6782,11 @@
                 const template = getCardTemplate(card.id);
                 
                 if (typeof template.onExecuteAbility === 'function') {
-                    await template.onExecuteAbility(card, this);
+                    // Contabilizada: aunque aquí SÍ se espera, quien llama a esta función no lo
+                    // hace (sale de un onclick), así que para el poller de reconexión la cadena
+                    // es una promesa flotante como cualquier otra. Cubre las Activas imperativas;
+                    // las declarativas se registran además por dentro (ver _ejecutarActiva).
+                    await this._seguirCorrutina(template.onExecuteAbility(card, this));
                     
                     if (this.inputState.startsWith('SELECT_') || this.inputState === 'WAITING_OPPONENT_DISCARD') {
                         this.isActionLocked = false;
@@ -6836,7 +6840,7 @@
                     this.render();
                     
                     if (typeof template.onTargetsReady === 'function') {
-                        await template.onTargetsReady(this.selectedCard, this);
+                        await this._seguirCorrutina(template.onTargetsReady(this.selectedCard, this));
                     }
                     this.forceSync(); // <--- MARTILLO TRAS EJECUTAR HABILIDAD CON OBJETIVO (Ej: Clarise)
                     // Red de seguridad si un rival reconectó mientras yo elegía objetivos (y
@@ -6858,7 +6862,7 @@
                 
                 const template = getCardTemplate(this.selectedCard.id);
                 if (typeof template.onTargetsReady === 'function') {
-                    await template.onTargetsReady(this.selectedCard, this);
+                    await this._seguirCorrutina(template.onTargetsReady(this.selectedCard, this));
                 }
             }
 
