@@ -5135,6 +5135,10 @@
             }
             
             showTurnOverlay() {
+                // Checkpoint: al cambiar de turno no puede quedar ninguna cadena viva, así que
+                // cualquier bandera de sincronización superviviente es basura de una reconexión
+                // anterior — y mientras siga puesta, los flotantes se reenvían por duplicado.
+                this._purgarBanderasSync();
                 const overlay = document.getElementById('turn-overlay');
                 const title = document.getElementById('overlay-title');
                 const subtitle = overlay.querySelector('.turn-subtitle');
@@ -7111,6 +7115,16 @@
             // instante) y luego por "quietud sostenida" del estado (se colaba igual, porque entre
             // robo y robo hay huecos en los que nada cambia mientras corre la animación, y esos
             // huecos duran más que cualquier ventana razonable). Esto no adivina: cuenta.
+            // Desarma TODAS las banderas de sincronización. Se llama al vencer el tope del poller
+            // y al cambiar de turno: para entonces cualquier cadena tiene que haber terminado, y
+            // dejarlas puestas solo puede causar reenvíos duplicados.
+            _purgarBanderasSync() {
+                this._esperandoSettleEspejo = false;
+                this._espejandoReaccion = false;
+                this._reSyncTrasEleccion = false;
+                this._debeVolcarTrasCadena = false;
+            }
+
             _seguirCorrutina(promesa) {
                 if (!promesa || typeof promesa.then !== 'function') return promesa;
                 this._corrutinasVivas = (this._corrutinasVivas || 0) + 1;
@@ -10013,6 +10027,13 @@
                 if (this._esperandoSettleEspejo) return; // ya hay un poller en marcha
                 this._esperandoSettleEspejo = true;
                 this._ultimoSnapEspejo = null; // firma del último estado intermedio enviado (dedup)
+                // TOPE DURO (Toto, 7-ago-2026). Mientras estas banderas están armadas,
+                // instalarReenvioAnimaciones REENVÍA cada flotante; si una cadena no llegase a
+                // asentarse nunca -una promesa que no resuelve, un prompt que se queda colgado-
+                // se quedarían puestas para siempre y TODA la partida siguiente vería los
+                // flotantes por duplicado, ya sin reconexión de por medio. Que es justo el
+                // síntoma que apareció al probar. El estado se vuelca igual al vencer el plazo.
+                const _limite = Date.now() + 15000;
                 const CADENCIA = 60; // ms entre sondeos; con dedup, solo emite/renderiza si el estado cambió
                 // Volcado DIRIGIDO cuando sé a quién se lo debo (el que acaba de reconectar): así
                 // no se le pisa el estado a un cliente que está perfectamente bien.
@@ -10024,6 +10045,13 @@
                 };
                 const poll = () => {
                     if (!this._espejandoReaccion && !this._reSyncTrasEleccion && !this._debeVolcarTrasCadena) { this._esperandoSettleEspejo = false; return; }
+                    if (Date.now() > _limite) {
+                        this._dbgRx('poller: TOPE alcanzado, desarmo banderas y vuelco');
+                        this._purgarBanderasSync();
+                        _emitirEstado();
+                        this._reSyncTarget = null;
+                        return;
+                    }
                     const esperandoOtraInteraccion =
                         this.pendingReaction ||          // otra reacción de la cadena (ya empujada por PENDING_REACTION)
                         this.pendingInteraction ||       // interacción visual encadenada (tablero/mazo/moneda)
