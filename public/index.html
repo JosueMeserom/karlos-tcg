@@ -8276,7 +8276,11 @@
                         clon.onmouseenter = () => this.startPreview(carta);
                         clon.onmouseleave = () => this.stopPreview();
                     }
-                    if (opts.fuente) clon.classList.add('selected'); // quién está actuando
+                    // Realce propio, NO `.selected`: esa clase lleva un scale(1.2) y el clon ya
+                    // viene dimensionado con el rect del original -que si estaba seleccionado YA
+                    // incluia ese 1.2-, así que se escalaba dos veces y salía enorme
+                    // (Toto, 7-ago-2026: "no te he dicho que se haga más grande").
+                    if (opts.fuente) clon.classList.add('mano-lift-fuente'); // quién está actuando
                     capa.appendChild(clon);
                     el.style.visibility = 'hidden';
                     this._manoLiftOcultas.push(carta.instanceId);
@@ -9981,13 +9985,34 @@
                         this.currentVisualResolve ||     // búsqueda visual / elección en tablero
                         this.dslPick ||                  // pick DSL en tablero
                         this.coinFlipResolve;            // moneda en vuelo
-                    const asentado = !esperandoOtraInteraccion &&
+                    // QUIETUD SOSTENIDA, no un instante suelto (Toto, 7-ago-2026). Los banderines
+                    // de arriba NO bastan: `playCard` lanza el onPlay de una Ayuda SIN await y SIN
+                    // isActionLocked ("la tubería de acciones en red no debe bloquearse"), así que
+                    // toda la cadena de Dobla la ropa -descartar 3, robar 3 con sus animaciones-
+                    // corre con inputState ya en IDLE y el candado suelto. El poller la daba por
+                    // asentada a mitad, mandaba el estado de ESE instante (descarte hecho, robo
+                    // no) y apagaba los flags: el rival se quedaba con 3 cartas y ya no llegaba
+                    // nada más. Exigiendo que la firma del estado no cambie durante varias
+                    // muestras seguidas, cualquier cadena que siga mutando -tenga o no candado-
+                    // mantiene vivo el poller sin tener que enumerar sus caminos async uno a uno.
+                    const quieto = !esperandoOtraInteraccion &&
                         this.inputState === 'IDLE' && !this.isActionLocked && !this.isFlipping;
+                    const MUESTRAS_QUIETAS = 4; // x CADENCIA (60ms) = ~240ms de estado inmóvil
+                    let _firmaAhora = null;
+                    if (quieto && this.gameMode === 'online' && this.myPlayerId !== 'spectator') {
+                        _firmaAhora = JSON.stringify(this.exportGameState(), (k, v) => k === 'logHistory' ? undefined : v);
+                    }
+                    this._quietasSeguidas = (_firmaAhora !== null && _firmaAhora === this._firmaQuietaPrev)
+                        ? (this._quietasSeguidas || 0) + 1 : 0;
+                    this._firmaQuietaPrev = _firmaAhora;
+                    const asentado = quieto && this._quietasSeguidas >= MUESTRAS_QUIETAS;
                     if (asentado) {
                         this._esperandoSettleEspejo = false;
                         this._espejandoReaccion = false;
                         this._reSyncTrasEleccion = false;
-                        this._dbgRx('poller ASENTADO -> vuelco estado final');
+                        this._quietasSeguidas = 0;
+                        this._firmaQuietaPrev = null;
+                        this._dbgRx('poller ASENTADO (quietud sostenida) -> vuelco estado final');
                         _emitirEstado();
                         this._reSyncTarget = null;
                     } else {

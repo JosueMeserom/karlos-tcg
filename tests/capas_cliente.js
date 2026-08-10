@@ -340,8 +340,10 @@ check('...por debajo de los clones', !!mlVelo && mlVelo.style.cssText.includes('
       (mlVelo && mlVelo.style.cssText) + ' / ' + (mlCapa && mlCapa.style.cssText));
 check('sube la mano ENTERA, no solo lo elegible', mlCapa.children.length === 3,
       'clones: ' + mlCapa.children.length + ' (esperados 3: fuente + 2 de mano)');
-check('...incluida la carta que ACTUA, marcada', mlCapa.children.some(x => x.classList.contains('selected')),
-      'ninguna lleva .selected');
+check('...incluida la carta que ACTUA, marcada SIN reescalarla', mlCapa.children.some(x => x.classList.contains('mano-lift-fuente')),
+      'ninguna lleva .mano-lift-fuente');
+check('...y NO con .selected, que lleva scale(1.2) y la escalaria dos veces',
+      !mlCapa.children.some(x => x.classList.contains('selected')), 'alguna lleva .selected');
 check('el DORSO sigue siendo dorso al clonarse (elegir a ciegas no revela nada)',
       mlCapa.children.some(x => x.classList.contains('card-back')), 'se perdio la clase card-back');
 check('los clones NO llevan data-id (no envenenan querySelector)',
