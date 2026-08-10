@@ -7309,9 +7309,21 @@
                 }
                 
                 this.pendingInteraction = null; // interacción visual resuelta (reanudar-perfecto)
+                const _habiaResolver = !!this.currentVisualResolve;
                 if (this.currentVisualResolve) {
                     this.currentVisualResolve(finalCards);
                     this.currentVisualResolve = null;
+                }
+                // Si la resolución vino DE FUERA y aquí había una corrutina viva, es que el peer
+                // la ha dirigido: la suya murió al recargar, así que él NO puede aplicar el
+                // resultado y me toca devolverle el estado sí o sí (Toto, 7-ago-2026).
+                // Antes esto dependía de que el modo espejo se hubiera armado en el REQUEST_SYNC;
+                // si ese mensaje no llegaba —o llegaba por un camino que no lo armaba— el
+                // reconectado se quedaba con su elección hecha "a medias" PARA SIEMPRE: veía el
+                // flotante y el siguiente prompt (se los manda quien sí ejecuta) pero no el
+                // efecto. Ahora la obligación se DEDUCE del hecho, no de un flag puesto antes.
+                if (isRemote && _habiaResolver && this.gameMode === 'online' && this.myPlayerId !== 'spectator') {
+                    this._reSyncTrasEleccion = true;   // sin _reSyncTarget: volcado autoritativo a la sala
                 }
                 // MODO ESPEJO (Toto, 31-jul-2026): el rival reconectado acaba de dirigir MI
                 // corrutina con su clic en el tablero (o en el visor de mazo), así que le debo el
