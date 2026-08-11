@@ -3875,6 +3875,7 @@
 
             startPreview(card) {
                 if (this.previewTimer) clearTimeout(this.previewTimer);
+                this._vigilarPreview(); // cierra el detalle si el ratón deja de estar sobre una carta
                 this.previewTimer = setTimeout(() => {
                     const panel = document.getElementById('card-preview');
                     document.getElementById('cp-name').innerText = card.name;
@@ -4371,7 +4372,28 @@
 
             stopPreview() {
                 if (this.previewTimer) clearTimeout(this.previewTimer);
+                if (this._vigilaPreview) { clearInterval(this._vigilaPreview); this._vigilaPreview = null; }
                 document.getElementById('card-preview').style.display = 'none'; if (this.clearModArrows) this.clearModArrows();
+            }
+
+            // VIGILANTE DEL DETALLE (Toto, 7-ago-2026). El detalle se cierra con `mouseleave`,
+            // pero ese evento NO se dispara si la carta DESAPARECE del DOM con el ratón encima —
+            // que es justo lo que pasa al elegir una carta de los descartes: la clicas, se la
+            // llevan, y el detalle se queda pegado hasta que algo repinta media cadena después.
+            // Esto lo cierra por la condición de verdad ("¿sigue el ratón sobre alguna carta?")
+            // en vez de por un evento que puede no llegar nunca.
+            // NOTA para el futuro: si algún día hay que enseñar el detalle SIN hover (fijarlo,
+            // un modo inspección…), este vigilante es lo primero que habrá que condicionar.
+            _vigilarPreview() {
+                if (this._vigilaPreview) return;
+                this._vigilaPreview = setInterval(() => {
+                    const panel = document.getElementById('card-preview');
+                    if (!panel || panel.style.display === 'none') {
+                        clearInterval(this._vigilaPreview); this._vigilaPreview = null; return;
+                    }
+                    // Si el puntero ya no está sobre NINGUNA carta, fuera el detalle.
+                    if (!document.querySelector('.card:hover, .card-back:hover')) this.stopPreview();
+                }, 150);
             }
 
             openDiscardViewer(playerId, event) {
@@ -4721,15 +4743,18 @@
             }
 
             closeDiscardViewer(isRemote = false) {
-                // OJO, DECISIÓN REVISADA (Toto, 7-ago-2026). Antes (21-jul) el visor con cartas
-                // elegibles NO se podía cerrar: la elección era obligatoria. Se cambia porque
-                // choca con la norma que ha ido ganando peso desde entonces: mientras no ocurra
-                // nada IRREVERSIBLE, el jugador tiene que poder arrepentirse — y abrir un visor
-                // no cambia el tablero. Lo detectó con Líquido mortal, que además ni avisaba de
-                // que no se podía salir. Cerrar sin elegir resuelve "nada", y cada carta ya
-                // decide qué significa eso: las consumibles llevan `abortaSiCancelas` y no se
-                // gastan. El bloqueo se queda SOLO para búsquedas ya comprometidas, si alguna lo
-                // necesitara, que hoy ninguna lo pide.
+                // La regla depende de QUÉ PILA es (Toto, 7-ago-2026, corrigiéndome):
+                //   · MAZO — una vez abierto, elegir es OBLIGATORIO. Abrirlo ya te ha enseñado
+                //     una pila oculta y obliga a barajar: el momento de arrepentirse es ANTES,
+                //     en la pregunta de "¿buscar?", no después de mirar. Esto era lo que había
+                //     desde el 21-jul y estaba bien; me equivoqué al quitarlo.
+                //   · DESCARTES — cancelable SIEMPRE. Esa pila es pública y se puede consultar
+                //     cuando se quiera, así que abrirla no compromete a nada ni revela nada que
+                //     no estuviera ya a la vista (lo pilló con Líquido mortal).
+                if (this._deckSearchActivo && this._deckSearchZona !== 'discard'
+                    && this._deckSearchElegiblesCount > 0 && !isRemote) {
+                    return;
+                }
 
                 // SEGURO ANTI-BUGS: El espectador no molesta a los jugadores enviando órdenes por red
                 if (this.gameMode === 'online' && !isRemote && this.myPlayerId !== 'spectator') {
@@ -4782,6 +4807,7 @@
                         else resolveRaw(cards && cards.length ? cards[0] : null);
                     };
 
+                    this._deckSearchZona = zona;        // 'deck' | 'discard': deciden cosas distintas
                     this._interaccionChooser = playerId; // quién busca (para la recuperación por reconexión)
                     // Descriptor serializable (reanudar-perfecto): si el buscador reconecta, se re-monta el visor.
                     this.pendingInteraction = { tipo: 'deckViewer', chooserId: playerId, playerId, elegiblesIds: (elegibles || []).map(c => c.instanceId), titulo: titulo || null, aviso: aviso || null, maxCount, zona };
@@ -4793,9 +4819,17 @@
                         if (this._espejandoReaccion || this._reSyncTrasEleccion) {
                             this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'PENDING_INTERACTION', pi: this.pendingInteraction });
                         }
-                        const banner = document.getElementById('action-banner');
-                        banner.innerText = `Esperando a que ${this.getDisplayName(playerId)} busque en ${_esDescartes ? 'su pila de descartes' : 'su mazo'}...`;
-                        banner.style.display = 'block';
+                        // Mismo criterio que _carteleraEspera (Toto, 7-ago-2026): al rival NO se
+                        // le anuncia nada mientras el que busca todavía pueda arrepentirse sin
+                        // que haya cambiado nada. Con Líquido mortal salía "Esperando a que J1
+                        // busque en su pila de descartes..." nada más abrir el visor, cuando aún
+                        // era cancelable: eso ya es contarle que has jugado algo.
+                        const _cadenaEnMarcha = (playerId !== this.activePlayerId) || this.isActionLocked;
+                        if (_cadenaEnMarcha && this.activePlayerId !== 'setup') {
+                            const banner = document.getElementById('action-banner');
+                            banner.innerText = `Esperando a que ${this.getDisplayName(playerId)} busque en ${_esDescartes ? 'su pila de descartes' : 'su mazo'}...`;
+                            banner.style.display = 'block';
+                        }
                         return; // sin visor local: lo resuelve el replay remoto
                     }
 
@@ -4816,12 +4850,13 @@
                     avisoEl.innerText = aviso || '';
                     avisoEl.style.display = aviso ? 'block' : 'none';
 
-                    // La pista se enseña SIEMPRE, porque ahora el visor siempre se puede cerrar.
-                    // Cambia el verbo: con elegibles delante, salir es CANCELAR la búsqueda; sin
-                    // ellas no hay nada que cancelar y es simplemente cerrar.
+                    // La pista dice la verdad en cada caso: en el MAZO con elegibles no hay
+                    // salida (no se enseña nada), en los DESCARTES siempre se puede cancelar, y
+                    // sin elegibles solo queda cerrar.
                     const _hint = document.getElementById('discard-close-hint');
                     if (_hint) {
-                        _hint.style.display = 'block';
+                        const _obligatoria = idsElegibles.size > 0 && !_esDescartes;
+                        _hint.style.display = _obligatoria ? 'none' : 'block';
                         _hint.innerText = idsElegibles.size > 0
                             ? '(Haz clic en el fondo oscuro para cancelar)'
                             : '(Haz clic en el fondo oscuro para cerrar)';
