@@ -2584,6 +2584,14 @@
                 if (!source || typeof source !== 'object' || !source.name) return '';
                 if (source.instanceId === card.instanceId) return '';
                 if (source.type === 'Ayuda' && source.location === 'hand') return '';
+                // La Ayuda que se está jugando AHORA MISMO (Toto, 7-ago-2026). Desde que se
+                // consume ANTES de resolver sus efectos, cuando estos corren ya está en el
+                // descarte, así que el guard de 'hand' de arriba dejó de cogerla y el coste
+                // pasaba a decir "-2 FUR (Pago por adelantado)". Se identifica por instanceId y
+                // no por zona, para no silenciar el caso CONTRARIO -que la suite ya cubría-: una
+                // Ayuda del descarte que dispara MÁS TARDE sí debe nombrarse, porque entonces sí
+                // es una fuente ajena al clic que acabas de dar.
+                if (source.instanceId && source.instanceId === this._ayudaEnCurso) return '';
                 return source.name;
             }
 

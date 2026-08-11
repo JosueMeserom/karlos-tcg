@@ -55,6 +55,14 @@ const escenarios = [
     },
     {
         nombre: 'Dobla la ropa: descarta 3 cartas elegidas y roba 3',
+        // ORDEN del descarte (7-ago-2026): la Ayuda se consume ANTES de resolver sus efectos,
+        // así que Dobla la ropa entra en la pila la PRIMERA y las 3 descartadas van detrás. La
+        // vieja la metía al final. Mismas cartas, distinto orden — y el nuevo es el natural: la
+        // jugaste antes de descartar nada.
+        diferenciasEsperadas: [
+            { contiene: 'estado.p1.discard', motivo: 'la Ayuda se consume primero, así que encabeza la pila en vez de cerrarla' },
+        ],
+
         semilla: 4,
         p1: {
             vanguardia: ['Oso con armadura'],

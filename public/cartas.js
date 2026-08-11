@@ -7299,7 +7299,11 @@ const DSL = {
             }
             return true;
         }
-        // NO_CONSUMIR (Atomización, 31-jul-2026): marca ESTA Ayuda para que el boilerplate de
+        // NO_CONSUMIR (Atomización, 31-jul-2026; semántica aclarada por Toto el 7-ago-2026):
+        // la Ayuda YA se ha consumido al empezar -va al descarte antes de correr los efectos-,
+        // así que esto no evita el consumo: pide la VUELTA, del descarte a la mano. El nombre se
+        // conserva para no tocar las cartas que ya lo declaran.
+        // NO_CONSUMIR: marca ESTA Ayuda para que el boilerplate de
         // AL_CONSUMIR la deje en la mano en vez de mandarla al descarte. El motor ya soporta el
         // caso (executeAyuda/onPlay solo la sacan de la mano si el flujo dice que se gastó); esto
         // solo lo hace declarable. Ojo con el nombre: el texto de la carta dice "vuelve a la
@@ -8811,14 +8815,39 @@ const DSL = {
                 const _vc = (DSL._vars[card.instanceId] = DSL._vars[card.instanceId] || {});
                 delete _vc.__noConsumir;
                 if (consumir.log) game.logMsg(DSL._fill(consumir.log, { carta: card.name, jugador: (typeof game.getDisplayName === 'function' ? game.getDisplayName(card.owner) : card.owner) }), consumir.logTipo || 'ability');
+                // LA AYUDA SE CONSUME PRIMERO (Toto, 7-ago-2026). Antes iba al descarte al FINAL
+                // de la cadena, así que la pila no se poblaba hasta que todo terminaba -y la
+                // animación de presentación aterrizaba sobre un montón que aún no existía-.
+                // Toto aclaró la semántica real: una Ayuda SÍ se consume al usarse; lo de
+                // Atomización es una IDA Y VUELTA (se gasta y, si mata, vuelve del descarte a la
+                // mano), no un "nunca se gastó". Con eso el orden natural es este.
+                const _alDescarte = () => {
+                    const hi = p.hand.findIndex(x => x.instanceId === card.instanceId);
+                    if (hi === -1) return;
+                    p.hand.splice(hi, 1);
+                    if (typeof game.resetCard === 'function') game.resetCard(card);
+                    p.discard.push(card);
+                    card.location = 'discard';
+                    if (typeof game.render === 'function') game.render();
+                };
+                const _volverAMano = () => {
+                    const di = p.discard.findIndex(x => x.instanceId === card.instanceId);
+                    if (di === -1) return;
+                    p.discard.splice(di, 1);
+                    card.location = 'hand';
+                    p.hand.push(card);
+                    if (typeof game.render === 'function') game.render();
+                };
+                _alDescarte();
+                // Marca "esta Ayuda se está jugando AHORA": la lee _fuenteFlotante para no
+                // nombrarla en sus propios flotantes (ver allí). Se limpia al terminar.
+                game._ayudaEnCurso = card.instanceId;
                 const res = await DSL._runEffectList(consumir.efectos || [], card, game, card.owner, null);
-                if (res && res.ok === false) { game.cancelAction(); return; } // elección cancelada: la carta NO se consume
-                // Boilerplate del consumible: de la mano al descarte (lavada), cierre de acción y
-                // refresco. Se salta entero si un NO_CONSUMIR pidió dejarla en la mano.
-                if (!_vc.__noConsumir) {
-                    const handIdx = p.hand.findIndex(x => x.instanceId === card.instanceId);
-                    if (handIdx !== -1) { p.hand.splice(handIdx, 1); if (typeof game.resetCard === 'function') game.resetCard(card); p.discard.push(card); card.location = 'discard'; }
-                }
+                game._ayudaEnCurso = null;
+                // Elección cancelada: no ha pasado nada, así que la Ayuda vuelve a la mano.
+                if (res && res.ok === false) { game._ayudaEnCurso = null; _volverAMano(); game.cancelAction(); if (typeof game.render === 'function') game.render(); return; }
+                // NO_CONSUMIR: la vuelta del viaje de ida (Atomización tras rematar).
+                if (_vc.__noConsumir) _volverAMano();
                 delete _vc.__noConsumir;
                 game.cancelAction();
                 if (typeof game.render === 'function') game.render();

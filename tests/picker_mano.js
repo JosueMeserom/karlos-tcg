@@ -60,9 +60,11 @@ const MAZO = ['Mini-tigre', 'Mini-tigre', 'Mini-tigre', 'Mini-tigre', 'Mini-tigr
         check('abre el PICKER, no el modal genérico', pend.tipo === 'elegirTablero', 'tipo=' + pend.tipo);
         check('...marcado como elección de MANO', g.dslPick && g.dslPick.mano === true);
         check('...sobre MI mano', g.dslPick && g.dslPick.manoDe === 'p1', 'manoDe=' + (g.dslPick && g.dslPick.manoDe));
-        // La propia Dobla la ropa NO está en el pool (se está jugando), así que la mano NO es
-        // "entera elegible" y el reborde verde SÍ aporta: distingue qué puedes descartar.
-        check('la mano no es entera elegible -> SÍ hay reborde verde', g._manoEnteraElegible() === false);
+        // Desde que la Ayuda se consume ANTES de resolver sus efectos (7-ago-2026), Dobla la
+        // ropa ya no está en la mano cuando se abre el picker: la mano son SOLO las 4
+        // descartables, o sea entera elegible, y por eso no se pinta reborde. Es coherente —
+        // señalar las 4 de 4 no distinguiría nada.
+        check('la mano es entera elegible -> sin reborde (no discriminaría)', g._manoEnteraElegible() === true);
         check('...y el pool son las 4 descartables, sin la propia carta jugada',
             (pend.pool || []).length === 4 && !(pend.pool || []).some(c => c.name === 'Dobla la ropa'),
             JSON.stringify((pend.pool || []).map(c => c.name)));
