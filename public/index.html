@@ -5919,7 +5919,22 @@
                     const _destino = card.type === 'Evento' ? `#${card.owner}-event-slot` : `#${card.owner}-discard-stack`;
                     // De dorso SOLO si para MÍ estaba tapada: la juega el rival desde su mano.
                     const _deDorso = this.gameMode === 'online' && this.myPlayerId !== card.owner;
-                    await animarPresentacionCarta(card.id, _origen, _destino, _deDorso);
+                    const _pres = { cardId: card.id, origen: _origen, destino: _destino, deDorso: _deDorso };
+                    // MISMA NORMA QUE EL COSTE DE UNA ACTIVA (Toto, 7-ago-2026): nada visible
+                    // hasta que deje de poder cancelarse. Enseñar la carta al clicarla SPOILEA la
+                    // mano si luego cancelas -lo pilló con Longaniza, que abre targeting-. Y como
+                    // con el coste, no es una opción por carta: se DEDUCE. Si al jugarla se abre
+                    // algo cancelable (targeting dirigido, tributo previo, o una primera elección
+                    // cancelable en su cadena), la presentación queda ARMADA y la dispara esa
+                    // elección al resolverse; si no hay ventana, ya es irreversible y sale ahora.
+                    const _ab = Array.isArray(template.abilities) ? template.abilities : [];
+                    const _p0 = (_ab.find(a => a.trigger === 'AL_CONSUMIR' || a.trigger === 'ANTES_DE_JUGAR' || a.trigger === 'AL_EQUIPAR') || {}).efectos;
+                    const _eleccionCancelable = !!(_p0 && _p0[0] && (_p0[0].op === 'ELEGIR' || _p0[0].op === 'BUSCAR') && _p0[0].cancelable !== false);
+                    const _hayVentana = typeof template.onValidateTarget === 'function'
+                                     || typeof template.onBeforePlayAsync === 'function'
+                                     || _eleccionCancelable;
+                    if (_hayVentana) this._presentacionArmada = _pres;
+                    else await animarPresentacionCarta(_pres.cardId, _pres.origen, _pres.destino, _pres.deDorso);
                 }
                 if (card.type === 'Ayuda') {
                     if (typeof template.onPlay === 'function') {
@@ -6075,6 +6090,10 @@
 
                 this.inputState = 'EXECUTING';
                 this.isActionLocked = true; 
+
+                // Objetivo confirmado: la Ayuda dirigida ya no se puede cancelar. Este es su
+                // instante irreversible, así que aquí se enseña (Longaniza y compañía).
+                this._dispararPresentacion();
 
                 let used = false;
                 if (typeof template.onExecuteAyuda === 'function') {
@@ -7205,6 +7224,18 @@
             // Desarma TODAS las banderas de sincronización. Se llama al vencer el tope del poller
             // y al cambiar de turno: para entonces cualquier cadena tiene que haber terminado, y
             // dejarlas puestas solo puede causar reenvíos duplicados.
+            // Dispara la presentación ARMADA en el primer instante irreversible. La llaman las
+            // elecciones al resolverse (igual que DSL._dispararCobro hace con el coste) y el
+            // camino de las Ayudas dirigidas al confirmar objetivo. Si no hay nada armado, no
+            // hace nada. NO se espera: la cadena ya está comprometida y bloquearla aquí solo
+            // añadiría latencia; la carta se ve igual porque va por encima de todo.
+            _dispararPresentacion() {
+                const p = this._presentacionArmada;
+                if (!p) return;
+                this._presentacionArmada = null;
+                animarPresentacionCarta(p.cardId, p.origen, p.destino, p.deDorso);
+            }
+
             _purgarBanderasSync() {
                 this._esperandoSettleEspejo = false;
                 this._espejandoReaccion = false;
@@ -7410,6 +7441,7 @@
                 }
                 
                 this.pendingInteraction = null; // interacción visual resuelta (reanudar-perfecto)
+                this._dispararPresentacion(); // primer instante irreversible de la jugada
                 const _habiaResolver = !!this.currentVisualResolve;
                 if (this.currentVisualResolve) {
                     this.currentVisualResolve(finalCards);
@@ -7930,6 +7962,11 @@
             }
 
             cancelAction(isRemote = false) {
+                // Si había una presentación ARMADA y se cancela, se DESARMA sin enseñar nada:
+                // ese es justo el caso que la norma protege -no spoilear la mano de quien se
+                // arrepiente-. Va lo primero para que ningún return posterior la deje colgada
+                // y se dispare en la jugada siguiente, con la carta equivocada.
+                this._presentacionArmada = null;
                 // Selección-en-tablero del DSL (SELECT_DSL_TARGETS): resuelve el pick
                 // en curso con null; el propio ELEGIR decide si eso aborta la carta o,
                 // con opcional:true, lo salta sin más. Bug de motor descubierto al
