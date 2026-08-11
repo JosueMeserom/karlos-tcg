@@ -4348,7 +4348,7 @@ const CARD_DB = [
     },
     {
         name: "Honsow", hp: 4, def: 4, atk: 3, type: "Personaje", subtype: "Ser vivo", tags: ["Usuario de VP"], gender: "M", rarity: "B", cost: 3, series: 2,
-        text: "P: MAESTRO DE ARMAS: Puedes equipar a Honsow cualquier Arma ignorando condiciones. A: GENERACIÓN DE ARMAMENTO MELÉ (1F): Busca Arma (no legendaria) con 'melé' en mano o mazo, equípala, baraja y realiza un ataque normal.",
+        text: "P: MAESTRO DE ARMAS: Puedes equipar a Honsow cualquier Arma ignorando condiciones. A: GENERACIÓN DE ARMAMENTO MELÉ (1F): Busca un Arma no legendaria 'melé' en tu mano o mazo, equípatela y ataca a un enemigo (si lo hay).",
         passiveName: "MAESTRO DE ARMAS", activeName: "GENERACIÓN DE ARMAMENTO MELÉ", activeCost: 1,
         // Migrada (31-jul-2026), reutilizando las piezas de Karlitos (`BUSCAR` multi-zona) más
         // dos añadidos suyos: `destino:"EQUIPADO"` (lo encontrado se equipa a la carta fuente en
@@ -7541,11 +7541,15 @@ const DSL = {
                     if (_zIdx === -1) _zIdx = 0;
                     if (_zonasNombre[_zIdx] === 'MAZO') _sacadaDelMazo = true;
                     const _zona = zonas[_zIdx];
-                    // PRESENTACIÓN (Toto, 7-ago-2026): las 18 cartas que recuperan algo de una
-                    // pila pasan TODAS por aquí, así que es un solo enganche y no 18 cambios.
-                    // Va antes de mover nada: la elección ya está hecha -este punto es
-                    // irreversible por definición- y así el viaje arranca desde la pila de
-                    // origen, que todavía existe.
+                    const idx0 = _zona.findIndex(x => x.instanceId === t.instanceId);
+                    if (idx0 !== -1) _zona.splice(idx0, 1);
+                    // La carta sale de la pila ANTES de la animación y se repinta (Toto,
+                    // 7-ago-2026): así el contador del mazo/descartes baja en cuanto empieza el
+                    // viaje, no al final. Antes bajaba después de barajar, que es tardísimo y
+                    // dejaba ver un número que ya no era cierto.
+                    if (typeof game.render === 'function') game.render();
+                    // PRESENTACIÓN: las 18 cartas que recuperan algo de una pila pasan TODAS por
+                    // aquí, así que es un solo enganche y no 18 cambios.
                     if (typeof animarPresentacionCarta === 'function') {
                         const _zn = _zonasNombre[_zIdx];
                         const _origen = _zn === 'MAZO' ? `#${pid}-deck-stack`
@@ -7561,11 +7565,9 @@ const DSL = {
                         const _deDorso = _zn === 'MAZO' || (_zn === 'MANO' && game.gameMode === 'online' && _yo !== pid);
                         await animarPresentacionCarta(t.id, _origen, _destino, _deDorso);
                     }
-                    const idx = _zona.findIndex(x => x.instanceId === t.instanceId);
-                    if (idx !== -1) _zona.splice(idx, 1);
                     if (!e.destino || e.destino === 'MANO') {
-                        const stack = _stackDe(_zonasNombre[_zIdx]);
-                        if (!e.sinAnimacion && typeof animateStackToHand === 'function') await animateStackToHand(stack, pid, t.id);
+                        // Sin animateStackToHand: la presentación de arriba YA hace ese viaje
+                        // (pila -> centro -> mano). Encadenarlas mostraba la carta dos veces.
                         t.location = 'hand';
                         p.hand.push(t);
                     } else if (e.destino === 'EQUIPADO') {
@@ -7592,10 +7594,10 @@ const DSL = {
                         const _aVanguardia = e.destino === 'CAMPO' && p.vanguard.length < 4;
                         t.location = _aVanguardia ? 'vanguard' : 'rearguard';
                         (_aVanguardia ? p.vanguard : p.rearguard).push(t);
-                        if (e.animacionResurrect && typeof animateResurrect === 'function') {
-                            game.render();
-                            try { await animateResurrect(pid, t.instanceId); } catch (err) {}
-                        }
+                        // Sin animateResurrect: la presentación ya lleva la carta de los
+                        // descartes a su sitio. Con las dos, se veía volar dos veces
+                        // (Toto, 7-ago-2026, con ARTES PROHIBIDAS).
+                        if (typeof game.render === 'function') game.render();
                     }
                     if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: DSL._nombre(game, t), jugador: dn }), e.logTipo || 'ability');
                 };

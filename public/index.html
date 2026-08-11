@@ -1436,7 +1436,18 @@
         // picker se escalaba dos veces; a Toto le gustó ESE para el escaparate (aquí no hay
         // original con la que descuadrar, así que no es un bug: es el tamaño elegido).
         const PRESENTA_ZOOM  = 1.44;
-        async function animarPresentacionCarta(cardId, origenSel, destinoSel, deDorso) {
+        // Las presentaciones se ENCOLAN (Toto, 7-ago-2026). Una cadena puede disparar varias
+        // -Líquido mortal presenta la Ayuda y acto seguido el Ser vivo que recupera- y sin cola
+        // salían las dos volando al centro a la vez. Encolar en vez de repartir esperas a mano
+        // evita tener que cuadrar timings carta por carta, que es donde se acumulan los errores.
+        let _colaPresenta = Promise.resolve();
+        function animarPresentacionCarta(cardId, origenSel, destinoSel, deDorso) {
+            _colaPresenta = _colaPresenta
+                .then(() => _presentarCarta(cardId, origenSel, destinoSel, deDorso))
+                .catch(() => {});
+            return _colaPresenta;
+        }
+        async function _presentarCarta(cardId, origenSel, destinoSel, deDorso) {
             const g = window.game;
             if (!g || g.isSkippingAnim) return;                 // saltable como el resto
             const tmpl = getCardTemplate(cardId);
@@ -1462,9 +1473,10 @@
             const W = 90, H = 126;
 
             const cont = document.createElement('div');
-            // z-index 4900: por encima de todo lo del juego (velos 4000, clones de mano 4100)
-            // pero POR DEBAJO del detalle (5000), para poder leerlo mientras se presenta la carta.
-            cont.style.cssText = `position:fixed; z-index:4900; width:${W}px; height:${H}px;`
+            // z-index 3900: por encima del tablero pero POR DEBAJO de los visores de pila
+            // (#discard-viewer, 4000) y del detalle. Con 4900 la carta presentada se dibujaba
+            // ENCIMA del modal de búsqueda y tapaba justo las cartas entre las que eliges.
+            cont.style.cssText = `position:fixed; z-index:3900; width:${W}px; height:${H}px;`
                 + 'perspective:800px; pointer-events:none; transition:'
                 + `left ${PRESENTA_VIAJE}ms cubic-bezier(.2,.8,.2,1), top ${PRESENTA_VIAJE}ms cubic-bezier(.2,.8,.2,1);`;
             cont.style.left = ((origen ? origen.left + origen.width / 2 : cx) - W / 2) + 'px';
