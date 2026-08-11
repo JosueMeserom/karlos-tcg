@@ -1431,8 +1431,11 @@
         //  TI estaba de dorso (o sea, si la juega el rival desde su mano). Quien la juega ya
         //  sabe lo que es y no necesita el volteo.
         const PRESENTA_VIAJE = 400;   // ms: origen -> escaparate  (y escaparate -> destino)
-        const PRESENTA_POSE  = 800;   // ms: quieta en el escaparate
-        const PRESENTA_ZOOM  = 1.2;   // el mismo que el hover/seleccion, no mas
+        const PRESENTA_POSE  = 600;   // ms: quieta en el escaparate
+        // 1.44 = 1.2 x 1.2. Es el tamaño que salía por accidente cuando la carta fuente del
+        // picker se escalaba dos veces; a Toto le gustó ESE para el escaparate (aquí no hay
+        // original con la que descuadrar, así que no es un bug: es el tamaño elegido).
+        const PRESENTA_ZOOM  = 1.44;
         async function animarPresentacionCarta(cardId, origenSel, destinoSel, deDorso) {
             const g = window.game;
             if (!g || g.isSkippingAnim) return;                 // saltable como el resto
@@ -1442,7 +1445,12 @@
             const origen = _rect(origenSel);
             // Sin origen visible (una zona oculta, un elemento aun sin pintar) se arranca desde
             // el centro: la presentacion sigue teniendo sentido aunque el viaje no.
-            const cx = window.innerWidth / 2, cy = window.innerHeight / 2;
+            // Centro del TABLERO, no del viewport (Toto: "sale un poco más a la izquierda").
+            // #game-board no ocupa todo el ancho -a su izquierda vive la franja del detalle- así
+            // que su centro está desplazado a la derecha respecto al de la pantalla.
+            const _tablero = _rect('#game-board');
+            const cx = _tablero ? _tablero.left + _tablero.width / 2 : window.innerWidth / 2;
+            const cy = _tablero ? _tablero.top + _tablero.height / 2 : window.innerHeight / 2;
             const W = 90, H = 126;
 
             const cont = document.createElement('div');
@@ -1456,9 +1464,13 @@
             const flip = document.createElement('div');
             flip.style.cssText = 'position:relative; width:100%; height:100%; transform-style:preserve-3d;'
                 + `transition: transform ${PRESENTA_VIAJE}ms ease, scale ${PRESENTA_VIAJE}ms ease;`;
-            const cara = g.createCardEl({ id: cardId, instanceId: '__presenta__', name: tmpl.name,
-                type: tmpl.type, rarity: tmpl.rarity, currentHp: tmpl.hp, currentDef: tmpl.def,
-                currentAtk: tmpl.atk, owner: 'p1', location: 'preview' }, false, true);
+            // OJO a `text`: createCardEl lo vuelca tal cual en .card-body, así que sin él salía
+            // literalmente "undefined" en la descripción. Se copia la plantilla entera y solo se
+            // sobrescribe lo que una instancia necesita, para no volver a olvidar un campo.
+            const cara = g.createCardEl(Object.assign({}, tmpl, {
+                instanceId: '__presenta__', owner: 'p1', location: 'preview',
+                currentHp: tmpl.hp, currentDef: tmpl.def, currentAtk: tmpl.atk,
+            }), false, true);
             cara.removeAttribute('data-id');
             cara.style.cssText += 'position:absolute; inset:0; margin:0; width:100%; height:100%; backface-visibility:hidden;';
             const dorso = document.createElement('div');
@@ -1468,6 +1480,10 @@
             flip.style.transform = deDorso ? 'rotateY(180deg) scale(1)' : 'rotateY(0deg) scale(1)';
             cont.appendChild(flip);
             document.body.appendChild(cont);
+            // El nombre se encoge para caber, igual que en el resto de cartas: ese ajuste lo hace
+            // adjustCardHeaders sobre TODOS los .card-header span, y solo corre desde render(),
+            // así que un elemento creado fuera de él se quedaba sin ajustar.
+            g.adjustCardHeaders();
             void cont.offsetWidth;
 
             // 1) Viaje al escaparate + volteo + zoom, todo a la vez.
