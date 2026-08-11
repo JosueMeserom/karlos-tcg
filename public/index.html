@@ -4721,13 +4721,15 @@
             }
 
             closeDiscardViewer(isRemote = false) {
-                // Elección obligatoria (pedido por Toto, 21-jul-2026): si el visor de
-                // búsqueda en mazo tiene alguna carta elegible, NO se puede cerrar sin
-                // elegir (clic fuera / fondo oscuro no hace nada). Solo se permite cerrar
-                // sin elegir cuando el visor está vacío de elegibles (nada que escoger).
-                if (this._deckSearchActivo && this._deckSearchElegiblesCount > 0 && !isRemote) {
-                    return;
-                }
+                // OJO, DECISIÓN REVISADA (Toto, 7-ago-2026). Antes (21-jul) el visor con cartas
+                // elegibles NO se podía cerrar: la elección era obligatoria. Se cambia porque
+                // choca con la norma que ha ido ganando peso desde entonces: mientras no ocurra
+                // nada IRREVERSIBLE, el jugador tiene que poder arrepentirse — y abrir un visor
+                // no cambia el tablero. Lo detectó con Líquido mortal, que además ni avisaba de
+                // que no se podía salir. Cerrar sin elegir resuelve "nada", y cada carta ya
+                // decide qué significa eso: las consumibles llevan `abortaSiCancelas` y no se
+                // gastan. El bloqueo se queda SOLO para búsquedas ya comprometidas, si alguna lo
+                // necesitara, que hoy ninguna lo pide.
 
                 // SEGURO ANTI-BUGS: El espectador no molesta a los jugadores enviando órdenes por red
                 if (this.gameMode === 'online' && !isRemote && this.myPlayerId !== 'spectator') {
@@ -4814,11 +4816,16 @@
                     avisoEl.innerText = aviso || '';
                     avisoEl.style.display = aviso ? 'block' : 'none';
 
-                    // La pista "(Haz clic en el fondo oscuro para cerrar)" solo vale cuando
-                    // el visor SÍ se puede cerrar sin elegir: con cartas elegibles la
-                    // elección es obligatoria (closeDiscardViewer lo impide), así que se oculta.
+                    // La pista se enseña SIEMPRE, porque ahora el visor siempre se puede cerrar.
+                    // Cambia el verbo: con elegibles delante, salir es CANCELAR la búsqueda; sin
+                    // ellas no hay nada que cancelar y es simplemente cerrar.
                     const _hint = document.getElementById('discard-close-hint');
-                    if (_hint) _hint.style.display = idsElegibles.size > 0 ? 'none' : 'block';
+                    if (_hint) {
+                        _hint.style.display = 'block';
+                        _hint.innerText = idsElegibles.size > 0
+                            ? '(Haz clic en el fondo oscuro para cancelar)'
+                            : '(Haz clic en el fondo oscuro para cerrar)';
+                    }
 
                     // Botón CONFIRMAR: solo en modo multi. Se crea una vez y se reutiliza.
                     let confirmEl = document.getElementById('deck-search-confirm');
@@ -7479,7 +7486,18 @@
                 }
                 
                 this.pendingInteraction = null; // interacción visual resuelta (reanudar-perfecto)
-                this._dispararPresentacion(); // primer instante irreversible de la jugada
+                // SOLO si de verdad se eligió algo (Toto, 7-ago-2026). Cancelar viaja por ESTE
+                // MISMO canal -VISUAL_SEARCH_CONFIRM con ids:[]- así que disparar aquí sin mirar
+                // el contenido enseñaba la carta AL RIVAL justo cuando el dueño se arrepentía:
+                // el spoiler más absurdo posible. En local no se notaba porque cancelAction la
+                // desarma, pero el rival no pasa por cancelAction, pasa por aquí.
+                // Que Hexagrama no lo hiciera y Pago por adelantado sí era solo que sus
+                // cancelados salen por caminos distintos (visor de pila vs pick de tablero).
+                if (Array.isArray(finalCards) ? finalCards.filter(Boolean).length : !!finalCards) {
+                    this._dispararPresentacion(); // primer instante irreversible de la jugada
+                } else {
+                    this._presentacionArmada = null; // cancelado: no ha pasado nada que enseñar
+                }
                 const _habiaResolver = !!this.currentVisualResolve;
                 if (this.currentVisualResolve) {
                     this.currentVisualResolve(finalCards);
