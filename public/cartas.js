@@ -7533,7 +7533,19 @@ const DSL = {
                 // del BUSCAR no vale: este await la animación, así que el anuncio salía cuando la
                 // carta ya estaba puesta — al revés que el resto de Activas, donde primero se
                 // anuncia y el efecto ocurre a la vez.
+                // Colocación en el campo, extraída para que la pueda invocar TAMBIÉN la
+                // presentación (que necesita hacerlo a mitad de su animación, para aterrizar).
+                let _yaColocada = false;
+                const _colocarEnCampo = (t) => {
+                    const tpl = getCardTemplate(t.id);
+                    t.currentHp = tpl.hp; t.currentDef = tpl.def; t.currentAtk = tpl.atk;
+                    t.furor = 0; t.exhausted = false;
+                    const _aVan = e.destino === 'CAMPO' && p.vanguard.length < 4;
+                    t.location = _aVan ? 'vanguard' : 'rearguard';
+                    (_aVan ? p.vanguard : p.rearguard).push(t);
+                };
                 const aMano = async (t) => {
+                    _yaColocada = false;
                     DSL._dispararCobro(sourceCard);
                     if (e.floatingExito && typeof showFloatingText === 'function') {
                         showFloatingText(sourceCard.instanceId, F(e.floatingExito.texto), e.floatingExito.estilo || 'ft-ability',
@@ -7572,7 +7584,16 @@ const DSL = {
                         // entera); de una MANO, solo para quien no es su dueño.
                         const _yo = game.myPlayerId;
                         const _deDorso = _zn === 'MAZO' || (_zn === 'MANO' && game.gameMode === 'online' && _yo !== pid);
-                        await animarPresentacionCarta(t.id, _origen, _destino, _deDorso);
+                        // Si la carta se queda EN UNA FILA, la colocación viaja dentro de la
+                        // presentación: así el tramo final aterriza en el hueco real y las cartas
+                        // que ya estaban se apartan deslizándose (Toto, 7-ago-2026).
+                        const _aFila = e.destino === 'RETAGUARDIA' || e.destino === 'CAMPO';
+                        const _opts = _aFila ? {
+                            zonaSel: _destino,
+                            colocar: () => { _colocarEnCampo(t); if (typeof game.render === 'function') game.render(); return t.instanceId; },
+                        } : null;
+                        await animarPresentacionCarta(t.id, _origen, _destino, _deDorso, _opts);
+                        if (_aFila) { _yaColocada = true; }
                     }
                     if (!e.destino || e.destino === 'MANO') {
                         // Sin animateStackToHand: la presentación de arriba YA hace ese viaje
@@ -7588,24 +7609,11 @@ const DSL = {
                         t.location = 'equipped';
                         t.equippedTo = sourceCard.instanceId;
                         if (typeof game.updatePassives === 'function') game.updatePassives();
-                    } else if (e.destino === 'RETAGUARDIA' || e.destino === 'CAMPO') {
-                        const tpl = getCardTemplate(t.id);
-                        t.currentHp = tpl.hp; t.currentDef = tpl.def; t.currentAtk = tpl.atk;
-                        t.furor = 0; t.exhausted = false;
-                        // CAMPO (Toto, 7-ago-2026): "colócalo en tu campo" = las MISMAS reglas de
-                        // colocación que jugar la carta a mano (playCard): a la vanguardia si
-                        // queda hueco, y a la retaguardia solo cuando está llena. RETAGUARDIA se
-                        // queda para las cartas que dicen literalmente "en retaguardia" (Cápsula
-                        // de bio-regeneración, que además EXIGE la vanguardia llena).
-                        // El límite de 2 Personajes NO se resuelve aquí sino filtrando el pool
-                        // (ver _dslPilaFiltrada): un Personaje que no cabe no debe ni ofrecerse,
-                        // igual que playCard lo rechaza de plano en vez de mandarlo atrás.
-                        const _aVanguardia = e.destino === 'CAMPO' && p.vanguard.length < 4;
-                        t.location = _aVanguardia ? 'vanguard' : 'rearguard';
-                        (_aVanguardia ? p.vanguard : p.rearguard).push(t);
-                        // Sin animateResurrect: la presentación ya lleva la carta de los
-                        // descartes a su sitio. Con las dos, se veía volar dos veces
-                        // (Toto, 7-ago-2026, con ARTES PROHIBIDAS).
+                    } else if ((e.destino === 'RETAGUARDIA' || e.destino === 'CAMPO') && !_yaColocada) {
+                        // Solo si la presentación NO la colocó ya al aterrizar (p. ej. porque la
+                        // animación estaba desactivada). Las reglas -vanguardia si cabe, atrás si
+                        // está llena- viven en _colocarEnCampo, que es quien usan los dos caminos.
+                        _colocarEnCampo(t);
                         if (typeof game.render === 'function') game.render();
                     }
                     if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: DSL._nombre(game, t), jugador: dn }), e.logTipo || 'ability');

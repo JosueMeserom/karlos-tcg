@@ -94,6 +94,11 @@ function coincide(nodo, sel) {
     const m = sel.match(/^\.card\[data-id="([^"]+)"\]$/);
     if (m) return nodo.classList.contains('card') && nodo.dataset.id === m[1];
     if (sel === '[data-id]') return nodo.dataset.id !== undefined;
+    // `.card[data-id]` sin valor: lo usa _cartasDeFila para recoger la fila entera.
+    if (sel === '.card[data-id]') return nodo.classList.contains('card') && nodo.dataset.id !== undefined;
+    // `#id`: _cartasDeFila localiza primero el contenedor de la fila con querySelector.
+    const _id = sel.match(/^#([A-Za-z0-9_-]+)$/);
+    if (_id) return nodo.id === _id[1];
     // `[data-id="X"]` sin exigir .card: lo usa _manoLiftRefrescar, que sube cartas de mano
     // (cara O dorso: un dorso NO lleva la clase .card sola) y la carta fuente del tablero.
     const di = sel.match(/^\[data-id="([^"]+)"\]$/);
@@ -377,6 +382,43 @@ check('al terminar se retira el mlVelo', !documento.getElementById('mano-overlay
 check('...y la capa de clones', !documento.getElementById('mano-lift'), 'sigue la capa');
 check('...y las originales vuelven a ser visibles', mlCara.style.visibility === ''
       && mlDorso.style.visibility === '', 'quedaron ocultas: la mano se veria vacia');
+
+// ---------- deslizamiento de fila (FLIP) ----------
+// Cuando entra una carta nueva, las que ya estaban se APARTAN en vez de saltar. Se hace con
+// FLIP: foto de posiciones ANTES, render, y a cada carta se le aplica la transformacion que la
+// devuelve opticamente a su sitio viejo para luego quitarla con transicion. Lo que se comprueba
+// aqui es el CONTRATO: que la carta entrante se excluya (viaja por su cuenta), que a las demas
+// se les ponga un translate distinto de cero, y que las que no se han movido no se toquen.
+// Que el movimiento SE VEA bien es cosa del navegador; esto solo fija que no se descuadre.
+console.log('\n--- deslizamiento de fila (FLIP) ---');
+const filaEl = Nodo('div'); filaEl.setAttribute('id', 'p1-vanguard'); raiz.appendChild(filaEl);
+const _mk = (id, left) => { const c = Nodo('div'); c.classList.add('card'); c.setAttribute('data-id', id);
+    c.__rect = { left: left, top: 400, width: 90, height: 126 }; filaEl.appendChild(c); return c; };
+const fA = _mk('FA', 100), fB = _mk('FB', 200), fNueva = _mk('FN', 300);
+
+const fotoFila = vm.runInContext('_fotoFila', sandbox)('#p1-vanguard');
+check('la foto recoge las 3 cartas de la fila', fotoFila.size === 3, 'tam: ' + fotoFila.size);
+
+// Se simula el repintado: todas se corren 50px porque ha entrado una nueva.
+fA.__rect = { left: 50, top: 400, width: 90, height: 126 };
+fB.__rect = { left: 150, top: 400, width: 90, height: 126 };
+vm.runInContext('_deslizarFila', sandbox)('#p1-vanguard', fotoFila, 'FN');
+
+// OJO: FLIP pone el translate y lo QUITA en el mismo tick (es lo que dispara la transicion),
+// asi que `transform` ya no es observable al volver. Lo que queda -y es el contrato real- es
+// que a las cartas que se movieron se les haya armado una transicion de transform.
+check('a la carta que se movio se le arma la transicion', /transform \d+ms/.test(fA.style.transition || ''),
+      'transition: ' + fA.style.transition);
+check('...y a la otra tambien', /transform \d+ms/.test(fB.style.transition || ''),
+      'transition: ' + fB.style.transition);
+check('la carta ENTRANTE se excluye (viaja por su cuenta)', !fNueva.style.transition,
+      'transition: ' + fNueva.style.transition);
+
+// Una carta que NO se ha movido no debe recibir transformacion ninguna.
+const foto2 = vm.runInContext('_fotoFila', sandbox)('#p1-vanguard');
+fA.style.transition = '';
+vm.runInContext('_deslizarFila', sandbox)('#p1-vanguard', foto2, 'FN');
+check('si no se ha movido, no se le toca', !fA.style.transition, 'transition: ' + fA.style.transition);
 
 console.log(fallos === 0 ? '\nSUITE capas_cliente: ' + comprobaciones + '/' + comprobaciones + ' comprobaciones — CAPAS CORRECTAS' : '\nSUITE capas_cliente: ' + fallos + ' FALLOS de ' + comprobaciones + ' comprobaciones');
 process.exit(fallos ? 1 : 0);

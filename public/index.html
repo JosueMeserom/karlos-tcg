@@ -1436,20 +1436,66 @@
         // picker se escalaba dos veces; a Toto le gustó ESE para el escaparate (aquí no hay
         // original con la que descuadrar, así que no es un bug: es el tamaño elegido).
         const PRESENTA_ZOOM  = 1.44;
+        // ── DESLIZAMIENTO DE FILA (técnica FLIP) ─────────────────────────────────────────
+        // Cuando entra una carta nueva, las que ya estaban se APARTAN deslizándose en vez de
+        // saltar a su nueva posición (Toto, 7-ago-2026). Se hace con FLIP -First, Last, Invert,
+        // Play-: se fotografían las posiciones ANTES, se deja que render() repinte, y a cada
+        // carta se le aplica la transformación que la devuelve ópticamente a donde estaba para
+        // luego quitarla con transición. Es la única forma que no descuadra los adornos: no se
+        // mueve nada a mano ni se tocan los botones elevados (_liftExhaustedBtn), porque el
+        // elemento que se transforma es la carta entera y sus hijos van con ella.
+        const DESLIZA_MS = 400;
+        // La consulta va ACOTADA al contenedor (querySelectorAll sobre él) en vez de con un
+        // selector descendente global: es más barato y no depende de que el motor de selectores
+        // soporte descendencia.
+        function _cartasDeFila(sel) {
+            const cont = document.querySelector(sel);
+            return cont ? Array.from(cont.querySelectorAll('.card[data-id]')) : [];
+        }
+        function _fotoFila(sel) {
+            const foto = new Map();
+            _cartasDeFila(sel).forEach(el => {
+                foto.set(el.getAttribute('data-id'), el.getBoundingClientRect());
+            });
+            return foto;
+        }
+        function _deslizarFila(sel, foto, exceptoId) {
+            _cartasDeFila(sel).forEach(el => {
+                const id = el.getAttribute('data-id');
+                if (id === exceptoId) return;              // la que entra viaja por su cuenta
+                const antes = foto.get(id);
+                if (!antes) return;                        // no estaba: nada que deslizar
+                const ahora = el.getBoundingClientRect();
+                const dx = antes.left - ahora.left, dy = antes.top - ahora.top;
+                if (!dx && !dy) return;
+                el.style.transition = 'none';
+                el.style.transform = `translate(${dx}px, ${dy}px)`;
+                void el.offsetWidth;                       // fuerza el reflow antes de soltar
+                el.style.transition = `transform ${DESLIZA_MS}ms cubic-bezier(.2,.8,.2,1)`;
+                el.style.transform = '';
+                setTimeout(() => { el.style.transition = ''; }, DESLIZA_MS + 50);
+            });
+        }
+
         // Las presentaciones se ENCOLAN (Toto, 7-ago-2026). Una cadena puede disparar varias
         // -Líquido mortal presenta la Ayuda y acto seguido el Ser vivo que recupera- y sin cola
         // salían las dos volando al centro a la vez. Encolar en vez de repartir esperas a mano
         // evita tener que cuadrar timings carta por carta, que es donde se acumulan los errores.
         let _colaPresenta = Promise.resolve();
-        function animarPresentacionCarta(cardId, origenSel, destinoSel, deDorso) {
+        function animarPresentacionCarta(cardId, origenSel, destinoSel, deDorso, opts) {
             _colaPresenta = _colaPresenta
-                .then(() => _presentarCarta(cardId, origenSel, destinoSel, deDorso))
+                .then(() => _presentarCarta(cardId, origenSel, destinoSel, deDorso, opts))
                 .catch(() => {});
             return _colaPresenta;
         }
-        async function _presentarCarta(cardId, origenSel, destinoSel, deDorso) {
+        async function _presentarCarta(cardId, origenSel, destinoSel, deDorso, opts) {
             const g = window.game;
-            if (!g || g.isSkippingAnim) return;                 // saltable como el resto
+            // Saltable como el resto — pero la COLOCACIÓN no es adorno: si se salta la animación,
+            // la carta tiene que acabar en su sitio igualmente.
+            if (!g || g.isSkippingAnim) {
+                if (opts && typeof opts.colocar === 'function') await opts.colocar();
+                return;
+            }
             const tmpl = getCardTemplate(cardId);
             if (!tmpl) return;
             const _rect = (sel) => { const el = sel && document.querySelector(sel); return el ? el.getBoundingClientRect() : null; };
@@ -1517,17 +1563,38 @@
             // 2) Pose.
             await g.sleep(PRESENTA_POSE);
 
-            // 3) Viaje al destino, deshaciendo el zoom.
-            const destino = _rect(destinoSel);
+            // 3) Viaje al destino. Si la carta va a QUEDARSE en una fila, aterriza de verdad:
+            // se coloca en el estado, la fila se reordena deslizándose, y el clon vuela al hueco
+            // exacto que le ha tocado -sin desvanecerse-. El desvanecido se reserva para
+            // destinos donde la carta no queda a la vista (una pila).
+            let destino = null, idEntrante = null;
+            if (opts && typeof opts.colocar === 'function' && opts.zonaSel) {
+                const foto = _fotoFila(opts.zonaSel);
+                idEntrante = await opts.colocar();          // cambia el estado y repinta
+                const nuevoEl = idEntrante && document.querySelector(`${opts.zonaSel} .card[data-id="${idEntrante}"]`);
+                if (nuevoEl) {
+                    nuevoEl.style.visibility = 'hidden';    // el clon ocupa su sitio mientras llega
+                    destino = nuevoEl.getBoundingClientRect();
+                }
+                _deslizarFila(opts.zonaSel, foto, idEntrante);
+            } else {
+                destino = _rect(destinoSel);
+            }
             if (destino) {
                 cont.style.left = (destino.left + destino.width / 2 - W / 2) + 'px';
                 cont.style.top  = (destino.top + destino.height / 2 - H / 2) + 'px';
             }
             flip.style.transform = 'rotateY(0deg) scale(1)';
-            cont.style.opacity = '0';
-            cont.style.transition += `, opacity ${PRESENTA_VIAJE}ms ease`;
+            if (!idEntrante) {                              // sin hueco propio: se funde en la pila
+                cont.style.opacity = '0';
+                cont.style.transition += `, opacity ${PRESENTA_VIAJE}ms ease`;
+            }
             await g.sleep(PRESENTA_VIAJE);
             cont.remove();
+            if (idEntrante) {
+                const real = document.querySelector(`[data-id="${idEntrante}"]`);
+                if (real) real.style.visibility = '';        // ya está en su sitio: se destapa
+            }
         }
 
         async function animateResurrect(ownerId, cardId) {
@@ -6156,6 +6223,13 @@
                     }
 
                     p.hand.splice(cardIndex, 1);
+                    // DESLIZAMIENTO al colocar desde la mano (Toto, 7-ago-2026): las cartas que
+                    // ya estaban en la fila se apartan en vez de saltar. La foto se toma con la
+                    // nueva YA en el array pero ANTES de repintar, así que _deslizarFila calcula
+                    // los deltas correctos; a la entrante se la excluye (tiene su propia
+                    // animación de entrada) pasándole su id como excepción.
+                    this._filaDeslizar = card.location === 'rearguard' ? `#${card.owner}-rearguard` : `#${card.owner}-vanguard`;
+                    this._filaFoto = _fotoFila(this._filaDeslizar);
 
                     this.assignCopyId(card); // el [n] nace al salir de la mano
                     this.placedUnitThisTurn = true;
@@ -6163,6 +6237,10 @@
                     card.justPlayed = true; 
                     this.updatePassives();
                     this.render(); 
+                    if (this._filaFoto) {
+                        _deslizarFila(this._filaDeslizar, this._filaFoto, card.instanceId);
+                        this._filaFoto = null; this._filaDeslizar = null;
+                    }
 
                     if (card.tributeSourceId) {
                         const source = this.findCard(card.tributeSourceId);
