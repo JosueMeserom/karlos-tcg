@@ -7541,6 +7541,26 @@ const DSL = {
                     if (_zIdx === -1) _zIdx = 0;
                     if (_zonasNombre[_zIdx] === 'MAZO') _sacadaDelMazo = true;
                     const _zona = zonas[_zIdx];
+                    // PRESENTACIÓN (Toto, 7-ago-2026): las 18 cartas que recuperan algo de una
+                    // pila pasan TODAS por aquí, así que es un solo enganche y no 18 cambios.
+                    // Va antes de mover nada: la elección ya está hecha -este punto es
+                    // irreversible por definición- y así el viaje arranca desde la pila de
+                    // origen, que todavía existe.
+                    if (typeof animarPresentacionCarta === 'function') {
+                        const _zn = _zonasNombre[_zIdx];
+                        const _origen = _zn === 'MAZO' ? `#${pid}-deck-stack`
+                                      : _zn === 'MANO' ? `#${pid}-hand` : `#${pid}-discard-stack`;
+                        const _destino = (!e.destino || e.destino === 'MANO') ? `#${pid}-hand`
+                                       : e.destino === 'RETAGUARDIA' ? `#${pid}-rearguard`
+                                       : e.destino === 'EQUIPADO' ? `.card[data-id="${sourceCard.instanceId}"]`
+                                       : `#${pid}-vanguard`;   // CAMPO
+                        // Volteo: solo si la carta era desconocida para QUIEN MIRA. Del MAZO lo es
+                        // para los dos; de los DESCARTES no lo es para nadie (esa pila se ve
+                        // entera); de una MANO, solo para quien no es su dueño.
+                        const _yo = game.myPlayerId;
+                        const _deDorso = _zn === 'MAZO' || (_zn === 'MANO' && game.gameMode === 'online' && _yo !== pid);
+                        await animarPresentacionCarta(t.id, _origen, _destino, _deDorso);
+                    }
                     const idx = _zona.findIndex(x => x.instanceId === t.instanceId);
                     if (idx !== -1) _zona.splice(idx, 1);
                     if (!e.destino || e.destino === 'MANO') {

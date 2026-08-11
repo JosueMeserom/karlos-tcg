@@ -1445,16 +1445,26 @@
             const origen = _rect(origenSel);
             // Sin origen visible (una zona oculta, un elemento aun sin pintar) se arranca desde
             // el centro: la presentacion sigue teniendo sentido aunque el viaje no.
-            // Centro del TABLERO, no del viewport (Toto: "sale un poco más a la izquierda").
-            // #game-board no ocupa todo el ancho -a su izquierda vive la franja del detalle- así
-            // que su centro está desplazado a la derecha respecto al de la pantalla.
+            // Centro de la FILA DE VANGUARDIA, que es el centro real del campo de juego.
+            // Dos intentos fallidos antes de dar con esto (Toto, 7-ago-2026):
+            //   · El viewport: obvio que no, el campo no ocupa la pantalla entera.
+            //   · #game-board: tampoco cambia nada, porque el panel de detalle es
+            //     `position:absolute` y NO ocupa layout, así que el board sí abarca todo el
+            //     ancho y su centro coincide con el del viewport.
+            // Lo que de verdad desplaza el campo es `.rows-container { padding-left: 120px }`,
+            // el hueco que se les deja a las pilas: las filas empiezan 120px más a la derecha,
+            // o sea que su centro está 60px corrido. Midiendo la fila REAL sale bien, y además
+            // se autocorrige con cualquier resize (la consola abierta, sin ir más lejos).
+            const _fila = _rect('#p1-vanguard') || _rect('#p2-vanguard') || _rect('#game-board');
             const _tablero = _rect('#game-board');
-            const cx = _tablero ? _tablero.left + _tablero.width / 2 : window.innerWidth / 2;
+            const cx = _fila ? _fila.left + _fila.width / 2 : window.innerWidth / 2;
             const cy = _tablero ? _tablero.top + _tablero.height / 2 : window.innerHeight / 2;
             const W = 90, H = 126;
 
             const cont = document.createElement('div');
-            cont.style.cssText = `position:fixed; z-index:6000; width:${W}px; height:${H}px;`
+            // z-index 4900: por encima de todo lo del juego (velos 4000, clones de mano 4100)
+            // pero POR DEBAJO del detalle (5000), para poder leerlo mientras se presenta la carta.
+            cont.style.cssText = `position:fixed; z-index:4900; width:${W}px; height:${H}px;`
                 + 'perspective:800px; pointer-events:none; transition:'
                 + `left ${PRESENTA_VIAJE}ms cubic-bezier(.2,.8,.2,1), top ${PRESENTA_VIAJE}ms cubic-bezier(.2,.8,.2,1);`;
             cont.style.left = ((origen ? origen.left + origen.width / 2 : cx) - W / 2) + 'px';
