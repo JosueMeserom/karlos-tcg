@@ -329,7 +329,8 @@ game.inputState = 'SELECT_DSL_TARGETS';
 game.gameMode = 'local';
 game.selectedCard = spencer;                       // la carta que ACTUA (esta en el tablero)
 game.dslPick = { pool: new Set(['MANO1']), n: 1, targets: [], byId: {}, chooserId: 'p1',
-                 cancelable: true, mano: true, manoDe: 'p1' };
+                 cancelable: true, mano: true, manoDe: 'p1',
+                 prompt: 'Puedes elegir ahora un Necronomicón de tu mano' };
 game._manoLiftRefrescar();
 
 const mlVelo = documento.getElementById('mano-overlay');
@@ -338,6 +339,14 @@ check('se monta el VELO (mismo lenguaje que el resto de overlays)', !!mlVelo, 'n
 check('...por debajo de los clones', !!mlVelo && mlVelo.style.cssText.includes('z-index:4000')
       && !!mlCapa && mlCapa.style.cssText.includes('z-index:4100'),
       (mlVelo && mlVelo.style.cssText) + ' / ' + (mlCapa && mlCapa.style.cssText));
+// El cartel: sin él, oscurecer la mano no dice QUE se esta eligiendo ni que se puede salir.
+const mlCab = mlVelo.children[0];
+check('el velo lleva cartel explicativo', !!mlCab && mlCab.children.length >= 1, 'velo sin cabecera');
+check('...con el texto del prompt', !!mlCab && (mlCab.children[0].innerText || '').includes('Necronomicón'),
+      'texto: ' + (mlCab && mlCab.children[0] && mlCab.children[0].innerText));
+check('...y la pista de cancelar (la eleccion es cancelable)',
+      !!mlCab && mlCab.children.length === 2 && (mlCab.children[1].innerText || '').includes('cancelar'),
+      'hijos: ' + (mlCab && mlCab.children.length));
 check('sube la mano ENTERA, no solo lo elegible', mlCapa.children.length === 3,
       'clones: ' + mlCapa.children.length + ' (esperados 3: fuente + 2 de mano)');
 check('...incluida la carta que ACTUA, marcada SIN reescalarla', mlCapa.children.some(x => x.classList.contains('mano-lift-fuente')),

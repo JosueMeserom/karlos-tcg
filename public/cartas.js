@@ -6799,7 +6799,7 @@ const CARD_DB = [
                   log: "¡Artes prohibidas! {carta} devuelve a {objetivo} al campo de batalla." },
                 { op: "ELEGIR", de: "MANO", cantidad: 1, opcional: true,
                   filtros: [ { campo: "name", op: "contieneTexto", valor: "Necronomicón" } ],
-                  titulo: "¿DESCARTAR NECRONOMICÓN? (+1 FUROR)",
+                  titulo: "Puedes elegir ahora un Necronomicón de tu mano para descartarlo y ganar 1 de Furor",
                   efectos: [
                     { op: "DESCARTAR" },
                     // Sin `floating`: modifyStat ya pinta su "+1 FUR" automático para cualquier
@@ -8197,7 +8197,9 @@ const DSL = {
             // cartas de su sitio. `forzarModal` sigue siendo la vía de escape, a justificar.
             if (!e.forzarModal && typeof game.pickBoardTargets === 'function') {
                 const _esMano = e.de === 'MANO';
-                const _texto = e.cancelable === false ? '' : (_esMano ? ' (clic en tu mano; X para cancelar)' : ' (clic en el tablero; X para cancelar)');
+                // Sin coletilla en la MANO: su velo ya lleva cartel y pista de cancelación
+                // (Toto, 7-ago-2026). En el tablero se mantiene, que ahí no hay cartel.
+                const _texto = (e.cancelable === false || _esMano) ? '' : ' (clic en el tablero; X para cancelar)';
                 // permitirParar / maxPorZona (AL-FÉNIX, 31-jul-2026): parada anticipada con botón
                 // OK, y cupo por fila además del total. `hastaCantidad` NO servía para esto:
                 // aquel ajusta el cupo a los objetivos disponibles, pero no deja al jugador

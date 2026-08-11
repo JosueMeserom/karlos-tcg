@@ -4528,7 +4528,7 @@
                         return; // sin picker local: lo resuelve el replay remoto (VISUAL_SEARCH_CONFIRM)
                     }
 
-                    this.dslPick = { pool: new Set(cards.map(c => c.instanceId)), n: n, targets: [], byId: {}, chooserId, cancelable, permitirParar: !!opts.permitirParar, maxPorZona: opts.maxPorZona || null, mano: !!opts.mano, manoDe: opts.mano ? (cards[0] && cards[0].owner) : null };
+                    this.dslPick = { pool: new Set(cards.map(c => c.instanceId)), n: n, targets: [], byId: {}, chooserId, cancelable, permitirParar: !!opts.permitirParar, maxPorZona: opts.maxPorZona || null, mano: !!opts.mano, manoDe: opts.mano ? (cards[0] && cards[0].owner) : null, prompt: prompt || null };
                     this.selectedCard = sourceCard; // la Ayuda origen: el render la necesita
                     cards.forEach(c => this.dslPick.byId[c.instanceId] = c);
                     this.inputState = 'SELECT_DSL_TARGETS';
@@ -8546,6 +8546,26 @@
                     velo.onclick = () => this.cancelAction();
                     document.body.appendChild(velo);
                 }
+                // Cartel explicativo, mismo sitio y misma tipografía que el resto de overlays
+                // (Toto, 7-ago-2026): sin él, oscurecer la mano no dice QUÉ se está eligiendo ni
+                // que se puede salir. Se reconstruye en cada refresco, como el resto de la capa.
+                velo.innerHTML = '';
+                if (p.prompt) {
+                    const cabecera = document.createElement('div');
+                    cabecera.style.cssText = 'position:absolute; top:8%; left:0; width:100%; text-align:center; pointer-events:none; padding:0 40px; box-sizing:border-box;';
+                    const tit = document.createElement('div');
+                    // Copiado de #discard-title, para que se lea igual que los demás overlays.
+                    tit.style.cssText = 'font-size:1.5rem; color:white; text-transform:uppercase; font-weight:bold; margin-bottom:5px;';
+                    tit.innerText = p.prompt;
+                    cabecera.appendChild(tit);
+                    if (p.cancelable !== false) {
+                        const pista = document.createElement('div');
+                        pista.style.cssText = 'color:#94a3b8; font-size:0.9rem; font-style:italic;';
+                        pista.innerText = '(Haz clic en el fondo oscuro para cancelar)';
+                        cabecera.appendChild(pista);
+                    }
+                    velo.appendChild(cabecera);
+                }
                 let capa = document.getElementById('mano-lift');
                 if (!capa) {
                     capa = document.createElement('div');
@@ -10105,7 +10125,7 @@
                     const cards = (pi.cardsIds || []).map(id => this.findCard(id)).filter(Boolean);
                     if (!cards.length) return;
                     const source = pi.sourceId ? this.findCard(pi.sourceId) : null;
-                    this.dslPick = { pool: new Set(cards.map(c => c.instanceId)), n: pi.n, targets: [], byId: {}, chooserId: pi.chooserId, cancelable: pi.cancelable, permitirParar: !!pi.permitirParar, maxPorZona: pi.maxPorZona || null, mano: !!pi.mano, manoDe: pi.mano ? (cards[0] && cards[0].owner) : null };
+                    this.dslPick = { pool: new Set(cards.map(c => c.instanceId)), n: pi.n, targets: [], byId: {}, chooserId: pi.chooserId, cancelable: pi.cancelable, permitirParar: !!pi.permitirParar, maxPorZona: pi.maxPorZona || null, mano: !!pi.mano, manoDe: pi.mano ? (cards[0] && cards[0].owner) : null, prompt: pi.prompt || null };
                     cards.forEach(c => this.dslPick.byId[c.instanceId] = c);
                     this.selectedCard = source;      // la Ayuda/origen: el render la resalta
                     this.inputState = 'SELECT_DSL_TARGETS';
