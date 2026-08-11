@@ -7548,6 +7548,11 @@ const DSL = {
                     // viaje, no al final. Antes bajaba después de barajar, que es tardísimo y
                     // dejaba ver un número que ya no era cierto.
                     if (typeof game.render === 'function') game.render();
+                    // Si alguien tiene ABIERTO el visor de esa misma pila, se le repinta ya: si
+                    // no, se queda el hueco de la carta que acaba de salir (Toto, 7-ago-2026).
+                    if (typeof game._refrescarVisorPila === 'function') {
+                        game._refrescarVisorPila(pid, _zonasNombre[_zIdx] === 'MAZO' ? 'deck' : 'discard');
+                    }
                     // PRESENTACIÓN: las 18 cartas que recuperan algo de una pila pasan TODAS por
                     // aquí, así que es un solo enganche y no 18 cambios.
                     if (typeof animarPresentacionCarta === 'function') {
@@ -7662,6 +7667,8 @@ const DSL = {
                                                              (!e.algunFiltro || e.algunFiltro.some(f => DSL._match(x, f))));
                     if (e.logIntro) game.logMsg(F(e.logIntro), e.logIntroTipo || 'ability');
                     if (elegida === 'MAZO' && typeof game.openDeckSearchViewer === 'function') {
+                        // Mismo criterio que arriba: elegir la zona MAZO ya compromete.
+                        if (typeof game._dispararPresentacion === 'function') await game._dispararPresentacion();
                         // Con el mazo vacío de coincidencias el visor se abre IGUAL, y con el
                         // aviso puesto (Toto, 7-ago-2026): aquí se pasaba `null` siempre, así que
                         // el jugador veía su mazo sin nada en verde y sin una sola palabra que se
@@ -7776,6 +7783,12 @@ const DSL = {
                 }
                 let elegidas;
                 if (esVisorPila) {
+                    // Abrir el visor del MAZO ya es el compromiso (pila oculta + barajado), así
+                    // que la carta jugada se enseña AQUÍ y se espera: la cadena no sigue hasta
+                    // que se ha visto. Con los DESCARTES no, que ahí aún se puede cancelar.
+                    if (_zonaVisor === 'deck' && typeof game._dispararPresentacion === 'function') {
+                        await game._dispararPresentacion();
+                    }
                     // maxCount = e.cantidad: single (1) devuelve una carta o null; multi (>1)
                     // devuelve un array (Inspiración: hasta 2, mín. 1).
                     const r = await game.openDeckSearchViewer(pid, lista, F(e.titulo || 'ELIGE UNA CARTA'), null, e.cantidad || 1, _zonaVisor);

@@ -2053,6 +2053,20 @@
                     const MAX_WAIT_CYCLES = 80; // 80 × 100ms = 8 segundos
                     while (this.inputState === 'EXECUTING' || this.isActionLocked || this.isFlipping || this.isSkippingAnim) {
                         await new Promise(r => setTimeout(r, 100));
+                        // ESPERAR A UN JUGADOR NO ES ESTAR COLGADO (Toto, 7-ago-2026). Mientras
+                        // haya un prompt abierto, la partida está sana: alguien está pensando. El
+                        // contador se reinicia, así que el timeout NUNCA salta ahí. Sin esto, a
+                        // los 8 s de tener un modal delante -el "¿descartar Necronomicón?" de
+                        // ARTES PROHIBIDAS, por ejemplo- la cola llamaba a cancelAction() y te
+                        // cerraba la elección sola. Toto lo achacó a mi tope de 15 s del poller,
+                        // pero venía de aquí y es MUY anterior; solo hacía falta que hubiera algo
+                        // encolado (un chat, un sync) para dispararlo.
+                        // La red de seguridad se conserva para lo que de verdad se cuelga: un
+                        // EXECUTING sin ningún prompt que lo justifique.
+                        const _alguienDecide = this.currentChoices || this.currentVisualResolve
+                            || this.dslPick || this.pendingInteraction || this.coinFlipResolve
+                            || this.pendingReaction;
+                        if (_alguienDecide) { waitCycles = 0; continue; }
                         waitCycles++;
                         if (waitCycles >= MAX_WAIT_CYCLES) {
                             console.error('[COLA] Timeout esperando estado IDLE. Forzando recuperación.');
@@ -4400,7 +4414,23 @@
                 if (event) event.stopPropagation();
                 const p = this.players[playerId];
                 const discardCopy = [...p.discard].reverse(); // Vemos lo más reciente primero
+                // Se apunta qué pila se está mirando para poder REPINTARLA si cambia mientras
+                // está abierta (ver _refrescarVisorPila).
+                this._visorSoloLectura = { tipo: 'discard', playerId };
                 this.showCardsInViewer(discardCopy, `PILA DE DESCARTES DEL ${this.getDisplayName(playerId)}`);
+            }
+
+            // Repinta el visor de solo-lectura si está enseñando JUSTO la pila que acaba de
+            // cambiar (Toto, 7-ago-2026). Sin esto, si el J2 está mirando los descartes del J1
+            // mientras este revive una carta, el hueco de la carta que se fue seguía ahí -y la
+            // animación vieja llegaba a devolverla a ese hueco fantasma en vez de al campo-.
+            // Se llama desde el punto único por el que las cartas salen de una pila.
+            _refrescarVisorPila(playerId, tipo) {
+                const v = this._visorSoloLectura;
+                if (!v || v.playerId !== playerId || v.tipo !== tipo) return;
+                const visor = document.getElementById('discard-viewer');
+                if (!visor || visor.style.display === 'none') { this._visorSoloLectura = null; return; }
+                if (tipo === 'discard') this.openDiscardViewer(playerId, null);
             }
 
             openHandViewer(playerId, viewerId = null) {
@@ -4762,6 +4792,7 @@
                 }
 
                 document.getElementById('discard-viewer').style.display = 'none';
+                this._visorSoloLectura = null;
                 this._purgarVisor(); // vacía el visor (evita cartas fantasma) y quita lo elevado
                 const avisoVisor = document.getElementById('deck-search-notice');
                 if (avisoVisor) avisoVisor.style.display = 'none';
@@ -7309,11 +7340,16 @@
             // camino de las Ayudas dirigidas al confirmar objetivo. Si no hay nada armado, no
             // hace nada. NO se espera: la cadena ya está comprometida y bloquearla aquí solo
             // añadiría latencia; la carta se ve igual porque va por encima de todo.
+            // Devuelve la promesa de la animación, para que quien lo necesite pueda ESPERARLA.
+            // La usa el visor de MAZO: ahí el compromiso es abrir el visor (te enseña una pila
+            // oculta y obliga a barajar), así que la carta se presenta ANTES y la cadena no
+            // arranca hasta que se ha visto — si no, el modal se abría encima de la animación
+            // (Toto, con Hexagrama).
             _dispararPresentacion() {
                 const p = this._presentacionArmada;
-                if (!p) return;
+                if (!p) return Promise.resolve();
                 this._presentacionArmada = null;
-                animarPresentacionCarta(p.cardId, p.origen, p.destino, p.deDorso);
+                return animarPresentacionCarta(p.cardId, p.origen, p.destino, p.deDorso);
             }
 
             _purgarBanderasSync() {
