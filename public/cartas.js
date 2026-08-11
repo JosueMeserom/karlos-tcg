@@ -7784,7 +7784,16 @@ const DSL = {
                     elegidas = await game.openVisualSearchModal(F(e.titulo || 'ELIGE UNA CARTA'), lista, e.cantidad || 1, !!e.autoSeleccion, pid);
                 }
                 if (elegidas && elegidas.length > 0) { for (const t of elegidas) await aMano(t); algunExito = true; }
-                else if (e.abortaSiCancelas) return false; // p. ej. consumibles: cancelar el modal no consume la carta
+                else if (e.abortaSiCancelas) {
+                    // Cancelar NO consume la carta... pero el mazo ya se ha visto, así que se
+                    // baraja igual antes de salir (Toto, 7-ago-2026, razonándolo a partir de que
+                    // el visor pase a ser cancelable): mirar el mazo lo revuelve, se coja algo o
+                    // no. Antes este `return` se saltaba el barajado, con lo que cancelar dejaba
+                    // el mazo inspeccionado Y en su orden — información gratis. Con los descartes
+                    // no aplica: esa pila se puede mirar cuando se quiera y no se baraja.
+                    await baraja();
+                    return false;
+                }
                 else if (e.logSinEleccion) game.logMsg(F(e.logSinEleccion), 'system');
                 await baraja(); // se baraja aunque no se cogiera nada (fidelidad: la búsqueda ya revolvió el mazo)
             }

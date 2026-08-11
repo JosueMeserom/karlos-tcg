@@ -361,6 +361,26 @@ también delataba.
 Y elegir una carta **ya en el campo** es siempre reborde verde en el tablero, nunca un modal
 (ver la norma de targeting en CLAUDE.md).
 
+### 12.bis Cancelar una búsqueda (Toto, 7-ago-2026)
+
+**Un visor de pila SIEMPRE se puede cerrar sin elegir.** Abrirlo no cambia el tablero, así que
+mientras no se escoja nada el jugador tiene derecho a arrepentirse — la misma norma que rige el
+coste de las Activas y la presentación de carta.
+
+Esto **revisa** un comportamiento anterior ("con cartas elegibles la elección es obligatoria")
+que nunca estuvo escrito en ninguna norma: vivía solo como comentario de código, introducido de
+paso en un commit que en realidad iba de otra cosa. Queda anulado.
+
+La pista del visor lo dice, cambiando el verbo según haya algo que cancelar:
+
+- Con elegibles: *"(Haz clic en el fondo oscuro para cancelar)"*
+- Sin elegibles: *"(Haz clic en el fondo oscuro para cerrar)"*
+
+**Pero cancelar una búsqueda en el MAZO sí baraja.** Mirar el mazo lo revuelve, se coja algo o
+no; si no se barajara, cancelar sería una forma gratis de leerse el mazo en orden. Con los
+DESCARTES no aplica: esa pila se puede consultar cuando se quiera y no se baraja nunca.
+
+
 ## 13. Elegir de una MANO
 
 Desde el 7-ago-2026 la mano tiene su propio picker, hermano del de tablero: se **oscurece todo
