@@ -1419,6 +1419,79 @@
             flyCard.remove();
         }
 
+        // ─────────────────────────────────────────────────────────────────────────────────
+        //  PRESENTACIÓN DE CARTA (Toto, 7-ago-2026)
+        //  Cuando alguien juega o recupera algo que TODOS deben ver, la carta viaja a un
+        //  escaparate en el centro, se queda un momento y luego sigue a su destino. Nace de
+        //  que muchos efectos son sutiles o no tienen animación propia y era difícil saber
+        //  QUÉ se acababa de jugar sin ir al historial.
+        //
+        //  LOS TRES TIEMPOS, para afinarlos sin bucear: son estas tres constantes.
+        //  El flip se decide EN CADA CLIENTE, no se transmite: volteas la carta solo si para
+        //  TI estaba de dorso (o sea, si la juega el rival desde su mano). Quien la juega ya
+        //  sabe lo que es y no necesita el volteo.
+        const PRESENTA_VIAJE = 400;   // ms: origen -> escaparate  (y escaparate -> destino)
+        const PRESENTA_POSE  = 800;   // ms: quieta en el escaparate
+        const PRESENTA_ZOOM  = 1.2;   // el mismo que el hover/seleccion, no mas
+        async function animarPresentacionCarta(cardId, origenSel, destinoSel, deDorso) {
+            const g = window.game;
+            if (!g || g.isSkippingAnim) return;                 // saltable como el resto
+            const tmpl = getCardTemplate(cardId);
+            if (!tmpl) return;
+            const _rect = (sel) => { const el = sel && document.querySelector(sel); return el ? el.getBoundingClientRect() : null; };
+            const origen = _rect(origenSel);
+            // Sin origen visible (una zona oculta, un elemento aun sin pintar) se arranca desde
+            // el centro: la presentacion sigue teniendo sentido aunque el viaje no.
+            const cx = window.innerWidth / 2, cy = window.innerHeight / 2;
+            const W = 90, H = 126;
+
+            const cont = document.createElement('div');
+            cont.style.cssText = `position:fixed; z-index:6000; width:${W}px; height:${H}px;`
+                + 'perspective:800px; pointer-events:none; transition:'
+                + `left ${PRESENTA_VIAJE}ms cubic-bezier(.2,.8,.2,1), top ${PRESENTA_VIAJE}ms cubic-bezier(.2,.8,.2,1);`;
+            cont.style.left = ((origen ? origen.left + origen.width / 2 : cx) - W / 2) + 'px';
+            cont.style.top  = ((origen ? origen.top + origen.height / 2 : cy) - H / 2) + 'px';
+
+            // Cara y dorso en un volteador; si no venia de dorso, se arranca ya girado a la cara.
+            const flip = document.createElement('div');
+            flip.style.cssText = 'position:relative; width:100%; height:100%; transform-style:preserve-3d;'
+                + `transition: transform ${PRESENTA_VIAJE}ms ease, scale ${PRESENTA_VIAJE}ms ease;`;
+            const cara = g.createCardEl({ id: cardId, instanceId: '__presenta__', name: tmpl.name,
+                type: tmpl.type, rarity: tmpl.rarity, currentHp: tmpl.hp, currentDef: tmpl.def,
+                currentAtk: tmpl.atk, owner: 'p1', location: 'preview' }, false, true);
+            cara.removeAttribute('data-id');
+            cara.style.cssText += 'position:absolute; inset:0; margin:0; width:100%; height:100%; backface-visibility:hidden;';
+            const dorso = document.createElement('div');
+            dorso.className = 'card card-back';
+            dorso.style.cssText = 'position:absolute; inset:0; margin:0; width:100%; height:100%; backface-visibility:hidden; transform:rotateY(180deg);';
+            flip.appendChild(cara); flip.appendChild(dorso);
+            flip.style.transform = deDorso ? 'rotateY(180deg) scale(1)' : 'rotateY(0deg) scale(1)';
+            cont.appendChild(flip);
+            document.body.appendChild(cont);
+            void cont.offsetWidth;
+
+            // 1) Viaje al escaparate + volteo + zoom, todo a la vez.
+            cont.style.left = (cx - W / 2) + 'px';
+            cont.style.top  = (cy - H / 2) + 'px';
+            flip.style.transform = `rotateY(0deg) scale(${PRESENTA_ZOOM})`;
+            await g.sleep(PRESENTA_VIAJE);
+
+            // 2) Pose.
+            await g.sleep(PRESENTA_POSE);
+
+            // 3) Viaje al destino, deshaciendo el zoom.
+            const destino = _rect(destinoSel);
+            if (destino) {
+                cont.style.left = (destino.left + destino.width / 2 - W / 2) + 'px';
+                cont.style.top  = (destino.top + destino.height / 2 - H / 2) + 'px';
+            }
+            flip.style.transform = 'rotateY(0deg) scale(1)';
+            cont.style.opacity = '0';
+            cont.style.transition += `, opacity ${PRESENTA_VIAJE}ms ease`;
+            await g.sleep(PRESENTA_VIAJE);
+            cont.remove();
+        }
+
         async function animateResurrect(ownerId, cardId) {
             const discardPile = document.getElementById(`${ownerId}-discard-stack`);
             const targetEl = document.querySelector(`.card[data-id="${cardId}"]`);
@@ -5834,6 +5907,20 @@
                 }
 
                 // --- 3. EJECUCIÓN DEL ESTADO ---
+                // PRESENTACIÓN (Toto, 7-ago-2026): las Ayudas y Eventos son justo las que peor se
+                // veían -muchas no tienen animación propia y su efecto es sutil-, así que se
+                // enseñan antes de resolverse. Los Personajes/Esbirros NO la llevan: aparecer en
+                // el campo ya es señal suficiente y encima son los que más se juegan.
+                // El `await` es a propósito: el efecto no debe empezar hasta que se ha visto la
+                // carta. Y el LOG de "juega X" sale ANTES, dentro de la propia jugada, no al
+                // terminar la animación (pedido explícito de Toto).
+                if (card.type === 'Ayuda' || card.type === 'Evento') {
+                    const _origen = `#${card.owner}-hand`;
+                    const _destino = card.type === 'Evento' ? `#${card.owner}-event-slot` : `#${card.owner}-discard-stack`;
+                    // De dorso SOLO si para MÍ estaba tapada: la juega el rival desde su mano.
+                    const _deDorso = this.gameMode === 'online' && this.myPlayerId !== card.owner;
+                    await animarPresentacionCarta(card.id, _origen, _destino, _deDorso);
+                }
                 if (card.type === 'Ayuda') {
                     if (typeof template.onPlay === 'function') {
                         // Sin await (la tubería de acciones en red no debe bloquearse) pero SÍ
@@ -10211,7 +10298,10 @@
         (function instalarReenvioAnimaciones() {
             const REENVIABLES = ['showFloatingText', 'animateAttack', 'animateSpecialAttack',
                                  'animateDirectAttack', 'animateEvolution', 'animateSpinToHand',
-                                 'animateTrueDamage', 'animateResurrect', 'animateDodge'];
+                                 'animateTrueDamage', 'animateResurrect', 'animateDodge',
+                                 // La presentación también se reenvía al reconectado: es
+                                 // justo la que le dice QUÉ se acaba de jugar.
+                                 'animarPresentacionCarta'];
             REENVIABLES.forEach(nombre => {
                 const orig = window[nombre];
                 if (typeof orig !== 'function') return;
