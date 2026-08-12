@@ -7242,15 +7242,18 @@ const DSL = {
         return false;
     },
 
-    // Dispara la presentación ARMADA justo antes del primer efecto que CAMBIA algo. Las
-    // elecciones (ELEGIR/BUSCAR) no cuentan: mientras solo se está eligiendo, todo es
-    // reversible — y una cadena puede encadenar varias (Atomización: pagador y objetivo).
-    // Esta es la lectura operativa de "el último punto cancelable" de la §14: no se cuentan
-    // elecciones, se mira cuándo muta el estado.
-    async _dispararPresentacionSiMuta(e, game) {
-        if (!game || !game._presentacionArmada) return;
-        if (e.op === 'ELEGIR' || e.op === 'BUSCAR') return;
-        await game._dispararPresentacion();
+    // PUNTO DE COMPROMISO (§14), en un solo sitio. Cobro de la Activa y presentación de la
+    // carta tienen que caer EXACTAMENTE en el mismo instante -el primero en que algo deja de
+    // poder deshacerse- así que se disparan juntos y desde aquí. Antes cada uno colgaba de un
+    // sitio distinto y el cobro seguía atado a la PRIMERA elección resuelta: con una Activa que
+    // encadena dos elecciones cancelables (Kami, SACRIFICIO EQUIVALENTE) elegir el aliado ya
+    // cobraba el Furor, agotaba la carta y pintaba los flotantes; cancelar después lo dejaba
+    // todo pagado. Mismo fallo que tenía Atomización con la presentación, y misma solución:
+    // no se cuentan elecciones, se mira cuándo MUTA el estado.
+    async _comprometer(sourceCard, game) {
+        if (!game) return;
+        DSL._dispararCobro(sourceCard);
+        if (game._presentacionArmada) await game._dispararPresentacion();
     },
 
     async _doEffect(e, sourceCard, target, game, ownerId, habilidad) {
@@ -7561,8 +7564,7 @@ const DSL = {
                     _yaColocada = false;
                     // Coger la carta SÍ es mutar: si la presentación seguía armada (búsqueda en
                     // descartes, donde el compromiso es elegir y no abrir), este es su momento.
-                    if (game._presentacionArmada) await game._dispararPresentacion();
-                    DSL._dispararCobro(sourceCard);
+                    await DSL._comprometer(sourceCard, game);
                     if (e.floatingExito && typeof showFloatingText === 'function') {
                         showFloatingText(sourceCard.instanceId, F(e.floatingExito.texto), e.floatingExito.estilo || 'ft-ability',
                             e.floatingExito.offset !== undefined ? e.floatingExito.offset : -30);
@@ -8158,7 +8160,9 @@ const DSL = {
                     e.floatingAntes.estilo || 'ft-ability', e.floatingAntes.offset !== undefined ? e.floatingAntes.offset : -30);
             };
             const _logAntes = (lista) => {
-                DSL._dispararCobro(sourceCard);
+                // Sin _dispararCobro: resolver una elección NO compromete (puede haber otra
+                // detrás, también cancelable). Ahora lo hace DSL._comprometer, ante la primera
+                // mutación real. Ver el comentario de ese helper.
                 _floatAntes();
                 if (!e.logAntes) return;
                 const els = lista.map(x => DSL._nombre(game, x)).join(' y ');
@@ -8396,7 +8400,7 @@ const DSL = {
         // (§14). Ponerlo en la llamada, fuera, disparaba también cuando el lote no animaba nada
         // — y con Atomización eso significaba presentarla al elegir el pagador, cuando todavía
         // se puede cancelar (Toto, 8-ago-2026).
-        if (game && game._presentacionArmada) await game._dispararPresentacion();
+        await DSL._comprometer(sourceCard, game);
         await animateTrueDamage(DSL._lanzador(sourceCard), lista.map(t => t.instanceId));
         return e;
     },
@@ -8436,9 +8440,8 @@ const DSL = {
             // con Atomización se veía el casteo primero -sin daño ni flotantes, porque aún no
             // había pasado nada- y la carta se presentaba después. §14: primero se presenta, y
             // recién entonces empieza el efecto, animación incluida.
-            if (e.op !== 'ELEGIR' && e.op !== 'BUSCAR' && game._presentacionArmada) {
-                await game._dispararPresentacion();
-            }
+            // Cualquier efecto que NO sea una elección ya cambia algo: punto de compromiso.
+            if (e.op !== 'ELEGIR' && e.op !== 'BUSCAR') await DSL._comprometer(sourceCard, game);
             if (e.animacion === 'DANO_VERDADERO' && targets.length && !(opts && opts.sinAnimacion) && typeof animateTrueDamage === 'function') {
                 await animateTrueDamage(DSL._lanzador(sourceCard), targets.map(t => t.instanceId));
             }
