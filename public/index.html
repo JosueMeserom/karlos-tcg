@@ -1568,7 +1568,13 @@
             // exacto que le ha tocado -sin desvanecerse-. El desvanecido se reserva para
             // destinos donde la carta no queda a la vista (una pila).
             let destino = null, idEntrante = null;
-            if (opts && typeof opts.colocar === 'function' && opts.zonaSel) {
+            // Sin fila (destino = una pila): se coloca igual, pero no hay hueco propio al que
+            // volar ni nada que deslizar. El contador de la pila sube AQUÍ, que es cuando la
+            // carta llega (§14).
+            if (opts && typeof opts.colocar === 'function' && !opts.zonaSel) {
+                opts.colocar();
+                destino = _rect(destinoSel);
+            } else if (opts && typeof opts.colocar === 'function' && opts.zonaSel) {
                 const foto = _fotoFila(opts.zonaSel);
                 idEntrante = await opts.colocar();          // cambia el estado y repinta
                 const nuevoEl = idEntrante && document.querySelector(`${opts.zonaSel} .card[data-id="${idEntrante}"]`);
@@ -7435,7 +7441,12 @@
                 const p = this._presentacionArmada;
                 if (!p) return Promise.resolve();
                 this._presentacionArmada = null;
-                return animarPresentacionCarta(p.cardId, p.origen, p.destino, p.deDorso);
+                // §14: si alguien le colgó un `colocar`, la carta sale de su zona DENTRO de la
+                // animación (al aterrizar), no antes ni después. Es lo que hace que la pila se
+                // pueble justo cuando la carta llega y que, mientras aún se pueda cancelar, siga
+                // viéndose en la mano.
+                return animarPresentacionCarta(p.cardId, p.origen, p.destino, p.deDorso,
+                    p.colocar ? { colocar: () => { p.colocar(); return null; } } : null);
             }
 
             _purgarBanderasSync() {
@@ -8638,7 +8649,10 @@
                 velo.innerHTML = '';
                 if (p.prompt) {
                     const cabecera = document.createElement('div');
-                    cabecera.style.cssText = 'position:absolute; top:8%; left:0; width:100%; text-align:center; pointer-events:none; padding:0 40px; box-sizing:border-box;';
+                    // Centrado vertical como el resto de overlays (Toto: "se ve MUY arriba").
+                    // El velo ocupa la pantalla entera, así que el cartel se centra en él y se
+                    // sube lo justo para no taparse con la mano, que vive abajo.
+                    cabecera.style.cssText = 'position:absolute; top:50%; left:0; width:100%; transform:translateY(-50%); text-align:center; pointer-events:none; padding:0 40px; box-sizing:border-box;';
                     const tit = document.createElement('div');
                     // Copiado de #discard-title, para que se lea igual que los demás overlays.
                     tit.style.cssText = 'font-size:1.5rem; color:white; text-transform:uppercase; font-weight:bold; margin-bottom:5px;';

@@ -73,6 +73,9 @@ La batería histórica (r1–r23 + humo) se perdió con los transcripts de chat 
 - **Elegir de una MANO usa su picker**, no el modal genérico: se oscurece todo menos esa mano y se clica la carta (`pickBoardTargets(..., { mano: true })`). Reborde verde SOLO si no vale toda la mano; sin elegibles no se abre nada (aviso por log); la mano del RIVAL se elige a ciegas viendo los dorsos. Campo y mano nunca en el mismo selector: se pregunta por zona primero.
 - **Guion corto (`-`), nunca guion largo (`—`)**, en TODO lo que el jugador pueda ver: logs, detalle, modales, títulos, textos de carta. El guion largo se queda solo en los comentarios del código.
 
+## Orden de la cadena al jugar una carta (CONSULTAR, no deducir)
+`docs/rubrica_textos_cartas.md` §14. Se ha derivado mal varias veces seguidas: **nada visible ni irreversible hasta el punto de compromiso, y en ese punto ocurre todo junto** (log → sale de la mano y entra en su zona → presentación que aterriza → recién entonces el efecto). El punto de compromiso depende de la carta: al clicarla si no hay elecciones, al confirmar objetivo, al completar la última elección cancelable, al ABRIR el visor si es el mazo, al ELEGIR si son los descartes. Mientras se pueda cancelar, la carta **sigue en la mano** y el rival no ve nada.
+
 ## Al añadir o tocar una carta (leer ANTES de escribir el `text`)
 El Excel de Toto (`docs/Cartas KG.csv`, **ignorado por git a propósito: son sus ideas sin publicar, no se versiona ni se sube a ninguna parte**) es la fuente de la MECÁNICA, nunca de la REDACCIÓN. Copiar su texto tal cual es el error más repetido de esta fase; el CSV arrastra formulaciones viejas de antes de fijar la rúbrica.
 1. Escribir el `text` aplicando `docs/rubrica_textos_cartas.md`, no copiándolo del CSV.

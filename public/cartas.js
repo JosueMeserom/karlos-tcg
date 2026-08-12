@@ -8838,6 +8838,12 @@ const DSL = {
                     card.location = 'discard';
                     if (typeof game.render === 'function') game.render();
                 };
+                // §14: la carta sale de la mano EN EL PUNTO DE COMPROMISO, que es cuando se
+                // presenta — no al empezar la cadena. Se le entrega el movimiento a la
+                // presentación para que ocurran juntos; si por lo que sea no llega a
+                // presentarse, el cierre de abajo lo hace igualmente.
+                if (game._presentacionArmada) game._presentacionArmada.colocar = _alDescarte;
+                else _alDescarte();
                 const _volverAMano = () => {
                     const di = p.discard.findIndex(x => x.instanceId === card.instanceId);
                     if (di === -1) return;
@@ -8846,7 +8852,6 @@ const DSL = {
                     p.hand.push(card);
                     if (typeof game.render === 'function') game.render();
                 };
-                _alDescarte();
                 // Marca "esta Ayuda se está jugando AHORA": la lee _fuenteFlotante para no
                 // nombrarla en sus propios flotantes (ver allí). Se limpia al terminar.
                 game._ayudaEnCurso = card.instanceId;
@@ -8855,6 +8860,7 @@ const DSL = {
                 // Elección cancelada: no ha pasado nada, así que la Ayuda vuelve a la mano.
                 if (res && res.ok === false) { game._ayudaEnCurso = null; _volverAMano(); game.cancelAction(); if (typeof game.render === 'function') game.render(); return; }
                 // NO_CONSUMIR: la vuelta del viaje de ida (Atomización tras rematar).
+                _alDescarte();            // no-op si la presentación ya la movió
                 if (_vc.__noConsumir) _volverAMano();
                 delete _vc.__noConsumir;
                 game.cancelAction();

@@ -398,3 +398,51 @@ menos esa mano** y se elige clicando la carta. Nada de sacar las cartas a un mod
 
 Implementado reutilizando `pickBoardTargets` con `{ mano: true }`, no con una función nueva: así
 el chooser, el cancelado, la cola de red y el reanudar-perfecto se heredan ya resueltos.
+
+---
+
+## 14. ORDEN DE LA CADENA AL JUGAR UNA CARTA (Toto, 8-ago-2026)
+
+Esta sección existe porque el orden se ha derivado mal **varias veces seguidas**, cada vez de una
+forma distinta. No se deduce: se consulta. **Leerla antes de tocar cualquier cosa que mueva una
+carta de zona o que dispare una animación.**
+
+### La regla, en una frase
+
+> Nada visible ni irreversible ocurre hasta el **punto de compromiso**. Y en ese punto ocurre
+> TODO junto: sale del sitio donde estaba, se presenta, y solo entonces empieza el efecto.
+
+### Dónde está el punto de compromiso
+
+| Carta | Punto de compromiso |
+|---|---|
+| Sin elecciones previas (Jarabe amargo) | Al clicarla: ya es irreversible |
+| Ayuda dirigida (Longaniza) | Al confirmar el **objetivo** |
+| Con elección en el campo/mano (Dobla la ropa, Pago por adelantado) | Al completar **esa elección** |
+| Con varias elecciones encadenadas (Atomización) | Al completar **la última** que aún se pudiera cancelar |
+| Búsqueda en **MAZO** (Hexagrama) | Al **abrir el visor** — te enseña una pila oculta y obliga a barajar |
+| Búsqueda en **DESCARTES** (Líquido mortal) | Al **elegir la carta** — la pila es pública, abrirla no compromete |
+
+### Qué pasa exactamente en ese punto, y en este orden
+
+1. **El log** de la jugada (lo primero de todo, antes de ninguna animación).
+2. **La carta sale de la mano** y entra en su zona destino — descartes, ranura de Evento o fila.
+   El contador de la pila y el hueco de la fila se actualizan **ya**, no al final de la cadena.
+3. **La presentación**: viaja al centro, se voltea si para quien mira estaba de dorso, posa, y
+   **aterriza** en el sitio que le acaba de tocar. Si va a una fila, las que ya estaban se
+   apartan deslizándose (FLIP).
+4. **Recién entonces** empieza el efecto: coste, animaciones, modales encadenados.
+
+### Lo que NO debe pasar
+
+- Que la carta salga de la mano **antes** del punto de compromiso. Si estás eligiendo y aún
+  puedes cancelar, la carta **sigue en tu mano** y el rival no ve nada.
+- Que un modal se abra **encima** de la presentación. La cadena espera a que termine.
+- Que la pila destino se pueble **al final** de la cadena en vez de al aterrizar.
+
+### Ida y vuelta
+
+Una carta que "vuelve" (Atomización al rematar) hace el viaje **completo otra vez**, en sentido
+inverso: sale del descarte, se presenta en el centro y aterriza en la mano. Es un evento que los
+dos jugadores deben ver, no una línea de log. Y el log va en 3ª persona con dueño, como todo:
+*"vuelve a la mano de J1 (Ultra_K)"*, nunca *"vuelve a tu mano"*.
