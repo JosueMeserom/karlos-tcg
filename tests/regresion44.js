@@ -95,8 +95,8 @@ const escenarios = [
               motivo: 'la vieja lo registra ANTES de checkDeath; ver logsSoloNueva para el mismo aviso en su nueva posición' },
         ],
         logsSoloNueva: [
-            { linea: 'Enemigo destruido. Atomización vuelve a tu mano.',
-              motivo: 'la nueva lo registra DESPUÉS de checkDeath, porque el aviso vive en la rama siMuere y esa rama corre tras comprobar la muerte' },
+            { linea: '¡Enemigo destruido! Atomización vuelve a la mano de J1 (Jugador 1).',
+              motivo: 'la nueva lo registra DESPUÉS de checkDeath (el aviso vive en siMuere, que corre tras comprobar la muerte) Y con la redacción de la norma: 3ª persona con dueño, no "a tu mano" (§14, 8-ago-2026)' },
         ],
         flotantesSoloNueva: FLOTANTE_NUEVO,
     },

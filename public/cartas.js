@@ -1547,7 +1547,7 @@ const CARD_DB = [
                         { op: "MODIFICAR_STAT", stat: "currentHp", delta: -2, comprobarMuerte: true,
                           animacion: "DANO_VERDADERO",
                           floating: { texto: "DAÑO VERDADERO", estilo: "ft-purple", offset: -30 },
-                          siMuere: [ { op: "NO_CONSUMIR", log: "Enemigo destruido. Atomización vuelve a tu mano." } ] } ] },
+                          siMuere: [ { op: "NO_CONSUMIR", log: "¡Enemigo destruido! Atomización vuelve a la mano de {jugador}." } ] } ] },
                     { op: "MARCAR", campo: "exhausted", valor: true } ] } ] }
         ],
     },
@@ -7327,7 +7327,9 @@ const DSL = {
         if (e.op === 'NO_CONSUMIR') {
             DSL._vars = DSL._vars || {};
             (DSL._vars[sourceCard.instanceId] = DSL._vars[sourceCard.instanceId] || {}).__noConsumir = true;
-            if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: target ? DSL._nombre(game, target) : '' }), e.logTipo || 'ability');
+            // {jugador}: el log va en 3ª persona con dueño, como todo lo visible por ambos.
+            if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: target ? DSL._nombre(game, target) : '',
+                jugador: (typeof game.getDisplayName === 'function' ? game.getDisplayName(sourceCard.owner) : sourceCard.owner) }), e.logTipo || 'ability');
             return true;
         }
         if (e.op === 'CURAR') {
@@ -8844,9 +8846,24 @@ const DSL = {
                 // presentarse, el cierre de abajo lo hace igualmente.
                 if (game._presentacionArmada) game._presentacionArmada.colocar = _alDescarte;
                 else _alDescarte();
-                const _volverAMano = () => {
+                // La VUELTA hace el viaje completo otra vez, en sentido inverso (§14): sale del
+                // descarte, se presenta en el centro y aterriza en la mano. Es un evento que los
+                // dos jugadores deben VER, no una línea de log (Toto, 8-ago-2026).
+                const _volverAMano = async () => {
                     const di = p.discard.findIndex(x => x.instanceId === card.instanceId);
                     if (di === -1) return;
+                    if (typeof animarPresentacionCarta === 'function') {
+                        await animarPresentacionCarta(card.id, `#${card.owner}-discard-stack`, `#${card.owner}-hand`, false, {
+                            colocar: () => {
+                                const i = p.discard.findIndex(x => x.instanceId === card.instanceId);
+                                if (i !== -1) p.discard.splice(i, 1);   // la pila BAJA al salir
+                                card.location = 'hand';
+                                p.hand.push(card);
+                                if (typeof game.render === 'function') game.render();
+                            },
+                        });
+                        return;
+                    }
                     p.discard.splice(di, 1);
                     card.location = 'hand';
                     p.hand.push(card);
@@ -8858,10 +8875,10 @@ const DSL = {
                 const res = await DSL._runEffectList(consumir.efectos || [], card, game, card.owner, null);
                 game._ayudaEnCurso = null;
                 // Elección cancelada: no ha pasado nada, así que la Ayuda vuelve a la mano.
-                if (res && res.ok === false) { game._ayudaEnCurso = null; _volverAMano(); game.cancelAction(); if (typeof game.render === 'function') game.render(); return; }
+                if (res && res.ok === false) { game._ayudaEnCurso = null; await _volverAMano(); game.cancelAction(); if (typeof game.render === 'function') game.render(); return; }
                 // NO_CONSUMIR: la vuelta del viaje de ida (Atomización tras rematar).
                 _alDescarte();            // no-op si la presentación ya la movió
-                if (_vc.__noConsumir) _volverAMano();
+                if (_vc.__noConsumir) await _volverAMano();
                 delete _vc.__noConsumir;
                 game.cancelAction();
                 if (typeof game.render === 'function') game.render();

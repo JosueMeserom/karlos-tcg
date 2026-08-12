@@ -1294,6 +1294,7 @@
 
             // Esperamos a que todo el grupo termine de romperse
             await Promise.all(animations);
+            if (_cLog) delete _cLog._animandoMuerte;
         }
 
         async function animateMassiveSacrifice(cardIds) {
@@ -6229,13 +6230,16 @@
                     }
 
                     p.hand.splice(cardIndex, 1);
-                    // DESLIZAMIENTO al colocar desde la mano (Toto, 7-ago-2026): las cartas que
-                    // ya estaban en la fila se apartan en vez de saltar. La foto se toma con la
-                    // nueva YA en el array pero ANTES de repintar, así que _deslizarFila calcula
-                    // los deltas correctos; a la entrante se la excluye (tiene su propia
-                    // animación de entrada) pasándole su id como excepción.
                     this._filaDeslizar = card.location === 'rearguard' ? `#${card.owner}-rearguard` : `#${card.owner}-vanguard`;
                     this._filaFoto = _fotoFila(this._filaDeslizar);
+                    // PRESENTACIÓN también al colocar una unidad desde la mano (§14, pedido de
+                    // Toto): viaja al centro, se enseña, y de ahí a su hueco — que es cuando las
+                    // demás se apartan deslizándose. Antes solo se hacía el deslizamiento, que
+                    // era la mitad del encargo. Se salta con el resto de animaciones.
+                    this._presentandoUnidad = true;
+                    await animarPresentacionCarta(card.id, `#${card.owner}-hand`, this._filaDeslizar,
+                        this.gameMode === 'online' && this.myPlayerId !== card.owner);
+                    this._presentandoUnidad = false;
 
                     this.assignCopyId(card); // el [n] nace al salir de la mano
                     this.placedUnitThisTurn = true;
@@ -6294,16 +6298,46 @@
                 this.inputState = 'EXECUTING';
                 this.isActionLocked = true; 
 
-                // Objetivo confirmado: la Ayuda dirigida ya no se puede cancelar. Este es su
-                // instante irreversible, así que aquí se enseña (Longaniza y compañía).
-                this._dispararPresentacion();
+                // Objetivo confirmado: la Ayuda dirigida ya no se puede cancelar. Punto de
+                // compromiso (§14), así que aquí ocurre TODO junto: sale de la mano, entra en la
+                // pila y se presenta. Y se ESPERA: el efecto no arranca hasta que se ha visto la
+                // carta — si no, el modal de Hexagrama se abría encima de su propia presentación.
+                let _yaDescartada = false;
+                if (this._presentacionArmada) {
+                    this._presentacionArmada.colocar = () => {
+                        const i = p.hand.findIndex(c => c.instanceId === card.instanceId);
+                        if (i === -1) return;
+                        p.hand.splice(i, 1);
+                        this.assignCopyId(card);
+                        if (!p.discard) p.discard = [];
+                        p.discard.push(card);
+                        card.location = 'discard';
+                        _yaDescartada = true;
+                        this.render();   // el contador de la pila sube AQUÍ, al llegar la carta
+                    };
+                }
+                await this._dispararPresentacion();
 
+                // Igual que en AL_CONSUMIR: mientras esta Ayuda actúa no se nombra a sí misma en
+                // sus flotantes. Hace falta AQUÍ TAMBIÉN desde que sale de la mano al presentarse
+                // (antes bastaba el guard de location==='hand'), o el coste decía
+                // "-2 FUR (Flash de maná)".
                 let used = false;
+                this._ayudaEnCurso = card.instanceId;
                 if (typeof template.onExecuteAyuda === 'function') {
                     used = await template.onExecuteAyuda(card, target, this);
                 }
+                this._ayudaEnCurso = null;
 
-                if (used) {
+                // Equipable que acabó anexada: la presentación la había mandado al descarte por
+                // defecto, así que se rescata de ahí (su sitio es el equipo, no la pila).
+                if (_yaDescartada && card.equippedTo) {
+                    const di = p.discard.findIndex(c => c.instanceId === card.instanceId);
+                    if (di !== -1) p.discard.splice(di, 1);
+                    card.location = 'equipped';
+                    this.render();
+                }
+                if (used && !_yaDescartada) {
                     const idx = p.hand.findIndex(c => c.instanceId === card.instanceId);
                     if (idx !== -1) {
                         p.hand.splice(idx, 1);

@@ -431,6 +431,8 @@ carta de zona o que dispare una animación.**
 3. **La presentación**: viaja al centro, se voltea si para quien mira estaba de dorso, posa, y
    **aterriza** en el sitio que le acaba de tocar. Si va a una fila, las que ya estaban se
    apartan deslizándose (FLIP).
+   **Los contadores de pila se mueven CON la carta**: suben cuando entra y bajan cuando sale, en
+   el instante del aterrizaje o de la salida — nunca al final de la cadena.
 4. **Recién entonces** empieza el efecto: coste, animaciones, modales encadenados.
 
 ### Lo que NO debe pasar
