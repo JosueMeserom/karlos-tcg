@@ -1595,8 +1595,14 @@
                 destino = _rect(destinoSel);
             }
             if (destino) {
-                cont.style.left = (destino.left + destino.width / 2 - W / 2) + 'px';
-                cont.style.top  = (destino.top + destino.height / 2 - H / 2) + 'px';
+                // Se ENCAJA en el rect real, no se centra un 90x126 encima (Toto, 8-ago-2026:
+                // "no va exactamente al sitio, si no un poco más abajo"). El hueco puede medir
+                // otra cosa -wrapper de equipo, escalas- así que centrar un tamaño fijo dejaba
+                // el clon desplazado justo al aterrizar, que es cuando más se nota.
+                cont.style.left = destino.left + 'px';
+                cont.style.top  = destino.top + 'px';
+                cont.style.width = destino.width + 'px';
+                cont.style.height = destino.height + 'px';
             }
             flip.style.transform = 'rotateY(0deg) scale(1)';
             if (!idEntrante) {                              // sin hueco propio: se funde en la pila
@@ -6248,6 +6254,8 @@
                             colocar: () => {
                                 (card.location === 'rearguard' ? p.rearguard : p.vanguard).push(card);
                                 card.justPlayed = true;
+                                card._presentada = true;   // su entrada la hace la presentación
+                                setTimeout(() => { delete card._presentada; }, 800);
                                 this.updatePassives();
                                 this.render();
                                 return card.instanceId;
@@ -9461,7 +9469,11 @@
                     }
                 }
 
-                if (card.justPlayed) el.classList.add('entering');
+                // `entering` es el rebote VIEJO de entrada. No se pone si la carta ha llegado
+                // con la presentación: esa YA es su animación de entrada, y encadenar las dos
+                // hacía que desapareciera un frame y rebotara (Toto, 8-ago-2026). `justPlayed`
+                // se conserva porque lo usan otras cosas (retrasoSiRecienJugada).
+                if (card.justPlayed && !card._presentada) el.classList.add('entering');
 
                 const isMyTurn = this.gameMode === 'local' || this.activePlayerId === this.myPlayerId;
 

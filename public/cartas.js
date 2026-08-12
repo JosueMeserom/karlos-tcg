@@ -8391,6 +8391,12 @@ const DSL = {
     async _animarLote(efectos, sourceCard, game, lista) {
         const e = (efectos || []).find(x => x.animacion === 'DANO_VERDADERO');
         if (!e || !lista || !lista.length || typeof animateTrueDamage !== 'function') return null;
+        // Aquí ya está decidido que HAY animación de efecto, así que este es el punto exacto en
+        // el que la carta debe estar presentada: el casteo forma parte del efecto y va detrás
+        // (§14). Ponerlo en la llamada, fuera, disparaba también cuando el lote no animaba nada
+        // — y con Atomización eso significaba presentarla al elegir el pagador, cuando todavía
+        // se puede cancelar (Toto, 8-ago-2026).
+        if (game && game._presentacionArmada) await game._dispararPresentacion();
         await animateTrueDamage(DSL._lanzador(sourceCard), lista.map(t => t.instanceId));
         return e;
     },
