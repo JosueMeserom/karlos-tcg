@@ -7688,17 +7688,17 @@
                 }
                 
                 this.pendingInteraction = null; // interacción visual resuelta (reanudar-perfecto)
-                // SOLO si de verdad se eligió algo (Toto, 7-ago-2026). Cancelar viaja por ESTE
-                // MISMO canal -VISUAL_SEARCH_CONFIRM con ids:[]- así que disparar aquí sin mirar
-                // el contenido enseñaba la carta AL RIVAL justo cuando el dueño se arrepentía:
-                // el spoiler más absurdo posible. En local no se notaba porque cancelAction la
-                // desarma, pero el rival no pasa por cancelAction, pasa por aquí.
-                // Que Hexagrama no lo hiciera y Pago por adelantado sí era solo que sus
-                // cancelados salen por caminos distintos (visor de pila vs pick de tablero).
-                if (Array.isArray(finalCards) ? finalCards.filter(Boolean).length : !!finalCards) {
-                    this._dispararPresentacion(); // primer instante irreversible de la jugada
-                } else {
-                    this._presentacionArmada = null; // cancelado: no ha pasado nada que enseñar
+                // AQUÍ YA NO SE PRESENTA (Toto, 8-ago-2026). Resolver UNA elección no significa
+                // que la jugada sea irreversible: Atomización encadena dos -pagador y objetivo- y
+                // las dos se pueden cancelar. Disparando en la primera, elegir al pagador ya
+                // mandaba la carta al descarte y cancelar después la hacía volver con animación
+                // de retorno: al rival se le enseñaba la carta, se le quitaba y se le volvía a
+                // enseñar. La §14 dice "la ÚLTIMA que aún se pudiera cancelar", y eso no se sabe
+                // contando elecciones — se sabe mirando cuándo MUTA el estado de verdad, que es
+                // lo que hace ahora DSL._dispararPresentacionSiMuta.
+                // Lo único que sigue aquí es el DESARME: si se canceló, no hay nada que enseñar.
+                if (!(Array.isArray(finalCards) ? finalCards.filter(Boolean).length : !!finalCards)) {
+                    this._presentacionArmada = null;
                 }
                 const _habiaResolver = !!this.currentVisualResolve;
                 if (this.currentVisualResolve) {

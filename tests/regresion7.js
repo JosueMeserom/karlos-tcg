@@ -55,6 +55,14 @@ const escenarios = [
     },
     {
         nombre: 'Dobla la ropa: descarta 3 cartas elegidas y roba 3',
+        // ORDEN del descarte (§14, 8-ago-2026): en el punto de compromiso la carta entra en su
+        // zona ANTES de que corra el efecto, así que Dobla la ropa encabeza la pila y las 3
+        // descartadas van detrás. La vieja la metía al final. Mismas cartas, distinto orden — y
+        // el nuevo es el que describe la norma: la jugaste antes de descartar nada.
+        diferenciasEsperadas: [
+            { contiene: 'estado.p1.discard', motivo: '§14: la carta entra en su pila en el punto de compromiso, antes del efecto, así que encabeza el descarte en vez de cerrarlo' },
+        ],
+
 
         semilla: 4,
         p1: {

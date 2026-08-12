@@ -7242,7 +7242,19 @@ const DSL = {
         return false;
     },
 
+    // Dispara la presentación ARMADA justo antes del primer efecto que CAMBIA algo. Las
+    // elecciones (ELEGIR/BUSCAR) no cuentan: mientras solo se está eligiendo, todo es
+    // reversible — y una cadena puede encadenar varias (Atomización: pagador y objetivo).
+    // Esta es la lectura operativa de "el último punto cancelable" de la §14: no se cuentan
+    // elecciones, se mira cuándo muta el estado.
+    async _dispararPresentacionSiMuta(e, game) {
+        if (!game || !game._presentacionArmada) return;
+        if (e.op === 'ELEGIR' || e.op === 'BUSCAR') return;
+        await game._dispararPresentacion();
+    },
+
     async _doEffect(e, sourceCard, target, game, ownerId, habilidad) {
+        await DSL._dispararPresentacionSiMuta(e, game);
         const ctx = { self: sourceCard, objetivo: target };
         if (e.guardaNombre && target) { DSL._vars = DSL._vars || {}; (DSL._vars[sourceCard.instanceId] = DSL._vars[sourceCard.instanceId] || {})[e.guardaNombre] = DSL._nombre(game, target); }
         if (e.op === 'MODIFICAR_STAT') {
@@ -7548,6 +7560,9 @@ const DSL = {
                 };
                 const aMano = async (t) => {
                     _yaColocada = false;
+                    // Coger la carta SÍ es mutar: si la presentación seguía armada (búsqueda en
+                    // descartes, donde el compromiso es elegir y no abrir), este es su momento.
+                    if (game._presentacionArmada) await game._dispararPresentacion();
                     DSL._dispararCobro(sourceCard);
                     if (e.floatingExito && typeof showFloatingText === 'function') {
                         showFloatingText(sourceCard.instanceId, F(e.floatingExito.texto), e.floatingExito.estilo || 'ft-ability',
