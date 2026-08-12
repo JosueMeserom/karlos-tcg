@@ -2641,15 +2641,24 @@ const CARD_DB = [
             { trigger: "JUGAR", requisitos: [ { count: { filtros: [ { campo: "furor", op: ">=", valor: 2 } ] }, op: ">=", valor: 1, msg: "Necesitas un aliado con al menos 2 de Furor." } ] },
             { trigger: "AL_CONSUMIR",
               efectos: [
+                // El pagador se ANOTA aquí pero se le cobra DESPUÉS (§14): elegirlo todavía se
+                // puede cancelar, así que el Furor no puede irse hasta que la búsqueda -que es
+                // el punto de compromiso de verdad- haya arrancado. Mismo patrón que usa
+                // Necronomicón: guardaIdsEnSelf + un MODIFICAR_STAT con selfLista más abajo.
                 { op: "ELEGIR", de: "ALIADOS", filtros: [ { campo: "furor", op: ">=", valor: 2 } ], cantidad: 1, titulo: "¿QUIÉN PAGA POR ADELANTADO? (-2 FUROR)",
-                  efectos: [ { op: "MODIFICAR_STAT", stat: "furor", delta: -2 } ] },
+                  guardaIdsEnSelf: "pagoPagador" },
                 { op: "BUSCAR", en: "MAZO", cantidad: 1, destino: "MANO",
                   filtros: [ { campo: "tags", op: "includes", valor: "Mercenario" } ],
                   algunFiltro: [ { campo: "type", op: "==", valor: "Personaje" }, { campo: "type", op: "==", valor: "Esbirro" } ],
                   titulo: "BUSCAR MERCENARIO EN EL MAZO",
                   log: "{jugador} contrata a {objetivo} desde su mazo.",
                   logNoValidas: "No quedan Mercenarios en el mazo de {jugador}. ¡El pago se ha perdido!",
-                  barajarDespues: { log: "Barajando el mazo de {jugador}...", inclusoSinValidas: true } } ] }
+                  barajarDespues: { log: "Barajando el mazo de {jugador}...", inclusoSinValidas: true } },
+                // El cobro va DETRÁS de la búsqueda: en el MAZO el compromiso es ABRIR el visor
+                // (§14), no elegir pagador. Puesto antes, el Furor se iba en cuanto señalabas a
+                // quién pagaba, cuando todavía podías arrepentirte. Se sigue cobrando aunque no
+                // se encuentre nada — lo dice su propio texto: "el pago se ha perdido".
+                { op: "MODIFICAR_STAT", target: { selfLista: "pagoPagador" }, stat: "furor", delta: -2 } ] }
         ],
     },
     {
@@ -4170,15 +4179,22 @@ const CARD_DB = [
             { trigger: "JUGAR", requisitos: [ { count: { filtros: [ { campo: "furor", op: ">=", valor: 1 } ] }, op: ">=", valor: 2, msg: "Necesitas al menos 2 aliados con 1 de Furor cada uno." } ] },
             { trigger: "AL_CONSUMIR",
               efectos: [
+                // Los dos pagadores se anotan y se les cobra DESPUÉS (§14, ver Pago por
+                // adelantado). Aquí ya se salvaba de rebote -al pedir DOS, la elección no
+                // resuelve hasta tenerlos ambos- pero dependía de esa casualidad; ahora es
+                // explícito y no se rompe si algún día pide uno solo.
                 { op: "ELEGIR", de: "ALIADOS", filtros: [ { campo: "furor", op: ">=", valor: 1 } ], cantidad: 2, titulo: "ELIGE 2 ALIADOS (-1 FUROR C/U)",
-                  efectos: [ { op: "MODIFICAR_STAT", stat: "furor", delta: -1, floating: { texto: "-1 FUR", estilo: "ft-red-stat", offset: -20 } } ],
+                  guardaIdsEnSelf: "rezoPagadores",
                   logDespues: "Tributo pagado. ¡Inicia el Rezo en grupo!" },
                 { op: "BUSCAR", en: "MAZO", cantidad: 1, destino: "MANO",
                   algunFiltro: [ { campo: "tags", op: "includes", valor: "Diosa" }, { campo: "tags", op: "includes", valor: "Dios" } ],
                   titulo: "BUSCAR DIOS/A EN EL MAZO",
                   log: "¡La deidad {objetivo} acude a la mano de {jugador}!",
                   logNoValidas: "No quedan Dioses ni Diosas en el mazo de {jugador}.",
-                  barajarDespues: { log: "Barajando el mazo de {jugador}...", inclusoSinValidas: true } } ] }
+                  barajarDespues: { log: "Barajando el mazo de {jugador}...", inclusoSinValidas: true } },
+                // Igual que Pago por adelantado: el tributo se cobra tras abrir el visor.
+                { op: "MODIFICAR_STAT", target: { selfLista: "rezoPagadores" }, stat: "furor", delta: -1,
+                  floating: { texto: "-1 FUR", estilo: "ft-red-stat", offset: -20 } } ] }
         ],
     },
     {
@@ -8909,6 +8925,12 @@ const DSL = {
                 if (res && res.ok === false) { game._ayudaEnCurso = null; await _volverAMano(); game.cancelAction(); if (typeof game.render === 'function') game.render(); return; }
                 // NO_CONSUMIR: la vuelta del viaje de ida (Atomización tras rematar).
                 _alDescarte();            // no-op si la presentación ya la movió
+                // Las anotaciones de `guardaIdsEnSelf` (quién pagaba, a quién se eligió) son
+                // andamio de ESTA jugada: no deben viajar con la carta al descarte ni salir en
+                // exportGameState. Se limpian AQUÍ, al terminar — no al descartar, porque el
+                // descarte ocurre en el punto de compromiso y los efectos posteriores (el cobro
+                // al pagador anotado) todavía las necesitan.
+                Object.keys(card).forEach(k => { if (/^(pagoPagador|rezoPagadores|necroLector|kamiSacrificio|chosenAllies)$/.test(k)) delete card[k]; });
                 if (_vc.__noConsumir) await _volverAMano();
                 delete _vc.__noConsumir;
                 game.cancelAction();
