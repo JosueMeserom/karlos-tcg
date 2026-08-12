@@ -164,6 +164,10 @@ function crearDocumento() {
             return porId.get(id);
         },
         createElement(tag) { return crearElemento(tag); },
+        // SVG (las flechas de Coste/Requisito de la presentación). Sin esto, cualquier carta con
+        // coste marcado reventaba la presentación entera, y como la cola se traga los errores
+        // (.catch), la carta ni siquiera llegaba a colocarse. Lo destapó Wolfgang (8-ago-2026).
+        createElementNS(ns, tag) { return crearElemento(tag); },
         createTextNode(t) { return { textContent: t }; },
         querySelector() { return null; },
         querySelectorAll() { return []; },
@@ -828,6 +832,23 @@ function compararCapturas(esc, vieja, nueva) {
     for (const regla of (esc.flotantesSoloVieja || [])) {
         if (!regla.motivo) throw new Error(`escenario "${esc.nombre}": flotantesSoloVieja sin "motivo" documentado`);
         const antes = flotantesViejos.length;
+        // `consecutivo`: la vieja pintaba el MISMO flotante dos veces seguidas y la nueva lo
+        // pinta una. Colapsa repeticiones inmediatas idénticas en vez de borrar por texto: sin
+        // esto, declarar "-2 FUR" se llevaba por delante también el legítimo, y un fallo de
+        // recuento -el bug clásico de esta batería- pasaba desapercibido. No depende de
+        // instanceId ni de contar a mano, así que no se pudre al retocar un escenario.
+        // Si no hay ninguna repetición consecutiva, falla (8-ago-2026).
+        if (regla.consecutivo) {
+            const out = [];
+            let quitados = 0;
+            for (const l of flotantesViejos) {
+                if (out.length && out[out.length - 1] === l && l.includes(regla.linea)) { quitados++; continue; }
+                out.push(l);
+            }
+            flotantesViejos = out;
+            if (!quitados) diffs.push(`flotantesSoloVieja(consecutivo): "${regla.linea}" no sale repetido en la vieja`);
+            continue;
+        }
         flotantesViejos = flotantesViejos.filter(l => !l.includes(regla.linea));
         if (flotantesViejos.length === antes) {
             diffs.push(`flotantesSoloVieja: la línea declarada "${regla.linea}" no aparece en la salida vieja`);

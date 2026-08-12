@@ -82,6 +82,13 @@ const escenarios = [
     },
     {
         nombre: 'Infundir desesperación caduca: +3 de Furor a los enemigos de vanguardia',
+        // Aquí el flotante retirado no era un duplicado: era MENTIRA. El propio Infundir
+        // desesperación sigue en juego en el instante en que caduca, así que bloquea el Furor
+        // que él mismo regala y el cambio real es 0 -las dos bases acaban con el MISMO Furor,
+        // el estado coincide-. La vieja pintaba "+3 FUROR" igualmente porque lo tenía escrito a
+        // mano; el automático de modifyStat no sale (aborta con amount 0), que es lo honesto.
+        // OJO: eso deja al descubierto un fallo REAL de la carta, no de la migración.
+        flotantesSoloVieja: [ { linea: '+3 FUROR', motivo: 'la vieja anunciaba un +3 que nunca ocurría (el propio evento lo bloquea al caducar); el motor no pinta nada porque el cambio real es 0' } ],
         turnoDe: 'p2',
         p1: {
             vanguardia: ['Oso con armadura'],

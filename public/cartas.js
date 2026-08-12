@@ -1580,8 +1580,7 @@ const CARD_DB = [
         abilities: [
             { trigger: "PREVIEW_GLOBAL", lineas: [ { quien: "ENEMIGO", soloTipos: ["Personaje", "Esbirro"], texto: "No gana Furor al inicio del turno" } ] },
             { trigger: "AL_CADUCAR", log: "Efecto de expiración de Infundir desesperación: Enemigos en vanguardia ganan 3 de Furor.",
-              efectos: [ { op: "MODIFICAR_STAT", stat: "furor", delta: 3, target: { quien: "ENEMIGO", zona: "vanguardia", modo: "TODOS" },
-                           floating: { texto: "+3 FUROR", estilo: "ft-green", offset: -20 } } ] }
+              efectos: [ { op: "MODIFICAR_STAT", stat: "furor", delta: 3, target: { quien: "ENEMIGO", zona: "vanguardia", modo: "TODOS" } } ] }
         ]
     },
     {
@@ -1842,27 +1841,30 @@ const CARD_DB = [
             const hasAniceto = [...p.vanguard, ...p.rearguard].some(c => c.name === 'Aniceto');
             const manzanahoria = p.hand.find(c => c.name === 'Manzanahoria');
 
-            if (hasAniceto && manzanahoria) {
-                return await new Promise(resolve => {
-                    game.openChoiceModal('INVOCAR A WOLFGANG', [
-                        { label: 'USAR PRESENCIA DE ANICETO', action: () => resolve(true) },
-                        { label: 'DESCARTAR MANZANAHORIA', action: () => {
-                            const mIdx = p.hand.findIndex(c => c.instanceId === manzanahoria.instanceId);
-                            p.hand.splice(mIdx, 1);
-                            p.discard.push(manzanahoria);
-                            manzanahoria.location = 'discard';
-                            resolve(true);
-                        }}
-                    ]);
-                });
-            } else if (manzanahoria) {
+            // Coste y Requisito se ANOTAN para que la presentación los enseñe: la Manzanahoria
+            // viaja al escaparate al lado de Wolfgang (viene de la mano) y Aniceto se queda en
+            // el campo con una flecha de "Req. cumplido" (Toto, 8-ago-2026).
+            const _aniceto = [...p.vanguard, ...p.rearguard].find(c => c.name === 'Aniceto');
+            const _pagarConManzanahoria = () => {
                 const mIdx = p.hand.findIndex(c => c.instanceId === manzanahoria.instanceId);
                 p.hand.splice(mIdx, 1);
                 p.discard.push(manzanahoria);
                 manzanahoria.location = 'discard';
+                DSL._marcarCoste(game, manzanahoria, 'coste');
+            };
+            if (hasAniceto && manzanahoria) {
+                return await new Promise(resolve => {
+                    game.openChoiceModal('INVOCAR A WOLFGANG', [
+                        { label: 'USAR PRESENCIA DE ANICETO', action: () => { DSL._marcarCoste(game, _aniceto, 'requisito'); resolve(true); } },
+                        { label: 'DESCARTAR MANZANAHORIA', action: () => { _pagarConManzanahoria(); resolve(true); } }
+                    ]);
+                });
+            } else if (manzanahoria) {
+                _pagarConManzanahoria();
                 game.logMsg(`${game.getDisplayName(card.owner)} descarta Manzanahoria para invocar a Wolfgang.`, 'system');
                 return true;
             }
+            DSL._marcarCoste(game, _aniceto, 'requisito');
             return true;
         },
         // SABIDURÍA migrada para ARREGLARLA (31-jul-2026, betasteo de Toto). La versión
@@ -2647,18 +2649,18 @@ const CARD_DB = [
                 // Necronomicón: guardaIdsEnSelf + un MODIFICAR_STAT con selfLista más abajo.
                 { op: "ELEGIR", de: "ALIADOS", filtros: [ { campo: "furor", op: ">=", valor: 2 } ], cantidad: 1, titulo: "¿QUIÉN PAGA POR ADELANTADO? (-2 FUROR)",
                   guardaIdsEnSelf: "pagoPagador" },
+                // `esCoste`: el efecto se aparca hasta el escaparate, así que sigue sin cobrarse
+                // mientras te puedas arrepentir (el compromiso en el MAZO es ABRIR el visor,
+                // §14) pero el "-2 FUR" sale ya a la vez que la carta se enseña. Se cobra aunque
+                // no se encuentre nada — lo dice su propio texto: "el pago se ha perdido".
+                { op: "MODIFICAR_STAT", target: { selfLista: "pagoPagador" }, stat: "furor", delta: -2, esCoste: true },
                 { op: "BUSCAR", en: "MAZO", cantidad: 1, destino: "MANO",
                   filtros: [ { campo: "tags", op: "includes", valor: "Mercenario" } ],
                   algunFiltro: [ { campo: "type", op: "==", valor: "Personaje" }, { campo: "type", op: "==", valor: "Esbirro" } ],
                   titulo: "BUSCAR MERCENARIO EN EL MAZO",
                   log: "{jugador} contrata a {objetivo} desde su mazo.",
                   logNoValidas: "No quedan Mercenarios en el mazo de {jugador}. ¡El pago se ha perdido!",
-                  barajarDespues: { log: "Barajando el mazo de {jugador}...", inclusoSinValidas: true } },
-                // El cobro va DETRÁS de la búsqueda: en el MAZO el compromiso es ABRIR el visor
-                // (§14), no elegir pagador. Puesto antes, el Furor se iba en cuanto señalabas a
-                // quién pagaba, cuando todavía podías arrepentirte. Se sigue cobrando aunque no
-                // se encuentre nada — lo dice su propio texto: "el pago se ha perdido".
-                { op: "MODIFICAR_STAT", target: { selfLista: "pagoPagador" }, stat: "furor", delta: -2 } ] }
+                  barajarDespues: { log: "Barajando el mazo de {jugador}...", inclusoSinValidas: true } } ] }
         ],
     },
     {
@@ -3040,7 +3042,6 @@ const CARD_DB = [
                 { campo: "furor", op: ">=", valor: 2, msg: "El objetivo debe tener al menos 2 de Furor." } ],
               efectos: [
                 { op: "MODIFICAR_STAT", stat: "furor", delta: -2,
-                  floating: { texto: "-2 FUR", estilo: "ft-red-stat", offset: -20 },
                   log: "¡{objetivo} canaliza maná puro y se equipa con {carta}!" },
                 { op: "EQUIPAR", soloAnexar: true } ] }
         ],
@@ -3284,7 +3285,6 @@ const CARD_DB = [
                 { o: [ [ { campo: "furor", op: ">=", valor: 2 } ], [ { campo: "name", op: "contieneTexto", valor: "Eris" }, { campo: "furor", op: ">=", valor: 1 } ] ], msg: "Este aliado necesita al menos 2 de Furor (o 1 si es Eris)." } ],
               efectos: [
                 { op: "MODIFICAR_STAT", stat: "furor", delta: -2, deltaCondicional: [ { filtro: { campo: "name", op: "contieneTexto", valor: "Eris" }, delta: -1 } ],
-                  floating: { texto: "-{delta} FUR", estilo: "ft-red-stat", offset: -20 },
                   log: "¡{objetivo} desata un Flash de maná cegador!" },
                 { op: "APLICAR_ESTADO", estado: "ceguera", duracion: 2, fuente: "Flash de maná",
                   target: { quien: "ENEMIGO", zona: "VANGUARDIA" },
@@ -3302,8 +3302,7 @@ const CARD_DB = [
                 { o: [ [ { campo: "furor", op: ">=", valor: 2 } ], [ { campo: "name", op: "contieneTexto", valor: "Eris" }, { campo: "furor", op: ">=", valor: 1 } ] ], msg: "Este aliado necesita al menos 2 de Furor (o 1 si es Eris)." } ],
               efectos: [
                 { op: "MODIFICAR_STAT", stat: "furor", delta: -2, deltaCondicional: [ { filtro: { campo: "name", op: "contieneTexto", valor: "Eris" }, delta: -1 } ],
-                  guardaNombre: "pagador",
-                  floating: { texto: "-{delta} FUR", estilo: "ft-red-stat", offset: -20 } },
+                  guardaNombre: "pagador" },
                 { op: "ELEGIR", de: "ENEMIGOS", zona: "VANGUARDIA", cantidad: 2, hastaCantidad: true,
                   titulo: "Elige hasta 2 enemigos para la Granada de maná",
                   logSiVacio: "¡{pagador} lanza la Granada de maná, pero no hay objetivos en vanguardia!",
@@ -3323,7 +3322,7 @@ const CARD_DB = [
                 { campo: "isAvatar", op: "falsy", dePlantilla: true, msg: "Debes elegir a uno de tus aliados." },
                 { campo: "furor", op: ">=", valor: 1, msg: "Este aliado necesita al menos 1 de Furor para tributar." } ],
               efectos: [
-                { op: "MODIFICAR_STAT", stat: "furor", delta: -1, floating: { texto: "-1 FUR", estilo: "ft-red-stat", offset: -20 } },
+                { op: "MODIFICAR_STAT", stat: "furor", delta: -1 },
                 { op: "BUSCAR", en: "MAZO", cantidad: 1, destino: "MANO",
                   filtros: [ { campo: "tags", op: "includesCI", valor: "invocación" } ],
                   logIntro: "El Hexagrama brilla y permite a {jugador} buscar en su mazo...",
@@ -4186,15 +4185,16 @@ const CARD_DB = [
                 { op: "ELEGIR", de: "ALIADOS", filtros: [ { campo: "furor", op: ">=", valor: 1 } ], cantidad: 2, titulo: "ELIGE 2 ALIADOS (-1 FUROR C/U)",
                   guardaIdsEnSelf: "rezoPagadores",
                   logDespues: "Tributo pagado. ¡Inicia el Rezo en grupo!" },
+                // El tributo va AQUÍ, en su sitio natural: `esCoste` lo aparca solo hasta el
+                // escaparate, así que no se cobra mientras la búsqueda aún se pueda cancelar
+                // y el "-1 FUR" sale a la vez que la carta se presenta.
+                { op: "MODIFICAR_STAT", target: { selfLista: "rezoPagadores" }, stat: "furor", delta: -1, esCoste: true },
                 { op: "BUSCAR", en: "MAZO", cantidad: 1, destino: "MANO",
                   algunFiltro: [ { campo: "tags", op: "includes", valor: "Diosa" }, { campo: "tags", op: "includes", valor: "Dios" } ],
                   titulo: "BUSCAR DIOS/A EN EL MAZO",
                   log: "¡La deidad {objetivo} acude a la mano de {jugador}!",
                   logNoValidas: "No quedan Dioses ni Diosas en el mazo de {jugador}.",
-                  barajarDespues: { log: "Barajando el mazo de {jugador}...", inclusoSinValidas: true } },
-                // Igual que Pago por adelantado: el tributo se cobra tras abrir el visor.
-                { op: "MODIFICAR_STAT", target: { selfLista: "rezoPagadores" }, stat: "furor", delta: -1,
-                  floating: { texto: "-1 FUR", estilo: "ft-red-stat", offset: -20 } } ] }
+                  barajarDespues: { log: "Barajando el mazo de {jugador}...", inclusoSinValidas: true } } ] }
         ],
     },
     {
@@ -6722,7 +6722,7 @@ const CARD_DB = [
               efectos: [
                 { op: "ELEGIR", de: "ENEMIGOS", cantidad: 1, titulo: "Elige a quién quemarle el maná",
                   efectos: [
-                    { op: "MODIFICAR_STAT", stat: "furor", delta: -2, floating: { texto: "-2 FUR", estilo: "ft-red-stat", offset: -20 },
+                    { op: "MODIFICAR_STAT", stat: "furor", delta: -2,
                       log: "{carta} quema el maná de {objetivo}." } ] } ] }
         ],
     },
@@ -7270,6 +7270,45 @@ const DSL = {
         if (!game) return;
         DSL._dispararCobro(sourceCard);
         if (game._presentacionArmada) await game._dispararPresentacion();
+        // Red de seguridad: lo que la presentación no haya llegado a cobrar se cobra aquí. La
+        // animación es adorno y puede fallar (sin DOM, con la animación saltada, si revienta y
+        // se la traga el .catch de la cola); un COSTE no puede perderse por eso. Se drena, no se
+        // recorre, así que lo que ya cobró el escaparate no se cobra dos veces.
+        await DSL._drenarCobros(game);
+    },
+
+    // Cola ÚNICA de cobros aparcados. La vacía quien llegue primero: el escaparate (para que el
+    // "-1 FUR" salga a la vez que la carta se enseña) o _comprometer (si no hubo animación).
+    async _drenarCobros(game) {
+        if (!game || !game._cobrosPendientes) return;
+        while (game._cobrosPendientes.length) {
+            const f = game._cobrosPendientes.shift();
+            try { await f(); } catch (err) { console.error(err); }
+        }
+    },
+
+    // ── COSTES Y REQUISITOS VISIBLES EN LA PRESENTACIÓN ──────────────────────────
+    // (Toto, 8-ago-2026) Una carta no se presenta sola: se presenta CON lo que ha
+    // costado. Las cartas marcadas aquí se le pasan al cliente para que dibuje una
+    // flecha desde cada una hacia la que se está presentando ("Coste" / "Req.
+    // cumplido"), y las que vengan de la mano viajan al escaparate a su lado.
+    //
+    // `esCoste` hace además otra cosa importante: si hay una presentación ARMADA, el
+    // efecto NO se ejecuta en su sitio de la lista, se aparca y se ejecuta DENTRO de
+    // la presentación, en el instante en que la carta llega al escaparate. Así el
+    // "-1 FUR" sale a la vez que la carta se enseña, y no cinco pasos después. Es lo
+    // que sustituye al apaño de colocar el MODIFICAR_STAT detrás del BUSCAR: aquel
+    // conseguía "no cobrar mientras se pueda cancelar" moviendo el efecto de sitio, y
+    // el precio era que el flotante salía al final de toda la cadena.
+    _marcarCoste(game, cartas, tipo) {
+        if (!game || !cartas) return;
+        const lista = Array.isArray(cartas) ? cartas : [cartas];
+        game._costesPresenta = game._costesPresenta || [];
+        for (const c of lista) {
+            if (!c || !c.instanceId) continue;
+            if (game._costesPresenta.some(x => x.id === c.instanceId)) continue;
+            game._costesPresenta.push({ id: c.instanceId, cardId: c.id, tipo: tipo, owner: c.owner });
+        }
     },
 
     async _doEffect(e, sourceCard, target, game, ownerId, habilidad) {
@@ -7789,7 +7828,7 @@ const DSL = {
                     // mirado la pila oculta y se va a barajar igual. Sin esto, una búsqueda sin
                     // resultados dejaba la carta jugada sin presentar y sin llegar al descarte
                     // hasta el final de la cadena (Toto, 8-ago-2026, con Rezo en grupo).
-                    if (_zonaVisor === 'deck' && game._presentacionArmada) await game._dispararPresentacion();
+                    if (_zonaVisor === 'deck') await DSL._comprometer(sourceCard, game);
                     await game.openDeckSearchViewer(pid, [], F(e.titulo || 'ELIGE UNA CARTA'),
                         barajara ? `No hay cartas elegibles en ${_nombrePila}. Se barajará al cerrar el visor.` : `No hay cartas elegibles en ${_nombrePila}.`,
                         1, _zonaVisor);
@@ -7837,9 +7876,7 @@ const DSL = {
                     // Abrir el visor del MAZO ya es el compromiso (pila oculta + barajado), así
                     // que la carta jugada se enseña AQUÍ y se espera: la cadena no sigue hasta
                     // que se ha visto. Con los DESCARTES no, que ahí aún se puede cancelar.
-                    if (_zonaVisor === 'deck' && typeof game._dispararPresentacion === 'function') {
-                        await game._dispararPresentacion();
-                    }
+                    if (_zonaVisor === 'deck') await DSL._comprometer(sourceCard, game);
                     // maxCount = e.cantidad: single (1) devuelve una carta o null; multi (>1)
                     // devuelve un array (Inspiración: hasta 2, mín. 1).
                     const r = await game.openDeckSearchViewer(pid, lista, F(e.titulo || 'ELIGE UNA CARTA'), null, e.cantidad || 1, _zonaVisor);
@@ -8206,6 +8243,7 @@ const DSL = {
                 // guardaIdsEnSelf: como el anterior pero con TODOS los elegidos, como
                 // array (Esfuerzo dividido: chosenAllies; lo leen AURA/_pool soloSelfLista).
                 if (e.guardaIdsEnSelf) sourceCard[e.guardaIdsEnSelf] = lista.map(x => x.instanceId);
+                if (e.esCoste || e.esRequisito) DSL._marcarCoste(game, lista, e.esRequisito ? 'requisito' : 'coste');
             };
             const dn = typeof game.getDisplayName === 'function' ? game.getDisplayName(ownerId) : ownerId;
             // F incluye las vars propias de ESTA MISMA elección (p. ej. guardaEn: "maestro"
@@ -8450,6 +8488,19 @@ const DSL = {
             // fallback -null en Eventos-, machacando el campo con basura (rompía Esfuerzo
             // dividido: chosenAllies). El filter(Boolean) protege ese mismo caso en general.
             if (e.guardaIdsEnSelf && e.op !== 'ELEGIR') sourceCard[e.guardaIdsEnSelf] = targets.filter(Boolean).map(t => t.instanceId);
+            // Coste/Requisito: se anota QUIÉN lo paga o lo cumple para que la presentación
+            // pueda dibujarlo. `_marcarCoste` es idempotente por id, así que un mismo aliado
+            // marcado por dos vías no sale dos veces.
+            if ((e.esCoste || e.esRequisito) && e.op !== 'ELEGIR') DSL._marcarCoste(game, targets.filter(Boolean), e.esRequisito ? 'requisito' : 'coste');
+            // El cobro se aparca hasta el escaparate (ver _marcarCoste). Sin presentación
+            // armada -una Activa, un efecto de campo- se ejecuta aquí y ahora, como siempre.
+            if (e.esCoste && game._presentacionArmada && e.op !== 'ELEGIR') {
+                const _tg = targets.filter(Boolean);
+                (game._cobrosPendientes = game._cobrosPendientes || []).push(async () => {
+                    for (const t of _tg) await DSL._doEffect(e, sourceCard, t, game, ownerId, habilidad);
+                });
+                continue;
+            }
             // Animación declarativa de efecto (Toto, 30-jul-2026). Va AQUÍ y no dentro de
             // _doEffect a propósito: aquí la lista de objetivos ya está resuelta ENTERA, así
             // que el "casteo" suena UNA sola vez y los impactos se reparten entre todos —

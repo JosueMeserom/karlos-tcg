@@ -11,6 +11,7 @@ const { correrSuite } = require('./harness');
 const escenarios = [
     {
         nombre: 'Flash de maná: paga 2 de Furor y ciega la vanguardia enemiga',
+        flotantesSoloVieja: [ { linea: '-2 FUR', consecutivo: true, motivo: 'la vieja pintaba DOS veces el mismo flotante de Furor: el suyo escrito a mano MÁS el automático de modifyStat. La nueva ya no declara el suyo (Toto lo vio con Rezo en grupo, 8-ago-2026); el flotante que queda es el del motor, idéntico' } ],
         p1: { vanguardia: [{ carta: 'Oso con armadura', furor: 3 }], mano: ['Flash de maná'] },
         p2: { vanguardia: ['Mini-tigre', 'Droide antidisturbios'], retaguardia: ['Robot de seguridad SP'] },
         pasos: [
@@ -24,6 +25,7 @@ const escenarios = [
     },
     {
         nombre: 'Flash de maná pagado por Eris: descuento a 1 de Furor (deltaCondicional)',
+        flotantesSoloVieja: [ { linea: '-1 FUR', consecutivo: true, motivo: 'la vieja pintaba DOS veces el mismo flotante de Furor: el suyo escrito a mano MÁS el automático de modifyStat. La nueva ya no declara el suyo (Toto lo vio con Rezo en grupo, 8-ago-2026); el flotante que queda es el del motor, idéntico' } ],
         p1: { vanguardia: [{ carta: 'Eris', furor: 1 }], mano: ['Flash de maná'] },
         p2: { vanguardia: ['Mini-tigre'] },
         pasos: [
@@ -37,6 +39,7 @@ const escenarios = [
     },
     {
         nombre: 'Flash de maná sin enemigos en vanguardia (logSiVacio)',
+        flotantesSoloVieja: [ { linea: '-2 FUR', consecutivo: true, motivo: 'la vieja pintaba DOS veces el mismo flotante de Furor: el suyo escrito a mano MÁS el automático de modifyStat. La nueva ya no declara el suyo (Toto lo vio con Rezo en grupo, 8-ago-2026); el flotante que queda es el del motor, idéntico' } ],
         p1: { vanguardia: [{ carta: 'Oso con armadura', furor: 2 }], mano: ['Flash de maná'] },
         p2: { retaguardia: ['Mini-tigre'] },
         pasos: [
@@ -65,11 +68,15 @@ const escenarios = [
         // (DAÑO VERDADERO) ahora sale ANTES del flotante del cambio de Vida en sí, no después
         // -mismo criterio aplicado a MALDITO (Muñeca del mal, regresion51)-. Mismo texto en
         // ambas bases para los 2 objetivos, solo cambia el orden: se retira como PAR completo.
-        flotantesSoloVieja: [ { linea: '-1 VIDA', motivo: 'orden vieja: -1 VIDA antes de DAÑO VERDADERO (2 objetivos)' } ],
+        flotantesSoloVieja: [
+            { linea: '-1 VIDA', motivo: 'orden vieja: -1 VIDA antes de DAÑO VERDADERO (2 objetivos)' },
+            { linea: '-2 FUR', consecutivo: true, motivo: 'la vieja pintaba DOS veces el mismo flotante de Furor: el suyo escrito a mano MÁS el automático de modifyStat. La nueva ya no declara el suyo (Toto lo vio con Rezo en grupo, 8-ago-2026); el flotante que queda es el del motor, idéntico' },
+        ],
         flotantesSoloNueva: [ { linea: '-1 VIDA', motivo: 'orden nueva: DAÑO VERDADERO antes de -1 VIDA (2 objetivos)' } ],
     },
     {
         nombre: 'Hexagrama: tributa 1 Furor, busca la Invocación y baraja',
+        flotantesSoloVieja: [ { linea: '-1 FUR', consecutivo: true, motivo: 'la vieja pintaba DOS veces el mismo flotante de Furor: el suyo escrito a mano MÁS el automático de modifyStat. La nueva ya no declara el suyo (Toto lo vio con Rezo en grupo, 8-ago-2026); el flotante que queda es el del motor, idéntico' } ],
         semilla: 11,
         p1: {
             vanguardia: [{ carta: 'Mini-tigre', furor: 1 }],
@@ -93,6 +100,7 @@ const escenarios = [
     },
     {
         nombre: 'Hexagrama sin Invocaciones en el mazo: fracasa pero baraja igualmente',
+        flotantesSoloVieja: [ { linea: '-1 FUR', consecutivo: true, motivo: 'la vieja pintaba DOS veces el mismo flotante de Furor: el suyo escrito a mano MÁS el automático de modifyStat. La nueva ya no declara el suyo (Toto lo vio con Rezo en grupo, 8-ago-2026); el flotante que queda es el del motor, idéntico' } ],
         semilla: 11,
         p1: {
             vanguardia: [{ carta: 'Mini-tigre', furor: 1 }],

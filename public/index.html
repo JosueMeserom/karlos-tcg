@@ -1444,6 +1444,22 @@
         // picker se escalaba dos veces; a Toto le gustó ESE para el escaparate (aquí no hay
         // original con la que descuadrar, así que no es un bug: es el tamaño elegido).
         const PRESENTA_ZOOM  = 1.44;
+        // ── COSTES Y REQUISITOS EN LA PRESENTACIÓN (Toto, 8-ago-2026) ────────────────────
+        // Una carta se presenta CON lo que ha costado. Dos formas, según dónde esté el coste:
+        //   · Viene de la MANO (Manzanahoria por Wolfgang): viaja al escaparate al lado de la
+        //     carta usada, y el BLOQUE de las dos queda centrado en el campo (no la carta
+        //     principal en el centro con la otra colgando). Al llegar, sale la flecha "Coste"
+        //     apuntando al coste, brotando DESDE él y corriendo al centro del bloque.
+        //   · Está en el CAMPO (los dos pagadores de Rezo en grupo, Aniceto por Wolfgang): se
+        //     queda donde está y le CRECE una flecha hacia el escaparate mientras la carta
+        //     viaja; cuando la carta se posa, la flecha ya está entera con su punta.
+        // En los dos casos, al arrancar el viaje al destino las flechas se desvanecen rápido.
+        // Colores de la misma familia pero distinguibles: lo pidió así para leer de un vistazo
+        // si algo se ha PERDIDO (coste) o solo se ha COMPROBADO (requisito).
+        const PRESENTA_COLOR = { coste: '#fbbf24', requisito: '#a3e635' };
+        const PRESENTA_ETIQ  = { coste: 'Coste',   requisito: 'Req. cumplido' };
+        const PRESENTA_FLECHA_MS = 180;   // ms: brote de la flecha del acompañante, y su fundido
+        const PRESENTA_GAP = 18;          // px entre cartas del bloque, ya contando el zoom
         // ── DESLIZAMIENTO DE FILA (técnica FLIP) ─────────────────────────────────────────
         // Cuando entra una carta nueva, las que ya estaban se APARTAN deslizándose en vez de
         // saltar a su nueva posición (Toto, 7-ago-2026). Se hace con FLIP -First, Last, Invert,
@@ -1491,17 +1507,71 @@
         // evita tener que cuadrar timings carta por carta, que es donde se acumulan los errores.
         let _colaPresenta = Promise.resolve();
         function animarPresentacionCarta(cardId, origenSel, destinoSel, deDorso, opts) {
+            // Los costes/requisitos anotados por el motor se CONSUMEN aquí, al encolar, no al
+            // ejecutar: pertenecen a la carta que se está encolando ahora mismo. Leerlos dentro
+            // de _presentarCarta los mezclaría con los de la siguiente presentación de la cadena
+            // (Líquido mortal encola dos seguidas).
+            const _g = window.game;
+            const _costes = (_g && _g._costesPresenta) || [];
+            if (_g) _g._costesPresenta = [];
+            const _opts = Object.assign({}, opts || {}, { costes: _costes });
             _colaPresenta = _colaPresenta
-                .then(() => _presentarCarta(cardId, origenSel, destinoSel, deDorso, opts))
+                .then(() => _presentarCarta(cardId, origenSel, destinoSel, deDorso, _opts))
                 .catch(() => {});
             return _colaPresenta;
         }
+
+        // Capa de flechas de la presentación: por DEBAJO de las cartas del escaparate (3900) y
+        // por encima de todo lo demás del campo, que es donde Toto la quiere.
+        function _capaFlechasPresenta() {
+            const capa = document.createElement('div');
+            capa.id = 'presenta-arrows';
+            capa.style.cssText = 'position:fixed; inset:0; z-index:3895; pointer-events:none;';
+            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.setAttribute('style', 'position:absolute; inset:0; width:100%; height:100%; overflow:visible;');
+            const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+            svg.appendChild(defs);
+            capa.appendChild(svg);
+            document.body.appendChild(capa);
+            // Una punta por color. markerUnits userSpaceOnUse para que no escale con el grosor.
+            const punta = (color) => {
+                const id = 'presenta-ah-' + color.replace(/[^a-z0-9]/gi, '');
+                if (!defs.querySelector('#' + id)) {
+                    const m = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+                    m.setAttribute('id', id); m.setAttribute('markerWidth', '13'); m.setAttribute('markerHeight', '10');
+                    m.setAttribute('markerUnits', 'userSpaceOnUse');
+                    m.setAttribute('refX', '1'); m.setAttribute('refY', '5'); m.setAttribute('orient', 'auto');
+                    const pg = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                    pg.setAttribute('points', '0 0, 13 5, 0 10'); pg.setAttribute('fill', color);
+                    m.appendChild(pg); defs.appendChild(m);
+                }
+                return id;
+            };
+            const etiqueta = (x, y, texto, color) => {
+                const d = document.createElement('div');
+                d.style.cssText = 'position:absolute; transform:translate(-50%,-50%); white-space:nowrap;'
+                    + `color:${color}; font-weight:bold; font-size:0.9rem; opacity:0;`
+                    + 'text-shadow:0 1px 3px #000, 0 0 6px #000; transition:opacity 150ms ease;'
+                    + `left:${x}px; top:${y}px;`;
+                d.textContent = texto;
+                capa.appendChild(d);
+                return d;
+            };
+            return { capa, svg, punta, etiqueta };
+        }
         async function _presentarCarta(cardId, origenSel, destinoSel, deDorso, opts) {
             const g = window.game;
+            // Cobros aparcados por el DSL (`esCoste`): se ejecutan cuando la carta llega al
+            // escaparate. Si se salta la animación tienen que correr igualmente — son estado del
+            // juego, no adorno.
+            const _ejecutarCobros = async () => {
+                if (window.DSL && typeof DSL._drenarCobros === 'function') await DSL._drenarCobros(g);
+            };
             // Saltable como el resto — pero la COLOCACIÓN no es adorno: si se salta la animación,
             // la carta tiene que acabar en su sitio igualmente.
             if (!g || g.isSkippingAnim) {
                 if (opts && typeof opts.colocar === 'function') await opts.colocar();
+                await _ejecutarCobros();
                 return;
             }
             const tmpl = getCardTemplate(cardId);
@@ -1526,50 +1596,175 @@
             const cy = _tablero ? _tablero.top + _tablero.height / 2 : window.innerHeight / 2;
             const W = 90, H = 126;
 
-            const cont = document.createElement('div');
-            // z-index 3900: por encima del tablero pero POR DEBAJO de los visores de pila
-            // (#discard-viewer, 4000) y del detalle. Con 4900 la carta presentada se dibujaba
-            // ENCIMA del modal de búsqueda y tapaba justo las cartas entre las que eliges.
-            cont.style.cssText = `position:fixed; z-index:3900; width:${W}px; height:${H}px;`
-                + 'perspective:800px; pointer-events:none; transition:'
-                + `left ${PRESENTA_VIAJE}ms cubic-bezier(.2,.8,.2,1), top ${PRESENTA_VIAJE}ms cubic-bezier(.2,.8,.2,1);`;
-            cont.style.left = ((origen ? origen.left + origen.width / 2 : cx) - W / 2) + 'px';
-            cont.style.top  = ((origen ? origen.top + origen.height / 2 : cy) - H / 2) + 'px';
+            // Un clon de escaparate: contenedor + volteador cara/dorso. Lo usan por igual la
+            // carta que se presenta y sus acompañantes (los costes que vienen de la mano).
+            const _clon = (plantilla, dorsoInicial, rectOrigen) => {
+                const c = document.createElement('div');
+                // z-index 3900: por encima del tablero pero POR DEBAJO de los visores de pila
+                // (#discard-viewer, 4000) y del detalle. Con 4900 la carta presentada se dibujaba
+                // ENCIMA del modal de búsqueda y tapaba justo las cartas entre las que eliges.
+                c.style.cssText = `position:fixed; z-index:3900; width:${W}px; height:${H}px;`
+                    + 'perspective:800px; pointer-events:none; transition:'
+                    + `left ${PRESENTA_VIAJE}ms cubic-bezier(.2,.8,.2,1), top ${PRESENTA_VIAJE}ms cubic-bezier(.2,.8,.2,1);`;
+                c.style.left = ((rectOrigen ? rectOrigen.left + rectOrigen.width / 2 : cx) - W / 2) + 'px';
+                c.style.top  = ((rectOrigen ? rectOrigen.top + rectOrigen.height / 2 : cy) - H / 2) + 'px';
+                // Cara y dorso en un volteador; si no venia de dorso, se arranca ya girado a la cara.
+                const f = document.createElement('div');
+                f.style.cssText = 'position:relative; width:100%; height:100%; transform-style:preserve-3d;'
+                    + `transition: transform ${PRESENTA_VIAJE}ms ease, scale ${PRESENTA_VIAJE}ms ease;`;
+                // OJO a `text`: createCardEl lo vuelca tal cual en .card-body, así que sin él salía
+                // literalmente "undefined" en la descripción. Se copia la plantilla entera y solo se
+                // sobrescribe lo que una instancia necesita, para no volver a olvidar un campo.
+                const cara = g.createCardEl(Object.assign({}, plantilla, {
+                    instanceId: '__presenta__', owner: 'p1', location: 'preview',
+                    currentHp: plantilla.hp, currentDef: plantilla.def, currentAtk: plantilla.atk,
+                }), false, true);
+                cara.removeAttribute('data-id');
+                cara.style.cssText += 'position:absolute; inset:0; margin:0; width:100%; height:100%; backface-visibility:hidden;';
+                const dor = document.createElement('div');
+                dor.className = 'card card-back';
+                dor.style.cssText = 'position:absolute; inset:0; margin:0; width:100%; height:100%; backface-visibility:hidden; transform:rotateY(180deg);';
+                f.appendChild(cara); f.appendChild(dor);
+                f.style.transform = dorsoInicial ? 'rotateY(180deg) scale(1)' : 'rotateY(0deg) scale(1)';
+                c.appendChild(f);
+                document.body.appendChild(c);
+                return { cont: c, flip: f };
+            };
 
-            // Cara y dorso en un volteador; si no venia de dorso, se arranca ya girado a la cara.
-            const flip = document.createElement('div');
-            flip.style.cssText = 'position:relative; width:100%; height:100%; transform-style:preserve-3d;'
-                + `transition: transform ${PRESENTA_VIAJE}ms ease, scale ${PRESENTA_VIAJE}ms ease;`;
-            // OJO a `text`: createCardEl lo vuelca tal cual en .card-body, así que sin él salía
-            // literalmente "undefined" en la descripción. Se copia la plantilla entera y solo se
-            // sobrescribe lo que una instancia necesita, para no volver a olvidar un campo.
-            const cara = g.createCardEl(Object.assign({}, tmpl, {
-                instanceId: '__presenta__', owner: 'p1', location: 'preview',
-                currentHp: tmpl.hp, currentDef: tmpl.def, currentAtk: tmpl.atk,
-            }), false, true);
-            cara.removeAttribute('data-id');
-            cara.style.cssText += 'position:absolute; inset:0; margin:0; width:100%; height:100%; backface-visibility:hidden;';
-            const dorso = document.createElement('div');
-            dorso.className = 'card card-back';
-            dorso.style.cssText = 'position:absolute; inset:0; margin:0; width:100%; height:100%; backface-visibility:hidden; transform:rotateY(180deg);';
-            flip.appendChild(cara); flip.appendChild(dorso);
-            flip.style.transform = deDorso ? 'rotateY(180deg) scale(1)' : 'rotateY(0deg) scale(1)';
-            cont.appendChild(flip);
-            document.body.appendChild(cont);
+            // ── Reparto de los costes/requisitos ─────────────────────────────────────────
+            // El criterio es DÓNDE está la carta en este instante, no lo que declare el motor:
+            // si tiene elemento en el tablero se queda ahí y le sale una flecha; si no lo tiene
+            // (venía de la mano y ya está en el descarte) acompaña a la carta al escaparate.
+            const costes = (opts && opts.costes) || [];
+            const _elDe = (c) => document.querySelector(`.card[data-id="${c.id}"]`);
+            const enCampo = costes.filter(c => !!_elDe(c));
+            const acomp   = costes.filter(c => !_elDe(c));
+
+            // El BLOQUE (carta + acompañantes) va centrado en el campo, no la carta principal.
+            const paso = W * PRESENTA_ZOOM + PRESENTA_GAP;
+            const mx = cx - (acomp.length * paso) / 2;      // centro de la carta que se presenta
+
+            const cl = _clon(tmpl, deDorso, origen);
+            const cont = cl.cont, flip = cl.flip;
+            // Acompañantes: nacen en la mano de su dueño (de donde salieron) y viajan a la vez.
+            const acompCl = acomp.map((c, i) => {
+                const inst = getCardTemplate(c.cardId);
+                if (!inst) return null;
+                const rOrig = _rect(`#${c.owner}-hand`);
+                const cc = _clon(inst, false, rOrig);
+                return { ref: c, cont: cc.cont, flip: cc.flip, x: mx + (i + 1) * paso };
+            }).filter(Boolean);
+
             // El nombre se encoge para caber, igual que en el resto de cartas: ese ajuste lo hace
             // adjustCardHeaders sobre TODOS los .card-header span, y solo corre desde render(),
             // así que un elemento creado fuera de él se quedaba sin ajustar.
             g.adjustCardHeaders();
             void cont.offsetWidth;
 
+            // Las flechas son ADORNO: si algo falla al dibujarlas, la presentación tiene que
+            // seguir -y sobre todo tiene que seguir COLOCANDO la carta-. La cola de
+            // presentaciones se traga las excepciones con un .catch, así que un fallo aquí se
+            // llevaba por delante el aterrizaje sin dejar rastro (Wolfgang, 8-ago-2026).
+            let flechas = null;
+            try { if (enCampo.length || acompCl.length) flechas = _capaFlechasPresenta(); } catch (err) { console.error(err); }
+
             // 1) Viaje al escaparate + volteo + zoom, todo a la vez.
-            cont.style.left = (cx - W / 2) + 'px';
+            cont.style.left = (mx - W / 2) + 'px';
             cont.style.top  = (cy - H / 2) + 'px';
             flip.style.transform = `rotateY(0deg) scale(${PRESENTA_ZOOM})`;
+            acompCl.forEach(a => {
+                a.cont.style.left = (a.x - W / 2) + 'px';
+                a.cont.style.top  = (cy - H / 2) + 'px';
+                a.flip.style.transform = `rotateY(0deg) scale(${PRESENTA_ZOOM})`;
+            });
+
+            // Flechas del CAMPO: crecen desde cada carta durante el viaje, y quedan enteras -con
+            // punta y etiqueta- justo cuando la carta se posa en el escaparate.
+            const _lineas = [];
+            if (flechas) try { enCampo.forEach(c => {
+                const el = _elDe(c); if (!el) return;
+                const r = el.getBoundingClientRect();
+                const ox = r.left + r.width / 2, oy = r.top + r.height / 2;
+                const color = PRESENTA_COLOR[c.tipo] || PRESENTA_COLOR.coste;
+                // La punta se queda a las puertas del escaparate: si apunta al centro exacto
+                // acaba escondida DEBAJO de la carta presentada y no se ve la flecha entera.
+                const dx = mx - ox, dy = cy - oy, dist = Math.hypot(dx, dy) || 1;
+                const margen = (W * PRESENTA_ZOOM) / 2 + 10;
+                const tx = ox + dx * (1 - margen / dist), ty = oy + dy * (1 - margen / dist);
+                const L = Math.hypot(tx - ox, ty - oy);
+                const ln = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                ln.setAttribute('x1', ox); ln.setAttribute('y1', oy);
+                ln.setAttribute('x2', tx); ln.setAttribute('y2', ty);
+                ln.setAttribute('stroke', color); ln.setAttribute('stroke-width', '3');
+                ln.setAttribute('stroke-linecap', 'round');
+                // Truco clásico de "dibujado": toda la línea es un solo guion de longitud L,
+                // desplazado L (invisible) y traído a 0 (visible) con transición.
+                ln.setAttribute('stroke-dasharray', L); ln.setAttribute('stroke-dashoffset', L);
+                ln.style.transition = `stroke-dashoffset ${PRESENTA_VIAJE}ms linear`;
+                flechas.svg.appendChild(ln);
+                void ln.getBoundingClientRect();
+                ln.setAttribute('stroke-dashoffset', 0);
+                // La etiqueta va sobre la MITAD de la longitud de la flecha, un pelo por encima.
+                const et = flechas.etiqueta((ox + tx) / 2, (oy + ty) / 2 - 12, PRESENTA_ETIQ[c.tipo] || PRESENTA_ETIQ.coste, color);
+                _lineas.push({ ln, et, color });
+            }); } catch (err) { console.error(err); }
+
             await g.sleep(PRESENTA_VIAJE);
+
+            // La punta y la etiqueta aparecen con la flecha ya entera: puesta antes, el marcador
+            // se dibuja igual aunque el trazo esté oculto y se veía una punta suelta flotando.
+            try {
+                _lineas.forEach(({ ln, et, color }) => {
+                    ln.setAttribute('marker-end', `url(#${flechas.punta(color)})`);
+                    et.style.opacity = '1';
+                });
+            } catch (err) { console.error(err); }
+
+            // Flecha del ACOMPAÑANTE: brota del propio coste y corre al centro del bloque,
+            // apuntando de vuelta hacia él.
+            if (flechas && acompCl.length) try {
+                const primero = acompCl[0];
+                const color = PRESENTA_COLOR[primero.ref.tipo] || PRESENTA_COLOR.coste;
+                const fl = document.createElement('div');
+                fl.style.cssText = 'position:absolute; transform:translate(-50%,-50%); pointer-events:none;'
+                    + 'display:flex; flex-direction:column; align-items:center; font-weight:bold;'
+                    + `color:${color}; text-shadow:0 1px 3px #000, 0 0 6px #000; opacity:0;`
+                    + `left:${primero.x}px; top:${cy}px;`
+                    + `transition: left ${PRESENTA_FLECHA_MS}ms cubic-bezier(.2,.8,.2,1), opacity ${PRESENTA_FLECHA_MS}ms ease;`;
+                fl.innerHTML = '<div style="font-size:0.9rem; margin-bottom:1px; white-space:nowrap;">'
+                    + (PRESENTA_ETIQ[primero.ref.tipo] || PRESENTA_ETIQ.coste)
+                    + '</div><div style="font-size:2.4rem; line-height:1;">&#10230;</div>';
+                flechas.capa.appendChild(fl);
+                void fl.offsetWidth;
+                fl.style.left = cx + 'px';
+                fl.style.opacity = '1';
+            } catch (err) { console.error(err); }
+
+            // El coste se cobra AQUÍ (Toto, 8-ago-2026): el "-1 FUR" sale a la vez que la carta
+            // se enseña, con las flechas ya puestas señalando a quién le ha tocado pagar.
+            await _ejecutarCobros();
 
             // 2) Pose.
             await g.sleep(PRESENTA_POSE);
+
+            // Las flechas se van en cuanto arranca el viaje al destino, no antes.
+            if (flechas) {
+                flechas.capa.style.transition = `opacity ${PRESENTA_FLECHA_MS}ms ease`;
+                flechas.capa.style.opacity = '0';
+                setTimeout(() => flechas.capa.remove(), PRESENTA_FLECHA_MS + 60);
+            }
+            // Los acompañantes se van a su pila a la vez y durante el mismo tiempo que la carta.
+            acompCl.forEach(a => {
+                const d = _rect(`#${a.ref.owner}-discard-stack`);
+                if (d) {
+                    a.cont.style.left = (d.left + d.width / 2 - W / 2) + 'px';
+                    a.cont.style.top  = (d.top + d.height / 2 - H / 2) + 'px';
+                }
+                a.flip.style.transform = 'rotateY(0deg) scale(1)';
+                a.cont.style.transition += `, opacity ${PRESENTA_VIAJE}ms ease`;
+                a.cont.style.opacity = '0';
+                setTimeout(() => a.cont.remove(), PRESENTA_VIAJE + 60);
+            });
 
             // 3) Viaje al destino. Si la carta va a QUEDARSE en una fila, aterriza de verdad:
             // se coloca en el estado, la fila se reordena deslizándose, y el clon vuela al hueco
@@ -7498,8 +7693,9 @@
                 // animación (al aterrizar), no antes ni después. Es lo que hace que la pila se
                 // pueble justo cuando la carta llega y que, mientras aún se pueda cancelar, siga
                 // viéndose en la mano.
-                return animarPresentacionCarta(p.cardId, p.origen, p.destino, p.deDorso,
-                    p.colocar ? { colocar: () => { p.colocar(); return null; } } : null);
+                const _o = {};
+                if (p.colocar) _o.colocar = () => { p.colocar(); return null; };
+                return animarPresentacionCarta(p.cardId, p.origen, p.destino, p.deDorso, _o);
             }
 
             _purgarBanderasSync() {

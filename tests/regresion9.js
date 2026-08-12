@@ -17,6 +17,7 @@ const { correrSuite } = require('./harness');
 const escenarios = [
     {
         nombre: 'Infusión de maná: paga 2 de Furor y equipa treatAttacksAsSpecial',
+        flotantesSoloVieja: [ { linea: '-2 FUR', consecutivo: true, motivo: 'la vieja pintaba DOS veces el mismo flotante de Furor: el suyo escrito a mano MÁS el automático de modifyStat. La nueva ya no declara el suyo (Toto lo vio con Rezo en grupo, 8-ago-2026); el flotante que queda es el del motor, idéntico' } ],
         p1: { vanguardia: [{ carta: 'Oso con armadura', furor: 2 }], mano: ['Infusión de maná'] },
         p2: { vanguardia: ['Mini-tigre'] },
         pasos: [
@@ -30,6 +31,7 @@ const escenarios = [
     },
     {
         nombre: 'Rezo en grupo: dos pagadores distintos y busca a la única Diosa del mazo',
+        flotantesSoloVieja: [ { linea: '-1 FUR', consecutivo: true, motivo: 'la vieja pintaba DOS veces el mismo flotante de Furor: el suyo escrito a mano MÁS el automático de modifyStat. La nueva ya no declara el suyo (Toto lo vio con Rezo en grupo, 8-ago-2026); el flotante que queda es el del motor, idéntico' } ],
         semilla: 6,
         p1: {
             vanguardia: [{ carta: 'Oso con armadura', furor: 1 }, { carta: 'Mini-tigre', furor: 1 }],
@@ -53,6 +55,7 @@ const escenarios = [
     },
     {
         nombre: 'Rezo en grupo sin Dioses/Diosas en el mazo: falla la búsqueda pero baraja igualmente',
+        flotantesSoloVieja: [ { linea: '-1 FUR', consecutivo: true, motivo: 'la vieja pintaba DOS veces el mismo flotante de Furor: el suyo escrito a mano MÁS el automático de modifyStat. La nueva ya no declara el suyo (Toto lo vio con Rezo en grupo, 8-ago-2026); el flotante que queda es el del motor, idéntico' } ],
         semilla: 6,
         p1: {
             vanguardia: [{ carta: 'Oso con armadura', furor: 1 }, { carta: 'Mini-tigre', furor: 1 }],

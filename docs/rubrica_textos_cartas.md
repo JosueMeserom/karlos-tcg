@@ -448,3 +448,46 @@ Una carta que "vuelve" (Atomización al rematar) hace el viaje **completo otra v
 inverso: sale del descarte, se presenta en el centro y aterriza en la mano. Es un evento que los
 dos jugadores deben ver, no una línea de log. Y el log va en 3ª persona con dueño, como todo:
 *"vuelve a la mano de J1 (Ultra_K)"*, nunca *"vuelve a tu mano"*.
+
+## 14.bis. LOS COSTES Y LOS REQUISITOS SE ENSEÑAN CON LA CARTA (Toto, 8-ago-2026)
+
+Una carta no se presenta sola: se presenta **con lo que ha costado**. Antes el "-1 FUR" salía
+cuando le tocaba a su efecto dentro de la cadena, que con una búsqueda de por medio podía ser
+cinco pasos después de haber visto la carta. Ahora el cobro se **aparca hasta el escaparate**: el
+flotante sale a la vez que la carta se enseña, con las flechas ya puestas señalando a quién le ha
+tocado pagar.
+
+**En el DSL** basta con marcar el efecto:
+
+- `esCoste: true` — quien lo paga queda anotado, y **el efecto se aparca** hasta que la carta
+  llega al escaparate. Va en su sitio natural de la lista (justo detrás de la elección del
+  pagador), no colado detrás de la búsqueda: ese apaño servía para no cobrar mientras aún se
+  podía cancelar, pero a cambio retrasaba el flotante hasta el final de todo.
+- `esRequisito: true` — solo anota. Un requisito no se pierde, se comprueba.
+
+En una carta imperativa se anota a mano con `DSL._marcarCoste(game, carta, 'coste'|'requisito')`.
+
+**Cómo se ve**, según dónde esté el coste en ese momento — lo decide el cliente mirando si la
+carta tiene elemento en el tablero, no lo declara la carta:
+
+- **Viene de la mano** (la Manzanahoria de Wolfgang): viaja al escaparate **al lado** de la carta
+  usada, y el **bloque de las dos** queda centrado en el campo. Al llegar, brota del propio coste
+  una flecha "Coste" que corre al centro del bloque apuntándolo. Los acompañantes se van a su
+  pila a la vez y durante el mismo tiempo que la carta principal.
+- **Está en el campo** (los dos pagadores de Rezo en grupo, Aniceto por Wolfgang): se queda donde
+  está y le **crece** una flecha hacia el escaparate mientras la carta viaja; cuando la carta se
+  posa, la flecha ya está entera con su punta y su etiqueta sobre la mitad de su longitud.
+
+En los dos casos las flechas se desvanecen en cuanto arranca el viaje al destino, nunca antes.
+Colores de la misma familia pero distinguibles: **coste ámbar, requisito lima** — de un vistazo
+se lee si algo se ha *perdido* o solo se ha *comprobado*.
+
+**Dos cosas que no se pueden romper al tocar esto:**
+
+1. Un coste **no puede perderse**. La cola de presentaciones se traga las excepciones con un
+   `.catch`, así que un fallo dibujando una flecha se llevaba por delante un cobro entero -y el
+   aterrizaje de la carta- sin dejar rastro. El dibujo va blindado y el drenaje de cobros tiene
+   red de seguridad en `_comprometer`: lo cobre el escaparate o lo cobre él, se cobra una vez.
+2. **`modifyStat` ya pinta su propio flotante** al cambiar un stat. Declarar además un `floating`
+   con el mismo texto ("-1 FUR") lo saca **dos veces**. Un `floating` propio solo se pone si dice
+   algo DISTINTO ("CAÑÓN DE POSITRONES", "-1 FUR (Aura)").
