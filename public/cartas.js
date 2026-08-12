@@ -7254,7 +7254,6 @@ const DSL = {
     },
 
     async _doEffect(e, sourceCard, target, game, ownerId, habilidad) {
-        await DSL._dispararPresentacionSiMuta(e, game);
         const ctx = { self: sourceCard, objetivo: target };
         if (e.guardaNombre && target) { DSL._vars = DSL._vars || {}; (DSL._vars[sourceCard.instanceId] = DSL._vars[sourceCard.instanceId] || {})[e.guardaNombre] = DSL._nombre(game, target); }
         if (e.op === 'MODIFICAR_STAT') {
@@ -8426,6 +8425,14 @@ const DSL = {
             // TORMENTA PERFECTA golpea a todo el campo enemigo y con un enganche por objetivo
             // se habría recanalizado en cada uno. Corre ANTES del daño para que los números
             // salgan como consecuencia del impacto, no antes que él.
+            // La presentación va ANTES de la animación del efecto (Toto, 8-ago-2026): estaba
+            // dentro de _doEffect, que corre DESPUÉS del bloque de animación de abajo, así que
+            // con Atomización se veía el casteo primero -sin daño ni flotantes, porque aún no
+            // había pasado nada- y la carta se presentaba después. §14: primero se presenta, y
+            // recién entonces empieza el efecto, animación incluida.
+            if (e.op !== 'ELEGIR' && e.op !== 'BUSCAR' && game._presentacionArmada) {
+                await game._dispararPresentacion();
+            }
             if (e.animacion === 'DANO_VERDADERO' && targets.length && !(opts && opts.sinAnimacion) && typeof animateTrueDamage === 'function') {
                 await animateTrueDamage(DSL._lanzador(sourceCard), targets.map(t => t.instanceId));
             }

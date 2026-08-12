@@ -1219,6 +1219,13 @@
         async function animateDeath(cardId) {
             const mainEl = document.querySelector(`.card[data-id="${cardId}"]`);
             if (!mainEl) return;
+            // La original se oculta con `opacity:0` SOBRE EL NODO, y cualquier render() mientras
+            // las mitades vuelan lo recrea VISIBLE: esa es la copia fantasma que veía Toto, con
+            // la Vida en negativo — la pista de que no era un clon sino la carta REAL repintada.
+            // Se marca por ID en un Set del juego (no con findCard, que devuelve null si la carta
+            // ya cambió de zona) y createCardEl lo respeta en cada repintado.
+            const g0 = window.game;
+            if (g0) { g0._muriendo = g0._muriendo || new Set(); g0._muriendo.add(cardId); }
 
             // Lista de elementos que vamos a partir en dos (empezando por el portador)
             const elementsToAnimate = [];
@@ -1294,7 +1301,7 @@
 
             // Esperamos a que todo el grupo termine de romperse
             await Promise.all(animations);
-            if (_cLog) delete _cLog._animandoMuerte;
+            if (g0 && g0._muriendo) g0._muriendo.delete(cardId);
         }
 
         async function animateMassiveSacrifice(cardIds) {
@@ -6218,39 +6225,38 @@
                         } else {
                             if (card.type === 'Personaje' && vanguardChars >= 2) this.logMsg(`Límite de 2 Personajes. ${card.name} va a la retaguardia.`, 'system');
                             else this.logMsg(`Vanguardia llena. ${card.name} va a la retaguardia.`, 'system');
-                            
                             card.location = 'rearguard';
-                            p.rearguard.push(card);
                         }
                     } else {
                         card.location = 'vanguard';
-                        p.vanguard.push(card);
-                        this.assignCopyId(card);
                         this.logMsg(`${pName} juega ${this.getCardNameWithOwner(card)} en la vanguardia.`, logType);
                     }
 
+                    // La carta NO se mete en la fila aquí: eso es el ATERRIZAJE, y ocurre DENTRO
+                    // de la presentación (§14). Antes se empujaba a la fila primero, así que el
+                    // clon no tenía hueco al que volar: iba al centro de la zona, se desvanecía,
+                    // y el deslizamiento salía DESPUÉS, como una animación aparte. Ahora el viaje
+                    // desde el centro va directo al sitio exacto que le toca, y las demás se
+                    // apartan A LA VEZ.
                     p.hand.splice(cardIndex, 1);
-                    this._filaDeslizar = card.location === 'rearguard' ? `#${card.owner}-rearguard` : `#${card.owner}-vanguard`;
-                    this._filaFoto = _fotoFila(this._filaDeslizar);
-                    // PRESENTACIÓN también al colocar una unidad desde la mano (§14, pedido de
-                    // Toto): viaja al centro, se enseña, y de ahí a su hueco — que es cuando las
-                    // demás se apartan deslizándose. Antes solo se hacía el deslizamiento, que
-                    // era la mitad del encargo. Se salta con el resto de animaciones.
-                    this._presentandoUnidad = true;
-                    await animarPresentacionCarta(card.id, `#${card.owner}-hand`, this._filaDeslizar,
-                        this.gameMode === 'online' && this.myPlayerId !== card.owner);
-                    this._presentandoUnidad = false;
-
                     this.assignCopyId(card); // el [n] nace al salir de la mano
+                    const _filaSel = card.location === 'rearguard' ? `#${card.owner}-rearguard` : `#${card.owner}-vanguard`;
+                    await animarPresentacionCarta(card.id, `#${card.owner}-hand`, _filaSel,
+                        this.gameMode === 'online' && this.myPlayerId !== card.owner,
+                        {
+                            zonaSel: _filaSel,
+                            colocar: () => {
+                                (card.location === 'rearguard' ? p.rearguard : p.vanguard).push(card);
+                                card.justPlayed = true;
+                                this.updatePassives();
+                                this.render();
+                                return card.instanceId;
+                            },
+                        });
+
                     this.placedUnitThisTurn = true;
-                    
-                    card.justPlayed = true; 
                     this.updatePassives();
                     this.render(); 
-                    if (this._filaFoto) {
-                        _deslizarFila(this._filaDeslizar, this._filaFoto, card.instanceId);
-                        this._filaFoto = null; this._filaDeslizar = null;
-                    }
 
                     if (card.tributeSourceId) {
                         const source = this.findCard(card.tributeSourceId);
@@ -9437,6 +9443,9 @@
                 if (card.currentHp <= 0 && (card.type === 'Personaje' || card.type === 'Esbirro') && card.location !== 'discard' && card.location !== 'hand') {
                     el.style.pointerEvents = 'none';
                 }
+                // Muriendo: sus mitades ya vuelan por la capa de animación, así que el original
+                // debe seguir invisible aunque este repintado lo acabe de crear. Ver animateDeath.
+                if (this._muriendo && this._muriendo.has(card.instanceId)) el.style.opacity = '0';
 
                 if (this.isDebugOpen && this.debugSelectedCard && this.debugSelectedCard.instanceId === card.instanceId) {
                     el.classList.add('debug-mode-active');
