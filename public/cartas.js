@@ -7785,6 +7785,11 @@ const DSL = {
                 const _nombrePila = _zonaVisor === 'discard' ? 'esta pila de descartes' : 'este mazo';
                 const visorVacio = async (barajara) => {
                     if (!esVisorPila) return;
+                    // Abrir el visor del MAZO compromete AUNQUE esté vacío de elegibles: has
+                    // mirado la pila oculta y se va a barajar igual. Sin esto, una búsqueda sin
+                    // resultados dejaba la carta jugada sin presentar y sin llegar al descarte
+                    // hasta el final de la cadena (Toto, 8-ago-2026, con Rezo en grupo).
+                    if (_zonaVisor === 'deck' && game._presentacionArmada) await game._dispararPresentacion();
                     await game.openDeckSearchViewer(pid, [], F(e.titulo || 'ELIGE UNA CARTA'),
                         barajara ? `No hay cartas elegibles en ${_nombrePila}. Se barajará al cerrar el visor.` : `No hay cartas elegibles en ${_nombrePila}.`,
                         1, _zonaVisor);

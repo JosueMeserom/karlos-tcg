@@ -1594,15 +1594,20 @@
             } else {
                 destino = _rect(destinoSel);
             }
-            if (destino) {
-                // Se ENCAJA en el rect real, no se centra un 90x126 encima (Toto, 8-ago-2026:
-                // "no va exactamente al sitio, si no un poco más abajo"). El hueco puede medir
-                // otra cosa -wrapper de equipo, escalas- así que centrar un tamaño fijo dejaba
-                // el clon desplazado justo al aterrizar, que es cuando más se nota.
+            if (destino && idEntrante) {
+                // Hueco REAL de una carta: se encaja en él tal cual. El hueco puede medir otra
+                // cosa que 90x126 (wrapper de equipo, escalas), así que centrar un tamaño fijo
+                // dejaba el clon desplazado al aterrizar.
                 cont.style.left = destino.left + 'px';
                 cont.style.top  = destino.top + 'px';
                 cont.style.width = destino.width + 'px';
                 cont.style.height = destino.height + 'px';
+            } else if (destino) {
+                // Destino que NO es un hueco de carta (una pila, la zona de mano entera): se
+                // CENTRA conservando el tamaño de carta. Copiar el rect aquí era lo que hacía
+                // que la carta se ensanchara hasta ocupar toda la mano (Toto, 8-ago-2026).
+                cont.style.left = (destino.left + destino.width / 2 - W / 2) + 'px';
+                cont.style.top  = (destino.top + destino.height / 2 - H / 2) + 'px';
             }
             flip.style.transform = 'rotateY(0deg) scale(1)';
             if (!idEntrante) {                              // sin hueco propio: se funde en la pila
