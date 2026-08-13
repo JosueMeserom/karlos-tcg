@@ -1120,6 +1120,18 @@ const CARD_DB = [
                   cantidad: 1, titulo: "TRIBUTO PARA GARRET (-4 FUROR)",
                   efectos: [ { op: "MODIFICAR_STAT", stat: "furor", delta: -4, esCoste: true,
                                log: "{objetivo} entrega su Furor como tributo para Garret." } ] } ] },
+            { trigger: "AL_JUGAR",
+              efectos: [
+                { op: "BUSCAR", en: ["MAZO", "DESCARTES"], cantidad: 1, destino: "MANO",
+                  filtros: [ { campo: "name", op: "==", valor: "Escudo mágico" } ],
+                  titulo: "DESBORDE DE MANÁ: ELIGE UN ESCUDO MÁGICO",
+                  confirmarPorZona: true,
+                  confirmar: { titulo: "DESBORDE DE MANÁ: BÚSQUEDA", no: "NO BUSCAR NADA",
+                               porZona: { MAZO: "BUSCAR EN EL MAZO", DESCARTES: "BUSCAR EN DESCARTES" } },
+                  log: "{carta} atrae un Escudo mágico a la mano de {jugador}.",
+                  logNoValidas: "No queda ningún Escudo mágico en el mazo ni en los descartes de {jugador}.",
+                  logNoEncontrada: "No hay ningún Escudo mágico ahí.",
+                  barajarDespues: { log: "Barajando el mazo de {jugador}...", inclusoSinValidas: true } } ] },
             { trigger: "ACTIVA", nombre: "ANDANADA METEÓRICA", coste: { furor: 3 }, sinObjetivo: true,
               requisitos: [
                 { count: { quien: "ENEMIGO", zona: "vanguardia", filtros: [ { campo: "stealth", op: "falsy" } ] }, op: ">=", valor: 2,
@@ -1130,83 +1142,17 @@ const CARD_DB = [
                   efectos: [ { op: "ATACAR", especial: true } ] } ] }
         ],
 
-        // PENDIENTE de migrar a BUSCAR (13-ago-2026). Este modal de tres opciones (mazo /
-        // descartes si hay / nada) es literalmente lo que hace `confirmarPorZona`, la pieza que
-        // ya usan Berry y Karlitos, y al migrar heredaría el VISOR del mazo -hoy coge el primer
-        // Escudo por id fijo, sin enseñar la pila ni dejarte elegir cuál- y la PRESENTACIÓN
-        // camino de la mano, que es lo que hacía que el rival no viera el Escudo.
-        // Se intentó y se revirtió: la migración sale, pero reordena y funde varios logs de
-        // regresion64 (uno por zona pasa a ser uno solo, el aviso de "no se encontró" lo absorbe
-        // el visor) y hay que documentar cada diferencia con calma. La red YA está puesta, que
-        // era lo que faltaba: cuando se retome, la suite dirá exactamente qué cambia.
-        // HOOK 2: Búsqueda del Escudo Mágico tras colocarse
-        onAfterPlayAsync: async function(card, game, p) {
-            const hasInDiscard = p.discard && p.discard.some(c => c.id === 26);
-            
-            await new Promise(resolve => {
-                const choices = [];
-                choices.push({
-                    label: 'BUSCAR EN EL MAZO',
-                    action: async () => {
-                        const idx = p.deck.findIndex(c => c.id === 26);
-                        if (idx !== -1) {
-                            const target = p.deck[idx]; // <--- Obtenemos la carta primero
-                            
-                            // Sale de la pila ANTES de volar: si no, la carta existe en dos sitios a la vez
-                            // durante toda la animación y el contador de la pila miente. Y entra en la mano
-                            // DENTRO del vuelo, para aterrizar en su hueco (§14.quater, Toto 13-ago-2026).
-                            p.deck.splice(idx, 1);
-                            const _aMano = () => { target.location = 'hand'; p.hand.push(target); game.render(); return target.instanceId; };
-                            if (typeof animateStackToHand === 'function') {
-                                await animateStackToHand(`${p.id}-deck-stack`, p.id, target.id, _aMano);
-                            } else { _aMano(); }
-                            
-                            game.logMsg(`${card.name} añade Escudo mágico del mazo a la mano.`, 'ability');
-                        } else {
-                            game.logMsg(`No se encontró ningún Escudo mágico en el mazo.`, 'system');
-                        }
-                        
-                        game.logMsg(`Barajando el mazo de ${game.getDisplayName(p.id)}...`, 'system');
-                        await animateShuffle(p.id);
-                        game.shuffle(p.deck);
-                        game.render();
-                        resolve();
-                    }
-                });
-
-                if (hasInDiscard) {
-                    choices.push({
-                        label: 'BUSCAR EN DESCARTES',
-                        action: async () => {
-                            const idx = p.discard.findIndex(c => c.id === 26);
-                            if (idx !== -1) {
-                                const target = p.discard[idx];
-                                
-                                // Sale de la pila ANTES de volar: si no, la carta existe en dos sitios a la vez
-                                // durante toda la animación y el contador de la pila miente. Y entra en la mano
-                                // DENTRO del vuelo, para aterrizar en su hueco (§14.quater, Toto 13-ago-2026).
-                                p.discard.splice(idx, 1);
-                                const _aMano = () => { target.location = 'hand'; p.hand.push(target); game.render(); return target.instanceId; };
-                                if (typeof animateStackToHand === 'function') {
-                                    await animateStackToHand(`${p.id}-discard-stack`, p.id, target.id, _aMano);
-                                } else { _aMano(); }
-                                
-                                game.logMsg(`${card.name} recupera Escudo mágico de los descartes.`, 'ability');
-                                game.render();
-                            }
-                            resolve();
-                        }
-                    });
-                }
-
-                choices.push({
-                    label: 'NO BUSCAR NADA',
-                    action: () => resolve()
-                });
-
-                game.openChoiceModal('DESBORDE DE MANÁ: BÚSQUEDA', choices);
-            });
-        },
+        // DESBORDE DE MANÁ migrada al op BUSCAR (13-ago-2026). El modal de tres opciones que
+        // tenía escrito a mano -mazo / descartes si hay / nada- es literalmente `confirmarPorZona`,
+        // la pieza que ya usan Berry y Karlitos. Al migrar hereda tres cosas que le faltaban:
+        //   · el VISOR del mazo, con la pila entera a la vista. Antes cogía el primer Escudo por
+        //     id fijo, sin enseñar nada y sin dejarte elegir cuál.
+        //   · la PRESENTACIÓN camino de la mano, que es lo que hacía que el rival no llegara a
+        //     ver el Escudo que te llevabas (Toto lo pilló probando a Garret).
+        //   · el aviso de "no hay ninguno", que ahora lo lleva el propio visor.
+        // Sus dos logs por zona ("añade del mazo" / "recupera de los descartes") se funden en el
+        // del op: decisión de Toto, que la carta se comporte igual que sus hermanas pesa más que
+        // conservar cada mensaje.
 
         // HOOK 3: Ganar 2 de Furor en vez de 1 SÓLO en la fase de Furor
         onBeforeGainFuror: function(card, amount, source, game) {
@@ -4337,6 +4283,16 @@ const CARD_DB = [
         name: "La Bestia", hp: 8, def: 4, atk: 4, type: "Esbirro", subtype: "Ser mágico", tags: ["Invocación"], rarity: "S", cost: 1, series: 2,
         text: "Coste: 6 de Furor repartidos entre tus aliados. P: MANIFESTACIÓN PROHIBIDA: Si 'Dáedra' está activo (tuyo o rival), Def y Atq = 8. Si expira, baja. A: CATÁSTROFE (1F): Busca 'Fusión de planos' en el mazo. Baraja siempre.",
         passiveName: "MANIFESTACIÓN PROHIBIDA", activeName: "CATÁSTROFE", activeCost: 1,
+        abilities: [
+            { trigger: "ACTIVA", nombre: "CATÁSTROFE", coste: { furor: 1 }, sinObjetivo: true,
+              efectos: [
+                { op: "BUSCAR", en: "MAZO", cantidad: 1, destino: "MANO",
+                  filtros: [ { campo: "name", op: "==", valor: "Fusión de planos" } ],
+                  titulo: "BUSCAR FUSIÓN DE PLANOS",
+                  log: "¡{carta} atrae el caos! {objetivo} va a la mano de {jugador}.",
+                  logNoValidas: "No queda ninguna Fusión de planos en el mazo de {jugador}.",
+                  barajarDespues: { log: "Barajando el mazo de {jugador}...", inclusoSinValidas: true } } ] }
+        ],
         onBeforePlayAsync: async function(card, game, p) {
             let totalFuror = 0;
             [...p.vanguard, ...p.rearguard].forEach(c => totalFuror += c.furor);
@@ -4380,37 +4336,12 @@ const CARD_DB = [
             if (card.furor < 1) { game.logError("Falta Furor (1)."); return false; }
             return true;
         },
-        onExecuteAbility: async function(card, game) {
-            game.modifyStat(card, 'furor', -1);
-            showFloatingText(card.instanceId, card.activeName, "ft-ability", -30);
-            
-            const p = game.players[card.owner];
-            const fusions = p.deck.filter(c => c.name === "Fusión de planos");
-
-            if (fusions.length > 0) {
-                const _elegida = await game.openDeckSearchViewer(card.owner, fusions, 'BUSCAR FUSIÓN DE PLANOS');
-                const chosen = _elegida ? [_elegida] : [];
-                if (chosen && chosen.length > 0) {
-                    const target = chosen[0];
-                    const idx = p.deck.findIndex(c => c.instanceId === target.instanceId);
-                    p.deck.splice(idx, 1);
-                    await window.animateStackToHand(`${p.id}-deck-stack`, p.id, target.id,
-                        () => { target.location = 'hand'; p.hand.push(target); game.render(); return target.instanceId; });
-                    game.logMsg(`La Bestia atrae el caos: Fusión de planos añadida a la mano.`, 'ability');
-                }
-            } else {
-                game.logError("No quedan cartas 'Fusión de planos' en el mazo.");
-            }
-
-            game.logError("Barajando el mazo...");
-            if (typeof animateShuffle === 'function') await animateShuffle(p.id);
-            game.shuffle(p.deck);
-
-            card.exhausted = true;
-            game.isActionLocked = false;
-            game.cancelAction();
-            game.render();
-        }
+        // CATÁSTROFE migrada al op BUSCAR (13-ago-2026). Hacía a mano el mismo baile que las
+        // otras búsquedas, y de paso arrastraba dos cosas mal: los avisos de "no quedan" y
+        // "barajando" salían por `logError` -el canal de ERRORES, en rojo, para algo que es
+        // información normal- y la carta encontrada no se presentaba, así que el rival no la
+        // veía. El coste, el flotante de la Activa y el agotado los pone ya el compilador.
+        // `inclusoSinValidas`: su texto dice "Baraja siempre".
     },
     {
         name: "Xidachane", hp: 3, def: 3, atk: 4, type: "Personaje", subtype: "Ser vivo", tags: ["Alienígena", "Usuario de Súper Evolución"], gender: "M", rarity: "S", cost: 4, series: 2,

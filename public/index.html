@@ -1470,12 +1470,16 @@
             if (nuevoEl) nuevoEl.style.visibility = '';
         }
 
+        // SIN USUARIOS desde que Garret, La Bestia e Igniz pasaron al op BUSCAR (13-ago-2026).
+        // Se conserva un turno más por si alguna carta futura la necesita, pero el camino bueno
+        // es BUSCAR: esta función existía como "la parte visual" de las búsquedas imperativas y,
+        // por vivir separada del op, se quedó atrás dos veces seguidas -no aterrizaba en la mano
+        // y no presentaba, así que el rival no veía lo que sacabas del mazo-.
+        //
         // Sacar una carta CONOCIDA de una pila es un evento PÚBLICO: pasa por el escaparate y la
         // ven los dos jugadores, y solo después viaja a la mano -volteándose de vuelta si esa
-        // mano no es visible para quien mira-. Es la misma regla que ya cumplía el `aMano` del op
-        // BUSCAR; estas cuatro cartas (Escudo mágico x2, La Bestia, Igniz) se la saltaban y la
-        // carta llegaba a la mano sin que el rival llegara a verla (Toto, 13-ago-2026).
-        // Sin `cardId` (carta desconocida) no hay nada que presentar: vuelo simple.
+        // mano no es visible para quien mira-. Sin `cardId` no hay nada que presentar: vuelo
+        // simple.
         async function animateStackToHand(sourceId, playerId, cardId = null, colocar = null, carta = null) {
             const _c = carta || (cardId !== null ? { id: cardId } : null);
             if (!_c || typeof animarPresentacionCarta !== 'function') {

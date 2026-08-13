@@ -573,6 +573,26 @@ async function montar(esc) {
             [...g.players.p1.vanguard, ...g.players.p1.rearguard].some(c => c.name === 'La Bestia'));
     }
     {
+        // Su BÚSQUEDA es su ACTIVA (CATÁSTROFE, 1F), no la colocación. Migrada a BUSCAR: antes
+        // sacaba sus avisos por logError -el canal de ERRORES, en rojo, para información normal-
+        // y la carta encontrada no se presentaba, así que el rival no la veía.
+        const { ctx, g } = await montar({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'La Bestia', furor: 2 }], mazo: ['Fusión de planos', 'Mini-tigre'] },
+            p2: { vanguardia: ['Mini-tigre'] },
+        });
+        const bestia = g.players.p1.vanguard[0];
+        await ejecutarPaso(ctx, g, { habilidad: 'La Bestia' });
+        await ejecutarPaso(ctx, g, { confirmar: true });   // "¿Usar La Bestia?"
+        if (ctx.pendientes.length) await ejecutarPaso(ctx, g, { elegir: ['Fusión de planos'] });
+        check('La Bestia: CATÁSTROFE se lleva Fusión de planos a la mano',
+            g.players.p1.hand.some(c => c.name === 'Fusión de planos'),
+            'mano=' + JSON.stringify(g.players.p1.hand.map(c => c.name)));
+        check('La Bestia: ...cobrando su Furor (2 -> 1) y agotándose',
+            bestia.furor === 1 && bestia.exhausted,
+            'furor=' + bestia.furor + ' agotada=' + bestia.exhausted);
+    }
+    {
         const { ctx, g } = await montar({
             turno: 2, turnoDe: 'p1', empieza: 'p2',
             p1: { vanguardia: ['Mini-tigre'], mano: ['Igniz'], mazo: ['Longaniza', 'Mini-tigre', 'Oso con armadura'] },
