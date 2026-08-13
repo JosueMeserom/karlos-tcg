@@ -7365,6 +7365,19 @@ const DSL = {
         }
     },
 
+    // ¿Esta Ayuda se EQUIPA a un aliado en vez de irse al descarte?
+    // Importa porque la presentación manda al descarte a toda Ayuda por defecto, y EQUIPAR saca
+    // la carta DE LA MANO: si el descarte se ha adelantado, el splice no encuentra nada y la
+    // carta acaba a la vez en la pila y en `equippedCards` del objetivo. Eso es lo que dejaba a
+    // Shichishito volando al descarte sin que Karlos la equipara, y a Espada V poblando la pila
+    // un instante antes de aparecer bien puesta (Toto, 13-ago-2026).
+    _esEquipo(tmpl) {
+        if (!tmpl || !Array.isArray(tmpl.abilities)) return false;
+        const hay = (lista) => (lista || []).some(e =>
+            (e.op === 'EQUIPAR' && !e.invertido) || hay(e.efectos));
+        return tmpl.abilities.some(a => a.trigger === 'AL_EQUIPAR' || hay(a.efectos));
+    },
+
     // Cola ÚNICA de cobros aparcados. La vacía quien llegue primero: el escaparate (para que el
     // "-1 FUR" salga a la vez que la carta se enseña) o _comprometer (si no hubo animación).
     async _drenarCobros(game) {
@@ -9067,7 +9080,11 @@ const DSL = {
                 // presenta — no al empezar la cadena. Se le entrega el movimiento a la
                 // presentación para que ocurran juntos; si por lo que sea no llega a
                 // presentarse, el cierre de abajo lo hace igualmente.
-                if (game._presentacionArmada) game._presentacionArmada.colocar = _alDescarte;
+                // Una Ayuda que se EQUIPA no va al descarte: la coloca EQUIPAR, sacándola de la
+                // mano. Adelantarle el descarte le rompe ese splice (ver DSL._esEquipo).
+                const _equipa = DSL._esEquipo(typeof getCardTemplate === 'function' ? getCardTemplate(card.id) : null);
+                if (_equipa) { /* la coloca EQUIPAR */ }
+                else if (game._presentacionArmada) game._presentacionArmada.colocar = _alDescarte;
                 else _alDescarte();
                 // La VUELTA hace el viaje completo otra vez, en sentido inverso (§14): sale del
                 // descarte, se presenta en el centro y aterriza en la mano. Es un evento que los
@@ -9100,7 +9117,7 @@ const DSL = {
                 // Elección cancelada: no ha pasado nada, así que la Ayuda vuelve a la mano.
                 if (res && res.ok === false) { game._ayudaEnCurso = null; await _volverAMano(); game.cancelAction(); if (typeof game.render === 'function') game.render(); return; }
                 // NO_CONSUMIR: la vuelta del viaje de ida (Atomización tras rematar).
-                _alDescarte();            // no-op si la presentación ya la movió
+                if (!_equipa) _alDescarte();   // no-op si la presentación ya la movió
                 // Las anotaciones de `guardaIdsEnSelf` (quién pagaba, a quién se eligió) son
                 // andamio de ESTA jugada: no deben viajar con la carta al descarte ni salir en
                 // exportGameState. Se limpian AQUÍ, al terminar — no al descartar, porque el

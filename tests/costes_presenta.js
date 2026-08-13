@@ -274,6 +274,28 @@ async function montar(esc) {
             !marcas.some(m => m.tipo === 'requisito'), JSON.stringify(marcas));
     }
 
+    // ── UNA AYUDA QUE SE EQUIPA NO SE DESCARTA ────────────────────────────────────
+    // La presentación manda al descarte a toda Ayuda por defecto, y EQUIPAR saca la carta DE LA
+    // MANO: con el descarte adelantado, ese splice no encontraba nada y la carta acababa a la vez
+    // en la pila y en `equippedCards`. Shichishito volaba al descarte sin que Karlos la equipara;
+    // Espada V poblaba la pila un instante (Toto, 13-ago-2026).
+    console.log('\n--- Las Ayudas que se equipan acaban EN el aliado, no en la pila ---');
+    for (const nombre of ['Shichishito', 'Espada V', 'Poder Legado']) {
+        const { ctx, g } = await montar({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'Karlos', furor: 2, vida: 1 }], mano: [nombre] },
+            p2: { vanguardia: ['Mini-tigre'] },
+        });
+        await ejecutarPaso(ctx, g, { jugar: nombre });
+        await ejecutarPaso(ctx, g, { elegir: ['Karlos'] });
+        const k = g.players.p1.vanguard[0];
+        check(nombre + ' queda equipada en Karlos',
+            (k.equippedCards || []).some(c => c.name === nombre),
+            'equipadas=' + JSON.stringify((k.equippedCards || []).map(c => c.name)));
+        check(nombre + ' NO pasa por los descartes', !g.players.p1.discard.length,
+            'descartes=' + JSON.stringify(g.players.p1.discard.map(c => c.name)));
+    }
+
     console.log('');
     if (fallos) { console.log(`SUITE costes_presenta: ${fallos} FALLOS de ${total} comprobaciones`); process.exit(1); }
     console.log(`SUITE costes_presenta: ${total}/${total} comprobaciones — COSTES Y REQUISITOS CORRECTOS`);

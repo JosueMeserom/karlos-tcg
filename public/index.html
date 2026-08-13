@@ -1595,6 +1595,9 @@
         }
         async function _presentarCarta(cardId, origenSel, destinoSel, deDorso, opts) {
             const g = window.game;
+            // La carta se va al escaparate, así que el ratón deja de estar encima sin que llegue
+            // ningún mouseleave: el detalle se quedaba abierto (Toto, 13-ago-2026).
+            if (g && g.cerrarDetalle) g.cerrarDetalle();
             // Cobros aparcados por el DSL (`esCoste`): se ejecutan cuando la carta llega al
             // escaparate. Si se salta la animación tienen que correr igualmente — son estado del
             // juego, no adorno.
@@ -1680,7 +1683,11 @@
             const _dorsoDe = (pid) => g.gameMode === 'online' && g.myPlayerId !== pid
                 && !(g.players[pid] && g.players[pid].handExposedTo === g.myPlayerId);
             const costes = (opts && opts.costes) || [];
-            const _elDe = (c) => document.querySelector(`.card[data-id="${c.id}"]`);
+            // El Evento activo NO se pinta como `.card[data-id]`: vive en su RANURA. Sin este
+            // segundo intento, Xanadu, Diego Antonio, Silhouette y Giro de guion marcaban
+            // correctamente y la flecha no aparecía jamás (Toto, 13-ago-2026).
+            const _elDe = (c) => document.querySelector(`.card[data-id="${c.id}"]`)
+                || (c.zona === 'event' ? document.getElementById(`${c.owner}-event-slot`) : null);
             const _enTablero = (c) => c.zona === 'vanguard' || c.zona === 'rearguard' || c.zona === 'event';
             const enCampo = costes.filter(_enTablero);
             const acomp   = costes.filter(c => !_enTablero(c));
@@ -6671,7 +6678,13 @@
                 // pila y se presenta. Y se ESPERA: el efecto no arranca hasta que se ha visto la
                 // carta — si no, el modal de Hexagrama se abría encima de su propia presentación.
                 let _yaDescartada = false;
-                if (this._presentacionArmada) {
+                // Una Ayuda que se EQUIPA no se descarta: la coloca EQUIPAR sacándola de la mano
+                // (ver DSL._esEquipo). Y su presentación termina EN EL OBJETIVO, no en la pila.
+                const _equipa = typeof DSL !== 'undefined' && DSL._esEquipo && DSL._esEquipo(template);
+                if (_equipa && this._presentacionArmada && target) {
+                    this._presentacionArmada.destino = `.card[data-id="${target.instanceId}"]`;
+                }
+                if (!_equipa && this._presentacionArmada) {
                     this._presentacionArmada.colocar = () => {
                         const i = p.hand.findIndex(c => c.instanceId === card.instanceId);
                         if (i === -1) return;
