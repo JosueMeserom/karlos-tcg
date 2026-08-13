@@ -1443,6 +1443,16 @@
         // 1.44 = 1.2 x 1.2. Es el tamaño que salía por accidente cuando la carta fuente del
         // picker se escalaba dos veces; a Toto le gustó ESE para el escaparate (aquí no hay
         // original con la que descuadrar, así que no es un bug: es el tamaño elegido).
+        //
+        // ZOOM REAL, no `transform: scale()` (Toto, 13-ago-2026: "se ven borrosas"). Un
+        // transform escala el BITMAP ya rasterizado, así que agrandar difumina. El clon se monta
+        // con `zoom`, que recalcula el layout -tipografías incluidas- y rasteriza al tamaño
+        // final: en la pose, que es cuando de verdad se lee la carta, el transform está en
+        // scale(1) y se ve nítida. El viaje sí usa transform (va de 1/ZOOM a 1), pero ahí la
+        // imagen se ENCOGE, y encoger un bitmap no se nota.
+        //
+        // OJO al tocar posiciones: `zoom` multiplica también left/top/width/height del propio
+        // elemento, así que todo lo que se le asigne va DIVIDIDO por el zoom (_pz más abajo).
         const PRESENTA_ZOOM  = 1.44;
         // ── COSTES Y REQUISITOS EN LA PRESENTACIÓN (Toto, 8-ago-2026) ────────────────────
         // Una carta se presenta CON lo que ha costado. Dos formas, según dónde esté el coste:
@@ -1569,7 +1579,7 @@
                 const d = document.createElement('div');
                 d.style.cssText = 'position:absolute; transform:translate(-50%,-50%); white-space:nowrap;'
                     + `color:${color}; font-weight:bold; font-size:0.9rem; opacity:0;`
-                    + 'text-shadow:0 1px 3px #000, 0 0 6px #000; transition:opacity 150ms ease;'
+                    + `text-shadow:0 1px 3px #000, 0 0 6px #000; transition:opacity ${PRESENTA_FLECHA_MS}ms ease;`
                     + `left:${x}px; top:${y}px;`;
                 d.textContent = texto;
                 capa.appendChild(d);
@@ -1616,16 +1626,18 @@
 
             // Un clon de escaparate: contenedor + volteador cara/dorso. Lo usan por igual la
             // carta que se presenta y sus acompañantes (los costes que vienen de la mano).
+            // Coordenada de pantalla -> coordenada dentro de un elemento con `zoom`.
+            const _pz = (v) => v / PRESENTA_ZOOM;
             const _clon = (plantilla, dorsoInicial, rectOrigen) => {
                 const c = document.createElement('div');
                 // z-index 3900: por encima del tablero pero POR DEBAJO de los visores de pila
                 // (#discard-viewer, 4000) y del detalle. Con 4900 la carta presentada se dibujaba
                 // ENCIMA del modal de búsqueda y tapaba justo las cartas entre las que eliges.
                 c.style.cssText = `position:fixed; z-index:3900; width:${W}px; height:${H}px;`
-                    + 'perspective:800px; pointer-events:none; transition:'
+                    + `zoom:${PRESENTA_ZOOM}; perspective:800px; pointer-events:none; transition:`
                     + `left ${PRESENTA_VIAJE}ms cubic-bezier(.2,.8,.2,1), top ${PRESENTA_VIAJE}ms cubic-bezier(.2,.8,.2,1);`;
-                c.style.left = ((rectOrigen ? rectOrigen.left + rectOrigen.width / 2 : cx) - W / 2) + 'px';
-                c.style.top  = ((rectOrigen ? rectOrigen.top + rectOrigen.height / 2 : cy) - H / 2) + 'px';
+                c.style.left = _pz((rectOrigen ? rectOrigen.left + rectOrigen.width / 2 : cx)) - W / 2 + 'px';
+                c.style.top  = _pz((rectOrigen ? rectOrigen.top + rectOrigen.height / 2 : cy)) - H / 2 + 'px';
                 // Cara y dorso en un volteador; si no venia de dorso, se arranca ya girado a la cara.
                 const f = document.createElement('div');
                 f.style.cssText = 'position:relative; width:100%; height:100%; transform-style:preserve-3d;'
@@ -1643,7 +1655,8 @@
                 dor.className = 'card card-back';
                 dor.style.cssText = 'position:absolute; inset:0; margin:0; width:100%; height:100%; backface-visibility:hidden; transform:rotateY(180deg);';
                 f.appendChild(cara); f.appendChild(dor);
-                f.style.transform = dorsoInicial ? 'rotateY(180deg) scale(1)' : 'rotateY(0deg) scale(1)';
+                const _s0 = (1 / PRESENTA_ZOOM).toFixed(4);
+                f.style.transform = dorsoInicial ? `rotateY(180deg) scale(${_s0})` : `rotateY(0deg) scale(${_s0})`;
                 c.appendChild(f);
                 document.body.appendChild(c);
                 return { cont: c, flip: f };
@@ -1654,6 +1667,12 @@
             // una carta ya descartada sigue dibujada en la mano hasta el siguiente render, así
             // que mirar el DOM dejaba a la Manzanahoria de Wolfgang clasificada como "en el
             // campo" -se quedaba en la mano con una flecha saliendo de ella- (13-ago-2026).
+            // Una carta de mano está de dorso para mí si no es mía Y esa mano no está expuesta a
+            // mí. `handExposedTo` es lo que pone SEGUIMIENTO (Erasmo): con él, la mano rival se
+            // ve boca arriba, así que "revelarla" con un volteo sería mentir sobre lo que ya se
+            // estaba viendo.
+            const _dorsoDe = (pid) => g.gameMode === 'online' && g.myPlayerId !== pid
+                && !(g.players[pid] && g.players[pid].handExposedTo === g.myPlayerId);
             const costes = (opts && opts.costes) || [];
             const _elDe = (c) => document.querySelector(`.card[data-id="${c.id}"]`);
             const _enTablero = (c) => c.zona === 'vanguard' || c.zona === 'rearguard' || c.zona === 'event';
@@ -1679,7 +1698,11 @@
                 // movido de zona pero aún no se ha repintado); si no, del centro de la mano.
                 const propio = _elDe(c);
                 const rOrig = propio ? propio.getBoundingClientRect() : _rect(`#${c.owner}-hand`);
-                const cc = _clon(inst, false, rOrig);
+                // El coste sale de la MISMA mano que la carta usada, así que se voltea con el
+                // mismo criterio: solo si para MÍ estaba de dorso (Toto, 13-ago-2026: la
+                // Manzanahoria no hacía flip y Wolfgang sí). Y no se voltea lo que ya se estaba
+                // viendo: con la mano expuesta (SEGUIMIENTO de Erasmo) no hay nada que revelar.
+                const cc = _clon(inst, _dorsoDe(c.owner), rOrig);
                 if (propio) _salirDeLaMano(propio);   // deja hueco y el resto de la mano se acomoda
                 return { ref: c, cont: cc.cont, flip: cc.flip, x: mx + (i + 1) * paso };
             }).filter(Boolean);
@@ -1698,13 +1721,13 @@
             try { if (enCampo.length || acompCl.length) flechas = _capaFlechasPresenta(); } catch (err) { console.error(err); }
 
             // 1) Viaje al escaparate + volteo + zoom, todo a la vez.
-            cont.style.left = (mx - W / 2) + 'px';
-            cont.style.top  = (cy - H / 2) + 'px';
-            flip.style.transform = `rotateY(0deg) scale(${PRESENTA_ZOOM})`;
+            cont.style.left = _pz(mx) - W / 2 + 'px';
+            cont.style.top  = _pz(cy) - H / 2 + 'px';
+            flip.style.transform = 'rotateY(0deg) scale(1)';
             acompCl.forEach(a => {
-                a.cont.style.left = (a.x - W / 2) + 'px';
-                a.cont.style.top  = (cy - H / 2) + 'px';
-                a.flip.style.transform = `rotateY(0deg) scale(${PRESENTA_ZOOM})`;
+                a.cont.style.left = _pz(a.x) - W / 2 + 'px';
+                a.cont.style.top  = _pz(cy) - H / 2 + 'px';
+                a.flip.style.transform = 'rotateY(0deg) scale(1)';
             });
 
             // Flechas del CAMPO: crecen desde cada carta durante el viaje, y quedan enteras -con
@@ -1786,10 +1809,10 @@
             acompCl.forEach(a => {
                 const d = _rect(`#${a.ref.owner}-discard-stack`);
                 if (d) {
-                    a.cont.style.left = (d.left + d.width / 2 - W / 2) + 'px';
-                    a.cont.style.top  = (d.top + d.height / 2 - H / 2) + 'px';
+                    a.cont.style.left = _pz(d.left + d.width / 2) - W / 2 + 'px';
+                    a.cont.style.top  = _pz(d.top + d.height / 2) - H / 2 + 'px';
                 }
-                a.flip.style.transform = 'rotateY(0deg) scale(1)';
+                a.flip.style.transform = `rotateY(0deg) scale(${(1 / PRESENTA_ZOOM).toFixed(4)})`;
                 a.cont.style.transition += `, opacity ${PRESENTA_VIAJE}ms ease`;
                 a.cont.style.opacity = '0';
                 setTimeout(() => a.cont.remove(), PRESENTA_VIAJE + 60);
@@ -1822,18 +1845,18 @@
                 // Hueco REAL de una carta: se encaja en él tal cual. El hueco puede medir otra
                 // cosa que 90x126 (wrapper de equipo, escalas), así que centrar un tamaño fijo
                 // dejaba el clon desplazado al aterrizar.
-                cont.style.left = destino.left + 'px';
-                cont.style.top  = destino.top + 'px';
-                cont.style.width = destino.width + 'px';
-                cont.style.height = destino.height + 'px';
+                cont.style.left = _pz(destino.left) + 'px';
+                cont.style.top  = _pz(destino.top) + 'px';
+                cont.style.width = _pz(destino.width) + 'px';
+                cont.style.height = _pz(destino.height) + 'px';
             } else if (destino) {
                 // Destino que NO es un hueco de carta (una pila, la zona de mano entera): se
                 // CENTRA conservando el tamaño de carta. Copiar el rect aquí era lo que hacía
                 // que la carta se ensanchara hasta ocupar toda la mano (Toto, 8-ago-2026).
-                cont.style.left = (destino.left + destino.width / 2 - W / 2) + 'px';
-                cont.style.top  = (destino.top + destino.height / 2 - H / 2) + 'px';
+                cont.style.left = _pz(destino.left + destino.width / 2) - W / 2 + 'px';
+                cont.style.top  = _pz(destino.top + destino.height / 2) - H / 2 + 'px';
             }
-            flip.style.transform = 'rotateY(0deg) scale(1)';
+            flip.style.transform = `rotateY(0deg) scale(${(1 / PRESENTA_ZOOM).toFixed(4)})`;
             if (!idEntrante) {                              // sin hueco propio: se funde en la pila
                 cont.style.opacity = '0';
                 cont.style.transition += `, opacity ${PRESENTA_VIAJE}ms ease`;
@@ -3688,6 +3711,46 @@
                 if (!skipAnim) {
                     const cardEl = document.querySelector(`.card[data-id="${card.instanceId}"]`);
                     const deckEl = document.getElementById(`${playerId}-deck-stack`);
+                    // VOLTEO AL ROBAR (Toto, 13-ago-2026). Una carta sale del mazo de DORSO: si
+                    // quien mira va a verle la cara, tiene que VOLTEARSE por el camino, igual que
+                    // en el escaparate. Antes entraba deslizándose ya con la cara puesta, que es
+                    // justo lo que el volteo existe para evitar.
+                    // Quién ve la cara: su dueño, y quien tenga esa mano expuesta (SEGUIMIENTO de
+                    // Erasmo). Para el resto no hay nada que revelar y se queda el deslizamiento
+                    // de siempre, sin tocar: la carta ya es un dorso de principio a fin.
+                    const _veLaCara = this.gameMode !== 'online' || this.myPlayerId === playerId
+                        || p.handExposedTo === this.myPlayerId;
+                    if (cardEl && deckEl && _veLaCara && !this.isSkippingAnim) {
+                        const cr = cardEl.getBoundingClientRect();
+                        const dr = deckEl.getBoundingClientRect();
+                        cardEl.style.visibility = 'hidden';        // el clon ocupa su sitio
+                        const cont = document.createElement('div');
+                        cont.style.cssText = `position:fixed; z-index:3800; width:${cr.width}px; height:${cr.height}px;`
+                            + `left:${dr.left + dr.width / 2 - cr.width / 2}px; top:${dr.top + dr.height / 2 - cr.height / 2}px;`
+                            + 'perspective:800px; pointer-events:none; transition:'
+                            + `left ${animSpeed}ms cubic-bezier(.2,.8,.2,1), top ${animSpeed}ms cubic-bezier(.2,.8,.2,1);`;
+                        const flip = document.createElement('div');
+                        flip.style.cssText = 'position:relative; width:100%; height:100%; transform-style:preserve-3d;'
+                            + `transition: transform ${animSpeed}ms ease; transform: rotateY(180deg);`;
+                        const cara = this.createCardEl(card, false, true);
+                        cara.removeAttribute('data-id');           // solo visual: que no colisione en los querySelector
+                        cara.style.cssText += 'position:absolute; inset:0; margin:0; width:100%; height:100%; backface-visibility:hidden;';
+                        const dorso = document.createElement('div');
+                        dorso.className = 'card card-back';
+                        dorso.style.cssText = 'position:absolute; inset:0; margin:0; width:100%; height:100%; backface-visibility:hidden; transform:rotateY(180deg);';
+                        flip.appendChild(cara); flip.appendChild(dorso);
+                        cont.appendChild(flip);
+                        document.body.appendChild(cont);
+                        this.adjustCardHeaders();
+                        void cont.offsetWidth;
+                        cont.style.left = cr.left + 'px';
+                        cont.style.top  = cr.top + 'px';
+                        flip.style.transform = 'rotateY(0deg)';
+                        await this.sleep(animSpeed);
+                        cont.remove();
+                        cardEl.style.visibility = '';
+                        return;
+                    }
                     if (cardEl && deckEl) {
                         cardEl.classList.remove('entering');
                         const cardRect = cardEl.getBoundingClientRect();

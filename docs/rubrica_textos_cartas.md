@@ -489,6 +489,17 @@ descartada sigue dibujada en la mano hasta el siguiente render.
 Colores de la misma familia pero distinguibles: **coste ámbar, requisito lima** — de un vistazo
 se lee si algo se ha *perdido* o solo se ha *comprobado*.
 
+**El volteo dice la verdad sobre lo que se ve.** Una carta se voltea **solo si para quien mira
+estaba tapada**: eso incluye a los costes que acompañan (salen de la misma mano, mismo criterio) y
+al robo normal, que sale del mazo de dorso y se voltea al llegar a la mano de quien va a verla. Y
+**no se voltea lo que ya se estaba viendo**: con `handExposedTo` puesto (SEGUIMIENTO de Erasmo) la
+mano rival se ve boca arriba, así que "revelarla" sería mentir sobre lo que ya había a la vista.
+
+**El zoom del escaparate es zoom REAL** (`zoom`, no `transform: scale()`): un transform escala el
+bitmap ya rasterizado y agrandar difumina. El clon se monta con `zoom` y el transform va de
+`1/ZOOM` a `1`, así que en la pose -que es cuando se lee la carta- está a escala 1 y sale nítida.
+Al tocar posiciones ahí, **todo lo que se le asigne al clon va dividido por el zoom** (`_pz`).
+
 **Dos cosas que no se pueden romper al tocar esto:**
 
 1. Un coste **no puede perderse**. La cola de presentaciones se traga las excepciones con un
