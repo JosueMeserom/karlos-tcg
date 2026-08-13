@@ -1345,54 +1345,16 @@
             else await new Promise(r => setTimeout(r, 200));
         }
 
-        // `colocar` es lo que mete la carta en la mano: se llama a MITAD del vuelo, para que el
-        // clon aterrice en el hueco REAL que le toca y el resto de la mano se aparte deslizándose
-        // -igual que una búsqueda en pila-. Antes volaba al centro de la zona, se quitaba, y la
-        // carta aparecía de golpe al terminar (Toto, 13-ago-2026).
-        // Sigue siendo un DORSO todo el viaje: una retribución es tuya y el rival no debe verla.
-        async function animateRetributionToHand(playerId, colocar) {
-            const retEl = document.getElementById(`${playerId}-retribution`);
-            const handSel = `#${playerId}-hand`;
-            const handEl = document.querySelector(handSel);
-            if (!retEl || !handEl) { if (typeof colocar === 'function') colocar(); return; }
-
-            const flyCard = document.createElement('div');
-            flyCard.className = 'card card-back';
-            flyCard.style.position = 'fixed';
-            flyCard.style.zIndex = 5000;
-
-            const startRect = retEl.getBoundingClientRect();
-            flyCard.style.left = startRect.left + 'px';
-            flyCard.style.top = startRect.top + 'px';
-            flyCard.style.width = '90px'; 
-            flyCard.style.height = '126px';
-
-            document.body.appendChild(flyCard);
-            void flyCard.offsetWidth;
-
-            // La mano se acomoda AHORA, con la carta ya dentro: así hay un hueco real al que ir.
-            const foto = _fotoFila(handSel);
-            const idEntrante = (typeof colocar === 'function') ? colocar() : null;
-            const nuevoEl = idEntrante && document.querySelector(`${handSel} .card[data-id="${idEntrante}"]`);
-            if (nuevoEl) nuevoEl.style.visibility = 'hidden';   // el clon ocupa su sitio mientras llega
-            _deslizarFila(handSel, foto, idEntrante);
-
-            const destino = nuevoEl ? nuevoEl.getBoundingClientRect() : handEl.getBoundingClientRect();
-            flyCard.style.transition = 'all 0.8s cubic-bezier(0.2, 0.8, 0.2, 1)';
-            if (nuevoEl) {
-                flyCard.style.left = destino.left + 'px';
-                flyCard.style.top = destino.top + 'px';
-                flyCard.style.width = destino.width + 'px';
-                flyCard.style.height = destino.height + 'px';
-            } else {
-                flyCard.style.left = (destino.left + destino.width / 2 - 45) + 'px';
-                flyCard.style.top = (destino.top + destino.height / 2 - 63) + 'px';
-                flyCard.style.transform = 'scale(0.5)';
-            }
-
-            await game.sleep(800);
-            flyCard.remove();
-            if (nuevoEl) nuevoEl.style.visibility = '';
+        // `colocar` mete la carta en la mano a MITAD del vuelo, para que el clon aterrice en el
+        // hueco REAL y el resto de la mano se aparte deslizándose. Antes volaba al centro de la
+        // zona y la carta aparecía de golpe al terminar (Toto, 13-ago-2026).
+        //
+        // Y SE VOLTEA, con la misma regla que el resto: sale de DORSO -es una carta de una pila
+        // oculta- y se gira a la cara SI la mano de destino es visible para quien mira. Para su
+        // dueño lo es siempre, así que él ve la carta; para el rival no, y se queda de dorso.
+        // Lo tenía mal: iba de dorso todo el viaje también para su dueño (Toto, 13-ago-2026).
+        async function animateRetributionToHand(playerId, colocar, carta) {
+            return volarALaMano(`#${playerId}-retribution`, playerId, carta, colocar, 800);
         }
 
         async function animateShuffle(playerId) {
@@ -1408,61 +1370,83 @@
         // aterrice en su hueco real y el resto de la mano se aparte deslizándose. Sin él se
         // comporta como siempre (vuela al centro de la zona y desaparece), que es lo que hacían
         // las cuatro cartas que la usan (Toto, 13-ago-2026).
-        async function animateStackToHand(sourceId, playerId, cardId = null, colocar = null) {
-            const sourceEl = document.getElementById(sourceId);
+        // ─── UNA CARTA VUELA A UNA MANO ──────────────────────────────────────────────────
+        // Punto ÚNICO por el que pasan todas las llegadas a la mano que no van por el
+        // escaparate. Existe porque cada una tenía su copia y cada copia se saltaba una regla
+        // distinta: la retribución no volteaba nunca (ni para su dueño), y animateStackToHand
+        // enseñaba la cara A TODO EL MUNDO, viera o no esa mano (Toto, 13-ago-2026).
+        //
+        // LAS DOS REGLAS, juntas y en un solo sitio:
+        //  1. ATERRIZA. La carta entra en la mano a MITAD del vuelo (`colocar`), así que el clon
+        //     va a su hueco REAL y las que ya estaban se apartan deslizándose.
+        //  2. VOLTEA SEGÚN QUIÉN MIRA. Sale de DORSO -viene de una pila oculta- y se gira a la
+        //     cara solo si la mano de destino es visible para este cliente: la tuya siempre, la
+        //     del rival solo con SEGUIMIENTO (handExposedTo). Si no la ve, se queda de dorso.
+        async function volarALaMano(origenSel, playerId, carta, colocar, ms = 600) {
+            const sourceEl = document.querySelector(origenSel);
             const handSel = `#${playerId}-hand`;
             const handEl = document.querySelector(handSel);
             if (!sourceEl || !handEl) { if (typeof colocar === 'function') colocar(); return; }
+            const g = window.game;
+            const veLaCara = !g || g.gameMode !== 'online' || g.myPlayerId === playerId
+                || g.myPlayerId === 'spectator'
+                || (g.players[playerId] && g.players[playerId].handExposedTo === g.myPlayerId);
 
-            const flyCard = document.createElement('div');
-            
-            if (cardId !== null) {
-                const template = getCardTemplate(cardId);
-                flyCard.className = `card type-${template.type}`;
-                flyCard.innerHTML = `
-                    <div class="card-header"><span>${template.name}</span></div>
-                    <div class="card-image" style="font-size:1rem;">${template.type === 'Ayuda' ? '💊' : '👤'}</div>
-                `;
-            } else {
-                flyCard.className = 'card card-back';
+            const cont = document.createElement('div');
+            cont.style.cssText = 'position:fixed; z-index:5000; width:90px; height:126px;'
+                + ' perspective:800px; pointer-events:none;';
+            const r0 = sourceEl.getBoundingClientRect();
+            cont.style.left = r0.left + 'px';
+            cont.style.top = r0.top + 'px';
+
+            const flip = document.createElement('div');
+            flip.style.cssText = 'position:relative; width:100%; height:100%; transform-style:preserve-3d;'
+                + ` transition: transform ${ms}ms ease; transform: rotateY(180deg);`;
+            const tmpl = carta && typeof getCardTemplate === 'function' ? getCardTemplate(carta.id) : null;
+            if (tmpl && g && typeof g.createCardEl === 'function') {
+                const cara = g.createCardEl(Object.assign({}, tmpl, carta, { location: 'preview' }), false, true);
+                cara.removeAttribute('data-id');   // solo visual: que no colisione en los querySelector
+                cara.style.cssText += 'position:absolute; inset:0; margin:0; width:100%; height:100%; backface-visibility:hidden;';
+                flip.appendChild(cara);
             }
-            
-            flyCard.style.position = 'fixed';
-            flyCard.style.zIndex = 5000;
-
-            const startRect = sourceEl.getBoundingClientRect();
-            flyCard.style.left = startRect.left + 'px';
-            flyCard.style.top = startRect.top + 'px';
-            flyCard.style.width = '90px'; 
-            flyCard.style.height = '126px';
-
-            document.body.appendChild(flyCard);
-            void flyCard.offsetWidth;
+            const dorso = document.createElement('div');
+            dorso.className = 'card card-back';
+            dorso.style.cssText = 'position:absolute; inset:0; margin:0; width:100%; height:100%; backface-visibility:hidden; transform:rotateY(180deg);';
+            flip.appendChild(dorso);
+            cont.appendChild(flip);
+            document.body.appendChild(cont);
+            if (g && typeof g.adjustCardHeaders === 'function') g.adjustCardHeaders();
+            void cont.offsetWidth;
+            if (veLaCara && tmpl) flip.style.transform = 'rotateY(0deg)';
 
             const foto = _fotoFila(handSel);
             const idEntrante = (typeof colocar === 'function') ? colocar() : null;
             const nuevoEl = idEntrante && document.querySelector(`${handSel} .card[data-id="${idEntrante}"]`);
-            if (nuevoEl) nuevoEl.style.visibility = 'hidden';
+            if (nuevoEl) nuevoEl.style.visibility = 'hidden';   // el clon ocupa su sitio mientras llega
             _deslizarFila(handSel, foto, idEntrante);
 
             const destino = nuevoEl ? nuevoEl.getBoundingClientRect() : handEl.getBoundingClientRect();
-            flyCard.style.transition = 'all 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)';
+            cont.style.transition = `left ${ms}ms cubic-bezier(.2,.8,.2,1), top ${ms}ms cubic-bezier(.2,.8,.2,1),`
+                + ` width ${ms}ms ease, height ${ms}ms ease`;
             if (nuevoEl) {
-                flyCard.style.left = destino.left + 'px';
-                flyCard.style.top = destino.top + 'px';
-                flyCard.style.width = destino.width + 'px';
-                flyCard.style.height = destino.height + 'px';
+                cont.style.left = destino.left + 'px';
+                cont.style.top = destino.top + 'px';
+                cont.style.width = destino.width + 'px';
+                cont.style.height = destino.height + 'px';
             } else {
-                flyCard.style.left = (destino.left + destino.width / 2 - 45) + 'px';
-                flyCard.style.top = (destino.top + destino.height / 2 - 63) + 'px';
-                flyCard.style.transform = 'scale(0.5) rotate(10deg)';
+                cont.style.left = (destino.left + destino.width / 2 - 45) + 'px';
+                cont.style.top = (destino.top + destino.height / 2 - 63) + 'px';
             }
-            flyCard.style.opacity = '1'; 
 
-            if (window.game) await window.game.sleep(600);
-            else await new Promise(r => setTimeout(r, 600));
-            flyCard.remove();
+            if (g) await g.sleep(ms); else await new Promise(r => setTimeout(r, ms));
+            cont.remove();
             if (nuevoEl) nuevoEl.style.visibility = '';
+        }
+
+        // Envoltorios finos: las cartas siguen llamando por su nombre de siempre.
+        async function animateStackToHand(sourceId, playerId, cardId = null, colocar = null, carta = null) {
+            const _c = carta || (cardId !== null ? { id: cardId } : null);
+            return volarALaMano(`#${sourceId}`, playerId, _c, colocar, 600);
         }
 
         // ─────────────────────────────────────────────────────────────────────────────────
@@ -8903,7 +8887,7 @@
                         return retCard.instanceId;
                     };
                     try {
-                        if (typeof animateRetributionToHand === 'function') await animateRetributionToHand(playerId, _aLaMano);
+                        if (typeof animateRetributionToHand === 'function') await animateRetributionToHand(playerId, _aLaMano, retCard);
                     } catch(e) { console.error(e); }
                     _aLaMano();
                     this.logMsg(`${this.getDisplayName(playerId)} coge 1 retribución (le quedan ${p.hp}).`, 'system');

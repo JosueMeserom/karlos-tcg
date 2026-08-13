@@ -615,6 +615,13 @@ callback para hacerla a mitad del vuelo.
 Estaba solo para vanguardia y retaguardia, y a la mano la carta se desvanecía sobre la zona sin
 aparecer hasta que todo terminaba (Toto lo vio con la búsqueda de Goodman al morir).
 
+Ese patrón vive en **un solo sitio**, `volarALaMano` (index.html), del que cuelgan la retribución
+y `animateStackToHand`. El otro camino legítimo es el `aMano` del op `BUSCAR`, que va por la
+presentación. **Cualquier otra forma de meter una carta en la mano es sospechosa**, y
+`node tests/auditar_llegadas.js` las enumera: hoy 15 correctas, 5 exentas (reparto, robo,
+utilidades de debug) y **0 por revisar**. Esa auditoría nació de arreglarlas de una en una según
+Toto las encontraba en el navegador, que es justo lo que evita.
+
 **Y el volteo cuenta la verdad en los DOS tramos.** Del mazo la carta sale de dorso y se voltea al
 escaparate: ahí la ven los dos jugadores. Del escaparate a la mano, **se vuelve a voltear solo si
 esa mano no es visible para quien mira** (`ocultarAlLlegar`), y acaba de dorso como la pinta la
