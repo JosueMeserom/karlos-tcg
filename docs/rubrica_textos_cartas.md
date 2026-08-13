@@ -608,3 +608,26 @@ comprueba mirando que la carta base siga en mesa en el instante de presentar, no
 **Las flechas de coste/requisito se van al ACABAR LA POSE**, siempre con el mismo tiempo, retenga
 o no la carta después. Si esperasen al viaje al destino, una carta que se queda pagando costes en
 el centro las arrastraría durante toda esa animación.
+
+
+## 15. LAS ETIQUETAS SE NOMBRAN DICIENDO QUE LO SON (Toto, 13-ago-2026)
+
+Las comillas simples se usaban para **dos cosas** -nombres de carta y etiquetas- y hay **52
+etiquetas distintas**, así que `'Mercenario'` o `'Estudioso'` se leían como si fueran cartas. La
+gramática es **`con etiqueta 'X'`**:
+
+> *Busca en tu mazo una carta **con etiqueta 'Mercenario'**, añádela a tu mano y baraja.*
+> *Requiere un aliado **con etiqueta 'Estudioso'** en el campo.*
+
+La negación es `sin etiqueta 'X'` (*"Equípala a un aliado sin etiqueta 'Animal salvaje'"*), y con
+varias se repite: *"sin etiqueta 'Animal salvaje', sin etiqueta 'Cosa'"* — enumerar una sola vez
+deja la duda de si el calificador alcanza a las dos.
+
+Los **subtipos** no llevan el prefijo: *'Ser vivo'*, *'No-muerto'*, *'Máquina'* se leen ya como lo
+que son, y no se confunden con nombres de carta.
+
+`tests/auditar_textos.js` lo comprueba, y **no leyendo la prosa**: contrasta cada texto
+entrecomillado contra la lista REAL de etiquetas y la de nombres de carta, sacadas de `CARD_DB`.
+Si coincide con una etiqueta y no con un nombre, exige el prefijo. Ese es el método correcto para
+esta familia de comprobaciones, y la lección de haber buscado *"Energía Adán"* como nombre de
+carta -no existe- cuando era una etiqueta de Igniz y Yuriy.

@@ -2710,7 +2710,7 @@ const CARD_DB = [
     },
     {
         name: "Pago por adelantado", type: "Ayuda", subtype: "Técnica", tags: ["Consumible"], rarity: "C", series: 1, cost: 0,
-        text: "Coste: 2 de Furor. Busca en tu mazo un 'Mercenario', añádelo a tu mano y baraja.",
+        text: "Coste: 2 de Furor. Busca en tu mazo una carta con etiqueta 'Mercenario', añádela a tu mano y baraja.",
         abilities: [
             { trigger: "JUGAR", requisitos: [ { count: { filtros: [ { campo: "furor", op: ">=", valor: 2 } ] }, op: ">=", valor: 1, msg: "Necesitas un aliado con al menos 2 de Furor." } ] },
             { trigger: "AL_CONSUMIR",
@@ -4037,7 +4037,7 @@ const CARD_DB = [
         // +ATQ/+DEF ya calculados (vía onEquipUpdate/_statMods) -redundante y sin info real, ya
         // que el tempEffect a mano no lleva `duration`-.
         tempEffectSinLinea: true,
-        text: "Equipa a un 'Usuario de Súper Evolución' de tu vanguardia: adopta las stats de Súper Evolución, recupera toda su Vida y pierde sus estados alterados. Tras 3 turnos tuyos se destruye y le devuelve sus stats, la Vida y la limpieza de estados.",
+        text: "Equipa a un aliado con etiqueta 'Usuario de Súper Evolución' de tu vanguardia: adopta las stats de Súper Evolución, recupera toda su Vida y pierde sus estados alterados. Tras 3 turnos tuyos se destruye y le devuelve sus stats, la Vida y la limpieza de estados.",
         // Migrada por completo (31-jul-2026). Tres piezas nuevas, las tres compartidas con las
         // otras dos cartas de la tanda (Poder Legado y Milkor MGL):
         //   · `mientrasEquipado: {superStats:true}` — el bono NO es un delta fijo sino la
@@ -4293,7 +4293,7 @@ const CARD_DB = [
     },
     {
         name: "Dáedra", type: "Evento", rarity: "B", cost: 1, duration: 3, series: 2,
-        text: "3 turnos. Mientras esté en juego, los aliados con etiqueta 'Usuario de magia' o 'Monstruo' reciben el doble de Furor al inicio de cada turno.",
+        text: "3 turnos. Mientras esté en juego, los aliados con etiqueta 'Usuario de magia' o con etiqueta 'Monstruo' reciben el doble de Furor al inicio de cada turno.",
         onPlay: function(card, game) {
             game.logMsg(`¡La influencia de Dáedra inunda el campo!`, 'ability');
         },
@@ -4458,7 +4458,7 @@ const CARD_DB = [
     },
     {
         name: "Honsow", hp: 4, def: 4, atk: 3, type: "Personaje", subtype: "Ser vivo", tags: ["Usuario de VP"], gender: "M", rarity: "B", cost: 3, series: 2,
-        text: "P: MAESTRO DE ARMAS: Puedes equipar a Honsow cualquier Arma ignorando condiciones. A: GENERACIÓN DE ARMAMENTO MELÉ (1F): Busca un Arma no legendaria 'melé' en tu mano o mazo, equípatela y ataca a un enemigo (si lo hay).",
+        text: "P: MAESTRO DE ARMAS: Puedes equipar a Honsow cualquier Arma ignorando condiciones. A: GENERACIÓN DE ARMAMENTO MELÉ (1F): Busca un Arma no legendaria con etiqueta 'melé' en tu mano o mazo, equípatela y ataca a un enemigo (si lo hay).",
         passiveName: "MAESTRO DE ARMAS", activeName: "GENERACIÓN DE ARMAMENTO MELÉ", activeCost: 1,
         // Migrada (31-jul-2026), reutilizando las piezas de Karlitos (`BUSCAR` multi-zona) más
         // dos añadidos suyos: `destino:"EQUIPADO"` (lo encontrado se equipa a la carta fuente en
@@ -4500,7 +4500,7 @@ const CARD_DB = [
     },
     {
         name: "Domador", type: "Ayuda", subtype: "Ser vivo", tags: ["Consumible"], rarity: "C", cost: 1, series: 2,
-        text: "Elige un aliado 'Animal salvaje'. Aumenta su Def y Atq en 2 permanentemente (mientras siga en juego).",
+        text: "Elige un aliado con etiqueta 'Animal salvaje'. Aumenta su Def y Atq en 2 permanentemente (mientras siga en juego).",
         // Migrada (29-jul-2026): mismo patrón que Poción revitalizante (JUGAR requisitos +
         // AL_CONSUMIR con ELEGIR en tablero), pero con `stats` en MARCAR_TEMPORAL (28-jul-2026,
         // Capitán Guardia Real) en vez de un onUpdateTempEffect a mano — no hace falta escribirlo,
@@ -4833,7 +4833,7 @@ const CARD_DB = [
     },
     {
         name: "Meca EBA", hp: 5, def: 7, atk: 6, type: "Esbirro", subtype: "Máquina", tags: ["Controlable"], rarity: "B", cost: 4, series: 2,
-        text: "P: CONSUMO DESMESURADO: Máx 2 de Furor. Al colocar: +1 de Furor. No gana Furor en la Fase de Furor. Fin de tu turno: -1 de Furor; si baja a 0 así, se destruye. A: EMPLAZAR PILOTO (1F): Requiere aliado 'Energía Adán' en campo o mano. Destrúyelo/descártalo (si en campo, intercambia posición con Meca EBA antes). Anula la Pasiva de este Meca.",
+        text: "P: CONSUMO DESMESURADO: Máx 2 de Furor. Al colocar: +1 de Furor. No gana Furor en la Fase de Furor. Fin de tu turno: -1 de Furor; si baja a 0 así, se destruye. A: EMPLAZAR PILOTO (1F): Requiere un aliado con etiqueta 'Energía Adán' en campo o mano. Destrúyelo/descártalo (si en campo, intercambia posición con Meca EBA antes). Anula la Pasiva de este Meca.",
         passiveName: "CONSUMO DESMESURADO", activeName: "EMPLAZAR PILOTO", activeCost: 1,
         
         maxFuror: 2, // El motor ya se encarga de capar el límite con esta propiedad
@@ -4982,11 +4982,22 @@ const CARD_DB = [
         name: "Época de estudio", type: "Evento", rarity: "C", cost: 1, duration: 3, series: 2,
         // Requisito visible: a quién señala la flecha lima al presentarse (§14.bis).
         requisitoVisible: [ { quien: "ALIADO", algunFiltro: [ { campo: "tags", op: "includesCI", valor: "estudioso" }, { campo: "tags", op: "includesCI", valor: "estudiosa" } ], uno: true } ],
-        text: "3 turnos. Requiere un aliado 'Estudioso' en el campo. Mientras esté en juego, los aliados 'Estudiosos' no ganan Furor al inicio del turno y quedan Ocultos (inmunes a ataques normales). Al expirar, robas 2 cartas por cada aliado afectado.",
+        text: "3 turnos. Requiere un aliado con etiqueta 'Estudioso' en el campo. Mientras esté en juego, los aliados con etiqueta 'Estudioso' no ganan Furor al inicio del turno y quedan Ocultos (inmunes a ataques normales). Al expirar, robas 2 cartas por cada aliado afectado.",
         abilities: [
-            { trigger: "PREVIEW_GLOBAL", lineas: [ { quien: "ALIADO", algunaEtiqueta: ["Estudioso", "Estudiosa"], texto: "No gana Furor al inicio del turno y permanece {genero?Oculto|Oculta}" } ] },
-            { trigger: "PREVIEW_GLOBAL", lineas: [ { quien: "ALIADO", algunaEtiqueta: ["Estudioso"], texto: "No gana Furor al inicio del turno (estudiando)" } ] }
+            // Un solo PREVIEW_GLOBAL: el compilador coge el PRIMERO (`abs.find`), así que el
+            // segundo que había aquí era código muerto -y decía lo mismo, peor y sin género-.
+            { trigger: "PREVIEW_GLOBAL", lineas: [ { quien: "ALIADO", algunaEtiqueta: ["Estudioso", "Estudiosa"], texto: "No gana Furor al inicio del turno y permanece {genero?Oculto|Oculta}" } ] }
         ],
+        // Ancla de las flechas del detalle. El automático solo lo genera el compilador para las
+        // reglas de Furor DECLARATIVAS (GLOBAL_MODIFICAR_FUROR), y esta carta corta el Furor con
+        // un hook imperativo (onGlobalBeforeGainFuror), así que se quedaba sin él: la flecha solo
+        // llegaba a la badge de Oculto y no a la del Furor negado (Toto, 13-ago-2026).
+        // Las DOS, porque la carta hace las dos cosas a la vez.
+        onGlobalGetPreviewBadges: function(ev, targetCard, game) {
+            if (targetCard.owner !== ev.owner) return [];
+            const esEstudioso = targetCard.tags && (targetCard.tags.includes('Estudioso') || targetCard.tags.includes('Estudiosa'));
+            return esEstudioso ? ['furor', 'oculto'] : [];
+        },
         canPlayCard: function(card, game, p) {
             const hasEstudioso = [...p.vanguard, ...p.rearguard].some(c => c.tags && c.tags.includes('Estudioso'));
             if (!hasEstudioso) { game.logError("Necesitas al menos un aliado 'Estudioso' en el campo."); return false; }
@@ -5032,7 +5043,7 @@ const CARD_DB = [
     {
         name: "Arthas", hp: 2, def: 3, atk: 6, type: "Personaje", subtype: "Arma legendaria", tags: ["Equipable", "melé"], rarity: "B", cost: 4, series: 2,
         isDual: true, // <--- LA PALANCA PARA QUE EL MOTOR PINTE EL DEGRADADO
-        text: "Requisito: Karolina no está en tu vanguardia; si entra, Arthas se autodestruye. P: HERRERO LEGENDARIO: Carta dual. Como Personaje: equípalo gratis a un aliado en tu turno, dejando su hueco; si el portador cae, vuelve al campo, o a descartes si no hay sitio. Como Ayuda: anexa a un aliado que no sea 'Animal salvaje', 'Cosa' ni Karolina, y le da +3 de Atq.",
+        text: "Requisito: Karolina no está en tu vanguardia; si entra, Arthas se autodestruye. P: HERRERO LEGENDARIO: Carta dual. Como Personaje: equípalo gratis a un aliado en tu turno, dejando su hueco; si el portador cae, vuelve al campo, o a descartes si no hay sitio. Como Ayuda: anexa a un aliado sin etiqueta 'Animal salvaje', sin etiqueta 'Cosa' ni Karolina, y le da +3 de Atq.",
         passiveName: "HERRERO LEGENDARIO",
         
         canPlayCard: function(card, game, p) {
@@ -5398,7 +5409,7 @@ const CARD_DB = [
     },
     {
         name: "Llamada del deber", type: "Evento", rarity: "B", cost: 1, duration: 2, series: 2,
-        text: "2 turnos. Al colocarla, los aliados 'Guardia Real' ganan 1 de Furor. Mientras esté en juego, al final de tu turno puedes buscar un 'Guardia Real' en tu mazo, añadirlo a la mano y barajar.",
+        text: "2 turnos. Al colocarla, los aliados con etiqueta 'Guardia Real' ganan 1 de Furor. Mientras esté en juego, al final de tu turno puedes buscar una carta con etiqueta 'Guardia Real' en tu mazo, añadirla a la mano y barajar.",
         abilities: [
             { trigger: "AL_JUGAR", log: "¡Llamada del deber activada!", logTipo: "ability" },
             { trigger: "AL_ENTRAR", si: { quien: "ALIADO", algunaEtiqueta: ["Guardia Real"] }, marcador: "llamadaBuffed",
@@ -5540,7 +5551,7 @@ const CARD_DB = [
     },
     {
         name: "Investigar y desarrollar", type: "Evento", rarity: "B", cost: 1, duration: 3, series: 2,
-        text: "3 turnos. Mientras esté en juego, los aliados 'Científico' ganan +1 de Furor al inicio del turno (incluso en retaguardia). Al expirar, robas 3 cartas y recuperas un Esbirro 'No-muerto' o 'Creación artificial' del descarte.",
+        text: "3 turnos. Mientras esté en juego, los aliados con etiqueta 'Científico' ganan +1 de Furor al inicio del turno (incluso en retaguardia). Al expirar, robas 3 cartas y recuperas un Esbirro 'No-muerto' o con etiqueta 'Creación artificial' del descarte.",
         abilities: [
             { trigger: "AL_JUGAR", log: "¡La investigación comienza!" },
             { trigger: "GLOBAL_MODIFICAR_FUROR", reglas: [
@@ -5606,7 +5617,7 @@ const CARD_DB = [
     },
     {
         name: "Feria del cómic", type: "Evento", rarity: "A", cost: 1, duration: 2, series: 2,
-        text: "2 turnos. Mientras esté en juego, todo el campo sin la etiqueta 'Otaku' queda Silenciado. Al final de tu turno, moneda: con cara, busca una carta 'Otaku' en tu mazo y añádela a tu mano.",
+        text: "2 turnos. Mientras esté en juego, todo el campo sin la etiqueta 'Otaku' queda Silenciado. Al final de tu turno, moneda: con cara, busca una carta con etiqueta 'Otaku' en tu mazo y añádela a tu mano.",
         // Migrada al DSL (fase interceptores). Fidelidad: el AURA no exime a los
         // Avatares (la imperativa silenciaba también a Kami); se baraja aunque la
         // compra se cancele (la búsqueda ya revolvió el mazo); silencio si no hay
@@ -5639,7 +5650,7 @@ const CARD_DB = [
     },
     {
         name: "Deuda con la mafia", type: "Evento", rarity: "A", cost: 1, duration: 2, series: 2,
-        text: "2 turnos. Al colocarla, elige un aliado: queda Silenciado y no gana Furor mientras dure. Al expirar, busca en tu mazo una carta 'Mafia', añádela a la mano y baraja; el rival puede hacer lo mismo.",
+        text: "2 turnos. Al colocarla, elige un aliado: queda Silenciado y no gana Furor mientras dure. Al expirar, busca en tu mazo una carta con etiqueta 'Mafia', añádela a la mano y baraja; el rival puede hacer lo mismo.",
         // Migrada al DSL (fase interceptores). El deudor se ancla en la propia
         // carta (mafiaTargetId, mismo campo que la imperativa: estado exportado
         // idéntico). El silencio es un AURA sobre ese id; el corte de Furor, una
@@ -5796,7 +5807,7 @@ const CARD_DB = [
     },
     {
         name: "Milkor MGL", type: "Ayuda", subtype: "Arma", tags: ["Equipable", "a distancia"], rarity: "B", cost: 1, series: 2,
-        text: "Equípala a un aliado que no sea 'Animal salvaje'. Al atacar normal, moneda - Cara: +4 de Atq durante el golpe, hasta un máximo de 8. Cruz: el rival elige el objetivo y el daño baja en 3. Se destruye al segundo uso.",
+        text: "Equípala a un aliado sin etiqueta 'Animal salvaje'. Al atacar normal, moneda - Cara: +4 de Atq durante el golpe, hasta un máximo de 8. Cruz: el rival elige el objetivo y el daño baja en 3. Se destruye al segundo uso.",
         // Migrada (31-jul-2026), tercera y última de la tanda de equipos con vida propia. Es la
         // que tenía el trozo delicado: su interceptor DEVUELVE un valor al motor
         // ({dmgMod, newDefender}) y, en la rama de cruz, hace elegir al RIVAL a mitad del ataque.

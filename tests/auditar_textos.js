@@ -53,6 +53,32 @@ const HOOKS = [
 const hallazgos = [];
 const add = (cat, c, detalle) => hallazgos.push({ cat, carta: c.name, tipo: c.type, detalle });
 
+// ── ETIQUETAS: se nombran diciendo que lo son ────────────────────────────────
+// Las comillas simples se usan para DOS cosas -nombres de carta y etiquetas- y hay 52 etiquetas
+// distintas, así que 'Mercenario' o 'Estudioso' se leían como si fueran cartas. La gramática es
+// "con etiqueta 'X'" (Toto, 13-ago-2026).
+//
+// La comprobación NO lee la prosa: contrasta cada texto entrecomillado contra la lista REAL de
+// etiquetas y la de nombres de carta, sacadas de CARD_DB. Si coincide con una etiqueta y no con
+// un nombre, exige "etiqueta" delante. Es la lección de haber buscado "Energía Adán" como nombre
+// de carta -no existe- cuando era una etiqueta de Igniz y Yuriy.
+const ETIQUETAS = new Set();
+CARTAS.forEach(c => (c.tags || []).forEach(g => ETIQUETAS.add(g)));
+const NOMBRES = new Set(CARTAS.map(c => c.name));
+const _escRe = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+for (const c of CARTAS) {
+    const txt = String(c.text || '');
+    for (const g of ETIQUETAS) {
+        if (NOMBRES.has(g)) continue;   // ambiguo de verdad: es etiqueta Y nombre de carta
+        const re = new RegExp("(.{0,14})'" + _escRe(g) + "'", 'g');
+        let m;
+        while ((m = re.exec(txt))) {
+            if (/etiquetas?\s*$/i.test(m[1])) continue;
+            add('ETIQUETA-SIN-DECIRLO', c, `'${g}' es una ETIQUETA y se nombra como si fuera una carta: "...${m[1].trim()} '${g}'". Debe decir "con etiqueta '${g}'"`);
+        }
+    }
+}
+
 const T_COLOCAR = ['AL_JUGAR', 'ANTES_DE_JUGAR', 'AL_ENTRAR', 'onPlay', 'onAfterPlayAsync', 'onBeforePlayAsync'];
 const T_CONTINUO = ['PASIVA_CONTINUA', 'AURA', 'PREVIEW_GLOBAL', 'GLOBAL_MODIFICAR_FUROR',
     'GLOBAL_ANTES_DE_CAMBIO_STAT', 'PUEDE_ATACAR', 'SOBRECURACION', 'FIN_TURNO', 'INICIO_TURNO',
