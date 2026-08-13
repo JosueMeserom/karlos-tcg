@@ -141,6 +141,27 @@ async function montar(esc) {
             marcas.some(m => m.nombre === 'Aniceto' && m.tipo === 'requisito'), JSON.stringify(marcas));
     }
 
+    console.log('\n--- Un coste aparcado que es el ÚLTIMO de su lista se cobra igual ---');
+    {
+        // Garret: su tributo va DENTRO de un ELEGIR que es el ÚNICO efecto de la lista, así que
+        // no lleva nada detrás. Aparcar cambia dónde se ejecuta un efecto, nunca SI se ejecuta -y
+        // aquí no había ni efecto posterior que drenara la cola ni nada que disparara la
+        // presentación-, así que se cobraba cero y la carta se quedaba sin presentar.
+        const { ctx, g, marcas } = await montar({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'Aniceto', furor: 4 }], mano: ['Garret'] },
+            p2: { vanguardia: ['Mini-tigre'] },
+        });
+        await ejecutarPaso(ctx, g, { jugar: 'Garret' });
+        await ejecutarPaso(ctx, g, { elegir: ['Aniceto'] });
+        check('el tributo del último efecto de la lista se cobra (4 -> 0)',
+            g.players.p1.vanguard[0].furor === 0, 'furor=' + g.players.p1.vanguard[0].furor);
+        check('sin cobros huérfanos', !(g._cobrosPendientes || []).length);
+        check('y sin presentación colgada', !g._presentacionArmada);
+        check('marcado como tributo, con su cantidad',
+            marcas.some(m => m.tipo === 'tributo' && m.etiqueta === 'Tributa 4 FUR'), JSON.stringify(marcas));
+    }
+
     console.log('\n--- Wolfgang con las dos opciones: se puede CANCELAR ---');
     {
         const { ctx, g, marcas } = await montar({

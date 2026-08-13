@@ -14,6 +14,8 @@
 // Cómo detecta a un candidato, y por qué así:
 //   · Un MODIFICAR_STAT de `furor` con delta NEGATIVO dentro de un JUGAR/AL_CONSUMIR/ANTES_DE_
 //     JUGAR es un tributo. Da igual que el pagador salga de un ELEGIR o de un pool automático.
+//     PERO solo si se lo cobra a un ALIADO: quitarle Furor a un enemigo es lo que la carta HACE,
+//     no lo que cuesta (Quema de maná; se coló en la primera pasada, 13-ago-2026).
 //   · El `text` de la carta empieza por "Coste:" o "Requisito:" (gramática fijada en la rúbrica),
 //     que es la declaración de intenciones de la propia carta.
 // Lo segundo es lo que hace la auditoría útil de verdad: pilla cartas cuyo coste se cobra con
@@ -66,12 +68,15 @@ LINEAS.forEach((l, i) => {
 const TRIGGERS_DE_JUGADA = new Set(['JUGAR', 'AL_CONSUMIR', 'ANTES_DE_JUGAR', 'AL_JUGAR', 'AL_EQUIPAR', 'AL_USAR_AYUDA']);
 
 // Recorre efectos anidados (ELEGIR lleva los suyos dentro).
-function* efectosDe(lista) {
+// `de`/`quien` heredados del ELEGIR que envuelve al efecto: un MODIFICAR_STAT anidado no dice a
+// quién apunta, lo dice su ELEGIR.
+function* efectosDe(lista, bando) {
     for (const e of (lista || [])) {
-        yield e;
-        if (Array.isArray(e.efectos)) yield* efectosDe(e.efectos);
+        yield Object.assign({ __bando: bando }, e);
+        const _b = e.de || (e.target && e.target.quien) || e.quien || bando;
+        if (Array.isArray(e.efectos)) yield* efectosDe(e.efectos, _b);
         for (const rama of ['siExito', 'siFallo', 'siMuere']) {
-            if (e[rama] && Array.isArray(e[rama].efectos)) yield* efectosDe(e[rama].efectos);
+            if (e[rama] && Array.isArray(e[rama].efectos)) yield* efectosDe(e[rama].efectos, _b);
         }
     }
 }
@@ -83,9 +88,10 @@ for (const c of CARD_DB) {
 
     for (const ab of abilities) {
         if (!TRIGGERS_DE_JUGADA.has(ab.trigger)) continue;
-        for (const e of efectosDe(ab.efectos)) {
+        for (const e of efectosDe(ab.efectos, null)) {
             if (e.esCoste || e.esRequisito || e.esTributo) marcado = true;
-            const esFurorNegativo = e.op === 'MODIFICAR_STAT' && e.stat === 'furor'
+            const _contraEnemigo = /ENEMIG/i.test(String(e.__bando || '')) || /ENEMIG/i.test(String((e.target && e.target.quien) || ''));
+            const esFurorNegativo = e.op === 'MODIFICAR_STAT' && e.stat === 'furor' && !_contraEnemigo
                 && (typeof e.delta === 'number' ? e.delta < 0 : (e.vaciar || e.deltaCondicional));
             if (esFurorNegativo) tributo = tributo || (typeof e.delta === 'number' ? Math.abs(e.delta) : '?');
             // Marcar un requisito sobre algo que se PIERDE, o un coste sobre algo que no cambia,

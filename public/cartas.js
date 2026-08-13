@@ -1118,7 +1118,7 @@ const CARD_DB = [
                 { op: "ELEGIR", de: "ALIADOS",
                   filtros: [ { o: [ [ { campo: "name", op: "==", valor: "Sadame" } ], [ { campo: "name", op: "==", valor: "Aniceto" } ], [ { campo: "name", op: "==", valor: "Hawke" } ] ] }, { campo: "furor", op: ">=", valor: 4 } ],
                   cantidad: 1, titulo: "TRIBUTO PARA GARRET (-4 FUROR)",
-                  efectos: [ { op: "MODIFICAR_STAT", stat: "furor", delta: -4,
+                  efectos: [ { op: "MODIFICAR_STAT", stat: "furor", delta: -4, esCoste: true,
                                log: "{objetivo} entrega su Furor como tributo para Garret." } ] } ] },
             { trigger: "ACTIVA", nombre: "ANDANADA METEÓRICA", coste: { furor: 3 }, sinObjetivo: true,
               requisitos: [
@@ -1412,7 +1412,7 @@ const CARD_DB = [
               efectos: [
                 { op: "ELEGIR", de: "ALIADOS", filtros: [ { campo: "furor", op: ">=", valor: 1 } ], cantidad: 1, autoSiUnica: true, guardaEn: "pagador",
                   titulo: "¿QUIÉN PAGA EL TÉ HELADO? (-1 FUROR)",
-                  efectos: [ { op: "MODIFICAR_STAT", stat: "furor", delta: -1 } ] },
+                  efectos: [ { op: "MODIFICAR_STAT", stat: "furor", delta: -1, esCoste: true } ] },
                 { op: "CURAR", valor: 4, floating: "TÉ HELADO",
                   log: "{carta} usa 1 Furor de {pagador} y cura a {objetivo} ({antes} -> {despues})." } ] }
         ],
@@ -1818,7 +1818,7 @@ const CARD_DB = [
                   plantillaSin: ["onBeforePlayAsync", "canPlayCard"],
                   abortaSiCancelas: true, abortaSiVacio: true, titulo: "NECRONOMICÓN: ELIGE UN CAÍDO",
                   log: "¡{objetivo} vuelve del mundo de los muertos!" },
-                { op: "MODIFICAR_STAT", target: { selfLista: "necroLector" }, stat: "furor", delta: -2 },
+                { op: "MODIFICAR_STAT", target: { selfLista: "necroLector" }, stat: "furor", delta: -2, esCoste: true },
                 { op: "MARCAR", target: { selfLista: "necroLector" }, campo: "exhausted", valor: true,
                   log: "{objetivo} lee el Necronomicón y se agota..." } ] }
         ],
@@ -2614,7 +2614,7 @@ const CARD_DB = [
                 { campo: "name", op: "contieneTexto", valor: "Karlos", msg: "Solo un 'Karlos' puede disparar el Cañón de positrones." },
                 { campo: "furor", op: ">=", valor: 2, msg: "{objetivo} necesita al menos 2 de Furor." } ],
               efectos: [
-                { op: "MODIFICAR_STAT", stat: "furor", delta: -2, floating: { texto: "CAÑÓN DE POSITRONES", estilo: "ft-ability", offset: -30 } },
+                { op: "MODIFICAR_STAT", stat: "furor", delta: -2, esCoste: true, floating: { texto: "CAÑÓN DE POSITRONES", estilo: "ft-ability", offset: -30 } },
                 { op: "ELEGIR", de: "ENEMIGOS", cantidad: 1, cancelable: false,
                   titulo: "Elige al enemigo que será aniquilado",
                   efectos: [
@@ -2634,7 +2634,7 @@ const CARD_DB = [
                 { op: "ELEGIR", de: "ALIADOS", filtros: [ { o: [ [ { campo: "tags", op: "includes", valor: "Draconiana" } ], [ { campo: "tags", op: "includes", valor: "Draconiano" } ] ] }, { campo: "furor", op: ">=", valor: 2 } ], cantidad: 1,
                   titulo: "¿QUIÉN ENTRA EN FURIA? (-2 FUROR)",
                   efectos: [
-                    { op: "MODIFICAR_STAT", stat: "furor", delta: -2 },
+                    { op: "MODIFICAR_STAT", stat: "furor", delta: -2, esCoste: true },
                     { op: "EQUIPAR",
                       floats: [ { texto: "FURIA BERSERKER", estilo: "ft-ability", offset: -40 }, { texto: "+3 ATQ (EQUIPADO)", estilo: "ft-green", offset: -20 } ],
                       log: "{objetivo} se equipa con Furia berserker (+3 ATQ)." } ] } ] }
@@ -2759,7 +2759,7 @@ const CARD_DB = [
               efectos: [
                 { op: "ELEGIR", de: "ALIADOS", filtros: [ { campo: "furor", op: ">=", valor: 1 } ], cantidad: 1,
                   titulo: "¿QUIÉN DISPARA EL PEM? (-1 FUROR)",
-                  efectos: [ { op: "MODIFICAR_STAT", stat: "furor", delta: -1 } ] },
+                  efectos: [ { op: "MODIFICAR_STAT", stat: "furor", delta: -1, esCoste: true } ] },
                 { op: "ELEGIR", de: "ENEMIGOS", filtros: [ { campo: "subtype", op: "==", valor: "Máquina" } ], cantidad: 1, cancelable: false,
                   titulo: "Elige al enemigo 'Máquina' para paralizarlo",
                   efectos: [
@@ -2785,7 +2785,7 @@ const CARD_DB = [
               efectos: [
                 { op: "ELEGIR", de: "ALIADOS", filtros: [ { campo: "exhausted", op: "truthy" }, { campo: "furor", op: ">=", valor: 3 } ], sinMarcaTemporalPropia: true, cantidad: 1, titulo: "¿A QUIÉN QUIERES REBOBINAR? (-3 FUROR)",
                   efectos: [
-                    { op: "MODIFICAR_STAT", stat: "furor", delta: -3 },
+                    { op: "MODIFICAR_STAT", stat: "furor", delta: -3, esCoste: true },
                     { op: "MARCAR", campo: "exhausted", valor: false },
                     { op: "MARCAR_TEMPORAL", hastaFinDeTurnoPropio: true, floating: "REBOBINAR", floatingStyle: "ft-ability", offsetFloating: -30, log: "¡{objetivo} rebobina su tiempo y recupera su acción!" } ] } ] }
         ],
@@ -3045,7 +3045,7 @@ const CARD_DB = [
               requisitosObjetivo: [
                 { campo: "furor", op: ">=", valor: 2, msg: "El objetivo debe tener al menos 2 de Furor." } ],
               efectos: [
-                { op: "MODIFICAR_STAT", stat: "furor", delta: -2,
+                { op: "MODIFICAR_STAT", stat: "furor", delta: -2, esCoste: true,
                   log: "¡{objetivo} canaliza maná puro y se equipa con {carta}!" },
                 { op: "EQUIPAR", soloAnexar: true } ] }
         ],
@@ -3288,7 +3288,7 @@ const CARD_DB = [
               requisitosObjetivo: [
                 { o: [ [ { campo: "furor", op: ">=", valor: 2 } ], [ { campo: "name", op: "contieneTexto", valor: "Eris" }, { campo: "furor", op: ">=", valor: 1 } ] ], msg: "Este aliado necesita al menos 2 de Furor (o 1 si es Eris)." } ],
               efectos: [
-                { op: "MODIFICAR_STAT", stat: "furor", delta: -2, deltaCondicional: [ { filtro: { campo: "name", op: "contieneTexto", valor: "Eris" }, delta: -1 } ],
+                { op: "MODIFICAR_STAT", stat: "furor", delta: -2, esCoste: true, deltaCondicional: [ { filtro: { campo: "name", op: "contieneTexto", valor: "Eris" }, delta: -1 } ],
                   log: "¡{objetivo} desata un Flash de maná cegador!" },
                 { op: "APLICAR_ESTADO", estado: "ceguera", duracion: 2, fuente: "Flash de maná",
                   target: { quien: "ENEMIGO", zona: "VANGUARDIA" },
@@ -3305,7 +3305,7 @@ const CARD_DB = [
               requisitosObjetivo: [
                 { o: [ [ { campo: "furor", op: ">=", valor: 2 } ], [ { campo: "name", op: "contieneTexto", valor: "Eris" }, { campo: "furor", op: ">=", valor: 1 } ] ], msg: "Este aliado necesita al menos 2 de Furor (o 1 si es Eris)." } ],
               efectos: [
-                { op: "MODIFICAR_STAT", stat: "furor", delta: -2, deltaCondicional: [ { filtro: { campo: "name", op: "contieneTexto", valor: "Eris" }, delta: -1 } ],
+                { op: "MODIFICAR_STAT", stat: "furor", delta: -2, esCoste: true, deltaCondicional: [ { filtro: { campo: "name", op: "contieneTexto", valor: "Eris" }, delta: -1 } ],
                   guardaNombre: "pagador" },
                 { op: "ELEGIR", de: "ENEMIGOS", zona: "VANGUARDIA", cantidad: 2, hastaCantidad: true,
                   titulo: "Elige hasta 2 enemigos para la Granada de maná",
@@ -3326,7 +3326,7 @@ const CARD_DB = [
                 { campo: "isAvatar", op: "falsy", dePlantilla: true, msg: "Debes elegir a uno de tus aliados." },
                 { campo: "furor", op: ">=", valor: 1, msg: "Este aliado necesita al menos 1 de Furor para tributar." } ],
               efectos: [
-                { op: "MODIFICAR_STAT", stat: "furor", delta: -1 },
+                { op: "MODIFICAR_STAT", stat: "furor", delta: -1, esCoste: true },
                 { op: "BUSCAR", en: "MAZO", cantidad: 1, destino: "MANO",
                   filtros: [ { campo: "tags", op: "includesCI", valor: "invocación" } ],
                   logIntro: "El Hexagrama brilla y permite a {jugador} buscar en su mazo...",
@@ -3790,7 +3790,7 @@ const CARD_DB = [
             { trigger: "AL_CONSUMIR",
               efectos: [
                 { op: "ELEGIR", de: "ALIADOS", filtros: [ { campo: "furor", op: ">=", valor: 1 } ], cantidad: 1, titulo: "¿QUIÉN PAGA LA SALSA? (-1 FUROR)",
-                  efectos: [ { op: "MODIFICAR_STAT", stat: "furor", delta: -1 } ],
+                  efectos: [ { op: "MODIFICAR_STAT", stat: "furor", delta: -1, esCoste: true } ],
                   logDespues: "¡La poderosa Salsa de curry purifica el campo aliado!" },
                 { op: "LIMPIAR_ESTADOS", todos: true, floating: "PURIFICADO", floatingStyle: "ft-green", offsetFloating: -20 } ] }
         ],
@@ -8530,6 +8530,11 @@ const DSL = {
                 (game._cobrosPendientes = game._cobrosPendientes || []).push(async () => {
                     for (const t of _tg) await DSL._doEffect(e, sourceCard, t, game, ownerId, habilidad);
                 });
+                // Aparcar cambia DÓNDE se ejecuta el efecto, nunca SI se ejecuta. Sin este
+                // _comprometer, un coste que fuera el último de su lista no lo drenaba nadie:
+                // ni él (acaba de saltárselo) ni un efecto posterior (no lo hay). La carta se
+                // quedaba además sin presentar, porque el disparo cuelga del mismo sitio.
+                await DSL._comprometer(sourceCard, game);
                 continue;
             }
             // Animación declarativa de efecto (Toto, 30-jul-2026). Va AQUÍ y no dentro de
