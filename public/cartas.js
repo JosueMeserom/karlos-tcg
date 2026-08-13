@@ -1717,9 +1717,12 @@ const CARD_DB = [
                     // buscó ahí. Después se deshace sobre Zoe mientras esta evoluciona
                     // (§14.quater). Va ANTES del intercambio: Zoe tiene que seguir en el tablero
                     // para poder ser el destino de la disolución (Toto, 13-ago-2026).
+                    // BLINDADA por lo mismo que el resto: la animación no puede tumbar la jugada.
                     if (typeof game.evolucionarDesdeMano === "function") {
-                        await game.evolucionarDesdeMano(calcinante, zoe.instanceId, null,
-                            `#${playerId}-${fromZone === 'deck' ? 'deck-stack' : 'hand'}`);
+                        try {
+                            await game.evolucionarDesdeMano(calcinante, zoe.instanceId, null,
+                                `#${playerId}-${fromZone === 'deck' ? 'deck-stack' : 'hand'}`);
+                        } catch (e) { console.error(e); }
                     }
                     calcinante.location = zoe.location;
                     if (zoe.location === 'vanguard') {
@@ -2082,7 +2085,11 @@ const CARD_DB = [
                 // verdad -las dos animándose a la vez-, no al arrancar el viaje al escaparate,
                 // que es cuando salía antes (Toto, 13-ago-2026).
                 if (typeof showFloatingText === "function") showFloatingText(sadame.instanceId, "TRANSFORMACIÓN", "ft-purple", -40);
-                if (typeof game.evolucionarDesdeMano === "function") await game.evolucionarDesdeMano(card, sadame.instanceId, null);
+                // BLINDADA: la animación es ADORNO. Si falla en un cliente y no en el otro, la excepción
+                // sube hasta playCard, aborta la jugada SOLO ahí y los dos tableros acaban distintos.
+                if (typeof game.evolucionarDesdeMano === "function") {
+                    try { await game.evolucionarDesdeMano(card, sadame.instanceId, null); } catch (e) { console.error(e); }
+                }
                 if (sadame.location === 'vanguard') {
                     const idx = p.vanguard.findIndex(c => c.instanceId === sadame.instanceId);
                     p.vanguard[idx] = card;
@@ -6327,19 +6334,31 @@ const CARD_DB = [
                     const chosen = await game.pickBoardTargets(limos, 1, 'ELIGE EL LIMO ARTIFICIAL A EVOLUCIONAR', card, card.owner, true);
                     if (chosen && chosen.length > 0) {
                         const oldLimo = chosen[0];
-                        card.location = oldLimo.location;
-                        
+                        const _zonaLimo = oldLimo.location;
+                        card.location = _zonaLimo;
+                        // Se limpia el estado de entrada ANTES de la animación: en online,
+                        // cancelAction avisa al rival, y hacerlo a mitad de una animación de
+                        // 2 segundos lo metía en medio de la cadena del otro cliente.
+                        game.cancelAction();
+
                         // La evolución se PRESENTA y se DESHACE sobre la carta que evoluciona, que hace a la vez
                         // su propia animación (§14.quater). Va ANTES del intercambio: la base tiene que seguir
                         // en el tablero para poder ser el destino de la disolución (Toto, 13-ago-2026).
-                        if (typeof game.evolucionarDesdeMano === "function") await game.evolucionarDesdeMano(card, oldLimo.instanceId, null);
-                        if (oldLimo.location === 'vanguard') {
-                            const idx = p.vanguard.findIndex(c => c.instanceId === oldLimo.instanceId);
-                            p.vanguard[idx] = card;
-                        } else {
-                            const idx = p.rearguard.findIndex(c => c.instanceId === oldLimo.instanceId);
-                            p.rearguard[idx] = card;
+                        // BLINDADA: es ADORNO. Si falla en un cliente y no en el otro -y falla en
+                        // uno solo con facilidad, porque el rival ve esta carta de dorso y no
+                        // tiene los mismos elementos en el DOM-, la excepción sube hasta playCard,
+                        // aborta la jugada SOLO ahí y los dos tableros acaban distintos: uno con
+                        // el Limo crecido de vuelta en la mano y el otro con la evolución hecha
+                        // (Toto, 13-ago-2026). El estado nunca puede depender de que la animación
+                        // salga bien.
+                        if (typeof game.evolucionarDesdeMano === "function") {
+                            try { await game.evolucionarDesdeMano(card, oldLimo.instanceId, null); } catch (e) { console.error(e); }
                         }
+                        // Los índices se vuelven a buscar DESPUÉS de la espera: entre medias ha
+                        // podido llegar una instantánea del rival y reconstruir los arrays.
+                        const _fila = _zonaLimo === 'vanguard' ? p.vanguard : p.rearguard;
+                        const idx = _fila.findIndex(c => c.instanceId === oldLimo.instanceId);
+                        if (idx !== -1) _fila[idx] = card; else _fila.push(card);
                         
                         const baseOld = getCardTemplate(oldLimo.id);
                         card.currentAtk += (oldLimo.currentAtk - baseOld.atk);
@@ -6356,9 +6375,9 @@ const CARD_DB = [
                         const handIdx = p.hand.findIndex(c => c.instanceId === card.instanceId);
                         if (handIdx !== -1) p.hand.splice(handIdx, 1);
                         
-                        game.cancelAction();
                         game.updatePassives();
                         game.render();
+                        if (typeof game.forceSync === 'function') game.forceSync();   // los dos tableros, iguales
                         return false; 
                     }
                     // Cancelar el objetivo CANCELA la jugada. Antes caía al `return true` de
@@ -6452,7 +6471,11 @@ const CARD_DB = [
                 // La evolución se PRESENTA y se DESHACE sobre la carta que evoluciona, que hace a la vez
                 // su propia animación (§14.quater). Va ANTES del intercambio: la base tiene que seguir
                 // en el tablero para poder ser el destino de la disolución (Toto, 13-ago-2026).
-                if (typeof game.evolucionarDesdeMano === "function") await game.evolucionarDesdeMano(card, oldLimo.instanceId, null);
+                // BLINDADA: la animación es ADORNO. Si falla en un cliente y no en el otro, la excepción
+                // sube hasta playCard, aborta la jugada SOLO ahí y los dos tableros acaban distintos.
+                if (typeof game.evolucionarDesdeMano === "function") {
+                    try { await game.evolucionarDesdeMano(card, oldLimo.instanceId, null); } catch (e) { console.error(e); }
+                }
                 if (oldLimo.location === 'vanguard') {
                     const idx = p.vanguard.findIndex(c => c.instanceId === oldLimo.instanceId);
                     p.vanguard[idx] = card;
