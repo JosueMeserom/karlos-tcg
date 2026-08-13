@@ -11113,6 +11113,16 @@
                 // no se le pisa el estado a un cliente que está perfectamente bien.
                 const _emitirEstado = (snap) => {
                     if (this.gameMode !== 'online' || this.myPlayerId === 'spectator') return;
+                    // SIN DESTINATARIO NO SE MANDA (Toto, 13-ago-2026). Este volcado existe para
+                    // el que RECONECTÓ: su corrutina murió y le debo el resultado. Sin `_reSyncTarget`
+                    // no sé a quién se lo debo, y entonces esto es un HARD_SYNC autoritativo A TODA
+                    // LA SALA que le pisa el estado a un cliente que está perfectamente bien -es
+                    // lo que avisa el comentario de tres líneas más abajo, y pasaba en juego
+                    // normal: `resolveVisualSearch` arma la bandera en CUALQUIER elección remota,
+                    // no solo tras una reconexión-. El síntoma era un frame con el estado viejo
+                    // (la carta de vuelta en la mano) antes de corregirse solo.
+                    // En modo espejo sí se difunde: ahí el rival reconectado no tiene otra fuente.
+                    if (!this._reSyncTarget && !this._espejandoReaccion) return;
                     const msg = { roomCode: this.roomCode, action: 'HARD_SYNC', admin: true, state: snap || this.exportGameState() };
                     if (this._reSyncTarget) msg.targetId = this._reSyncTarget;
                     this.socket.emit('gameAction', msg);

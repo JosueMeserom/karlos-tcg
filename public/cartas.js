@@ -6377,7 +6377,13 @@ const CARD_DB = [
                         
                         game.updatePassives();
                         game.render();
-                        if (typeof game.forceSync === 'function') game.forceSync();   // los dos tableros, iguales
+                        // SIN forceSync. Lo puse de red de seguridad cuando no sabía de dónde venía
+                        // la desincronización, y es peor que el problema: los DOS clientes replican
+                        // esta jugada, así que los dos emitían una instantánea autoritativa en
+                        // instantes distintos y el que perdía la carrera enseñaba un frame con el
+                        // estado viejo -la carta de vuelta en la mano- antes de corregirse. La
+                        // réplica es determinista: no hace falta que nadie mande fotos
+                        // (Toto, 13-ago-2026).
                         return false; 
                     }
                     // Cancelar el objetivo CANCELA la jugada. Antes caía al `return true` de

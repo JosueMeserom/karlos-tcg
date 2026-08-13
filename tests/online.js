@@ -193,6 +193,13 @@ async function reposar(clientes, vueltas = 60) {
         await reposar(cl);
         check('durante la evolución hay una corrutina viva (el poller no volcará a medias)',
             vivasEnMedio > 0, '_corrutinasVivas en mitad de la animación = ' + vivasEnMedio);
+        // Y NADIE necesita mandar una foto. Es la distinción que este harness existe para hacer:
+        // los dos tableros pueden coincidir porque la réplica es determinista, o porque uno se
+        // rindió y copió al otro. Lo segundo se ve como un parpadeo del estado viejo antes de
+        // corregirse, que es justo lo que Toto veía (13-ago-2026).
+        check('sin instantáneas autoritativas de por medio (la réplica basta)',
+            !cl.p1.g.__sincronizado && !cl.p2.g.__sincronizado,
+            'HARD_SYNC aplicados: p1=' + (cl.p1.g.__sincronizado || 0) + ' p2=' + (cl.p2.g.__sincronizado || 0));
     }
 
     console.log('');
