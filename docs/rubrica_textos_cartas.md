@@ -585,3 +585,26 @@ Esto NO afecta a lo cancelable: una elección previa que aún permita retirar la
 ocurriendo antes, sin carta enseñada, porque `_comprometer` ya traza esa línea sola (la
 presentación queda ARMADA, no disparada, mientras haya una ventana cancelable delante). No hay
 nada que declarar por carta.
+
+## 14.quater. ATERRIZAR Y EVOLUCIONAR (Toto, 13-ago-2026)
+
+**Nada aparece de golpe.** Una carta que llega a un destino con "versión colocada" se **funde**
+con ella: el clon viaja entero y visible, encogiéndose hasta el tamaño exacto del hueco, y al
+llegar se cruza con la carta real (uno se va mientras el otro entra). Lo declara `fundirEn` con el
+selector del contenedor. Lo usan el **Evento** (la tira de su ranura) y la **pila de descartes
+cuando estaba vacía** — con la pila ya poblada no hay nada que estrenar y el desvanecido de
+siempre es lo correcto.
+
+**Una evolución se presenta y se deshace sobre la carta que evoluciona.** `disolverHacia` hace que
+el clon, tras la pose, viaje hacia la carta base desintegrándose -desenfoque y encogimiento
+crecientes- mientras la base corre su propia animación de evolución. El intercambio de estado va
+**después**, cuando las dos animaciones han terminado; el helper `game.evolucionarDesdeMano(carta,
+baseId, cambio)` lo monta entero.
+
+Y la regla que hace que esto funcione: **la llamada va ANTES del intercambio**. Si la base ya se
+ha sustituido en su fila, no queda nada en el tablero hacia lo que disolverse. La suite lo
+comprueba mirando que la carta base siga en mesa en el instante de presentar, no el estado final.
+
+**Las flechas de coste/requisito se van al ACABAR LA POSE**, siempre con el mismo tiempo, retenga
+o no la carta después. Si esperasen al viaje al destino, una carta que se queda pagando costes en
+el centro las arrastraría durante toda esa animación.

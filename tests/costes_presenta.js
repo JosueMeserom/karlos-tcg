@@ -369,6 +369,49 @@ async function montar(esc) {
             'vanguardia=' + JSON.stringify(g.players.p1.vanguard.map(x => x.name)));
     }
 
+    // ── ORDEN DE LAS DESTRUCCIONES Y DE LA EVOLUCIÓN ──────────────────────────────
+    console.log('\n--- Orden: el Evento propio primero, y la evolución se presenta antes del cambio ---');
+    {
+        const { ctx, g } = await montar({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: ['Mini-tigre'], mano: ['Giro de guion'], evento: { carta: 'Dáedra', duracion: 2 } },
+            p2: { vanguardia: ['Mini-tigre'], evento: { carta: 'Una buena razón', duracion: 2 } },
+        });
+        const orden = [];
+        const od = g.destroyEvent.bind(g);
+        g.destroyEvent = (pid) => { orden.push(pid); return od(pid); };
+        await ejecutarPaso(ctx, g, { jugar: 'Giro de guion' });
+        // El propio va PRIMERO: es el que estás sustituyendo. Antes salía al revés porque el tuyo
+        // lo destruía `canReplaceEvent` más tarde, fuera de la habilidad.
+        check('Giro de guion destruye tu Evento antes que el del rival',
+            orden.join('>') === 'p1>p2', 'orden=' + orden.join('>'));
+    }
+    {
+        // La evolución se presenta y se deshace sobre la carta base, así que la presentación
+        // tiene que ocurrir ANTES del intercambio: si no, la base ya no está en el tablero y no
+        // hay hacia dónde disolverse.
+        const { ctx, g } = await montar({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: ['Sadame', 'Erasmo'], mano: ['Sadame (retornada)'] },
+            p2: { vanguardia: ['Mini-tigre'] },
+        });
+        let baseEnMesaAlPresentar = null;
+        ctx.sandbox.__vio = () => {
+            if (baseEnMesaAlPresentar === null) {
+                baseEnMesaAlPresentar = g.players.p1.vanguard.some(c => c.name === 'Sadame');
+            }
+        };
+        require('vm').runInContext("(function(){var a=animarPresentacionCarta;animarPresentacionCarta=function(){"
+            + "__vio();return a.apply(null,arguments);};})()", ctx.sandbox);
+        await ejecutarPaso(ctx, g, { jugar: 'Sadame (retornada)' });
+        check('al presentarse, la Sadame base SIGUE en el tablero (hay hacia dónde disolverse)',
+            baseEnMesaAlPresentar === true, 'baseEnMesa=' + baseEnMesaAlPresentar);
+        check('...y al terminar, la evolución ocupa su sitio y la base está en el descarte',
+            g.players.p1.vanguard.some(c => c.name === 'Sadame (retornada)')
+            && g.players.p1.discard.some(c => c.name === 'Sadame'),
+            'vg=' + JSON.stringify(g.players.p1.vanguard.map(c => c.name)));
+    }
+
     console.log('');
     if (fallos) { console.log(`SUITE costes_presenta: ${fallos} FALLOS de ${total} comprobaciones`); process.exit(1); }
     console.log(`SUITE costes_presenta: ${total}/${total} comprobaciones — COSTES Y REQUISITOS CORRECTOS`);

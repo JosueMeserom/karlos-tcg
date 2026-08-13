@@ -1479,6 +1479,11 @@
         // bloque se ve apretado: la flecha con "Coste" va en el hueco y necesita sitio para
         // leerse (Toto lo subió de 18 a 56 el 13-ago-2026).
         const PRESENTA_GAP = 56;          // px entre cartas del bloque, ya contando el zoom
+        // Disolución de una evolución: la carta presentada no aterriza en ningún sitio, se
+        // deshace ENCIMA de la que evoluciona mientras esta hace su propia animación. El
+        // desenfoque creciente es lo que lo hace parecer que se disgrega en vez de un simple
+        // fundido (Toto, 13-ago-2026).
+        const PRESENTA_DISUELVE = 700;    // ms: viaje hacia la carta base + desintegración
         // ── DESLIZAMIENTO DE FILA (técnica FLIP) ─────────────────────────────────────────
         // Cuando entra una carta nueva, las que ya estaban se APARTAN deslizándose en vez de
         // saltar a su nueva posición (Toto, 7-ago-2026). Se hace con FLIP -First, Last, Invert,
@@ -1815,6 +1820,15 @@
             // 2) Pose.
             await g.sleep(PRESENTA_POSE);
 
+            // Las flechas se van AL ACABAR LA POSE, siempre con el mismo tiempo, retenga o no la
+            // carta después (Toto, 13-ago-2026): si esperasen al viaje al destino, una carta que
+            // se queda pagando costes en el centro las arrastraría durante toda esa animación.
+            if (flechas) {
+                flechas.capa.style.transition = `opacity ${PRESENTA_FLECHA_MS}ms ease`;
+                flechas.capa.style.opacity = '0';
+                setTimeout(() => flechas.capa.remove(), PRESENTA_FLECHA_MS + 60);
+            }
+
             // 2.bis) PUNTO DE ESPERA (Toto, 13-ago-2026). Una carta que hace algo "antes de
             // colocarla" lo hace AQUÍ, con la carta enseñada y quieta en el centro, y solo
             // después viaja a su sitio. Con Giro de guion se veía al revés: la carta llegaba a
@@ -1836,12 +1850,6 @@
                 });
             }
 
-            // Las flechas se van en cuanto arranca el viaje al destino, no antes.
-            if (flechas) {
-                flechas.capa.style.transition = `opacity ${PRESENTA_FLECHA_MS}ms ease`;
-                flechas.capa.style.opacity = '0';
-                setTimeout(() => flechas.capa.remove(), PRESENTA_FLECHA_MS + 60);
-            }
             // Los acompañantes se van a su pila a la vez y durante el mismo tiempo que la carta.
             acompCl.forEach(a => {
                 const d = _rect(`#${a.ref.owner}-discard-stack`);
@@ -1903,11 +1911,58 @@
                 cont.style.top  = _pz(destino.top + destino.height / 2) - H / 2 + 'px';
             }
             flip.style.transform = `rotateY(0deg) scale(${(1 / PRESENTA_ZOOM).toFixed(4)})`;
-            if (!idEntrante) {                              // sin hueco propio: se funde en la pila
+            // `disolverHacia`: no hay destino, hay una carta que EVOLUCIONA. La presentada viaja
+            // hacia ella deshaciéndose -desenfoque y encogimiento crecientes- mientras la base
+            // hace su propia animación de evolución, y el intercambio de estado ocurre cuando
+            // las dos han terminado. Así la transformación se ve como una sola cosa.
+            if (opts && opts.disolverHacia) {
+                const base = document.querySelector(`.card[data-id="${opts.disolverHacia}"]`);
+                const rb = base ? base.getBoundingClientRect() : null;
+                if (typeof animateEvolution === 'function' && base) animateEvolution(opts.disolverHacia);
+                cont.style.transition = `left ${PRESENTA_DISUELVE}ms ease-in, top ${PRESENTA_DISUELVE}ms ease-in,`
+                    + ` opacity ${PRESENTA_DISUELVE}ms ease-in, filter ${PRESENTA_DISUELVE}ms ease-in`;
+                if (rb) {
+                    cont.style.left = _pz(rb.left + rb.width / 2) - W / 2 + 'px';
+                    cont.style.top  = _pz(rb.top + rb.height / 2) - H / 2 + 'px';
+                }
+                flip.style.transition = `transform ${PRESENTA_DISUELVE}ms ease-in`;
+                flip.style.transform = `rotateY(0deg) scale(${(0.55 / PRESENTA_ZOOM).toFixed(4)})`;
+                cont.style.filter = 'blur(9px) brightness(1.7)';
+                cont.style.opacity = '0';
+                await g.sleep(PRESENTA_DISUELVE);
+                cont.remove();
+                if (opts && typeof opts.colocar === 'function') await opts.colocar();
+                return;
+            }
+            // `fundirEn`: el destino no es un hueco de carta pero SÍ tiene una versión colocada
+            // que enseñar (la tira del Evento en su ranura). En vez de desvanecerse por el camino
+            // y aparecer de golpe al llegar -que es lo que Toto lleva pidiendo desde el 8 de
+            // agosto-, el clon viaja ENTERO y visible, encogiéndose hasta el tamaño exacto de la
+            // ranura, y al llegar se cruza con la carta real: uno se va mientras el otro entra.
+            const _fundir = (!idEntrante && opts && opts.fundirEn) ? document.querySelector(opts.fundirEn) : null;
+            // Qué hay que cruzar: la tira del Evento en su ranura, o la miniatura de la carta
+            // superior de la pila de descartes. Si la pila ya tenía cartas la miniatura no cambia
+            // -y ahí Toto dice que desvanecerse está bien-, así que solo se cruza cuando el
+            // destino ESTRENA contenido (`fundirSoloSiVacio`).
+            const _real = _fundir && _fundir.querySelector('.active-event-card, .card-preview-mini');
+            if (_real) { _real.style.transition = 'none'; _real.style.opacity = '0'; }
+            else if (!idEntrante) {                         // sin nada que enseñar: se funde en la pila
                 cont.style.opacity = '0';
                 cont.style.transition += `, opacity ${PRESENTA_VIAJE}ms ease`;
             }
             await g.sleep(PRESENTA_VIAJE);
+            if (_real) {
+                // Cruce en el sitio: ni parpadeo ni salto de un frame.
+                const MORPH = 180;
+                _real.style.transition = `opacity ${MORPH}ms ease`;
+                cont.style.transition = `opacity ${MORPH}ms ease`;
+                void _real.offsetWidth;
+                _real.style.opacity = '1';
+                cont.style.opacity = '0';
+                await g.sleep(MORPH);
+                _real.style.transition = '';
+                _real.style.opacity = '';
+            }
             cont.remove();
             if (idEntrante) {
                 const real = document.querySelector(`[data-id="${idEntrante}"]`);
@@ -3740,6 +3795,16 @@
             // Quién ve la cara: su dueño, quien tenga esa mano expuesta (SEGUIMIENTO de Erasmo) y
             // el ESPECTADOR, que lo ve todo. Para el resto no hay nada que revelar y se queda el
             // deslizamiento de siempre: la carta es un dorso de principio a fin.
+            // Evolución desde la mano: la carta se presenta, y al terminar la pose se deshace
+            // sobre la que evoluciona mientras esta hace su animación; `cambio` es el
+            // intercambio de estado, que corre cuando las dos animaciones han acabado. Lo usan
+            // todas las evoluciones para no repetir el montaje (Toto, 13-ago-2026).
+            async evolucionarDesdeMano(card, baseInstanceId, cambio) {
+                await animarPresentacionCarta(card.id, `#${card.owner}-hand`, null,
+                    this.gameMode === 'online' && this.myPlayerId !== card.owner,
+                    { origenId: card.instanceId, disolverHacia: baseInstanceId, colocar: cambio });
+            }
+
             async animarRobo(card, playerId, animSpeed = 600) {
                 const p = this.players[playerId];
                 const cardEl = document.querySelector(`.card[data-id="${card.instanceId}"]`);
@@ -6517,7 +6582,16 @@
                     const _destino = card.type === 'Evento' ? `#${card.owner}-event-slot` : `#${card.owner}-discard-stack`;
                     // De dorso SOLO si para MÍ estaba tapada: la juega el rival desde su mano.
                     const _deDorso = this.gameMode === 'online' && this.myPlayerId !== card.owner;
-                    const _pres = { cardId: card.id, origen: _origen, destino: _destino, deDorso: _deDorso, origenId: card.instanceId };
+                    const _pres = { cardId: card.id, origen: _origen, destino: _destino, deDorso: _deDorso, origenId: card.instanceId,
+                        // Un Evento tiene versión colocada (la tira de su ranura): se funde con
+                        // ella en vez de desvanecerse y aparecer de golpe.
+                        // El Evento tiene versión colocada (la tira de su ranura) y la pila de
+                        // descartes estrena miniatura cuando estaba vacía: en los dos casos la
+                        // carta se funde con lo que aparece, en vez de desvanecerse y que salga
+                        // de golpe. Con la pila ya poblada no hay nada que estrenar y el
+                        // desvanecido de siempre es lo correcto (Toto, 13-ago-2026).
+                        fundirEn: card.type === 'Evento' ? `#${card.owner}-event-slot`
+                                : (!p.discard || !p.discard.length) ? `#${card.owner}-discard-stack` : null };
                     // MISMA NORMA QUE EL COSTE DE UNA ACTIVA (Toto, 7-ago-2026): nada visible
                     // hasta que deje de poder cancelarse. Enseñar la carta al clicarla SPOILEA la
                     // mano si luego cancelas -lo pilló con Longaniza, que abre targeting-. Y como
@@ -7963,7 +8037,7 @@
                 // animación (al aterrizar), no antes ni después. Es lo que hace que la pila se
                 // pueble justo cuando la carta llega y que, mientras aún se pueda cancelar, siga
                 // viéndose en la mano.
-                const _o = { origenId: p.origenId || null };
+                const _o = { origenId: p.origenId || null, fundirEn: p.fundirEn || null };
                 if (p.colocar) _o.colocar = () => { p.colocar(); return null; };
                 const _anim = animarPresentacionCarta(p.cardId, p.origen, p.destino, p.deDorso, _o);
                 // Con retención, esto resuelve al LLEGAR al centro, no al final: la cadena que

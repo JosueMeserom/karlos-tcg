@@ -2036,6 +2036,10 @@ const CARD_DB = [
                 showFloatingText(sadame.instanceId, "TRANSFORMACIÓN", "ft-purple", -40);
                 
                 card.location = sadame.location;
+                // La evolución se PRESENTA y se DESHACE sobre la carta que evoluciona, que hace a la vez
+                // su propia animación (§14.quater). Va ANTES del intercambio: la base tiene que seguir
+                // en el tablero para poder ser el destino de la disolución (Toto, 13-ago-2026).
+                if (typeof game.evolucionarDesdeMano === "function") await game.evolucionarDesdeMano(card, sadame.instanceId, null);
                 if (sadame.location === 'vanguard') {
                     const idx = p.vanguard.findIndex(c => c.instanceId === sadame.instanceId);
                     p.vanguard[idx] = card;
@@ -2056,7 +2060,6 @@ const CARD_DB = [
                 game.updatePassives();
                 game.render();
 
-                try { await animateEvolution(card.instanceId); } catch(e) {}
                 
                 return false; // Devolvemos false para que el motor no la intente colocar otra vez de forma normal
             }
@@ -2821,7 +2824,11 @@ const CARD_DB = [
             // documentarlo. Se revierte para no dejar la bateria en rojo (Toto, 13-ago-2026).
             { trigger: "ANTES_DE_JUGAR", log: "¡Giro de guion! ¡El tablero cambia drásticamente!", logTipo: "ability",
               pausaEnEscaparate: true,
-              efectos: [ { op: "DESTRUIR_EVENTO", deQuien: "RIVAL" } ] },
+              // El PROPIO primero: es el que estás sustituyendo. Antes salía al revés porque el
+              // tuyo lo destruía `canReplaceEvent` más tarde, ya fuera de la habilidad; ahora los
+              // dos se destruyen aquí, en el orden que se lee en la carta (Toto, 13-ago-2026).
+              efectos: [ { op: "DESTRUIR_EVENTO", deQuien: "PROPIO" },
+                         { op: "DESTRUIR_EVENTO", deQuien: "RIVAL" } ] },
             { trigger: "AL_CADUCAR", log: "El Giro de guion concluye.", logTipo: "system" }
         ],
     },
@@ -6274,6 +6281,10 @@ const CARD_DB = [
                         const oldLimo = chosen[0];
                         card.location = oldLimo.location;
                         
+                        // La evolución se PRESENTA y se DESHACE sobre la carta que evoluciona, que hace a la vez
+                        // su propia animación (§14.quater). Va ANTES del intercambio: la base tiene que seguir
+                        // en el tablero para poder ser el destino de la disolución (Toto, 13-ago-2026).
+                        if (typeof game.evolucionarDesdeMano === "function") await game.evolucionarDesdeMano(card, oldLimo.instanceId, null);
                         if (oldLimo.location === 'vanguard') {
                             const idx = p.vanguard.findIndex(c => c.instanceId === oldLimo.instanceId);
                             p.vanguard[idx] = card;
@@ -6300,7 +6311,6 @@ const CARD_DB = [
                         game.cancelAction();
                         game.updatePassives();
                         game.render();
-                        try { await animateEvolution(card.instanceId); } catch(e){}
                         return false; 
                     }
                 }
@@ -6386,6 +6396,10 @@ const CARD_DB = [
                 const oldLimo = chosen[0];
                 card.location = oldLimo.location;
                 
+                // La evolución se PRESENTA y se DESHACE sobre la carta que evoluciona, que hace a la vez
+                // su propia animación (§14.quater). Va ANTES del intercambio: la base tiene que seguir
+                // en el tablero para poder ser el destino de la disolución (Toto, 13-ago-2026).
+                if (typeof game.evolucionarDesdeMano === "function") await game.evolucionarDesdeMano(card, oldLimo.instanceId, null);
                 if (oldLimo.location === 'vanguard') {
                     const idx = p.vanguard.findIndex(c => c.instanceId === oldLimo.instanceId);
                     p.vanguard[idx] = card;
@@ -6412,7 +6426,6 @@ const CARD_DB = [
                 game.cancelAction();
                 game.updatePassives();
                 game.render();
-                try { await animateEvolution(card.instanceId); } catch(e){}
                 return false; 
             }
             return false; // Si el jugador cancela el modal, se aborta la invocación
