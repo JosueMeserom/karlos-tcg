@@ -428,6 +428,18 @@ fA.style.transition = '';
 vm.runInContext('_deslizarFila', sandbox)('#p1-vanguard', foto2, 'FN');
 check('si no se ha movido, no se le toca', !fA.style.transition, 'transition: ' + fA.style.transition);
 
+// Una carta con su PROPIA animación en marcha (transform inline puesto: embestida, muerte,
+// aterrizaje) no se toca: el FLIP genérico del repintado se la pisaría. Toto, 13-ago-2026, al
+// hacer que TODO repintado deslice en vez de saltar.
+const foto3 = vm.runInContext('_fotoFila', sandbox)('#p1-vanguard');
+fA.__rect = { left: 999, top: 400, width: 90, height: 126 };   // se ha movido mucho
+fA.style.transition = '';
+fA.style.transform = 'translate(5px, 5px) scale(1.2)';         // ...pero está animándose
+vm.runInContext('_deslizarFila', sandbox)('#p1-vanguard', foto3, null);
+check('una carta con su animación en marcha no se desliza', !fA.style.transition,
+      'transition: ' + fA.style.transition);
+fA.style.transform = '';
+
 // ---------- salir de la mano (la carta se va, el resto se acomoda) ----------
 // Cuando una carta viaja al escaparate deja de estar en la mano: si nadie la quita del DOM se
 // ve DUPLICADA -en la mano y en el escaparate a la vez- porque el estado ya la sacó pero no se

@@ -1506,6 +1506,9 @@
             _cartasDeFila(sel).forEach(el => {
                 const id = el.getAttribute('data-id');
                 if (id === exceptoId) return;              // la que entra viaja por su cuenta
+                // Con un transform inline ya puesto, la carta está en mitad de SU animación
+                // (embestida, muerte, aterrizaje): el FLIP se la pisaría. Se deja en paz.
+                if (el.style.transform) return;
                 const antes = foto.get(id);
                 if (!antes) return;                        // no estaba: nada que deslizar
                 const ahora = el.getBoundingClientRect();
@@ -8995,7 +8998,23 @@
             }
 
             // --- RENDERING ---
+            // El repintado NUNCA teletransporta cartas (Toto, 13-ago-2026). Cualquier cosa que
+            // cambie el ancho de una carta -una badge nueva, un contador, un equipo- recoloca su
+            // fila entera, y eso se veía como un salto de un frame: al hacer Oculto a Zoe con
+            // Entrenamiento arduo, toda su fila (ella incluida) daba un brinco.
+            // Se resuelve con el MISMO FLIP que ya usaba la colocación, pero aplicado a todo
+            // repintado: foto antes, render, y a lo que se haya movido se le devuelve ópticamente
+            // su sitio viejo para quitárselo con transición.
+            // Se respeta lo que ya esté animándose: `_deslizarFila` salta las cartas con un
+            // transform inline puesto (embestida, muerte, aterrizaje), que van por su cuenta.
             render() {
+                const _fotos = ['#p1-vanguard', '#p1-rearguard', '#p2-vanguard', '#p2-rearguard']
+                    .map(sel => [sel, _fotoFila(sel)]);
+                this._renderInterno();
+                if (!this.isSkippingAnim) _fotos.forEach(([sel, foto]) => _deslizarFila(sel, foto, null));
+            }
+
+            _renderInterno() {
                 // Ninguna carta se pinta nunca con una característica fuera del 0-9 (ver
                 // aplicarTopesStats): entre pasadas de updatePassives puede haber transitorios.
                 this.aplicarTopesStats([...this.players.p1.vanguard, ...this.players.p1.rearguard,
