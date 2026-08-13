@@ -438,6 +438,56 @@ async function montar(esc) {
             'descartes=' + JSON.stringify(g.players.p1.discard.map(c => c.name)));
     }
 
+    // ── EVOLUCIONES: CANCELAR CANCELA, Y ZOE PREGUNTA DE DÓNDE ────────────────────
+    console.log('\n--- Evoluciones: cancelar, y de dónde sale la calcinante ---');
+    {
+        // Cancelar el objetivo de Limo crecido caía en "colócala normal": el jugador cancelaba y
+        // le salía un Esbirro nuevo, con los dos clientes desincronizándose a base de re-syncs.
+        const { ctx, g } = await montar({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: ['Limo artificial'], mano: ['Limo crecido'] },
+            p2: { vanguardia: ['Mini-tigre'] },
+        });
+        await ejecutarPaso(ctx, g, { jugar: 'Limo crecido' });
+        const pend = ctx.pendientes[0] || {};
+        check('el modal de Limo crecido ofrece CANCELAR',
+            (pend.etiquetas || []).includes('CANCELAR'), JSON.stringify(pend.etiquetas));
+        await ejecutarPaso(ctx, g, { opcion: 'EVOLUCIONAR LIMO ARTIFICIAL' });
+        await ejecutarPaso(ctx, g, { cancelar: true });
+        check('cancelar el objetivo CANCELA la jugada, no la coloca de Esbirro nuevo',
+            g.players.p1.hand.some(c => c.name === 'Limo crecido')
+            && g.players.p1.vanguard.length === 1 && g.players.p1.vanguard[0].name === 'Limo artificial',
+            'mano=' + JSON.stringify(g.players.p1.hand.map(c => c.name)) + ' vg=' + JSON.stringify(g.players.p1.vanguard.map(c => c.name)));
+    }
+    {
+        // Con una calcinante en la mano SIEMPRE se pregunta: el jugador no tiene por qué saber si
+        // le queda otra en el mazo. Y si elige mazo y no hay, el efecto se acaba sin evolucionar.
+        const relleno = ['Mini-tigre', 'Mini-tigre', 'Mini-tigre', 'Mini-tigre'];
+        const evento = { carta: 'Entrenamiento arduo', duracion: 1 };
+        for (const c of [
+            { n: 'elige la de la mano', mazo: [...relleno, 'Zoe (calcinante)'], mano: ['Zoe (calcinante)'],
+              pasos: [{ opcion: 'USAR LA DE TU MANO' }], evoluciona: true },
+            { n: 'elige buscar en el mazo', mazo: [...relleno, 'Zoe (calcinante)'], mano: ['Zoe (calcinante)'],
+              pasos: [{ opcion: 'BUSCAR EN EL MAZO' }, { elegir: ['Zoe (calcinante)'] }], evoluciona: true },
+            { n: 'busca en el mazo y no hay: NO evoluciona', mazo: relleno, mano: ['Zoe (calcinante)'],
+              pasos: [{ opcion: 'BUSCAR EN EL MAZO' }, { elegir: [] }], evoluciona: false },
+            { n: 'sin ninguna en mano: visor del mazo directo', mazo: [...relleno, 'Zoe (calcinante)'], mano: [],
+              pasos: [{ elegir: ['Zoe (calcinante)'] }], evoluciona: true },
+        ]) {
+            const { ctx, g } = await montar({
+                turno: 2, turnoDe: 'p1', empieza: 'p2',
+                p1: { vanguardia: ['Zoe'], mano: c.mano, mazo: c.mazo, evento },
+                p2: { vanguardia: ['Mini-tigre'] },
+            });
+            await ejecutarPaso(ctx, g, { finTurno: true });
+            await ejecutarPaso(ctx, g, { finTurno: true });
+            for (const paso of c.pasos) await ejecutarPaso(ctx, g, paso);
+            const evolucionada = g.players.p1.vanguard.some(x => x.name === 'Zoe (calcinante)');
+            check('Zoe, ' + c.n, evolucionada === c.evoluciona,
+                'vanguardia=' + JSON.stringify(g.players.p1.vanguard.map(x => x.name)));
+        }
+    }
+
     console.log('');
     if (fallos) { console.log(`SUITE costes_presenta: ${fallos} FALLOS de ${total} comprobaciones`); process.exit(1); }
     console.log(`SUITE costes_presenta: ${total}/${total} comprobaciones — COSTES Y REQUISITOS CORRECTOS`);

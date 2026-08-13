@@ -1631,17 +1631,48 @@ const CARD_DB = [
                 // los descartes: la curación era inobservable. Lo que la calcinante hereda son los
                 // BONOS (diffs de stats + marcas temporales), no el estado de Vida de Zoe; ella
                 // entra a su Vida máxima por ser una carta que acaba de colocarse.
-                let calcinante = p.hand.find(c => c.name === 'Zoe (calcinante)');
+                // De dónde sale la calcinante. Con una en la mano SIEMPRE se pregunta -mano o
+                // mazo, en ese orden-, porque el jugador no tiene por qué recordar si le queda
+                // otra en el mazo; el aviso se lo dice sin destripar la respuesta. NO es
+                // cancelable: el Evento ya ha expirado, esto es su efecto. Si eliges mazo y no
+                // hay, el efecto se acaba sin evolucionar, que es el riesgo que asumes
+                // (Toto, 13-ago-2026).
+                const enMano = p.hand.find(c => c.name === 'Zoe (calcinante)');
+                let calcinante = null;
                 let fromZone = 'hand';
-                
-                if (!calcinante) {
-                    const deckIdx = p.deck.findIndex(c => c.name === 'Zoe (calcinante)');
-                    if (deckIdx !== -1) {
-                        calcinante = p.deck.splice(deckIdx, 1)[0];
-                        fromZone = 'deck';
-                        await animateShuffle(playerId);
-                        game.shuffle(p.deck);
+                let buscarEnMazo = !enMano;
+                if (enMano) {
+                    buscarEnMazo = await new Promise(resolve => {
+                        game.openChoiceModal(
+                            'EVOLUCIÓN DE ZOE\n\nAtención: tienes una Zoe (calcinante) en la mano. Si buscas en el mazo y no hay ninguna, el efecto se acabará sin que Zoe evolucione.',
+                            [ { label: 'USAR LA DE TU MANO', action: () => resolve(false) },
+                              { label: 'BUSCAR EN EL MAZO', action: () => resolve(true) } ],
+                            playerId);
+                    });
+                }
+                if (!buscarEnMazo) {
+                    calcinante = enMano;
+                } else {
+                    // Buscar en una PILA usa SIEMPRE su visor completo, aunque no haya ninguna
+                    // elegible: se abre igual con el aviso (norma de UX del proyecto). Antes se
+                    // sacaba del mazo a escondidas, sin enseñar nada.
+                    const elegibles = p.deck.filter(c => c.name === 'Zoe (calcinante)');
+                    let elegida = null;
+                    if (typeof game.openDeckSearchViewer === 'function') {
+                        elegida = await game.openDeckSearchViewer(playerId, elegibles,
+                            'BUSCA A ZOE (CALCINANTE) EN TU MAZO',
+                            elegibles.length ? null : 'No queda ninguna Zoe (calcinante) en el mazo. Zoe no evolucionará.',
+                            1, 'deck');
+                    } else {
+                        elegida = elegibles[0] || null;
                     }
+                    if (elegida) {
+                        const deckIdx = p.deck.findIndex(c => c.instanceId === elegida.instanceId);
+                        if (deckIdx !== -1) calcinante = p.deck.splice(deckIdx, 1)[0];
+                        fromZone = 'deck';
+                    }
+                    await animateShuffle(playerId);
+                    game.shuffle(p.deck);
                 }
                 
                 if (calcinante) {
@@ -2041,12 +2072,16 @@ const CARD_DB = [
             const sadame = [...p.vanguard, ...p.rearguard].find(c => c.name === 'Sadame');
             if (sadame) {
                 game.logMsg(`¡Sadame ve a Erasmo y se convierte en ${card.name}!`, 'ability');
-                showFloatingText(sadame.instanceId, "TRANSFORMACIÓN", "ft-purple", -40);
+                // (TRANSFORMACIÓN se anuncia al empezar la transformación de verdad, más abajo)
                 
                 card.location = sadame.location;
                 // La evolución se PRESENTA y se DESHACE sobre la carta que evoluciona, que hace a la vez
                 // su propia animación (§14.quater). Va ANTES del intercambio: la base tiene que seguir
                 // en el tablero para poder ser el destino de la disolución (Toto, 13-ago-2026).
+                // TRANSFORMACIÓN se anuncia AQUÍ, cuando la carta base empieza a transformarse de
+                // verdad -las dos animándose a la vez-, no al arrancar el viaje al escaparate,
+                // que es cuando salía antes (Toto, 13-ago-2026).
+                if (typeof showFloatingText === "function") showFloatingText(sadame.instanceId, "TRANSFORMACIÓN", "ft-purple", -40);
                 if (typeof game.evolucionarDesdeMano === "function") await game.evolucionarDesdeMano(card, sadame.instanceId, null);
                 if (sadame.location === 'vanguard') {
                     const idx = p.vanguard.findIndex(c => c.instanceId === sadame.instanceId);
@@ -6276,13 +6311,18 @@ const CARD_DB = [
         onBeforePlayAsync: async function(card, game, p) {
             const limos = [...p.vanguard, ...p.rearguard].filter(c => c.name === 'Limo artificial');
             if (limos.length > 0) {
+                // CANCELAR (Toto, 13-ago-2026): elegir cómo colocarla es una ventana cancelable —
+                // nada ha cambiado todavía—, así que §14 exige poder arrepentirse. Y con la
+                // opción puesta, clicar el velo del modal la dispara sola.
                 const choice = await new Promise(resolve => {
                     game.openChoiceModal(`¿CÓMO COLOCAR A LIMO CRECIDO?`, [
-                        { label: 'EVOLUCIONAR LIMO ARTIFICIAL', action: () => resolve(true) },
-                        { label: 'COLOCAR COMO ESBIRRO NUEVO', action: () => resolve(false) }
+                        { label: 'EVOLUCIONAR LIMO ARTIFICIAL', action: () => resolve('evo') },
+                        { label: 'COLOCAR COMO ESBIRRO NUEVO', action: () => resolve('nuevo') },
+                        { label: 'CANCELAR', action: () => resolve('cancelar') }
                     ], card.owner);
                 });
-                if (choice) {
+                if (choice === 'cancelar') return false;   // jugada abortada: sigue en la mano
+                if (choice === 'evo') {
                     // En tablero (Toto, 7-ago-2026): el limo a sustituir ya está en el campo.
                     const chosen = await game.pickBoardTargets(limos, 1, 'ELIGE EL LIMO ARTIFICIAL A EVOLUCIONAR', card, card.owner, true);
                     if (chosen && chosen.length > 0) {
@@ -6321,6 +6361,11 @@ const CARD_DB = [
                         game.render();
                         return false; 
                     }
+                    // Cancelar el objetivo CANCELA la jugada. Antes caía al `return true` de
+                    // abajo, o sea "colócala normal": el jugador cancelaba y le aparecía un
+                    // Esbirro nuevo, con los dos clientes desincronizándose a base de re-syncs
+                    // (Toto, 13-ago-2026). Cancelar es cancelar (§14).
+                    return false;
                 }
             }
             return true; 

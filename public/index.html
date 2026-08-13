@@ -1921,7 +1921,11 @@
             if (opts && opts.disolverHacia) {
                 const base = document.querySelector(`.card[data-id="${opts.disolverHacia}"]`);
                 const rb = base ? base.getBoundingClientRect() : null;
-                if (typeof animateEvolution === 'function' && base) animateEvolution(opts.disolverHacia);
+                // La animación de la carta base dura MÁS que la disolución, así que se guarda su
+                // promesa y se esperan las DOS antes del intercambio. Sin esto la base se
+                // sustituía a mitad de su propia animación y esta se veía cortada (Toto, 13-ago).
+                const _evo = (typeof animateEvolution === 'function' && base)
+                    ? animateEvolution(opts.disolverHacia) : null;
                 cont.style.transition = `left ${PRESENTA_DISUELVE}ms ease-in, top ${PRESENTA_DISUELVE}ms ease-in,`
                     + ` opacity ${PRESENTA_DISUELVE}ms ease-in, filter ${PRESENTA_DISUELVE}ms ease-in`;
                 if (rb) {
@@ -1934,6 +1938,7 @@
                 cont.style.opacity = '0';
                 await g.sleep(PRESENTA_DISUELVE);
                 cont.remove();
+                if (_evo) { try { await _evo; } catch (err) {} }   // que la base termine su animación
                 if (opts && typeof opts.colocar === 'function') await opts.colocar();
                 return;
             }
