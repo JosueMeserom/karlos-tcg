@@ -1459,7 +1459,10 @@
         const PRESENTA_COLOR = { coste: '#fbbf24', requisito: '#a3e635' };
         const PRESENTA_ETIQ  = { coste: 'Coste',   requisito: 'Req. cumplido' };
         const PRESENTA_FLECHA_MS = 180;   // ms: brote de la flecha del acompañante, y su fundido
-        const PRESENTA_GAP = 18;          // px entre cartas del bloque, ya contando el zoom
+        // Separación entre la carta y sus costes en el escaparate. Es EL número a tocar si el
+        // bloque se ve apretado: la flecha con "Coste" va en el hueco y necesita sitio para
+        // leerse (Toto lo subió de 18 a 56 el 13-ago-2026).
+        const PRESENTA_GAP = 56;          // px entre cartas del bloque, ya contando el zoom
         // ── DESLIZAMIENTO DE FILA (técnica FLIP) ─────────────────────────────────────────
         // Cuando entra una carta nueva, las que ya estaban se APARTAN deslizándose en vez de
         // saltar a su nueva posición (Toto, 7-ago-2026). Se hace con FLIP -First, Last, Invert,
@@ -1499,6 +1502,20 @@
                 el.style.transform = '';
                 setTimeout(() => { el.style.transition = ''; }, DESLIZA_MS + 50);
             });
+        }
+
+        // Una carta que se va de la mano al escaparate deja un hueco: el resto de la mano se
+        // ACOMODA deslizándose, igual que una fila cuando entra una carta (Toto, 13-ago-2026).
+        // Sin esto la carta se quedaba pintada en la mano mientras su clon volaba, y se veía
+        // duplicada -el estado ya la había sacado, pero nadie había repintado-.
+        function _salirDeLaMano(el) {
+            if (!el || !el.parentNode) return;
+            const cont = el.closest && el.closest('[id$="-hand"]');
+            const sel = cont && cont.id ? '#' + cont.id : null;
+            if (!sel) { el.remove(); return; }
+            const foto = _fotoFila(sel);   // posiciones ANTES de quitarla (FLIP)
+            el.remove();
+            _deslizarFila(sel, foto, null);
         }
 
         // Las presentaciones se ENCOLAN (Toto, 7-ago-2026). Una cadena puede disparar varias
@@ -1647,8 +1664,13 @@
             const paso = W * PRESENTA_ZOOM + PRESENTA_GAP;
             const mx = cx - (acomp.length * paso) / 2;      // centro de la carta que se presenta
 
-            const cl = _clon(tmpl, deDorso, origen);
+            // Si la presentación sabe QUÉ instancia viaja y esa instancia sigue pintada en la
+            // mano (el estado ya la sacó pero no se ha repintado), se arranca de su hueco exacto
+            // y se saca de la mano deslizando el resto. `origenId` lo pone quien encola.
+            const _elOrigen = (opts && opts.origenId) ? document.querySelector(`.card[data-id="${opts.origenId}"]`) : null;
+            const cl = _clon(tmpl, deDorso, _elOrigen ? _elOrigen.getBoundingClientRect() : origen);
             const cont = cl.cont, flip = cl.flip;
+            if (_elOrigen) _salirDeLaMano(_elOrigen);
             // Acompañantes: nacen en la mano de su dueño (de donde salieron) y viajan a la vez.
             const acompCl = acomp.map((c, i) => {
                 const inst = getCardTemplate(c.cardId);
@@ -1657,8 +1679,8 @@
                 // movido de zona pero aún no se ha repintado); si no, del centro de la mano.
                 const propio = _elDe(c);
                 const rOrig = propio ? propio.getBoundingClientRect() : _rect(`#${c.owner}-hand`);
-                if (propio) propio.style.visibility = 'hidden';   // el clon ocupa su sitio mientras vuela
                 const cc = _clon(inst, false, rOrig);
+                if (propio) _salirDeLaMano(propio);   // deja hueco y el resto de la mano se acomoda
                 return { ref: c, cont: cc.cont, flip: cc.flip, x: mx + (i + 1) * paso };
             }).filter(Boolean);
 
@@ -6332,7 +6354,7 @@
                     const _destino = card.type === 'Evento' ? `#${card.owner}-event-slot` : `#${card.owner}-discard-stack`;
                     // De dorso SOLO si para MÍ estaba tapada: la juega el rival desde su mano.
                     const _deDorso = this.gameMode === 'online' && this.myPlayerId !== card.owner;
-                    const _pres = { cardId: card.id, origen: _origen, destino: _destino, deDorso: _deDorso };
+                    const _pres = { cardId: card.id, origen: _origen, destino: _destino, deDorso: _deDorso, origenId: card.instanceId };
                     // MISMA NORMA QUE EL COSTE DE UNA ACTIVA (Toto, 7-ago-2026): nada visible
                     // hasta que deje de poder cancelarse. Enseñar la carta al clicarla SPOILEA la
                     // mano si luego cancelas -lo pilló con Longaniza, que abre targeting-. Y como
@@ -6347,7 +6369,7 @@
                                      || typeof template.onBeforePlayAsync === 'function'
                                      || _eleccionCancelable;
                     if (_hayVentana) this._presentacionArmada = _pres;
-                    else await animarPresentacionCarta(_pres.cardId, _pres.origen, _pres.destino, _pres.deDorso);
+                    else await animarPresentacionCarta(_pres.cardId, _pres.origen, _pres.destino, _pres.deDorso, { origenId: _pres.origenId });
                 }
                 if (card.type === 'Ayuda') {
                     if (typeof template.onPlay === 'function') {
@@ -6457,6 +6479,7 @@
                     await animarPresentacionCarta(card.id, `#${card.owner}-hand`, _filaSel,
                         this.gameMode === 'online' && this.myPlayerId !== card.owner,
                         {
+                            origenId: card.instanceId,
                             zonaSel: _filaSel,
                             colocar: () => {
                                 (card.location === 'rearguard' ? p.rearguard : p.vanguard).push(card);
@@ -7534,6 +7557,16 @@
                     };
                     container.appendChild(btn);
                 });
+                // Clic FUERA de la caja = CANCELAR, si el modal ofrece esa salida (Toto,
+                // 13-ago-2026). Va por etiqueta a propósito: cualquier modal que añada un
+                // CANCELAR lo hereda sin tocar nada, y el que no lo ofrezca sigue sin poder
+                // cerrarse a lo tonto. El clic solo cuenta si cae en el propio velo, no en un
+                // hijo (los botones ya paran la propagación, pero el título no).
+                const _idxCancelar = choices.findIndex(c => c.label === 'CANCELAR');
+                modalEl.onclick = (e) => {
+                    if (e.target !== modalEl || _idxCancelar < 0) return;
+                    this.executeChoice(_idxCancelar);
+                };
                 document.getElementById('choice-modal').style.display = 'flex';
                 
                 if (this.gameMode === 'online' && this.activePlayerId !== 'setup') {
@@ -7710,7 +7743,7 @@
                 // animación (al aterrizar), no antes ni después. Es lo que hace que la pila se
                 // pueble justo cuando la carta llega y que, mientras aún se pueda cancelar, siga
                 // viéndose en la mano.
-                const _o = {};
+                const _o = { origenId: p.origenId || null };
                 if (p.colocar) _o.colocar = () => { p.colocar(); return null; };
                 return animarPresentacionCarta(p.cardId, p.origen, p.destino, p.deDorso, _o);
             }

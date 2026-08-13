@@ -480,7 +480,10 @@ carta tiene elemento en el tablero, no lo declara la carta:
 
 En los dos casos las flechas se desvanecen en cuanto arranca el viaje al destino, nunca antes, y
 van **por encima** del escaparate (z-index 3950): sobre todo lo demás, pero bajo los modales.
-Y el coste que acompaña **sale de su hueco**, que se tapa mientras el clon vuela — la zona a la
+Y **toda** carta que sale de la mano al escaparate -la usada y sus costes- deja su hueco y el
+resto de la mano **se acomoda deslizándose**, con la misma técnica FLIP que una fila (si no, se
+ve duplicada: el estado ya la sacó pero nadie la ha repintado). La separación del bloque se
+ajusta con `PRESENTA_GAP`. El coste que acompaña sale de su hueco — la zona a la
 que pertenece la decide el motor (`zona`), nunca la presencia de la carta en el DOM: una carta ya
 descartada sigue dibujada en la mano hasta el siguiente render.
 Colores de la misma familia pero distinguibles: **coste ámbar, requisito lima** — de un vistazo
@@ -493,7 +496,8 @@ se lee si algo se ha *perdido* o solo se ha *comprobado*.
    aterrizaje de la carta- sin dejar rastro. El dibujo va blindado y el drenaje de cobros tiene
    red de seguridad en `_comprometer`: lo cobre el escaparate o lo cobre él, se cobra una vez.
 2. Si la carta pregunta **cómo** se paga (Wolfgang: Aniceto o Manzanahoria), esa pregunta es una
-   **ventana cancelable**: lleva CANCELAR y no puede cambiar nada hasta que se responde. Un modal
+   **ventana cancelable**: lleva CANCELAR -y se cancela también clicando FUERA de la caja, como
+   cualquier otra ventana cancelable- y no puede cambiar nada hasta que se responde. Un modal
    así necesita además su descriptor `pendingInteraction` de tipo `choice`, o al reconectar se
    pierde y la jugada se queda colgada esperando un `CHOICE_SELECTED` que ya nadie manda.
 3. **`modifyStat` ya pinta su propio flotante** al cambiar un stat. Declarar además un `floating`

@@ -65,7 +65,15 @@ function Nodo(tag, ns) {
         removeAttribute(k) { delete n.__attrs[k]; if (k === 'data-id') delete n.dataset.id; },
         getBoundingClientRect() { return Object.assign({}, n.__rect, { right: n.__rect.left + n.__rect.width, bottom: n.__rect.top + n.__rect.height }); },
         matches() { return false; },
-        closest() { return null; },
+        // closest acotado a lo que el cliente usa de verdad: `[id$="-sufijo"]`. Sube por
+        // parentNode, como el de verdad. Lo necesita _salirDeLaMano para encontrar la mano.
+        closest(sel) {
+            const m = /^\[id\$="([^"]+)"\]$/.exec(sel || '');
+            if (!m) return null;
+            let cur = n;
+            while (cur) { if (cur.id && cur.id.endsWith(m[1])) return cur; cur = cur.parentNode; }
+            return null;
+        },
         get firstChild() { return n.children[0] || null; },
         cloneNode(deep) {
             const c = Nodo(n.tagName, n.__ns);
@@ -419,6 +427,42 @@ const foto2 = vm.runInContext('_fotoFila', sandbox)('#p1-vanguard');
 fA.style.transition = '';
 vm.runInContext('_deslizarFila', sandbox)('#p1-vanguard', foto2, 'FN');
 check('si no se ha movido, no se le toca', !fA.style.transition, 'transition: ' + fA.style.transition);
+
+// ---------- salir de la mano (la carta se va, el resto se acomoda) ----------
+// Cuando una carta viaja al escaparate deja de estar en la mano: si nadie la quita del DOM se
+// ve DUPLICADA -en la mano y en el escaparate a la vez- porque el estado ya la sacó pero no se
+// ha repintado (Toto lo vio con Wolfgang, 13-ago-2026). Se comprueba el contrato: la carta sale
+// del DOM y a las que quedan se les arma el deslizamiento.
+console.log('\n--- salir de la mano ---');
+const manoEl = Nodo('div'); manoEl.setAttribute('id', 'p1-hand'); raiz.appendChild(manoEl);
+const _mkMano = (id, left) => { const c = Nodo('div'); c.classList.add('card'); c.setAttribute('data-id', id);
+    c.__rect = { left: left, top: 700, width: 90, height: 126 }; manoEl.appendChild(c); return c; };
+const mA = _mkMano('MA', 100), mB = _mkMano('MB', 200), mSale = _mkMano('MS', 300);
+
+// El repintado que provocaría quitar la del medio: las que quedan se recolocan.
+mSale.__salir = () => { mA.__rect = { left: 150, top: 700, width: 90, height: 126 }; };
+const _origAppend = mA.__rect;
+vm.runInContext('_salirDeLaMano', sandbox)(mSale);
+check('la carta que se va sale del DOM de la mano', !manoEl.children.includes(mSale),
+      'quedan: ' + manoEl.children.length);
+check('las que quedan siguen en la mano', manoEl.children.includes(mA) && manoEl.children.includes(mB));
+// Sin movimiento no hay transición (mismo contrato que _deslizarFila): se fuerza uno.
+mA.style.transition = ''; mB.style.transition = '';
+const manoEl2 = Nodo('div'); manoEl2.setAttribute('id', 'p2-hand'); raiz.appendChild(manoEl2);
+const nA = Nodo('div'); nA.classList.add('card'); nA.setAttribute('data-id', 'NA');
+nA.__rect = { left: 100, top: 700, width: 90, height: 126 }; manoEl2.appendChild(nA);
+const nS = Nodo('div'); nS.classList.add('card'); nS.setAttribute('data-id', 'NS');
+nS.__rect = { left: 200, top: 700, width: 90, height: 126 }; manoEl2.appendChild(nS);
+const _rectAntes = nA.__rect;
+nA.__rectTrasSalida = { left: 150, top: 700, width: 90, height: 126 };
+// _salirDeLaMano fotografía, quita y desliza; se simula el recolocado cambiando el rect justo
+// antes de que mida (aquí basta con dejarlo puesto: la foto ya se tomó con el valor viejo).
+const _fotoAntes = vm.runInContext('_fotoFila', sandbox)('#p2-hand');
+nA.__rect = nA.__rectTrasSalida;
+manoEl2.removeChild(nS);
+vm.runInContext('_deslizarFila', sandbox)('#p2-hand', _fotoAntes, null);
+check('a la carta que se recoloca se le arma el deslizamiento', /transform \d+ms/.test(nA.style.transition || ''),
+      'transition: ' + nA.style.transition);
 
 console.log(fallos === 0 ? '\nSUITE capas_cliente: ' + comprobaciones + '/' + comprobaciones + ' comprobaciones — CAPAS CORRECTAS' : '\nSUITE capas_cliente: ' + fallos + ' FALLOS de ' + comprobaciones + ' comprobaciones');
 process.exit(fallos ? 1 : 0);
