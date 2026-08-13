@@ -1863,18 +1863,22 @@
             // Sin fila (destino = una pila): se coloca igual, pero no hay hueco propio al que
             // volar ni nada que deslizar. El contador de la pila sube AQUÍ, que es cuando la
             // carta llega (§14).
-            if (opts && typeof opts.colocar === 'function' && !opts.zonaSel) {
+            // `zonaSel` admite una FUNCIÓN, y se resuelve AQUÍ: si la carta ha pagado su coste en
+            // el escaparate, su zona puede depender de lo que ese coste haya cambiado (Némesis
+            // vacía su propia vanguardia, así que deja de estar llena y ya no va a retaguardia).
+            const _zonaSel = opts && (typeof opts.zonaSel === 'function' ? opts.zonaSel() : opts.zonaSel);
+            if (opts && typeof opts.colocar === 'function' && !_zonaSel) {
                 opts.colocar();
                 destino = _rect(destinoSel);
-            } else if (opts && typeof opts.colocar === 'function' && opts.zonaSel) {
-                const foto = _fotoFila(opts.zonaSel);
+            } else if (opts && typeof opts.colocar === 'function' && _zonaSel) {
+                const foto = _fotoFila(_zonaSel);
                 idEntrante = await opts.colocar();          // cambia el estado y repinta
-                const nuevoEl = idEntrante && document.querySelector(`${opts.zonaSel} .card[data-id="${idEntrante}"]`);
+                const nuevoEl = idEntrante && document.querySelector(`${_zonaSel} .card[data-id="${idEntrante}"]`);
                 if (nuevoEl) {
                     nuevoEl.style.visibility = 'hidden';    // el clon ocupa su sitio mientras llega
                     destino = nuevoEl.getBoundingClientRect();
                 }
-                _deslizarFila(opts.zonaSel, foto, idEntrante);
+                _deslizarFila(_zonaSel, foto, idEntrante);
             } else {
                 destino = _rect(destinoSel);
             }
@@ -6624,22 +6628,35 @@
                     vanguardChars = p.vanguard.filter(c => c.type === 'Personaje').length;
                     vanguardFull = p.vanguard.length >= 4;
 
-                    if (vanguardFull) {
-                        if (card.type === 'Personaje' && vanguardChars < 2) {
-                            this.pendingPlayCard = card;
-                            this.inputState = 'SELECT_ESBIRRO_TO_SWAP';
-                            this.logMsg("Vanguardia llena. Selecciona un Esbirro de la vanguardia para retirarlo sin coste y hacer hueco.", 'system');
-                            this.render();
-                            return; 
-                        } else {
+                    // Dónde aterriza. Encapsulado porque con `pausaEnEscaparate` no se puede
+                    // decidir todavía: el coste (que destruye cartas del campo) corre DENTRO de
+                    // la presentación, y es justo lo que cambia si la vanguardia sigue llena.
+                    // Devuelve true si la jugada queda en suspenso esperando otro clic.
+                    const _decidirZona = () => {
+                        vanguardChars = p.vanguard.filter(c => c.type === 'Personaje').length;
+                        vanguardFull = p.vanguard.length >= 4;
+                        if (vanguardFull) {
+                            if (card.type === 'Personaje' && vanguardChars < 2) {
+                                this.pendingPlayCard = card;
+                                this.inputState = 'SELECT_ESBIRRO_TO_SWAP';
+                                this.logMsg("Vanguardia llena. Selecciona un Esbirro de la vanguardia para retirarlo sin coste y hacer hueco.", 'system');
+                                this.render();
+                                return true;
+                            }
                             if (card.type === 'Personaje' && vanguardChars >= 2) this.logMsg(`Límite de 2 Personajes. ${card.name} va a la retaguardia.`, 'system');
                             else this.logMsg(`Vanguardia llena. ${card.name} va a la retaguardia.`, 'system');
                             card.location = 'rearguard';
+                        } else {
+                            card.location = 'vanguard';
+                            this.logMsg(`${pName} juega ${this.getCardNameWithOwner(card)} en la vanguardia.`, logType);
                         }
-                    } else {
-                        card.location = 'vanguard';
-                        this.logMsg(`${pName} juega ${this.getCardNameWithOwner(card)} en la vanguardia.`, logType);
-                    }
+                        return false;
+                    };
+                    // Con el coste aplazado, la zona se decide después de pagarlo (más abajo, en
+                    // `enElEscaparate`). El hueco de vanguardia no puede faltar en ese caso: la
+                    // carta lo ha vaciado ella misma, así que la rama de "elige un Esbirro" no
+                    // se da y no hace falta un camino de suspenso dentro de la animación.
+                    if (!_pausaCoste && _decidirZona()) return;
 
                     // La carta NO se mete en la fila aquí: eso es el ATERRIZAJE, y ocurre DENTRO
                     // de la presentación (§14). Antes se empujaba a la fila primero, así que el
@@ -6649,14 +6666,16 @@
                     // apartan A LA VEZ.
                     p.hand.splice(cardIndex, 1);
                     this.assignCopyId(card); // el [n] nace al salir de la mano
-                    const _filaSel = card.location === 'rearguard' ? `#${card.owner}-rearguard` : `#${card.owner}-vanguard`;
-                    await animarPresentacionCarta(card.id, `#${card.owner}-hand`, _filaSel,
+                    const _filaDe = () => card.location === 'rearguard' ? `#${card.owner}-rearguard` : `#${card.owner}-vanguard`;
+                    await animarPresentacionCarta(card.id, `#${card.owner}-hand`, _filaDe(),
                         this.gameMode === 'online' && this.myPlayerId !== card.owner,
                         {
                             origenId: card.instanceId,
-                            enElEscaparate: (_pausaCoste && typeof template.onBeforePlayAsync === 'function')
-                                ? () => template.onBeforePlayAsync(card, this, p) : null,
-                            zonaSel: _filaSel,
+                            enElEscaparate: _pausaCoste ? async () => {
+                                if (typeof template.onBeforePlayAsync === 'function') await template.onBeforePlayAsync(card, this, p);
+                                _decidirZona();   // ya con el coste pagado: la vanguardia puede haberse vaciado
+                            } : null,
+                            zonaSel: _filaDe,
                             colocar: () => {
                                 (card.location === 'rearguard' ? p.rearguard : p.vanguard).push(card);
                                 card.justPlayed = true;

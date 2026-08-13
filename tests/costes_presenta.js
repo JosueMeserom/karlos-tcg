@@ -329,6 +329,16 @@ async function montar(esc) {
     // las destrucciones caigan ENTRE que la carta sale de la mano y que se coloca.
     console.log('\n--- Lo que cuesta cartas del campo se destruye con la carta en el centro ---');
     for (const c of [
+        { n: 'Giro de guion destruye los dos Eventos antes de colocarse',
+          esc: { turno: 2, turnoDe: 'p1', empieza: 'p2',
+                 p1: { vanguardia: ['Mini-tigre'], mano: ['Giro de guion'], evento: { carta: 'Dáedra', duracion: 2 } },
+                 p2: { vanguardia: ['Mini-tigre'], evento: { carta: 'Una buena razón', duracion: 2 } } },
+          pasos: [{ jugar: 'Giro de guion' }], destruidas: 2 },
+        { n: 'Némesis aniquila su vanguardia antes de colocarse',
+          esc: { turno: 2, turnoDe: 'p1', empieza: 'p2',
+                 p1: { vanguardia: ['Mini-tigre', 'Oso con armadura', 'Karlos', 'Agah'], mano: ['Némesis'] },
+                 p2: { vanguardia: ['Mini-tigre'] } },
+          pasos: [{ jugar: 'Némesis' }], destruidas: 4 },
     ]) {
         const { ctx, g } = await montar(c.esc);
         const hitos = [];
@@ -345,9 +355,9 @@ async function montar(esc) {
             'hitos=' + JSON.stringify(hitos));
     }
     {
-        // Némesis todavía NO usa la pausa (ver la nota en su definición: su zona se decide antes
-        // de vaciarse la vanguardia). Lo que sí se fija aquí es que sigue funcionando como
-        // siempre, para que activarla luego no lo rompa en silencio.
+        // Y aterriza DONDE DEBE. Es lo que rompió el primer intento: su zona se decidía antes de
+        // pagar el coste, con la vanguardia aún llena, así que se iba a retaguardia. Por eso
+        // `zonaSel` admite una función y se resuelve tras el escaparate.
         const { ctx, g } = await montar({
             turno: 2, turnoDe: 'p1', empieza: 'p2',
             p1: { vanguardia: ['Mini-tigre', 'Oso con armadura', 'Karlos', 'Agah'], mano: ['Némesis'] },

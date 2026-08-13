@@ -2819,7 +2819,8 @@ const CARD_DB = [
             // los logs en regresion9, 20 y 62, y en la 20 además cambia el RECUENTO -la vieja
             // emite lineas que la nueva ya no-, que es lo que falta por entender antes de
             // documentarlo. Se revierte para no dejar la bateria en rojo (Toto, 13-ago-2026).
-            { trigger: "AL_JUGAR", log: "¡Giro de guion! ¡El tablero cambia drásticamente!", logTipo: "ability",
+            { trigger: "ANTES_DE_JUGAR", log: "¡Giro de guion! ¡El tablero cambia drásticamente!", logTipo: "ability",
+              pausaEnEscaparate: true,
               efectos: [ { op: "DESTRUIR_EVENTO", deQuien: "RIVAL" } ] },
             { trigger: "AL_CADUCAR", log: "El Giro de guion concluye.", logTipo: "system" }
         ],
@@ -3560,13 +3561,11 @@ const CARD_DB = [
         text: "Coste: Tu vanguardia llena, que se destruye al colocar esta carta. P: NACIMIENTO DE DIVINIDAD: Una vez por turno, puedes destruir un aliado para curarla 1 Vida. A: OBLITERACIÓN (3F): Ataque especial que ignora completamente la Def del enemigo.",
         passiveName: "NACIMIENTO DE DIVINIDAD", activeName: "OBLITERACIÓN", activeCost: 3,
         // Coste de colocación migrado (31-jul-2026). Usa JUGAR requisitos (vanguardia llena) +
-        // PENDIENTE - pausaEnEscaparate (Toto, 13-ago-2026): su coste son CARTAS DEL CAMPO que se
-        // destruyen, y eso hay que verlo con la carta enseñada en el centro. Falta un paso para
-        // poder activarlo: Némesis decide su ZONA (vanguardia o retaguardia) mirando si la
-        // vanguardia está llena, y con el coste aplazado al escaparate esa decisión se toma
-        // ANTES de vaciarla, así que aterriza donde no debe. Hay que mover la elección de zona a
-        // después del coste. Giro de guion sí lo tiene activo: sus Eventos no cambian de sitio a
-        // nadie. Ver §14.ter.
+        // pausaEnEscaparate (Toto, 13-ago-2026): su coste son CARTAS DEL CAMPO que se destruyen,
+        // y eso hay que verlo. La carta se queda enseñada y quieta en el centro mientras su
+        // vanguardia se aniquila, y solo entonces viaja a su hueco. Su ZONA se decide DESPUÉS de
+        // pagar (por eso `zonaSel` admite una función): al vaciarse la vanguardia deja de estar
+        // llena, y decidirlo antes la mandaba a retaguardia. Ver §14.ter.
         // ANTES_DE_JUGAR (corre ANTES de colocar a Némesis, así que su propia vanguardia-
         // objetivo son solo las 4 cartas YA en el campo, ella misma no cuenta todavía) con
         // MODIFICAR_STAT `vaciar+sinRetribucion+comprobarMuerte` — el MISMO canal de
@@ -3590,7 +3589,7 @@ const CARD_DB = [
             { trigger: "JUGAR", requisitos: [
                 { count: { quien: "ALIADO", zona: "vanguardia" }, op: ">=", valor: 4,
                   msg: "Necesitas tener la vanguardia llena (4 aliados) para colocar a Némesis." } ] },
-            { trigger: "ANTES_DE_JUGAR",
+            { trigger: "ANTES_DE_JUGAR", pausaEnEscaparate: true,
               log: "¡Némesis desciende y aniquila a toda su propia vanguardia como tributo!",
               efectos: [
                 { op: "MODIFICAR_STAT", target: { quien: "ALIADO", zona: "VANGUARDIA" }, stat: "currentHp",

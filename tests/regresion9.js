@@ -101,6 +101,16 @@ const escenarios = [
         pasos: [
             { jugar: 'Giro de guion' },
         ],
+        logsSoloVieja: [
+            { linea: '¡Giro de guion! ¡El tablero cambia drásticamente!', motivo: 'REORDENAMIENTO INTENCIONADO (Toto, 13-ago-2026): Giro de guion dice "Antes de colocarla" y su codigo lo hacia DESPUES (destruia el Evento rival en AL_JUGAR). Movido a ANTES_DE_JUGAR, su anuncio y las destrucciones van ahora ANTES del "juega el Evento". Mismas lineas, otro orden: se retiran como par completo' },
+            { linea: 'ha sido destruido prematuramente', motivo: 'REORDENAMIENTO INTENCIONADO (Toto, 13-ago-2026): Giro de guion dice "Antes de colocarla" y su codigo lo hacia DESPUES (destruia el Evento rival en AL_JUGAR). Movido a ANTES_DE_JUGAR, su anuncio y las destrucciones van ahora ANTES del "juega el Evento". Mismas lineas, otro orden: se retiran como par completo' },
+            { linea: 'juega el Evento: Giro de guion', motivo: 'REORDENAMIENTO INTENCIONADO (Toto, 13-ago-2026): Giro de guion dice "Antes de colocarla" y su codigo lo hacia DESPUES (destruia el Evento rival en AL_JUGAR). Movido a ANTES_DE_JUGAR, su anuncio y las destrucciones van ahora ANTES del "juega el Evento". Mismas lineas, otro orden: se retiran como par completo' },
+        ],
+        logsSoloNueva: [
+            { linea: '¡Giro de guion! ¡El tablero cambia drásticamente!', motivo: 'REORDENAMIENTO INTENCIONADO (Toto, 13-ago-2026): Giro de guion dice "Antes de colocarla" y su codigo lo hacia DESPUES (destruia el Evento rival en AL_JUGAR). Movido a ANTES_DE_JUGAR, su anuncio y las destrucciones van ahora ANTES del "juega el Evento". Mismas lineas, otro orden: se retiran como par completo' },
+            { linea: 'ha sido destruido prematuramente', motivo: 'REORDENAMIENTO INTENCIONADO (Toto, 13-ago-2026): Giro de guion dice "Antes de colocarla" y su codigo lo hacia DESPUES (destruia el Evento rival en AL_JUGAR). Movido a ANTES_DE_JUGAR, su anuncio y las destrucciones van ahora ANTES del "juega el Evento". Mismas lineas, otro orden: se retiran como par completo' },
+            { linea: 'juega el Evento: Giro de guion', motivo: 'REORDENAMIENTO INTENCIONADO (Toto, 13-ago-2026): Giro de guion dice "Antes de colocarla" y su codigo lo hacia DESPUES (destruia el Evento rival en AL_JUGAR). Movido a ANTES_DE_JUGAR, su anuncio y las destrucciones van ahora ANTES del "juega el Evento". Mismas lineas, otro orden: se retiran como par completo' },
+        ],
     },
 ];
 

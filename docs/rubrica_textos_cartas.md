@@ -567,6 +567,20 @@ jugada cancelada, un escenario cargado a media cadena- la partida se cuelga sin 
 suelta también el `finally` del hook y el cierre de emergencia (`cerrarTodoYCancelar`), y por eso
 la suite lo comprueba explícitamente en vez de fiarse del resultado.
 
+**`pausaEnEscaparate`** es la marca que lo pide, en la habilidad `ANTES_DE_JUGAR`. Solo la llevan
+las dos cartas cuyo coste **destruye cartas del campo**, que es lo que tiene animación que merezca
+verse: **Némesis** (su vanguardia) y **Giro de guion** (los Eventos). Un coste de Furor no la
+necesita -no hay nada que esperar- y un efecto "al colocarla" tampoco: eso no es un coste.
+
+Con la pausa puesta, **la ZONA de destino se decide DESPUÉS de pagar**. Némesis vacía su propia
+vanguardia, así que deja de estar llena: decidirlo antes la mandaba a retaguardia. Por eso
+`zonaSel` admite una función, que se resuelve al salir del escaparate.
+
+Y una trampa de la batería que costó un turno entero: al documentar el reordenamiento de logs que
+esto provoca, **hay que FUNDIR las reglas con las que el escenario ya tenga**. Un segundo
+`logsSoloVieja` en el mismo literal no se suma: sustituye al primero, y las reglas que había se
+pierden en silencio. Es el mismo error que ya se cometió con los flotantes de Granada de maná.
+
 Esto NO afecta a lo cancelable: una elección previa que aún permita retirar la jugada sigue
 ocurriendo antes, sin carta enseñada, porque `_comprometer` ya traza esa línea sola (la
 presentación queda ARMADA, no disparada, mientras haya una ventana cancelable delante). No hay
