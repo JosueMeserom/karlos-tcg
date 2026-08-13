@@ -1845,10 +1845,15 @@
                 // Hueco REAL de una carta: se encaja en él tal cual. El hueco puede medir otra
                 // cosa que 90x126 (wrapper de equipo, escalas), así que centrar un tamaño fijo
                 // dejaba el clon desplazado al aterrizar.
-                cont.style.left = _pz(destino.left) + 'px';
-                cont.style.top  = _pz(destino.top) + 'px';
-                cont.style.width = _pz(destino.width) + 'px';
-                cont.style.height = _pz(destino.height) + 'px';
+                // Con `zoom` el tamaño visible es  ancho x ZOOM x scale, y al aterrizar la escala
+                // ya vale 1/ZOOM: los dos se cancelan, así que el ancho va SIN dividir o la carta
+                // llega 1,44 veces pequeña y pega el estirón al soltarla (Toto, 13-ago-2026).
+                // Lo que sí va dividido es la posición, y calculada desde el CENTRO: el clon se
+                // encoge respecto al centro de su caja, no de su esquina.
+                cont.style.width = destino.width + 'px';
+                cont.style.height = destino.height + 'px';
+                cont.style.left = _pz(destino.left + destino.width / 2) - destino.width / 2 + 'px';
+                cont.style.top  = _pz(destino.top + destino.height / 2) - destino.height / 2 + 'px';
             } else if (destino) {
                 // Destino que NO es un hueco de carta (una pila, la zona de mano entera): se
                 // CENTRA conservando el tamaño de carta. Copiar el rect aquí era lo que hacía
