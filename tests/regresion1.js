@@ -7,6 +7,11 @@
 'use strict';
 const { correrSuite } = require('./harness');
 
+// El Té helado cambió de mecánica a mano de Toto (13-ago-2026): cura AL QUE TRIBUTA, no a un
+// tercero. Las dos bases divergen a propósito en sus dos escenarios; el motivo va aquí para
+// no repetirlo cuatro veces.
+const MOTIVO_TE_HELADO = 'el Té helado cura ahora al aliado que tributó (texto de la carta, 13-ago-2026); la vieja elegía pagador aparte y el log nombraba dos veces a la misma carta';
+
 const escenarios = [
     {
         nombre: 'Manzanahoria cura 2 a un aliado dañado',
@@ -45,7 +50,7 @@ const escenarios = [
         ],
     },
     {
-        nombre: 'Té helado con dos pagadores posibles: elige quién paga',
+        nombre: 'Té helado: paga y se cura el MISMO aliado (mecánica nueva)',
         p1: {
             vanguardia: [{ carta: 'Oso con armadura', vida: 1, furor: 2 }],
             retaguardia: [{ carta: 'Mini-tigre', furor: 1 }],
@@ -55,15 +60,25 @@ const escenarios = [
         pasos: [
             { jugar: 'Té helado' },
             { seleccionar: 'Oso con armadura' },
-            { elegir: ['Mini-tigre'] }, // vieja: modal de búsqueda visual · nueva: selección-en-tablero
+            // La VIEJA pregunta además quién paga; la nueva ya no, porque paga el señalado.
+            { elegir: ['Mini-tigre'], soloEn: 'vieja' },
         ],
-        logsIntencionados: [
-            { de: 'usa 1 Furor de Mini-tigre y', a: 'usa 1 Furor de Mini-tigre [1] de J1 (Jugador 1) y',
-              motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja logueaba payer.name a secas; la nueva usa getCardNameWithOwner vía DSL._nombre' },
+        logsSoloVieja: [
+            { linea: 'usa 1 Furor de Mini-tigre y cura a Oso con armadura', motivo: MOTIVO_TE_HELADO },
+        ],
+        // El "-1 FUR" es el mismo flotante, pero sale de OTRA carta: el pagador ha cambiado.
+        flotantesSoloVieja: [ { linea: '-1 FUR', motivo: MOTIVO_TE_HELADO + ': lo pintaba el Mini-tigre' } ],
+        flotantesSoloNueva: [ { linea: '-1 FUR', motivo: MOTIVO_TE_HELADO + ': ahora lo pinta el Oso, que es quien paga' } ],
+        logsSoloNueva: [
+            { linea: 'tributa 1 de Furor y se refresca con Té helado', motivo: MOTIVO_TE_HELADO },
+        ],
+        diferenciasEsperadas: [
+            { contiene: 'vanguard.0.furor', motivo: MOTIVO_TE_HELADO + ': paga el Oso (2 -> 1), no el Mini-tigre' },
+            { contiene: 'rearguard.0.furor', motivo: MOTIVO_TE_HELADO + ': el Mini-tigre conserva su Furor' },
         ],
     },
     {
-        nombre: 'Té helado con pagador único: se paga solo (autoSiUnica)',
+        nombre: 'Té helado: si el señalado no tiene Furor, no se puede usar en él',
         p1: {
             vanguardia: [{ carta: 'Oso con armadura', vida: 1, furor: 2 }],
             retaguardia: ['Mini-tigre'],
@@ -74,9 +89,11 @@ const escenarios = [
             { jugar: 'Té helado' },
             { seleccionar: 'Oso con armadura' },
         ],
-        logsIntencionados: [
-            { de: 'usa 1 Furor de Oso con armadura y cura', a: 'usa 1 Furor de Oso con armadura [1] de J1 (Jugador 1) y cura',
-              motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja logueaba payer.name a secas; la nueva usa getCardNameWithOwner vía DSL._nombre' },
+        logsSoloVieja: [
+            { linea: 'usa 1 Furor de Oso con armadura y cura', motivo: MOTIVO_TE_HELADO },
+        ],
+        logsSoloNueva: [
+            { linea: 'tributa 1 de Furor y se refresca con Té helado', motivo: MOTIVO_TE_HELADO },
         ],
     },
     {

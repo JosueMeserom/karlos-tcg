@@ -1400,21 +1400,26 @@ const CARD_DB = [
         }
     },
     { 
-        id: 22, name: "Té helado", type: "Ayuda", subtype: "Ingerible", tags: ["Consumible"], rarity: "B", text: "Coste: 1 de Furor. Cura 4 de Vida al aliado que elijas.", cost: 0,
+        id: 22, name: "Té helado", type: "Ayuda", subtype: "Ingerible", tags: ["Consumible"], rarity: "B", text: "Coste: 1 de Furor. Cura 4 de Vida al aliado que tributó.", cost: 0,
         abilities: [
             { trigger: "JUGAR", requisitos: [
                 { count: {}, op: ">=", valor: 1, msg: "No tienes aliados en mesa para usar Té helado." },
                 { count: { filtros: [ { campo: "furor", op: ">=", valor: 1 } ] }, op: ">=", valor: 1, msg: "Necesitas un aliado con al menos 1 de Furor para pagar Té helado." } ] },
+            // El aliado señalado paga y se cura: la flecha de tributo sale de él.
             { trigger: "AL_USAR_AYUDA",
+              // Paga y se cura EL MISMO aliado (Toto, 13-ago-2026). Antes se elegía pagador
+              // aparte, así que el pagador y el curado podían ser distintos -y el log los
+              // nombraba a los dos, que con el aliado único era la misma carta repetida:
+              // "usa 1 Furor de X y cura a X"-. El texto de la carta dice "al aliado que
+              // tributó", así que el objetivo de la Ayuda es quien paga: una sola elección.
               requisitosObjetivo: [
                 { campo: "esZombi", op: "falsy", msg: "{objetivo} está Zombificado y rechaza la Ayuda." },
+                { campo: "furor", op: ">=", valor: 1, msg: "{objetivo} no tiene Furor con el que pagar el Té helado." },
                 { campo: "currentHp", op: "<", valorCampo: "maxHp", msg: "{objetivo} ya tiene la Vida completa." } ],
               efectos: [
-                { op: "ELEGIR", de: "ALIADOS", filtros: [ { campo: "furor", op: ">=", valor: 1 } ], cantidad: 1, autoSiUnica: true, guardaEn: "pagador",
-                  titulo: "¿QUIÉN PAGA EL TÉ HELADO? (-1 FUROR)",
-                  efectos: [ { op: "MODIFICAR_STAT", stat: "furor", delta: -1, esCoste: true } ] },
+                { op: "MODIFICAR_STAT", stat: "furor", delta: -1, esCoste: true },
                 { op: "CURAR", valor: 4, floating: "TÉ HELADO",
-                  log: "{carta} usa 1 Furor de {pagador} y cura a {objetivo} ({antes} -> {despues})." } ] }
+                  log: "{objetivo} tributa 1 de Furor y se refresca con {carta} ({antes} -> {despues})." } ] }
         ],
     },
     {
