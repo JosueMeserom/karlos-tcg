@@ -186,6 +186,45 @@ async function montar(esc) {
         check('y no queda ninguna presentación armada', !g._presentacionArmada);
     }
 
+    // ── LO QUE DE VERDAD DECIDE SI SE VE LA FLECHA ────────────────────────────────
+    // No basta con marcar: la marca tiene que EXISTIR en el instante en que la presentación se
+    // encola, que es cuando se consume. Toto lo pilló con Hexagrama, que estaba marcada y no
+    // dibujaba nada: en una Ayuda dirigida el compromiso es confirmar el objetivo, así que la
+    // carta se presenta ANTES de correr sus efectos y la marca llegaba con el escaparate ya
+    // cerrado (y encima se la comía la presentación siguiente, la de la carta encontrada).
+    // Esta comprobación mira justo eso: marcas pendientes al encolar la presentación.
+    console.log('\n--- La marca llega A TIEMPO de que se dibuje la flecha ---');
+    {
+        const casos = [
+            { n: 'Hexagrama (Ayuda dirigida, paga el objetivo)', et: 'Tributa 1 FUR',
+              esc: { turno: 2, turnoDe: 'p1', empieza: 'p2', semilla: 11,
+                     p1: { vanguardia: [{ carta: 'Karlos', furor: 3 }], mano: ['Hexagrama'], mazo: ['La Bestia', 'Mini-tigre'] },
+                     p2: { vanguardia: ['Mini-tigre'] } },
+              pasos: [{ jugar: 'Hexagrama' }, { elegir: ['Karlos'] }, { elegir: ['La Bestia'] }] },
+            { n: 'Necronomicón (marca al elegir pagador, cobra al final)', et: 'Tributa 2 FUR',
+              esc: { turno: 2, turnoDe: 'p1', empieza: 'p2',
+                     p1: { vanguardia: [{ carta: 'Karlos', furor: 3 }], mano: ['Necronomicón'], descartes: ['Mini-tigre'] },
+                     p2: { vanguardia: ['Mini-tigre'] } },
+              pasos: [{ jugar: 'Necronomicón' }, { elegir: ['Karlos'] }, { elegir: ['Mini-tigre'] }] },
+            { n: 'Garret (unidad: presenta por otra vía)', et: 'Tributa 4 FUR',
+              esc: { turno: 2, turnoDe: 'p1', empieza: 'p2',
+                     p1: { vanguardia: [{ carta: 'Aniceto', furor: 4 }], mano: ['Garret'] },
+                     p2: { vanguardia: ['Mini-tigre'] } },
+              pasos: [{ jugar: 'Garret' }, { elegir: ['Aniceto'] }] },
+        ];
+        for (const c of casos) {
+            const { ctx, g } = await montar(c.esc);
+            let alEncolar = null;
+            ctx.sandbox.__vio = (l) => { if (alEncolar === null) alEncolar = l; };
+            require('vm').runInContext("(function(){var o=animarPresentacionCarta;animarPresentacionCarta=function(){"
+                + "__vio(((window.game._costesPresenta)||[]).map(function(m){return m.etiqueta;}));"
+                + "return o.apply(null,arguments);};})()", ctx.sandbox);
+            for (const p of c.pasos) await ejecutarPaso(ctx, g, p);
+            check(c.n, !!(alEncolar && alEncolar.includes(c.et)),
+                'al encolar la presentación había: ' + JSON.stringify(alEncolar));
+        }
+    }
+
     console.log('');
     if (fallos) { console.log(`SUITE costes_presenta: ${fallos} FALLOS de ${total} comprobaciones`); process.exit(1); }
     console.log(`SUITE costes_presenta: ${total}/${total} comprobaciones — COSTES Y REQUISITOS CORRECTOS`);

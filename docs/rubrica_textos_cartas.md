@@ -509,6 +509,22 @@ bitmap ya rasterizado y agrandar difumina. El clon se monta con `zoom` y el tran
 `1/ZOOM` a `1`, así que en la pose -que es cuando se lee la carta- está a escala 1 y sale nítida.
 Al tocar posiciones ahí, **todo lo que se le asigne al clon va dividido por el zoom** (`_pz`).
 
+**La marca tiene que existir ANTES de que la presentación se encole**, que es cuando se consume.
+Marcar no basta: en una Ayuda dirigida el compromiso es confirmar el objetivo, así que la carta se
+presenta *antes* de correr sus efectos y un `esCoste` de esa lista llega con el escaparate ya
+cerrado — no dibuja nada y encima se lo come la siguiente presentación de la cadena. Por eso:
+
+- `DSL._marcarCostesDeclarados` anota, justo antes de disparar, los costes que la Ayuda le cobra
+  **a su propio objetivo** (los `esCoste` sin `target`).
+- Cuando el pagador se elige **antes** del compromiso pero se cobra después (Necronomicón: cobra
+  al final para que cancelar el visor de descartes no cueste nada), la marca se adelanta con
+  `esTributo: N` en el ELEGIR y **el cobro no se toca**. Las marcas viven hasta la siguiente
+  jugada, así que sobreviven a la búsqueda.
+- Si el pagador se elige **después** del compromiso, hoy no hay flecha posible. Le pasa a **Té
+  helado**: se confirma a quién curas -y ahí se presenta- y solo entonces se pregunta quién paga.
+  Arreglarlo es mover su punto de compromiso a la última elección cancelable, que es lo que §14
+  pide en realidad; está sin hacer.
+
 **Dos cosas que no se pueden romper al tocar esto:**
 
 1. Un coste **no puede perderse**. La cola de presentaciones se traga las excepciones con un

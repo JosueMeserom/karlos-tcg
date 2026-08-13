@@ -1811,14 +1811,14 @@ const CARD_DB = [
                 { op: "ELEGIR", de: "ALIADOS", cantidad: 1,
                   filtros: [ { campo: "furor", op: ">=", valor: 2 }, { campo: "exhausted", op: "falsy" } ],
                   titulo: "¿QUIÉN LEE EL NECRONOMICÓN? (-2 FUROR, GASTA SU ACCIÓN)",
-                  guardaIdsEnSelf: "necroLector", guardaEn: "lector" },
+                  guardaIdsEnSelf: "necroLector", guardaEn: "lector", esTributo: 2 },
                 { op: "BUSCAR", en: "DESCARTES", cantidad: 1, destino: "CAMPO", animacionResurrect: true, sinAnimacion: true,
                   filtros: [ { o: [ [ { campo: "type", op: "==", valor: "Personaje" } ], [ { campo: "type", op: "==", valor: "Esbirro" } ] ] },
                              { o: [ [ { campo: "subtype", op: "==", valor: "Ser vivo" } ], [ { campo: "subtype", op: "==", valor: "No-muerto" } ] ] } ],
                   plantillaSin: ["onBeforePlayAsync", "canPlayCard"],
                   abortaSiCancelas: true, abortaSiVacio: true, titulo: "NECRONOMICÓN: ELIGE UN CAÍDO",
                   log: "¡{objetivo} vuelve del mundo de los muertos!" },
-                { op: "MODIFICAR_STAT", target: { selfLista: "necroLector" }, stat: "furor", delta: -2, esCoste: true },
+                { op: "MODIFICAR_STAT", target: { selfLista: "necroLector" }, stat: "furor", delta: -2 },
                 { op: "MARCAR", target: { selfLista: "necroLector" }, campo: "exhausted", valor: true,
                   log: "{objetivo} lee el Necronomicón y se agota..." } ] }
         ],
@@ -7279,6 +7279,33 @@ const DSL = {
         // se la traga el .catch de la cola); un COSTE no puede perderse por eso. Se drena, no se
         // recorre, así que lo que ya cobró el escaparate no se cobra dos veces.
         await DSL._drenarCobros(game);
+    },
+
+    // Costes de una Ayuda DIRIGIDA, marcados ANTES de que la presentación se dispare.
+    //
+    // El problema: en una Ayuda dirigida el punto de compromiso es confirmar el objetivo, así que
+    // executeAyuda presenta la carta y SOLO DESPUÉS corre AL_USAR_AYUDA. Un `esCoste` de esa
+    // lista se marcaba con el escaparate ya terminado: no salía flecha, y peor, la marca se
+    // quedaba suelta y se la comía la SIGUIENTE presentación de la cadena (con Hexagrama, la
+    // flecha aparecía sobre la carta encontrada en el mazo). Toto, 13-ago-2026.
+    //
+    // Aquí solo se pueden resolver los costes que se le cobran AL PROPIO OBJETIVO (los que no
+    // declaran `target`): el objetivo ya se conoce. Un coste que elija pagador más adelante no
+    // se puede saber todavía, y por eso no se marca -ver la nota de Té helado en la rúbrica-.
+    _marcarCostesDeclarados(sourceCard, game, objetivo) {
+        if (!game || !objetivo) return;
+        const tmpl = (typeof getCardTemplate === 'function' && getCardTemplate(sourceCard.id)) || {};
+        for (const ab of (tmpl.abilities || [])) {
+            if (ab.trigger !== 'AL_USAR_AYUDA') continue;
+            for (const e of (ab.efectos || [])) {
+                if (e.target || (!e.esCoste && !e.esRequisito)) continue;
+                if (e.esRequisito) { DSL._marcarCoste(game, [objetivo], 'requisito'); continue; }
+                if (e.op === 'MODIFICAR_STAT' && e.stat === 'furor') {
+                    const d = Math.abs(DSL._deltaStat(e, sourceCard, objetivo, game, sourceCard.owner));
+                    DSL._marcarCoste(game, [objetivo], 'tributo', `Tributa ${d} FUR`);
+                } else DSL._marcarCoste(game, [objetivo], 'coste');
+            }
+        }
     },
 
     // Cola ÚNICA de cobros aparcados. La vacía quien llegue primero: el escaparate (para que el

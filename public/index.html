@@ -6318,6 +6318,13 @@
 
             async playCard(cardInstanceId, isRemote = false) {
                 if (this.phase !== 'PRINCIPAL' || this.inputState === 'EXECUTING') return;
+                // Cada jugada empieza con la pizarra limpia. Un coste puede marcarse cuando la
+                // presentación de SU carta ya ha pasado (Té helado elige pagador después del
+                // punto de compromiso, Necronomicón cobra tras la búsqueda): esa marca ya no se
+                // puede enseñar, y si sobrevive se la come la siguiente carta que se presente -y
+                // le sale una flecha de coste a quien no ha pagado nada-. Se limpia AQUÍ y no al
+                // presentar: las unidades presentan por otra vía y aún no han marcado nada.
+                this._costesPresenta = [];
 
                 const p = this.players[this.activePlayerId];
                 const cardIndex = p.hand.findIndex(c => c.instanceId === cardInstanceId);
@@ -6609,6 +6616,12 @@
                         _yaDescartada = true;
                         this.render();   // el contador de la pila sube AQUÍ, al llegar la carta
                     };
+                }
+                // Los costes que la Ayuda le cobra A SU PROPIO OBJETIVO se anotan AQUÍ, antes de
+                // disparar: la lista de efectos corre después de la presentación, y una marca
+                // hecha allí llega con el escaparate ya cerrado.
+                if (typeof DSL !== 'undefined' && typeof DSL._marcarCostesDeclarados === 'function') {
+                    DSL._marcarCostesDeclarados(card, this, target);
                 }
                 await this._dispararPresentacion();
 
