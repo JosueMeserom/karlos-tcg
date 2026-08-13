@@ -2813,6 +2813,12 @@ const CARD_DB = [
         text: "3 turnos. Requiere que tengas un Evento activo. Antes de colocarla, destruye los Eventos de ambos jugadores.",
         abilities: [
             { trigger: "JUGAR", requisitos: [ { eventoActivo: true, op: ">=", valor: 1, msg: "Debes tener ya una carta de Evento en juego para hacer el Giro de guion." } ] },
+            // PENDIENTE - su texto dice "Antes de colocarla" y esto corre DESPUÉS de colocarse.
+            // Moverlo a ANTES_DE_JUGAR + pausaEnEscaparate funciona (verificado con sonda de
+            // ORDEN: las dos destrucciones caen con la carta quieta en el centro), pero reordena
+            // los logs en regresion9, 20 y 62, y en la 20 además cambia el RECUENTO -la vieja
+            // emite lineas que la nueva ya no-, que es lo que falta por entender antes de
+            // documentarlo. Se revierte para no dejar la bateria en rojo (Toto, 13-ago-2026).
             { trigger: "AL_JUGAR", log: "¡Giro de guion! ¡El tablero cambia drásticamente!", logTipo: "ability",
               efectos: [ { op: "DESTRUIR_EVENTO", deQuien: "RIVAL" } ] },
             { trigger: "AL_CADUCAR", log: "El Giro de guion concluye.", logTipo: "system" }
@@ -3554,6 +3560,13 @@ const CARD_DB = [
         text: "Coste: Tu vanguardia llena, que se destruye al colocar esta carta. P: NACIMIENTO DE DIVINIDAD: Una vez por turno, puedes destruir un aliado para curarla 1 Vida. A: OBLITERACIÓN (3F): Ataque especial que ignora completamente la Def del enemigo.",
         passiveName: "NACIMIENTO DE DIVINIDAD", activeName: "OBLITERACIÓN", activeCost: 3,
         // Coste de colocación migrado (31-jul-2026). Usa JUGAR requisitos (vanguardia llena) +
+        // PENDIENTE - pausaEnEscaparate (Toto, 13-ago-2026): su coste son CARTAS DEL CAMPO que se
+        // destruyen, y eso hay que verlo con la carta enseñada en el centro. Falta un paso para
+        // poder activarlo: Némesis decide su ZONA (vanguardia o retaguardia) mirando si la
+        // vanguardia está llena, y con el coste aplazado al escaparate esa decisión se toma
+        // ANTES de vaciarla, así que aterriza donde no debe. Hay que mover la elección de zona a
+        // después del coste. Giro de guion sí lo tiene activo: sus Eventos no cambian de sitio a
+        // nadie. Ver §14.ter.
         // ANTES_DE_JUGAR (corre ANTES de colocar a Némesis, así que su propia vanguardia-
         // objetivo son solo las 4 cartas YA en el campo, ella misma no cuenta todavía) con
         // MODIFICAR_STAT `vaciar+sinRetribucion+comprobarMuerte` — el MISMO canal de
@@ -10163,6 +10176,12 @@ const DSL = {
         // (p. ej. el ELEGIR del deudor de Deuda con la mafia). Si un efecto no
         // opcional se cancela, la carta NO se coloca (sigue en la mano).
         const antesJugar = abs.find(a => a.trigger === 'ANTES_DE_JUGAR');
+        // `pausaEnEscaparate`: lo que esta carta hace antes de colocarse tiene ANIMACIÓN que
+        // merece verse (destruir cartas del campo), así que la presentación se queda parada en
+        // el centro mientras ocurre. Se sube a la plantilla para que el cliente no tenga que
+        // bucear en las abilities. Solo la piden Némesis (su vanguardia) y Giro de guion (los
+        // Eventos): un coste de Furor no tiene nada que esperar.
+        if (antesJugar && antesJugar.pausaEnEscaparate) tmpl.pausaEnEscaparate = true;
         if (antesJugar && typeof tmpl.onBeforePlayAsync !== 'function') {
             tmpl.onBeforePlayAsync = async function (card, game, p) {
                 // log (Némesis, 31-jul-2026): faltaba, a diferencia de AL_JUGAR/INICIO_TURNO/

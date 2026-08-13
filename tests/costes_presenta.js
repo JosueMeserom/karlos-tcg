@@ -322,6 +322,43 @@ async function montar(esc) {
             'retener=' + !!g._retenerEscaparate + ' soltar=' + !!g._soltarEscaparate + ' resto=' + !!g._restoPresentacion);
     }
 
+    // ── EL COSTE QUE DESTRUYE CARTAS SE VE EN EL ESCAPARATE ───────────────────────
+    // Se comprueba el ORDEN, no el resultado: con el estado final no se distingue una pausa que
+    // funciona de una que no existe, y por eso di por bueno un Giro de guion que se comportaba
+    // exactamente igual que antes (Toto, 13-ago-2026). Aquí se anotan los hitos y se exige que
+    // las destrucciones caigan ENTRE que la carta sale de la mano y que se coloca.
+    console.log('\n--- Lo que cuesta cartas del campo se destruye con la carta en el centro ---');
+    for (const c of [
+    ]) {
+        const { ctx, g } = await montar(c.esc);
+        const hitos = [];
+        ctx.sandbox.__hito = (s) => hitos.push(s);
+        require('vm').runInContext("(function(){var a=animarPresentacionCarta;animarPresentacionCarta=function(){"
+            + "__hito('presenta');return a.apply(null,arguments);};"
+            + "var d=animateDeath;animateDeath=function(){__hito('destruye');return d.apply(null,arguments);};})()", ctx.sandbox);
+        const ode = g.destroyEvent.bind(g);
+        g.destroyEvent = function (pid) { hitos.push('destruye'); return ode(pid); };
+        for (const p of c.pasos) await ejecutarPaso(ctx, g, p);
+        const iPres = hitos.indexOf('presenta');
+        const nDestr = hitos.filter((h, i) => h === 'destruye' && i > iPres).length;
+        check(c.n, iPres === 0 && nDestr === c.destruidas,
+            'hitos=' + JSON.stringify(hitos));
+    }
+    {
+        // Némesis todavía NO usa la pausa (ver la nota en su definición: su zona se decide antes
+        // de vaciarse la vanguardia). Lo que sí se fija aquí es que sigue funcionando como
+        // siempre, para que activarla luego no lo rompa en silencio.
+        const { ctx, g } = await montar({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: ['Mini-tigre', 'Oso con armadura', 'Karlos', 'Agah'], mano: ['Némesis'] },
+            p2: { vanguardia: ['Mini-tigre'] },
+        });
+        await ejecutarPaso(ctx, g, { jugar: 'Némesis' });
+        check('Némesis acaba colocada, sola en su vanguardia',
+            g.players.p1.vanguard.length === 1 && g.players.p1.vanguard[0].name === 'Némesis',
+            'vanguardia=' + JSON.stringify(g.players.p1.vanguard.map(x => x.name)));
+    }
+
     console.log('');
     if (fallos) { console.log(`SUITE costes_presenta: ${fallos} FALLOS de ${total} comprobaciones`); process.exit(1); }
     console.log(`SUITE costes_presenta: ${total}/${total} comprobaciones — COSTES Y REQUISITOS CORRECTOS`);

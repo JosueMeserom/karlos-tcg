@@ -1823,6 +1823,11 @@
             // Quien retiene marca `_retenerEscaparate` ANTES de que la presentación se dispare;
             // aquí se avisa de que la carta ya está en el centro (`_escaparateLlegada`) y se
             // espera a que lo suelten. Sin nadie reteniendo esto no cuesta nada.
+            // Callback directo: la cadena corre DENTRO de la animación. Vale para las unidades,
+            // que no tienen presentación armada y por tanto no pueden abrazarse con ella.
+            if (opts && typeof opts.enElEscaparate === 'function') {
+                try { await opts.enElEscaparate(); } catch (err) { console.error(err); }
+            }
             if (g._retenerEscaparate) {
                 g._retenerEscaparate = false;
                 await new Promise(soltar => {
@@ -6604,7 +6609,13 @@
                     let vanguardChars = p.vanguard.filter(c => c.type === 'Personaje').length;
                     let vanguardFull = p.vanguard.length >= 4;
 
-                    if (typeof template.onBeforePlayAsync === 'function') {
+                    // `pausaEnEscaparate`: el "antes de colocarla" de esta carta destruye cartas
+                    // del campo, y eso se ve CON ELLA ENSEÑADA en el centro (§14.ter). Se aparta
+                    // aquí y se ejecuta dentro de la presentación, unas líneas más abajo.
+                    // Solo para lo que no puede fallar: es un coste ya validado por sus
+                    // requisitos, no una elección que aún pueda cancelar la jugada.
+                    const _pausaCoste = !!template.pausaEnEscaparate;
+                    if (!_pausaCoste && typeof template.onBeforePlayAsync === 'function') {
                         const proceed = await template.onBeforePlayAsync(card, this, p);
                         if (!proceed) return; 
                     }
@@ -6643,6 +6654,8 @@
                         this.gameMode === 'online' && this.myPlayerId !== card.owner,
                         {
                             origenId: card.instanceId,
+                            enElEscaparate: (_pausaCoste && typeof template.onBeforePlayAsync === 'function')
+                                ? () => template.onBeforePlayAsync(card, this, p) : null,
                             zonaSel: _filaSel,
                             colocar: () => {
                                 (card.location === 'rearguard' ? p.rearguard : p.vanguard).push(card);
