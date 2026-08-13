@@ -7304,13 +7304,14 @@ const DSL = {
     // que sustituye al apaño de colocar el MODIFICAR_STAT detrás del BUSCAR: aquel
     // conseguía "no cobrar mientras se pueda cancelar" moviendo el efecto de sitio, y
     // el precio era que el flotante salía al final de toda la cadena.
-    _marcarCoste(game, cartas, tipo) {
+    _marcarCoste(game, cartas, tipo, etiqueta) {
         if (!game || !cartas) return;
         const lista = Array.isArray(cartas) ? cartas : [cartas];
         game._costesPresenta = game._costesPresenta || [];
         for (const c of lista) {
             if (!c || !c.instanceId) continue;
             if (game._costesPresenta.some(x => x.id === c.instanceId)) continue;
+            if (etiqueta) { game._costesPresenta.push({ id: c.instanceId, cardId: c.id, tipo: tipo, owner: c.owner, zona: c.location, etiqueta }); continue; }
             // `zona`: dónde está la carta EN ESTE INSTANTE. Es lo que decide si acompaña a la
             // presentación o si se queda con una flecha. No vale mirar el DOM (era lo que hacía
             // el cliente): una carta ya descartada sigue dibujada en la mano hasta el siguiente
@@ -7320,13 +7321,22 @@ const DSL = {
         }
     },
 
+    // Cuánto va a cambiar de verdad este MODIFICAR_STAT sobre ESTE objetivo. Vive aparte porque
+    // lo necesitan dos sitios: el efecto en sí y la etiqueta de la flecha de tributo, que tiene
+    // que decir la cantidad REAL de cada carta ("Tributa 1 FUR" / "Tributa 2 FUR") y no la
+    // declarada -Flash de maná le cobra menos a Eris, y la flecha se dibuja antes de cobrar-.
+    _deltaStat(e, sourceCard, target, game, ownerId, ctx) {
+        let d = DSL._value(ownerId, game, e.delta, sourceCard, ctx || { self: sourceCard, objetivo: target });
+        if (e.deltaCondicional) for (const dc of e.deltaCondicional) if (DSL._match(target, dc.filtro)) { d = dc.delta; break; }
+        if (e.vaciar) d = -(target[e.stat] || 0); // "vacía este stat a 0" (Cortarrollos: todo el Furor del atacante)
+        return d;
+    },
+
     async _doEffect(e, sourceCard, target, game, ownerId, habilidad) {
         const ctx = { self: sourceCard, objetivo: target };
         if (e.guardaNombre && target) { DSL._vars = DSL._vars || {}; (DSL._vars[sourceCard.instanceId] = DSL._vars[sourceCard.instanceId] || {})[e.guardaNombre] = DSL._nombre(game, target); }
         if (e.op === 'MODIFICAR_STAT') {
-            let d = DSL._value(ownerId, game, e.delta, sourceCard, ctx);
-            if (e.deltaCondicional) for (const dc of e.deltaCondicional) if (DSL._match(target, dc.filtro)) { d = dc.delta; break; }
-            if (e.vaciar) d = -(target[e.stat] || 0); // "vacía este stat a 0" (Cortarrollos: todo el Furor del atacante)
+            let d = DSL._deltaStat(e, sourceCard, target, game, ownerId, ctx);
             // Reacción de mano ante daño que NO viene de un ataque (Toto, 31-jul-2026: lo pilló
             // con Atomización). El daño de efecto se aplica por aquí y no por dealDamage, así que
             // una carta que reacciona a "un aliado va a recibir daño" no se enteraba. El motor
@@ -8253,6 +8263,7 @@ const DSL = {
                 // array (Esfuerzo dividido: chosenAllies; lo leen AURA/_pool soloSelfLista).
                 if (e.guardaIdsEnSelf) sourceCard[e.guardaIdsEnSelf] = lista.map(x => x.instanceId);
                 if (e.esCoste || e.esRequisito) DSL._marcarCoste(game, lista, e.esRequisito ? 'requisito' : 'coste');
+                if (e.esTributo) for (const x of lista) DSL._marcarCoste(game, [x], 'tributo', `Tributa ${Math.abs(e.esTributo)} FUR`);
             };
             const dn = typeof game.getDisplayName === 'function' ? game.getDisplayName(ownerId) : ownerId;
             // F incluye las vars propias de ESTA MISMA elección (p. ej. guardaEn: "maestro"
@@ -8500,7 +8511,18 @@ const DSL = {
             // Coste/Requisito: se anota QUIÉN lo paga o lo cumple para que la presentación
             // pueda dibujarlo. `_marcarCoste` es idempotente por id, así que un mismo aliado
             // marcado por dos vías no sale dos veces.
-            if ((e.esCoste || e.esRequisito) && e.op !== 'ELEGIR') DSL._marcarCoste(game, targets.filter(Boolean), e.esRequisito ? 'requisito' : 'coste');
+            if ((e.esCoste || e.esRequisito) && e.op !== 'ELEGIR') {
+                const _vivos = targets.filter(Boolean);
+                if (e.esRequisito) DSL._marcarCoste(game, _vivos, 'requisito');
+                else if (e.op === 'MODIFICAR_STAT' && e.stat === 'furor') {
+                    // Un tributo de Furor: la carta NO se pierde, solo paga. Etiqueta por
+                    // objetivo, porque la cantidad puede ser distinta en cada uno.
+                    for (const t of _vivos) {
+                        const d = Math.abs(DSL._deltaStat(e, sourceCard, t, game, ownerId));
+                        DSL._marcarCoste(game, [t], 'tributo', `Tributa ${d} FUR`);
+                    }
+                } else DSL._marcarCoste(game, _vivos, 'coste');
+            }
             // El cobro se aparca hasta el escaparate (ver _marcarCoste). Sin presentación
             // armada -una Activa, un efecto de campo- se ejecuta aquí y ahora, como siempre.
             if (e.esCoste && game._presentacionArmada && e.op !== 'ELEGIR') {

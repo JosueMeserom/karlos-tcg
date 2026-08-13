@@ -46,13 +46,13 @@ async function montar(esc) {
     construirEstado(ctx, g, esc);
     const marcas = [];
     // El sandbox es un contexto vm: se le inyecta el espía por dentro, no desde fuera.
-    ctx.sandbox.__espiaMarcas = (nombre, id, tipo) => marcas.push({ nombre, id, tipo });
+    ctx.sandbox.__espiaMarcas = (nombre, id, tipo, etiqueta) => marcas.push({ nombre, id, tipo, etiqueta });
     require('vm').runInContext(`(() => {
         const _orig = DSL._marcarCoste.bind(DSL);
-        DSL._marcarCoste = (juego, cartas, tipo) => {
+        DSL._marcarCoste = (juego, cartas, tipo, etiqueta) => {
             const lista = Array.isArray(cartas) ? cartas : [cartas];
-            lista.filter(Boolean).forEach(c => __espiaMarcas(c.name, c.instanceId, tipo));
-            return _orig(juego, cartas, tipo);
+            lista.filter(Boolean).forEach(c => __espiaMarcas(c.name, c.instanceId, tipo, etiqueta));
+            return _orig(juego, cartas, tipo, etiqueta);
         };
     })()`, ctx.sandbox);
     return { ctx, g, marcas };
@@ -73,8 +73,12 @@ async function montar(esc) {
         // cuanto el visor del mazo se abre, _comprometer ya lo ha vaciado.
         const ids = new Set([...g.players.p1.vanguard].map(c => c.instanceId));
         check('se anotan exactamente 2 pagadores', marcas.length === 2, 'marcados=' + marcas.length);
-        check('los dos son del tipo "coste"', marcas.every(m => m.tipo === 'coste'),
+        // TRIBUTO, no "coste" a secas: pagan Furor y se quedan en el campo. Y la etiqueta lleva
+        // la cantidad REAL de cada uno, porque puede ser distinta carta por carta.
+        check('los dos son del tipo "tributo"', marcas.every(m => m.tipo === 'tributo'),
             JSON.stringify(marcas.map(m => m.tipo)));
+        check('...y su etiqueta dice cuánto tributa cada uno',
+            marcas.every(m => m.etiqueta === 'Tributa 1 FUR'), JSON.stringify(marcas.map(m => m.etiqueta)));
         check('y son los dos aliados elegidos, que están en el campo',
             marcas.every(m => ids.has(m.id)) && marcas.map(m => m.nombre).sort().join(',') === 'Agah,Karlos',
             marcas.map(m => m.nombre).join(','));
@@ -106,7 +110,7 @@ async function montar(esc) {
         await ejecutarPaso(ctx, g, { jugar: 'Pago por adelantado' });
         await ejecutarPaso(ctx, g, { elegir: ['Karlos'] });
         await ejecutarPaso(ctx, g, { elegir: ['Gladiador'] });
-        check('con la animación saltada, el coste se cobra igual (3 -> 1)',
+        check('con la animación saltada, el tributo se cobra igual (3 -> 1)',
             g.players.p1.vanguard[0].furor === 1, 'furor=' + g.players.p1.vanguard[0].furor);
         check('sin cobros huérfanos en la cola', !(g._cobrosPendientes || []).length);
     }

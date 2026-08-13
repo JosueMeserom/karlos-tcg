@@ -460,7 +460,10 @@ tocado pagar.
 **En el DSL** basta con marcar el efecto:
 
 - `esCoste: true` — quien lo paga queda anotado, y **el efecto se aparca** hasta que la carta
-  llega al escaparate. Va en su sitio natural de la lista (justo detrás de la elección del
+  llega al escaparate. Si lo que se paga es **Furor** (`MODIFICAR_STAT` sobre `furor`), se marca
+  solo como **tributo** y la etiqueta lleva la cantidad real de cada carta ("Tributa 2 FUR"),
+  resuelta con el mismo cálculo que hará el cobro — Flash de maná le cobra menos a Eris, y la
+  flecha se dibuja antes de cobrar. Va en su sitio natural de la lista (justo detrás de la elección del
   pagador), no colado detrás de la búsqueda: ese apaño servía para no cobrar mientras aún se
   podía cancelar, pero a cambio retrasaba el flotante hasta el final de todo.
 - `esRequisito: true` — solo anota. Un requisito no se pierde, se comprueba.
@@ -486,8 +489,14 @@ ve duplicada: el estado ya la sacó pero nadie la ha repintado). La separación 
 ajusta con `PRESENTA_GAP`. El coste que acompaña sale de su hueco — la zona a la
 que pertenece la decide el motor (`zona`), nunca la presencia de la carta en el DOM: una carta ya
 descartada sigue dibujada en la mano hasta el siguiente render.
-Colores de la misma familia pero distinguibles: **coste ámbar, requisito lima** — de un vistazo
-se lee si algo se ha *perdido* o solo se ha *comprobado*.
+Tres colores para tres cosas distintas: **coste ámbar** (pierdes la carta), **tributo rojo**
+(pierdes Furor y la carta se queda) y **requisito lima** (no pierdes nada). El rojo del tributo es
+el del Furor (`.ft-red-stat`, el mismo del "-1 FUR") y no un verde a propósito: aquí el verde es la
+*ganancia* de Furor, así que pintar de verde una pérdida diría lo contrario de lo que pasa.
+
+`node tests/auditar_flechas.js` enumera qué cartas enseñan su coste y cuáles no. Marcar una carta
+es una decisión de diseño, así que la auditoría es informativa; lo que sí falla es un marcaje
+**incoherente** (p. ej. un `esRequisito` sobre algo que gasta Furor).
 
 **El volteo dice la verdad sobre lo que se ve.** Una carta se voltea **solo si para quien mira
 estaba tapada**: eso incluye a los costes que acompañan (salen de la misma mano, mismo criterio) y
