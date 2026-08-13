@@ -412,6 +412,32 @@ async function montar(esc) {
             'vg=' + JSON.stringify(g.players.p1.vanguard.map(c => c.name)));
     }
 
+    // ── EL EVENTO SALE DE LA MANO AL PRESENTARSE, NO AL ATERRIZAR ─────────────────
+    // Entre medias hay repintados (las destrucciones de Eventos tienen animación), y una carta
+    // que sigue en `p.hand` se vuelve a dibujar ahí mientras su clon está en el escaparate: Toto
+    // la vio a la vez en la mano y en el centro (13-ago-2026).
+    console.log('\n--- El Evento sale de la mano en cuanto se presenta ---');
+    {
+        const { ctx, g } = await montar({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: ['Mini-tigre'], mano: ['Giro de guion'], evento: { carta: 'Dáedra', duracion: 2 } },
+            p2: { vanguardia: ['Mini-tigre'], evento: { carta: 'Una buena razón', duracion: 2 } },
+        });
+        let enManoAlDestruir = null;
+        const od = g.destroyEvent.bind(g);
+        g.destroyEvent = (pid) => {
+            if (enManoAlDestruir === null) enManoAlDestruir = g.players.p1.hand.some(c => c.name === 'Giro de guion');
+            return od(pid);
+        };
+        await ejecutarPaso(ctx, g, { jugar: 'Giro de guion' });
+        check('mientras se destruyen los Eventos, ya NO está en la mano',
+            enManoAlDestruir === false, 'enMano=' + enManoAlDestruir);
+        check('...y acaba en su ranura', (g.players.p1.activeEvent || {}).name === 'Giro de guion');
+        check('...sin destruirse a sí misma (la vieja sí lo hacía)',
+            !g.players.p1.discard.some(c => c.name === 'Giro de guion'),
+            'descartes=' + JSON.stringify(g.players.p1.discard.map(c => c.name)));
+    }
+
     console.log('');
     if (fallos) { console.log(`SUITE costes_presenta: ${fallos} FALLOS de ${total} comprobaciones`); process.exit(1); }
     console.log(`SUITE costes_presenta: ${total}/${total} comprobaciones — COSTES Y REQUISITOS CORRECTOS`);

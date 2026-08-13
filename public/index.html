@@ -1711,6 +1711,9 @@
             const cl = _clon(tmpl, deDorso, _elOrigen ? _elOrigen.getBoundingClientRect() : origen);
             const cont = cl.cont, flip = cl.flip;
             if (_elOrigen) _salirDeLaMano(_elOrigen);
+            // Y que salga también DEL ESTADO, si quien encoló lo pidió: si no, el primer repintado
+            // de la cadena la vuelve a dibujar en la mano mientras su clon está en el escaparate.
+            if (opts && typeof opts.alSalirDeLaMano === 'function') opts.alSalirDeLaMano();
             // Acompañantes: nacen en la mano de su dueño (de donde salieron) y viajan a la vez.
             const acompCl = acomp.map((c, i) => {
                 const inst = getCardTemplate(c.cardId);
@@ -6583,6 +6586,7 @@
                 // terminar la animación (pedido explícito de Toto).
                 let _eventoColocado = false;
                 let _colocarEvento = () => {};
+                let _salirDeLaManoEvento = () => {};
                 if (card.type === 'Ayuda' || card.type === 'Evento') {
                     // Colocar el Evento es lo que hace aparecer su tira en la ranura, y eso tiene
                     // que pasar DENTRO de la presentación, al llegar: si la ranura sigue vacía
@@ -6590,12 +6594,18 @@
                     // al desvanecido de siempre — que es justo lo que había que quitar. Mismo
                     // contrato que ya usaban filas y pilas (Toto, 13-ago-2026).
                     _eventoColocado = false;
+                    // La carta sale de la MANO en cuanto la presentación arranca (§14: en el punto
+                    // de compromiso sale de su zona), no al aterrizar. Mientras se destruyen los
+                    // Eventos hay repintados, y como seguía en `p.hand` reaparecía dibujada en la
+                    // mano a la vez que en el escaparate (Toto, 13-ago-2026).
+                    _salirDeLaManoEvento = () => {
+                        const _i = p.hand.findIndex(c => c.instanceId === card.instanceId);
+                        if (_i !== -1) { p.hand.splice(_i, 1); this.assignCopyId(card); this.render(); }
+                    };
                     _colocarEvento = () => {
                         if (_eventoColocado) return;
                         _eventoColocado = true;
-                        const _i = p.hand.findIndex(c => c.instanceId === card.instanceId);
-                        if (_i !== -1) p.hand.splice(_i, 1);
-                        this.assignCopyId(card);
+                        _salirDeLaManoEvento();
                         p.activeEvent = card;
                         card.location = 'event';
                         this.logMsg(`${pName} juega el Evento: ${this.nCarta(card)}`, 'system');
@@ -6617,7 +6627,8 @@
                         // si hay Evento previo, y esa comprobación destruye el recién puesto:
                         // Giro de guion acaba en el descarte y el viejo se queda en la ranura
                         // (regresion9/20/62). Eso es lo que falta por entender (13-ago-2026).
-                        fundirEn: card.type === 'Evento' ? null
+                        colocar: card.type === 'Evento' ? _colocarEvento : null,
+                        fundirEn: card.type === 'Evento' ? `#${card.owner}-event-slot`
                                 : (!p.discard || !p.discard.length) ? `#${card.owner}-discard-stack` : null };
                     // MISMA NORMA QUE EL COSTE DE UNA ACTIVA (Toto, 7-ago-2026): nada visible
                     // hasta que deje de poder cancelarse. Enseñar la carta al clicarla SPOILEA la
@@ -6632,9 +6643,10 @@
                     const _hayVentana = typeof template.onValidateTarget === 'function'
                                      || typeof template.onBeforePlayAsync === 'function'
                                      || _eleccionCancelable;
+                    if (card.type === 'Evento') _pres.alSalirDeLaMano = _salirDeLaManoEvento;
                     if (_hayVentana) this._presentacionArmada = _pres;
                     else await animarPresentacionCarta(_pres.cardId, _pres.origen, _pres.destino, _pres.deDorso,
-                        { origenId: _pres.origenId, fundirEn: _pres.fundirEn, colocar: _pres.colocar || null });
+                        { origenId: _pres.origenId, fundirEn: _pres.fundirEn, colocar: _pres.colocar || null, alSalirDeLaMano: _pres.alSalirDeLaMano || null });
                 }
                 if (card.type === 'Ayuda') {
                     if (typeof template.onPlay === 'function') {
@@ -8070,7 +8082,7 @@
                 // animación (al aterrizar), no antes ni después. Es lo que hace que la pila se
                 // pueble justo cuando la carta llega y que, mientras aún se pueda cancelar, siga
                 // viéndose en la mano.
-                const _o = { origenId: p.origenId || null, fundirEn: p.fundirEn || null };
+                const _o = { origenId: p.origenId || null, fundirEn: p.fundirEn || null, alSalirDeLaMano: p.alSalirDeLaMano || null };
                 if (p.colocar) _o.colocar = () => { p.colocar(); return null; };
                 const _anim = animarPresentacionCarta(p.cardId, p.origen, p.destino, p.deDorso, _o);
                 // Con retención, esto resuelve al LLEGAR al centro, no al final: la cadena que

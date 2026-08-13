@@ -96,6 +96,10 @@ const escenarios = [
             { linea: 'ha sido destruido prematuramente', motivo: 'REORDENAMIENTO INTENCIONADO (Toto, 13-ago-2026): Giro de guion dice "Antes de colocarla" y su codigo lo hacia DESPUES (destruia el Evento rival en AL_JUGAR). Movido a ANTES_DE_JUGAR, su anuncio y las destrucciones van ahora ANTES del "juega el Evento". Mismas lineas, otro orden: se retiran como par completo' },
             { linea: 'juega el Evento: Giro de guion', motivo: 'REORDENAMIENTO INTENCIONADO (Toto, 13-ago-2026): Giro de guion dice "Antes de colocarla" y su codigo lo hacia DESPUES (destruia el Evento rival en AL_JUGAR). Movido a ANTES_DE_JUGAR, su anuncio y las destrucciones van ahora ANTES del "juega el Evento". Mismas lineas, otro orden: se retiran como par completo' },
         ],
+        diferenciasEsperadas: [
+            { contiene: 'activeEvent', motivo: 'ARREGLO, no regresion: en la VIEJA Giro de guion se destruia A SI MISMA. Su efecto corria en AL_JUGAR, o sea DESPUES de colocarse, asi que al "destruir los Eventos de ambos jugadores" se incluia a ella. Su texto dice "Antes de colocarla": movido a ANTES_DE_JUGAR, destruye los dos Eventos previos y se queda ella en la ranura, que es lo que la carta promete (Toto, 13-ago-2026)' },
+            { contiene: 'discard.0', motivo: 'ARREGLO, no regresion: en la VIEJA Giro de guion se destruia A SI MISMA. Su efecto corria en AL_JUGAR, o sea DESPUES de colocarse, asi que al "destruir los Eventos de ambos jugadores" se incluia a ella. Su texto dice "Antes de colocarla": movido a ANTES_DE_JUGAR, destruye los dos Eventos previos y se queda ella en la ranura, que es lo que la carta promete (Toto, 13-ago-2026)' },
+        ],
     },
 ];
 
