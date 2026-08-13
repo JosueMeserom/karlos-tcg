@@ -548,6 +548,49 @@ async function montar(esc) {
             'mano=' + JSON.stringify(g.players.p1.hand.map(c => c.name)));
     }
 
+    // ── BÚSQUEDAS IMPERATIVAS SIN PAREJA EN LA BASE VIEJA ─────────────────────────
+    // La Bestia busca 'Fusión de planos' e Igniz una Ayuda: las dos cartas son de serie 2 o su
+    // flujo no existe en la vieja, así que regresion64 no puede compararlas. Se caracterizan
+    // aquí, por aserción, ANTES de migrarlas a BUSCAR (Toto, 13-ago-2026).
+    console.log('\n--- Búsquedas imperativas: comportamiento de HOY, antes de migrar ---');
+    {
+        const { ctx, g } = await montar({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'Karlos', furor: 4 }, { carta: 'Agah', furor: 2 }],
+                  mano: ['La Bestia'], mazo: ['Fusión de planos', 'Mini-tigre'] },
+            p2: { vanguardia: ['Mini-tigre'] },
+        });
+        await ejecutarPaso(ctx, g, { jugar: 'La Bestia' });
+        // El tributo de 6 se reparte a golpe de clic, uno por vez. OJO: su búsqueda de 'Fusión de
+        // planos' NO es de colocación, es su ACTIVA (CATÁSTROFE, 1F) — se caracteriza aparte.
+        for (const quien of ['Karlos', 'Karlos', 'Karlos', 'Karlos', 'Agah', 'Agah']) {
+            await ejecutarPaso(ctx, g, { elegir: [quien] });
+        }
+        check('La Bestia: el tributo de 6 deja a los dos pagadores a 0',
+            g.players.p1.vanguard.filter(c => c.name !== 'La Bestia' && c.furor === 0).length === 2,
+            JSON.stringify(g.players.p1.vanguard.map(c => c.name + '=' + c.furor)));
+        check('La Bestia: y ella entra en el campo',
+            [...g.players.p1.vanguard, ...g.players.p1.rearguard].some(c => c.name === 'La Bestia'));
+    }
+    {
+        const { ctx, g } = await montar({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: ['Mini-tigre'], mano: ['Igniz'], mazo: ['Longaniza', 'Mini-tigre', 'Oso con armadura'] },
+            p2: { vanguardia: ['Mini-tigre'] },
+        });
+        await ejecutarPaso(ctx, g, { jugar: 'Igniz' });
+        if (ctx.pendientes.length && ctx.pendientes[0].tipo === 'opcion') {
+            await ejecutarPaso(ctx, g, { opcion: 'BUSCAR AYUDA EN EL MAZO' });
+        }
+        if (ctx.pendientes.length) await ejecutarPaso(ctx, g, { elegir: ['Longaniza'] });
+        check('Igniz: CONOCIMIENTO TEÓRICO se lleva la Ayuda elegida a la mano',
+            g.players.p1.hand.some(c => c.name === 'Longaniza'),
+            'mano=' + JSON.stringify(g.players.p1.hand.map(c => c.name)));
+        check('Igniz: ...y esa Ayuda ya no está en el mazo',
+            !g.players.p1.deck.some(c => c.name === 'Longaniza'),
+            'mazo=' + JSON.stringify(g.players.p1.deck.map(c => c.name)));
+    }
+
     console.log('');
     if (fallos) { console.log(`SUITE costes_presenta: ${fallos} FALLOS de ${total} comprobaciones`); process.exit(1); }
     console.log(`SUITE costes_presenta: ${total}/${total} comprobaciones — COSTES Y REQUISITOS CORRECTOS`);

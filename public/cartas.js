@@ -4813,15 +4813,27 @@ const CARD_DB = [
                 mecaToPlay = chosen[0];
                 const dIdx = p.deck.findIndex(c => c.instanceId === mecaToPlay.instanceId);
                 p.deck.splice(dIdx, 1);
-                if (typeof animateStackToHand === 'function') await animateStackToHand(`${p.id}-deck-stack`, p.id, mecaToPlay.id);
             }
 
             // 3. Colocación y Activación
             game.logMsg(`¡Igniz llama a su ${mecaToPlay.name}!`, 'ability');
 
             const placeChoice = p.vanguard.length < 4 ? 'vanguard' : 'rearguard';
-            mecaToPlay.location = placeChoice;
-            p[placeChoice].push(mecaToPlay);
+            // El Meca va AL CAMPO, no a la mano: antes usaba animateStackToHand -la animación de
+            // "algo vuela a tu mano"- para una carta que aterriza en una fila, y con el cambio a
+            // presentación eso la mandaba al escaparate rumbo a la mano para aparecer luego en el
+            // tablero. Se presenta hacia su FILA, aterrizando en el hueco (Toto, 13-ago-2026).
+            const _filaMeca = `#${p.id}-${placeChoice === 'rearguard' ? 'rearguard' : 'vanguard'}`;
+            const _colocarMeca = () => {
+                mecaToPlay.location = placeChoice;
+                p[placeChoice].push(mecaToPlay);
+                if (typeof game.render === 'function') game.render();
+                return mecaToPlay.instanceId;
+            };
+            if (typeof animarPresentacionCarta === 'function') {
+                await animarPresentacionCarta(mecaToPlay.id, `#${p.id}-deck-stack`, _filaMeca, true,
+                    { zonaSel: _filaMeca, colocar: _colocarMeca });
+            } else { _colocarMeca(); }
 
             const mecaTemplate = getCardTemplate(mecaToPlay.id);
             if (typeof mecaTemplate.onAfterPlayAsync === 'function') {
