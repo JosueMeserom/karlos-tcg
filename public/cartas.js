@@ -1143,15 +1143,15 @@ const CARD_DB = [
                         if (idx !== -1) {
                             const target = p.deck[idx]; // <--- Obtenemos la carta primero
                             
-                            // AHORA SÍ: Pasamos target.id para que la animación no salga boca abajo
-                            // La carta entra en la mano DENTRO del vuelo: aterriza en su hueco y el resto de
-                            // la mano se aparta deslizándose (§14.quater, Toto 13-ago-2026).
-                            if (typeof animateStackToHand === 'function') {
-                                await animateStackToHand(`${p.id}-deck-stack`, p.id, target.id,
-                                    () => { target.location = 'hand'; p.hand.push(target); game.render(); return target.instanceId; });
-                            } else { target.location = 'hand'; p.hand.push(target); }
-                            
+                            // Sale de la pila ANTES de volar: si no, la carta existe en dos sitios a la vez
+                            // durante toda la animación y el contador de la pila miente. Y entra en la mano
+                            // DENTRO del vuelo, para aterrizar en su hueco (§14.quater, Toto 13-ago-2026).
                             p.deck.splice(idx, 1);
+                            const _aMano = () => { target.location = 'hand'; p.hand.push(target); game.render(); return target.instanceId; };
+                            if (typeof animateStackToHand === 'function') {
+                                await animateStackToHand(`${p.id}-deck-stack`, p.id, target.id, _aMano);
+                            } else { _aMano(); }
+                            
                             game.logMsg(`${card.name} añade Escudo mágico del mazo a la mano.`, 'ability');
                         } else {
                             game.logMsg(`No se encontró ningún Escudo mágico en el mazo.`, 'system');
@@ -1173,15 +1173,15 @@ const CARD_DB = [
                             if (idx !== -1) {
                                 const target = p.discard[idx];
                                 
-                                // AHORA SÍ: Pasamos target.id para que se vea la cara en la animación
-                                // La carta entra en la mano DENTRO del vuelo: aterriza en su hueco y el resto de
-                                // la mano se aparta deslizándose (§14.quater, Toto 13-ago-2026).
-                                if (typeof animateStackToHand === 'function') {
-                                    await animateStackToHand(`${p.id}-discard-stack`, p.id, target.id,
-                                        () => { target.location = 'hand'; p.hand.push(target); game.render(); return target.instanceId; });
-                                } else { target.location = 'hand'; p.hand.push(target); }
-                                
+                                // Sale de la pila ANTES de volar: si no, la carta existe en dos sitios a la vez
+                                // durante toda la animación y el contador de la pila miente. Y entra en la mano
+                                // DENTRO del vuelo, para aterrizar en su hueco (§14.quater, Toto 13-ago-2026).
                                 p.discard.splice(idx, 1);
+                                const _aMano = () => { target.location = 'hand'; p.hand.push(target); game.render(); return target.instanceId; };
+                                if (typeof animateStackToHand === 'function') {
+                                    await animateStackToHand(`${p.id}-discard-stack`, p.id, target.id, _aMano);
+                                } else { _aMano(); }
+                                
                                 game.logMsg(`${card.name} recupera Escudo mágico de los descartes.`, 'ability');
                                 game.render();
                             }
