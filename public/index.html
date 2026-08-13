@@ -1345,11 +1345,16 @@
             else await new Promise(r => setTimeout(r, 200));
         }
 
-        async function animateRetributionToHand(playerId) {
+        // `colocar` es lo que mete la carta en la mano: se llama a MITAD del vuelo, para que el
+        // clon aterrice en el hueco REAL que le toca y el resto de la mano se aparte deslizándose
+        // -igual que una búsqueda en pila-. Antes volaba al centro de la zona, se quitaba, y la
+        // carta aparecía de golpe al terminar (Toto, 13-ago-2026).
+        // Sigue siendo un DORSO todo el viaje: una retribución es tuya y el rival no debe verla.
+        async function animateRetributionToHand(playerId, colocar) {
             const retEl = document.getElementById(`${playerId}-retribution`);
-            const handEl = document.getElementById(`${playerId}-hand`);
-
-            if (!retEl || !handEl) return;
+            const handSel = `#${playerId}-hand`;
+            const handEl = document.querySelector(handSel);
+            if (!retEl || !handEl) { if (typeof colocar === 'function') colocar(); return; }
 
             const flyCard = document.createElement('div');
             flyCard.className = 'card card-back';
@@ -1363,17 +1368,31 @@
             flyCard.style.height = '126px';
 
             document.body.appendChild(flyCard);
-
             void flyCard.offsetWidth;
 
-            const handRect = handEl.getBoundingClientRect();
+            // La mano se acomoda AHORA, con la carta ya dentro: así hay un hueco real al que ir.
+            const foto = _fotoFila(handSel);
+            const idEntrante = (typeof colocar === 'function') ? colocar() : null;
+            const nuevoEl = idEntrante && document.querySelector(`${handSel} .card[data-id="${idEntrante}"]`);
+            if (nuevoEl) nuevoEl.style.visibility = 'hidden';   // el clon ocupa su sitio mientras llega
+            _deslizarFila(handSel, foto, idEntrante);
+
+            const destino = nuevoEl ? nuevoEl.getBoundingClientRect() : handEl.getBoundingClientRect();
             flyCard.style.transition = 'all 0.8s cubic-bezier(0.2, 0.8, 0.2, 1)';
-            flyCard.style.left = (handRect.left + handRect.width / 2 - 45) + 'px';
-            flyCard.style.top = (handRect.top + handRect.height / 2 - 63) + 'px';
-            flyCard.style.transform = 'scale(0.5)'; 
+            if (nuevoEl) {
+                flyCard.style.left = destino.left + 'px';
+                flyCard.style.top = destino.top + 'px';
+                flyCard.style.width = destino.width + 'px';
+                flyCard.style.height = destino.height + 'px';
+            } else {
+                flyCard.style.left = (destino.left + destino.width / 2 - 45) + 'px';
+                flyCard.style.top = (destino.top + destino.height / 2 - 63) + 'px';
+                flyCard.style.transform = 'scale(0.5)';
+            }
 
             await game.sleep(800);
             flyCard.remove();
+            if (nuevoEl) nuevoEl.style.visibility = '';
         }
 
         async function animateShuffle(playerId) {
@@ -1385,10 +1404,15 @@
             deckEl.classList.remove('shuffling');
         }
 
-        async function animateStackToHand(sourceId, playerId, cardId = null) {
+        // `colocar` (opcional): mete la carta en la mano a MITAD del vuelo, para que el clon
+        // aterrice en su hueco real y el resto de la mano se aparte deslizándose. Sin él se
+        // comporta como siempre (vuela al centro de la zona y desaparece), que es lo que hacían
+        // las cuatro cartas que la usan (Toto, 13-ago-2026).
+        async function animateStackToHand(sourceId, playerId, cardId = null, colocar = null) {
             const sourceEl = document.getElementById(sourceId);
-            const handEl = document.getElementById(`${playerId}-hand`);
-            if (!sourceEl || !handEl) return;
+            const handSel = `#${playerId}-hand`;
+            const handEl = document.querySelector(handSel);
+            if (!sourceEl || !handEl) { if (typeof colocar === 'function') colocar(); return; }
 
             const flyCard = document.createElement('div');
             
@@ -1415,16 +1439,30 @@
             document.body.appendChild(flyCard);
             void flyCard.offsetWidth;
 
-            const handRect = handEl.getBoundingClientRect();
+            const foto = _fotoFila(handSel);
+            const idEntrante = (typeof colocar === 'function') ? colocar() : null;
+            const nuevoEl = idEntrante && document.querySelector(`${handSel} .card[data-id="${idEntrante}"]`);
+            if (nuevoEl) nuevoEl.style.visibility = 'hidden';
+            _deslizarFila(handSel, foto, idEntrante);
+
+            const destino = nuevoEl ? nuevoEl.getBoundingClientRect() : handEl.getBoundingClientRect();
             flyCard.style.transition = 'all 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)';
-            flyCard.style.left = (handRect.left + handRect.width / 2 - 45) + 'px';
-            flyCard.style.top = (handRect.top + handRect.height / 2 - 63) + 'px';
-            flyCard.style.transform = 'scale(0.5) rotate(10deg)'; 
+            if (nuevoEl) {
+                flyCard.style.left = destino.left + 'px';
+                flyCard.style.top = destino.top + 'px';
+                flyCard.style.width = destino.width + 'px';
+                flyCard.style.height = destino.height + 'px';
+            } else {
+                flyCard.style.left = (destino.left + destino.width / 2 - 45) + 'px';
+                flyCard.style.top = (destino.top + destino.height / 2 - 63) + 'px';
+                flyCard.style.transform = 'scale(0.5) rotate(10deg)';
+            }
             flyCard.style.opacity = '1'; 
 
             if (window.game) await window.game.sleep(600);
             else await new Promise(r => setTimeout(r, 600));
             flyCard.remove();
+            if (nuevoEl) nuevoEl.style.visibility = '';
         }
 
         // ─────────────────────────────────────────────────────────────────────────────────
@@ -1517,6 +1555,12 @@
                 const antes = foto.get(id);
                 if (!antes) return;                        // no estaba: nada que deslizar
                 const ahora = el.getBoundingClientRect();
+                // Si ha cambiado de TAMAÑO, no es una recolocación: es la propia carta la que
+                // crece o encoge (el zoom de selección al clicarla o al cancelar). FLIP compara
+                // esquinas, así que con tamaños distintos el translate sale desviado -la carta
+                // aparecía arriba-izquierda y saltaba a su sitio en unos frames- y además taparía
+                // la transición suave que ya tiene el propio zoom (Toto, 13-ago-2026).
+                if (Math.abs(antes.width - ahora.width) > 0.5 || Math.abs(antes.height - ahora.height) > 0.5) return;
                 const dx = antes.left - ahora.left, dy = antes.top - ahora.top;
                 if (!dx && !dy) return;
                 el.style.transition = 'none';
@@ -8846,11 +8890,22 @@
                 if (p.retribution.length > 0) {
                     const retCard = p.retribution.pop();
                     p.hp = p.retribution.length;
+                    // La carta entra en la mano DENTRO de la animación (§14.quater), para que
+                    // aterrice en su hueco y el resto se aparte. `_yaEnMano` evita el duplicado
+                    // si la animación no llega a correr.
+                    let _yaEnMano = false;
+                    const _aLaMano = () => {
+                        if (_yaEnMano) return retCard.instanceId;
+                        _yaEnMano = true;
+                        retCard.location = 'hand';
+                        p.hand.push(retCard);
+                        this.render();
+                        return retCard.instanceId;
+                    };
                     try {
-                        if (typeof animateRetributionToHand === 'function') await animateRetributionToHand(playerId);
-                    } catch(e) {}
-                    retCard.location = 'hand';
-                    p.hand.push(retCard);
+                        if (typeof animateRetributionToHand === 'function') await animateRetributionToHand(playerId, _aLaMano);
+                    } catch(e) { console.error(e); }
+                    _aLaMano();
                     this.logMsg(`${this.getDisplayName(playerId)} coge 1 retribución (le quedan ${p.hp}).`, 'system');
                 } else {
                     p.hp = 0;

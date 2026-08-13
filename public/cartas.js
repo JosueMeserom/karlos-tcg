@@ -1144,11 +1144,14 @@ const CARD_DB = [
                             const target = p.deck[idx]; // <--- Obtenemos la carta primero
                             
                             // AHORA SÍ: Pasamos target.id para que la animación no salga boca abajo
-                            await animateStackToHand(`${p.id}-deck-stack`, p.id, target.id);
+                            // La carta entra en la mano DENTRO del vuelo: aterriza en su hueco y el resto de
+                            // la mano se aparta deslizándose (§14.quater, Toto 13-ago-2026).
+                            if (typeof animateStackToHand === 'function') {
+                                await animateStackToHand(`${p.id}-deck-stack`, p.id, target.id,
+                                    () => { target.location = 'hand'; p.hand.push(target); game.render(); return target.instanceId; });
+                            } else { target.location = 'hand'; p.hand.push(target); }
                             
                             p.deck.splice(idx, 1);
-                            target.location = 'hand';
-                            p.hand.push(target);
                             game.logMsg(`${card.name} añade Escudo mágico del mazo a la mano.`, 'ability');
                         } else {
                             game.logMsg(`No se encontró ningún Escudo mágico en el mazo.`, 'system');
@@ -1171,11 +1174,14 @@ const CARD_DB = [
                                 const target = p.discard[idx];
                                 
                                 // AHORA SÍ: Pasamos target.id para que se vea la cara en la animación
-                                await animateStackToHand(`${p.id}-discard-stack`, p.id, target.id);
+                                // La carta entra en la mano DENTRO del vuelo: aterriza en su hueco y el resto de
+                                // la mano se aparta deslizándose (§14.quater, Toto 13-ago-2026).
+                                if (typeof animateStackToHand === 'function') {
+                                    await animateStackToHand(`${p.id}-discard-stack`, p.id, target.id,
+                                        () => { target.location = 'hand'; p.hand.push(target); game.render(); return target.instanceId; });
+                                } else { target.location = 'hand'; p.hand.push(target); }
                                 
                                 p.discard.splice(idx, 1);
-                                target.location = 'hand';
-                                p.hand.push(target);
                                 game.logMsg(`${card.name} recupera Escudo mágico de los descartes.`, 'ability');
                                 game.render();
                             }
@@ -4379,9 +4385,8 @@ const CARD_DB = [
                     const target = chosen[0];
                     const idx = p.deck.findIndex(c => c.instanceId === target.instanceId);
                     p.deck.splice(idx, 1);
-                    await window.animateStackToHand(`${p.id}-deck-stack`, p.id, target.id);
-                    target.location = 'hand';
-                    p.hand.push(target);
+                    await window.animateStackToHand(`${p.id}-deck-stack`, p.id, target.id,
+                        () => { target.location = 'hand'; p.hand.push(target); game.render(); return target.instanceId; });
                     game.logMsg(`La Bestia atrae el caos: Fusión de planos añadida a la mano.`, 'ability');
                 }
             } else {
@@ -4712,10 +4717,13 @@ const CARD_DB = [
                         const idx = p.deck.findIndex(c => c.instanceId === target.instanceId);
                         p.deck.splice(idx, 1);
                         
-                        if (typeof animateStackToHand === 'function') await animateStackToHand(`${p.id}-deck-stack`, p.id, target.id);
+                        // La carta entra en la mano DENTRO del vuelo: aterriza en su hueco y el resto de
+                        // la mano se aparta deslizándose (§14.quater, Toto 13-ago-2026).
+                        if (typeof animateStackToHand === 'function') {
+                            await animateStackToHand(`${p.id}-deck-stack`, p.id, target.id,
+                                () => { target.location = 'hand'; p.hand.push(target); game.render(); return target.instanceId; });
+                        } else { target.location = 'hand'; p.hand.push(target); }
                         
-                        target.location = 'hand';
-                        p.hand.push(target);
                         game.logMsg(`Igniz obtiene ${target.name} gracias a su Conocimiento Teórico.`, 'ability');
                     }
                 } else {
@@ -8337,6 +8345,10 @@ const DSL = {
             if (e.reset && typeof game.resetCard === 'function') game.resetCard(target);
             else target.currentHp = getCardTemplate(target.id).hp;
             pl.hand.push(target);
+            // La mano se acomoda con la carta ya dentro, igual que cualquier otra llegada
+            // (§14.quater). Sin esto, la carta que vuelve del campo aparecía de golpe y las
+            // demás daban un salto de un frame (Toto, 13-ago-2026).
+            if (typeof game.render === 'function') game.render();
             if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
             return true;
         }

@@ -440,6 +440,17 @@ check('una carta con su animación en marcha no se desliza', !fA.style.transitio
       'transition: ' + fA.style.transition);
 fA.style.transform = '';
 
+// Una carta que cambia de TAMAÑO no se desliza: no es una recolocación, es ella creciendo o
+// encogiendo (el zoom al seleccionarla o al cancelar). FLIP compara esquinas, así que con
+// tamaños distintos el translate sale desviado (Toto, 13-ago-2026).
+const foto4 = vm.runInContext('_fotoFila', sandbox)('#p1-vanguard');
+fA.style.transition = '';
+fA.__rect = { left: 90, top: 395, width: 108, height: 151 };   // se ha hecho MÁS GRANDE
+vm.runInContext('_deslizarFila', sandbox)('#p1-vanguard', foto4, null);
+check('una carta que cambia de tamano no se desliza', !fA.style.transition,
+      'transition: ' + fA.style.transition);
+fA.__rect = { left: 50, top: 400, width: 90, height: 126 };
+
 // ---------- salir de la mano (la carta se va, el resto se acomoda) ----------
 // Cuando una carta viaja al escaparate deja de estar en la mano: si nadie la quita del DOM se
 // ve DUPLICADA -en la mano y en el escaparate a la vez- porque el estado ya la sacó pero no se
