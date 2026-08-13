@@ -48,7 +48,7 @@ const escenarios = [
         // texto exacto) para que ambas comparaciones posicionales queden en el
         // único log que sí coincide en índice ("juega Garret...").
         logsSoloVieja: [
-            { linea: 'Aniceto entrega su Furor como tributo para Garret.',
+            { linea: 'entrega su Furor como tributo para Garret.',
               motivo: 'la vieja registra el tributo DESPUÉS de colocar la carta (mecanismo genérico del motor, nombre a secas); ver logsSoloNueva para el equivalente' },
         ],
         logsSoloNueva: [

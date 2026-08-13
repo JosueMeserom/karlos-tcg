@@ -1263,6 +1263,8 @@ const CARD_DB = [
             const chosen = await game.pickBoardTargets(validTributes, 1, 'TRIBUTO PARA EL GÓLEM (-1 FUROR)', card, card.owner, true);
             if (chosen && chosen.length > 0) {
                 card.tributeSourceId = chosen[0].instanceId;
+                // Flecha de tributo al presentarse (§14.bis): de quién sale el Furor.
+                DSL._marcarCoste(game, chosen[0], "tributo", "Tributa 1 FUR");
                 card.tributeCost = 1; 
                 card.defBoosts = 0; 
                 return true;
@@ -3449,6 +3451,8 @@ const CARD_DB = [
             const chosen = await game.pickBoardTargets(validAllies, 1, `${card.name}: elige quién tributa 4 de Furor`, card, card.owner, true);
             if (chosen && chosen.length > 0) {
                 card.tributeSourceId = chosen[0].instanceId;
+                // Flecha de tributo al presentarse (§14.bis): de quién sale el Furor.
+                DSL._marcarCoste(game, chosen[0], "tributo", "Tributa 4 FUR");
                 return true;
             }
             return false;
@@ -3499,6 +3503,8 @@ const CARD_DB = [
             const chosen = await game.pickBoardTargets(validAllies, 1, `${card.name}: elige quién tributa 4 de Furor`, card, card.owner, true);
             if (chosen && chosen.length > 0) {
                 card.tributeSourceId = chosen[0].instanceId;
+                // Flecha de tributo al presentarse (§14.bis): de quién sale el Furor.
+                DSL._marcarCoste(game, chosen[0], "tributo", "Tributa 4 FUR");
                 return true;
             }
             return false;
@@ -4293,7 +4299,7 @@ const CARD_DB = [
     },
     {
         name: "Dáedra", type: "Evento", rarity: "B", cost: 1, duration: 3, series: 2,
-        text: "3 turnos. Mientras esté en juego, los aliados con etiqueta 'Usuario de magia' o con etiqueta 'Monstruo' reciben el doble de Furor al inicio de cada turno.",
+        text: "3 turnos. Mientras esté en juego, los aliados con etiqueta 'Usuario de magia' o 'Monstruo' reciben el doble de Furor al inicio de cada turno.",
         onPlay: function(card, game) {
             game.logMsg(`¡La influencia de Dáedra inunda el campo!`, 'ability');
         },
@@ -4323,6 +4329,9 @@ const CARD_DB = [
 
             game.logMsg("Se requiere un tributo masivo de 6 Furor.", 'system');
             let remaining = 6;
+            // Quién ha puesto cuánto: el tributo se reparte, así que cada flecha tiene que decir
+            // la cantidad REAL de esa carta y no "6" (§14.bis).
+            const puesto = new Map();
             
             // Loop para exprimir furor carta a carta hasta llegar a 6
             while (remaining > 0) {
@@ -4331,8 +4340,11 @@ const CARD_DB = [
                 if (!chosen || chosen.length === 0) return false; // Canceló el tributo
                 
                 game.modifyStat(chosen[0], 'furor', -1);
+                puesto.set(chosen[0], (puesto.get(chosen[0]) || 0) + 1);
                 remaining--;
             }
+            // Se marca al final, con el reparto ya cerrado.
+            for (const [aliado, cuanto] of puesto) DSL._marcarCoste(game, aliado, 'tributo', `Tributa ${cuanto} FUR`);
             return true;
         },
         onUpdatePassive: function(card, game) {
@@ -5043,7 +5055,7 @@ const CARD_DB = [
     {
         name: "Arthas", hp: 2, def: 3, atk: 6, type: "Personaje", subtype: "Arma legendaria", tags: ["Equipable", "melé"], rarity: "B", cost: 4, series: 2,
         isDual: true, // <--- LA PALANCA PARA QUE EL MOTOR PINTE EL DEGRADADO
-        text: "Requisito: Karolina no está en tu vanguardia; si entra, Arthas se autodestruye. P: HERRERO LEGENDARIO: Carta dual. Como Personaje: equípalo gratis a un aliado en tu turno, dejando su hueco; si el portador cae, vuelve al campo, o a descartes si no hay sitio. Como Ayuda: anexa a un aliado sin etiqueta 'Animal salvaje', sin etiqueta 'Cosa' ni Karolina, y le da +3 de Atq.",
+        text: "Requisito: Karolina no está en tu vanguardia; si entra, Arthas se autodestruye. P: HERRERO LEGENDARIO: Carta dual. Como Personaje: equípalo gratis a un aliado en tu turno, dejando su hueco; si el portador cae, vuelve al campo, o a descartes si no hay sitio. Como Ayuda: anexa a un aliado sin etiqueta 'Animal salvaje' ni 'Cosa', ni sea Karolina, y le da +3 de Atq.",
         passiveName: "HERRERO LEGENDARIO",
         
         canPlayCard: function(card, game, p) {
@@ -7313,7 +7325,15 @@ const DSL = {
         }
         const titulo = o.titulo || `${card.name}: ELIGE TRIBUTO (-${coste} FUROR)`;
         const sel = await game.pickBoardTargets(valid, 1, titulo, card, card.owner, true);
-        if (sel && sel.length > 0) { game.modifyStat(sel[0], 'furor', -coste); return true; }
+        if (sel && sel.length > 0) {
+            game.modifyStat(sel[0], 'furor', -coste);
+            // Flecha de tributo al presentarse (§14.bis): de quién sale el Furor y cuánto. Va
+            // aquí, en el helper, y no carta por carta: lo usan las nueve que tributan Furor al
+            // invocarse (Imp mayor, Gul guerrero, Oni ancho, Tengu orgulloso, Súcubo, Raiju,
+            // Experimento fallido, Ángel y Edrielle).
+            DSL._marcarCoste(game, sel[0], 'tributo', `Tributa ${coste} FUR`);
+            return true;
+        }
         return false;
     },
 

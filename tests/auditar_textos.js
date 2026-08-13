@@ -74,6 +74,10 @@ for (const c of CARTAS) {
         let m;
         while ((m = re.exec(txt))) {
             if (/etiquetas?\s*$/i.test(m[1])) continue;
+            // Encadenado: "sin etiqueta 'A' ni 'B'". El nexo basta, pero SOLO si la frase ya
+            // dijo "etiqueta" antes; si no, cualquier texto colaría poniéndole un "o" delante.
+            const frase = txt.slice(0, m.index).split(/[.;]/).pop();
+            if (/\b(ni|o|y)\s*$/i.test(m[1]) && /etiquetas?\b/i.test(frase)) continue;
             add('ETIQUETA-SIN-DECIRLO', c, `'${g}' es una ETIQUETA y se nombra como si fuera una carta: "...${m[1].trim()} '${g}'". Debe decir "con etiqueta '${g}'"`);
         }
     }

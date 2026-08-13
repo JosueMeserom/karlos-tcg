@@ -488,6 +488,32 @@ async function montar(esc) {
         }
     }
 
+    // ── TANDA 2: los tributos imperativos ─────────────────────────────────────────
+    // Nueve cartas pagan por DSL.tributoFuror y tres por `tributeSourceId`. Se comprueban las dos
+    // vías: que marquen su flecha CON LA CANTIDAD REAL y que cobren esa misma cantidad — el Gólem
+    // declaraba `tributeCost: 1` y el motor le cobraba un 4 escrito a mano (Toto, 13-ago-2026).
+    console.log('\n--- Tanda 2: tributos imperativos, flecha y cobro ---');
+    for (const c of [
+        { n: 'Imp mayor', furor: 3, coste: 2 },        // vía DSL.tributoFuror
+        { n: 'Ángel', furor: 3, coste: 2 },            // ídem, otra carta del grupo
+        { n: 'Gólem multielemental', furor: 4, coste: 1 },  // vía tributeSourceId, coste propio
+        { n: 'Valafar', furor: 4, coste: 4 },          // vía tributeSourceId, coste por defecto
+    ]) {
+        const { ctx, g, marcas } = await montar({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'Karlos', furor: c.furor }], mano: [c.n] },
+            p2: { vanguardia: ['Mini-tigre'] },
+        });
+        await ejecutarPaso(ctx, g, { jugar: c.n });
+        if (ctx.pendientes.length) await ejecutarPaso(ctx, g, { elegir: ['Karlos'] });
+        const k = g.players.p1.vanguard.find(x => x.name === 'Karlos');
+        check(c.n + ': cobra ' + c.coste + ' de Furor, ni más ni menos',
+            k && k.furor === c.furor - c.coste, 'furor=' + (k ? k.furor : '(no está)') + ' esperado=' + (c.furor - c.coste));
+        check(c.n + ': marca su flecha con esa misma cantidad',
+            marcas.some(m => m.tipo === 'tributo' && m.etiqueta === 'Tributa ' + c.coste + ' FUR'),
+            JSON.stringify(marcas.map(m => m.tipo + '/' + m.etiqueta)));
+    }
+
     console.log('');
     if (fallos) { console.log(`SUITE costes_presenta: ${fallos} FALLOS de ${total} comprobaciones`); process.exit(1); }
     console.log(`SUITE costes_presenta: ${total}/${total} comprobaciones — COSTES Y REQUISITOS CORRECTOS`);

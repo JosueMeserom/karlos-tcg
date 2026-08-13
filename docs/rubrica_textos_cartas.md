@@ -620,8 +620,9 @@ gramática es **`con etiqueta 'X'`**:
 > *Requiere un aliado **con etiqueta 'Estudioso'** en el campo.*
 
 La negación es `sin etiqueta 'X'` (*"Equípala a un aliado sin etiqueta 'Animal salvaje'"*), y con
-varias se repite: *"sin etiqueta 'Animal salvaje', sin etiqueta 'Cosa'"* — enumerar una sola vez
-deja la duda de si el calificador alcanza a las dos.
+varias **se encadena con `ni` / `o`**, sin repetir el prefijo: *"sin etiqueta 'Animal salvaje' ni
+'Cosa', ni sea Karolina"*, *"con etiqueta 'Usuario de magia' o 'Monstruo'"*. El nexo ya arrastra
+la negación y repetir queda pesado (Toto, 13-ago-2026).
 
 Los **subtipos** no llevan el prefijo: *'Ser vivo'*, *'No-muerto'*, *'Máquina'* se leen ya como lo
 que son, y no se confunden con nombres de carta.

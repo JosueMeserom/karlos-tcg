@@ -6827,11 +6827,17 @@
 
                     if (card.tributeSourceId) {
                         const source = this.findCard(card.tributeSourceId);
+                        // La cantidad la dice la CARTA (`tributeCost`), no un 4 escrito aquí.
+                        // El Gólem multielemental cuesta 1, lo declaraba, y este cauce le cobraba
+                        // 4 igualmente: un aliado con 4 de Furor se quedaba a 0 en vez de a 3, y
+                        // el flotante mentía diciendo "-4 FUR" (Toto, 13-ago-2026). El 4 por
+                        // defecto es el de las tres cartas que no lo declaran.
+                        const _coste = typeof card.tributeCost === 'number' ? card.tributeCost : 4;
                         if (source) {
-                            source.furor = Math.max(0, source.furor - 4);
+                            source.furor = Math.max(0, source.furor - _coste);
                             this.render(); 
-                            showFloatingText(source.instanceId, "-4 FUR", "ft-red-stat");
-                            this.logMsg(`${source.name} entrega su Furor como tributo para ${card.name}.`, 'ability');
+                            showFloatingText(source.instanceId, `-${_coste} FUR`, "ft-red-stat");
+                            this.logMsg(`${this.getCardNameWithOwner(source)} entrega su Furor como tributo para ${card.name}.`, 'ability');
                         }
                         delete card.tributeSourceId;
                     }
