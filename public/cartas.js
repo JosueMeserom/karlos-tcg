@@ -1130,6 +1130,15 @@ const CARD_DB = [
                   efectos: [ { op: "ATACAR", especial: true } ] } ] }
         ],
 
+        // PENDIENTE de migrar a BUSCAR (13-ago-2026). Este modal de tres opciones (mazo /
+        // descartes si hay / nada) es literalmente lo que hace `confirmarPorZona`, la pieza que
+        // ya usan Berry y Karlitos, y al migrar heredaría el VISOR del mazo -hoy coge el primer
+        // Escudo por id fijo, sin enseñar la pila ni dejarte elegir cuál- y la PRESENTACIÓN
+        // camino de la mano, que es lo que hacía que el rival no viera el Escudo.
+        // Se intentó y se revirtió: la migración sale, pero reordena y funde varios logs de
+        // regresion64 (uno por zona pasa a ser uno solo, el aviso de "no se encontró" lo absorbe
+        // el visor) y hay que documentar cada diferencia con calma. La red YA está puesta, que
+        // era lo que faltaba: cuando se retome, la suite dirá exactamente qué cambia.
         // HOOK 2: Búsqueda del Escudo Mágico tras colocarse
         onAfterPlayAsync: async function(card, game, p) {
             const hasInDiscard = p.discard && p.discard.some(c => c.id === 26);
@@ -4698,45 +4707,23 @@ const CARD_DB = [
         text: "P: CONOCIMIENTO TEÓRICO: Al colocar, puedes buscar una 'Ayuda' en tu mazo y añadirla a tu mano. Si buscas, baraja el mazo. A: LLAMAR MECA (2F): Busca 'Meca EBA' en mano o mazo y colócalo en campo. Si buscas en mazo, baraja. Puedes activar su Habilidad gratis de inmediato.",
         passiveName: "CONOCIMIENTO TEÓRICO", activeName: "LLAMAR MECA", activeCost: 2,
         
-        // --- PASIVA CORREGIDA (Solo baraja si busca) ---
-        onAfterPlayAsync: async function(card, game, p) {
-            const wantSearch = await new Promise(resolve => {
-                game.openChoiceModal('CONOCIMIENTO TEÓRICO', [
-                    { label: 'BUSCAR AYUDA EN EL MAZO', action: () => resolve(true) },
-                    { label: 'NO BUSCAR', action: () => resolve(false) }
-                ], card.owner);
-            });
-
-            if (wantSearch) {
-                const valid = p.deck.filter(c => c.type === 'Ayuda');
-                if (valid.length > 0) {
-                    const _elegida = await game.openDeckSearchViewer(card.owner, valid, 'BUSCAR AYUDA');
-                    const chosen = _elegida ? [_elegida] : [];
-                    if (chosen && chosen.length > 0) {
-                        const target = chosen[0];
-                        const idx = p.deck.findIndex(c => c.instanceId === target.instanceId);
-                        p.deck.splice(idx, 1);
-                        
-                        // La carta entra en la mano DENTRO del vuelo: aterriza en su hueco y el resto de
-                        // la mano se aparta deslizándose (§14.quater, Toto 13-ago-2026).
-                        if (typeof animateStackToHand === 'function') {
-                            await animateStackToHand(`${p.id}-deck-stack`, p.id, target.id,
-                                () => { target.location = 'hand'; p.hand.push(target); game.render(); return target.instanceId; });
-                        } else { target.location = 'hand'; p.hand.push(target); }
-                        
-                        game.logMsg(`Igniz obtiene ${target.name} gracias a su Conocimiento Teórico.`, 'ability');
-                    }
-                } else {
-                    game.logMsg("No quedan cartas de Ayuda en el mazo.", 'system');
-                }
-
-                // REGLA TCG: Como ha mirado el mazo, ahora sí barajamos SIEMPRE
-                game.logMsg(`Barajando el mazo de ${game.getDisplayName(p.id)}...`, 'system');
-                if (typeof animateShuffle === 'function') await animateShuffle(p.id);
-                game.shuffle(p.deck);
-            }
-            game.render();
-        },
+        // CONOCIMIENTO TEÓRICO migrada al op BUSCAR (13-ago-2026). Hacía a mano exactamente lo
+        // que BUSCAR ya sabe: preguntar, abrir el visor del mazo, llevarse la elegida a la mano y
+        // barajar. Al migrarla hereda gratis lo que le faltaba: el visor se abre AUNQUE no queden
+        // Ayudas (norma de UX: la pila se enseña entera igual, con su aviso) y la carta se
+        // PRESENTA camino de la mano, que es lo que hacía que el rival no llegara a verla.
+        // `inclusoSinValidas`: si has mirado el mazo, se baraja aunque no te lleves nada.
+        abilities: [
+            { trigger: "AL_JUGAR",
+              efectos: [
+                { op: "BUSCAR", en: "MAZO", cantidad: 1, destino: "MANO",
+                  filtros: [ { campo: "type", op: "==", valor: "Ayuda" } ],
+                  confirmar: { titulo: "CONOCIMIENTO TEÓRICO", si: "BUSCAR AYUDA EN EL MAZO", no: "NO BUSCAR" },
+                  titulo: "BUSCAR AYUDA",
+                  log: "{jugador} obtiene {objetivo} gracias al Conocimiento Teórico de {carta}.",
+                  logNoValidas: "No quedan cartas de Ayuda en el mazo de {jugador}.",
+                  barajarDespues: { log: "Barajando el mazo de {jugador}...", inclusoSinValidas: true } } ] }
+        ],
         
         canActivateAbility: function(card, game) {
             if (card.furor < 2) { game.logError("Falta Furor (2)."); return false; }
