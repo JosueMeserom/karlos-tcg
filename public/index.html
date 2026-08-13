@@ -3948,6 +3948,9 @@
                 try { spec = JSON.parse(txt); }
                 catch (e) { this.logError('El escenario no es JSON válido: ' + e.message); return; }
                 try {
+                    // Cargar un escenario tira la partida anterior: lo que estuviera abierto o a
+                    // medias no puede sobrevivirle. Va ANTES de montar la mesa nueva.
+                    this.cerrarTodoYCancelar();
                     this.loadBoardScenario(spec);
                     try { localStorage.setItem('karlos_dbg_scenario', txt); } catch (e) {} // se recuerda el último cargado con éxito
                 }
@@ -4764,6 +4767,63 @@
                 document.getElementById('card-preview').style.display = 'none'; if (this.clearModArrows) this.clearModArrows();
             }
 
+            // stopPreview cierra lo que YA está abierto y cancela el temporizador pendiente, pero
+            // eso no basta al cerrar un modal: si el ratón sigue quieto encima de donde estaba una
+            // carta, un `mouseenter` posterior -o un hover que ya estaba en vuelo- vuelve a
+            // abrirlo, y el detalle se queda flotando sobre el tablero sin nada debajo. Toto lo
+            // pilló clavando el timing exacto al cancelar un modal (13-ago-2026).
+            // Se cierra, y se vuelve a cerrar en el siguiente tick, cuando el DOM del modal ya no
+            // existe y cualquier hover en vuelo ya ha caído.
+            cerrarDetalle() {
+                this.stopPreview();
+                setTimeout(() => this.stopPreview(), 0);
+            }
+
+            // TIERRA QUEMADA: cierra toda la UI abierta y corta lo que estuviera esperando.
+            // Es para cargar un escenario de debug en mitad de cualquier cosa (Toto, 13-ago-2026):
+            // antes los modales se quedaban puestos sobre el tablero nuevo y, al cerrarlos, la
+            // corrutina VIEJA seguía viva y aplicaba su efecto sobre la partida recién cargada.
+            // Cerrar el modal no basta: hay que resolver los `await` que lo sostenían, o se
+            // quedan colgados para siempre y bloquean la cola (inputState EXECUTING).
+            cerrarTodoYCancelar() {
+                ['choice-modal', 'discard-viewer', 'deck-insert-viewer', 'confirmation-overlay',
+                 'type-select-modal', 'coin-overlay', 'turn-overlay'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.style.display = 'none';
+                });
+                document.getElementById('choice-modal').style.zIndex = '8500';
+                const _cc = document.getElementById('choice-cards');
+                if (_cc) { _cc.innerHTML = ''; _cc.style.display = 'none'; }
+                const _b = document.getElementById('action-banner');
+                if (_b) _b.style.display = 'none';
+                if (this._manoLiftLimpiar) this._manoLiftLimpiar();
+                const _fl = document.getElementById('presenta-arrows');
+                if (_fl) _fl.remove();
+                this.cerrarDetalle();
+                if (this._limpiarResalteReaccion) this._limpiarResalteReaccion();
+
+                // Resolvers vivos: se sueltan con "nada elegido" para que la cadena que los
+                // esperaba termine en vez de quedarse suspendida.
+                try { if (this.currentVisualResolve) this.resolveVisualSearch([]); } catch (e) {}
+                try { if (this.coinFlipResolve) { const r = this.coinFlipResolve; this.coinFlipResolve = null; r([]); } } catch (e) {}
+                this.currentVisualResolve = null;
+                this.currentChoices = null;
+                this.dslPick = null;
+                this._deckSearchActivo = false;
+                this._interaccionChooser = null;
+                this.pendingReaction = null;
+                this.pendingInteraction = null;
+                this._costesPresenta = [];
+                this._cobrosPendientes = [];
+                this._presentacionArmada = null;
+                this._ayudaEnCurso = null;
+                this.abilityContext = null;
+                this.selectedCard = null;
+                this.isActionLocked = false;
+                this.inputState = 'IDLE';
+                if (this._purgarBanderasSync) this._purgarBanderasSync();
+            }
+
             // VIGILANTE DEL DETALLE (Toto, 7-ago-2026). El detalle se cierra con `mouseleave`,
             // pero ese evento NO se dispara si la carta DESAPARECE del DOM con el ratón encima —
             // que es justo lo que pasa al elegir una carta de los descartes: la clicas, se la
@@ -5081,7 +5141,7 @@
 
             openDeckInsertViewer(pid) {
                 // cierra otros visores ocultos abiertos
-                document.getElementById('discard-viewer').style.display = 'none';
+                document.getElementById('discard-viewer').style.display = 'none'; this.cerrarDetalle();
                 this._purgarVisor();
                 const viewer = document.getElementById('deck-insert-viewer');
                 const content = document.getElementById('deck-insert-content');
@@ -5165,7 +5225,7 @@
                     this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'CLOSE_VIEWER' });
                 }
 
-                document.getElementById('discard-viewer').style.display = 'none';
+                document.getElementById('discard-viewer').style.display = 'none'; this.cerrarDetalle();
                 this._visorSoloLectura = null;
                 this._purgarVisor(); // vacía el visor (evita cartas fantasma) y quita lo elevado
                 const avisoVisor = document.getElementById('deck-search-notice');
@@ -5297,7 +5357,7 @@
                             ev.stopPropagation();
                             if (seleccionadas.length < 1) return; // mín. 1 obligatoria
                             this._deckSearchActivo = false;
-                            document.getElementById('discard-viewer').style.display = 'none';
+                            document.getElementById('discard-viewer').style.display = 'none'; this.cerrarDetalle();
                             this._purgarVisor();
                             avisoEl.style.display = 'none';
                             confirmEl.style.display = 'none';
@@ -5338,7 +5398,7 @@
                                     el.onclick = (ev) => {
                                         ev.stopPropagation();
                                         this._deckSearchActivo = false;
-                                        document.getElementById('discard-viewer').style.display = 'none';
+                                        document.getElementById('discard-viewer').style.display = 'none'; this.cerrarDetalle();
                                         this._purgarVisor();
                                         avisoEl.style.display = 'none';
                                         if (this.gameMode === 'online') {
@@ -6330,6 +6390,13 @@
                 const cardIndex = p.hand.findIndex(c => c.instanceId === cardInstanceId);
                 if (cardIndex === -1) return;
                 const card = p.hand[cardIndex];
+                // Qué carta del campo hace legal esta jugada, si la carta lo declara. Se anota
+                // aquí, antes de validar: si la jugada se rechaza, la marca muere con ella (la
+                // limpia la línea de arriba en el siguiente intento). Hacerlo después de validar
+                // obligaría a repetirlo en las cuatro ramas de playCard.
+                if (typeof DSL !== 'undefined' && typeof DSL._marcarRequisitosVisibles === 'function') {
+                    DSL._marcarRequisitosVisibles(card, this);
+                }
                 const pName = this.getDisplayName(this.activePlayerId);
                 const logType = this.activePlayerId === 'p1' ? 'p1' : 'p2';
 
@@ -6617,13 +6684,26 @@
                         this.render();   // el contador de la pila sube AQUÍ, al llegar la carta
                     };
                 }
-                // Los costes que la Ayuda le cobra A SU PROPIO OBJETIVO se anotan AQUÍ, antes de
-                // disparar: la lista de efectos corre después de la presentación, y una marca
-                // hecha allí llega con el escaparate ya cerrado.
-                if (typeof DSL !== 'undefined' && typeof DSL._marcarCostesDeclarados === 'function') {
-                    DSL._marcarCostesDeclarados(card, this, target);
+                // ¿QUEDA VENTANA DESPUÉS DE CONFIRMAR EL OBJETIVO? (Toto, 13-ago-2026)
+                // §14 dice que el compromiso es la ÚLTIMA elección cancelable, no la primera.
+                // Té helado pregunta a quién curas y DESPUÉS quién paga: presentar al confirmar
+                // el objetivo enseñaba la carta con una elección cancelable todavía por delante
+                // -y dejaba a su tributo sin flecha posible, porque el pagador se elegía con el
+                // escaparate ya cerrado-. Si la lista arranca con una elección cancelable, la
+                // presentación se queda ARMADA y la dispara esa elección al mutar algo, igual que
+                // hace una Ayuda no dirigida. Se deduce, no se declara por carta: mismo criterio
+                // que en playCard.
+                const _ef0 = ((template.abilities || []).find(a => a.trigger === 'AL_USAR_AYUDA') || {}).efectos;
+                const _quedaVentana = !!(_ef0 && _ef0[0] && (_ef0[0].op === 'ELEGIR' || _ef0[0].op === 'BUSCAR') && _ef0[0].cancelable !== false);
+                if (!_quedaVentana) {
+                    // Los costes que la Ayuda le cobra A SU PROPIO OBJETIVO se anotan AQUÍ, antes
+                    // de disparar: la lista de efectos corre después de la presentación, y una
+                    // marca hecha allí llega con el escaparate ya cerrado.
+                    if (typeof DSL !== 'undefined' && typeof DSL._marcarCostesDeclarados === 'function') {
+                        DSL._marcarCostesDeclarados(card, this, target);
+                    }
+                    await this._dispararPresentacion();
                 }
-                await this._dispararPresentacion();
 
                 // Igual que en AL_CONSUMIR: mientras esta Ayuda actúa no se nombra a sí misma en
                 // sus flotantes. Hace falta AQUÍ TAMBIÉN desde que sale de la mano al presentarse
@@ -7755,7 +7835,7 @@
                 if (_cc) { _cc.innerHTML = ''; _cc.style.display = 'none'; }
                 document.getElementById('choice-modal').style.zIndex = '8500';
                 this._limpiarResalteReaccion();
-                this.stopPreview();
+                this.cerrarDetalle();
 
                 // NO borrar el texto del cartelón si estamos en el proceso de Setup inicial
                 if (this.activePlayerId !== 'setup') {

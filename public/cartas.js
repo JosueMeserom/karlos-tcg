@@ -1585,6 +1585,8 @@ const CARD_DB = [
     },
     {
         name: "Entrenamiento arduo", type: "Evento", rarity: "A", cost: 0, duration: 3, series: 1,
+        // Requisito visible: a quién señala la flecha lima al presentarse (§14.bis).
+        requisitoVisible: [ { quien: "ALIADO", filtros: [ { campo: "name", op: "==", valor: "Zoe" } ], uno: true } ],
         // Reestructurado (Toto, 5-ago-2026): "oculta y agota" no es algo que pase SOLO al
         // colocarla, es una condición que dura TODO el tiempo que el Evento está en juego (así lo
         // hace onUpdatePassive, más abajo: se reaplica en cada pasada) — el "Al colocarla:" viejo
@@ -2000,6 +2002,8 @@ const CARD_DB = [
     },
     {
         name: "Sadame (retornada)", hp: 4, def: 4, atk: 7, type: "Personaje", subtype: "No-muerto", tags: ["Usuaria de magia"], gender: "F", rarity: "S",
+        // Requisito visible: a quién señala la flecha lima al presentarse (§14.bis).
+        requisitoVisible: [ { quien: "ALIADO", filtros: [ { campo: "name", op: "==", valor: "Sadame" } ], uno: true }, { quien: "TODOS", filtros: [ { campo: "name", op: "==", valor: "Erasmo" } ], uno: true } ],
         text: "Requisito: Sadame en tu campo y Erasmo en cualquier campo. P: ÚLTIMA MISIÓN: Destruye a Sadame y ocupa su lugar, conservando sus bonos. Sus stats no bajan de las de base y restablece su Vida al colocarse. A: VUELVE A LA VIDA (3F): Revive 2 Personajes/Esbirros, dando igual sus condiciones o costes.",
         passiveName: "ÚLTIMA MISIÓN", activeName: "VUELVE A LA VIDA", activeCost: 3, series: 1,
         isEvolution: true,
@@ -2257,6 +2261,8 @@ const CARD_DB = [
     },
     {
         name: "Xanadu", hp: 6, def: 4, atk: 7, type: "Personaje", subtype: "Ser vivo", tags: ["Poder heredado"], gender: "M", rarity: "S", series: 1,
+        // Requisito visible: a quién señala la flecha lima al presentarse (§14.bis).
+        requisitoVisible: [ { quien: "TODOS", zona: "evento", filtros: [ { campo: "name", op: "==", valor: "Una buena razón" } ], uno: true } ],
         text: "Requisito: 'Una buena razón' activo en cualquier campo. P: REPULSIÓN ABSOLUTA: Al recibir un ataque normal, puede pagar 1 de Furor para evitarlo con todos sus efectos. A: ESTORNUDO DEVASTADOR (2F): Intercambia un enemigo de vanguardia por uno de retaguardia. Si no hay retaguardia enemiga, lo devuelve a su mano.",
         passiveName: "REPULSIÓN ABSOLUTA", activeName: "ESTORNUDO DEVASTADOR", activeCost: 2,
 
@@ -2443,6 +2449,8 @@ const CARD_DB = [
     },
     {
         name: "Diego Antonio", hp: 7, def: 9, atk: 9, type: "Personaje", subtype: "Ser vivo", tags: ["Usuario de VP", "mafia"], gender: "M", rarity: "S", series: 1,
+        // Requisito visible: a quién señala la flecha lima al presentarse (§14.bis).
+        requisitoVisible: [ { quien: "TODOS", zona: "evento", filtros: [ { campo: "name", op: "==", valor: "Una buena razón" } ], uno: true } ],
         text: "Requisito: 'Una buena razón' activo en cualquier campo. P: CÓLERA INFINITA: Al colocar: +1 de Furor y 3 Contadores; en vanguardia pierde 1 por turno y a 0 muere. No puede retirarse de forma normal. Al recibir un ataque normal invierte el cálculo: no sufre daño y daña al atacante. A: PACIFISMO (3F): Este turno no baja su contador.",
         passiveName: "CÓLERA INFINITA", activeName: "PACIFISMO", activeCost: 3,
         uncopyable: true, // Requiere los contadores exclusivos de Diego
@@ -2507,6 +2515,8 @@ const CARD_DB = [
     },
     {
         name: "Silhouette", hp: 7, def: 1, atk: 1, type: "Personaje", subtype: "Ser vivo", tags: ["Draconiana", "otaku", "usuaria de VP"], gender: "F", rarity: "S", series: 1,
+        // Requisito visible: a quién señala la flecha lima al presentarse (§14.bis).
+        requisitoVisible: [ { quien: "TODOS", zona: "evento", filtros: [ { campo: "name", op: "==", valor: "Una buena razón" } ], uno: true } ],
         text: "Requisito: 'Una buena razón' activo en cualquier campo. P: REINA DEL COSPLAY: Al inicio de tu turno, cura 2 Vida. A: PONTE TRAJE (1F): Elige cualquier aliado o enemigo en el campo. Copias sus stats base (Atq y Def).",
         passiveName: "REINA DEL COSPLAY", activeName: "PONTE TRAJE", activeCost: 1,
         
@@ -2792,6 +2802,8 @@ const CARD_DB = [
     },
     {
         name: "Giro de guion", type: "Evento", rarity: "B", cost: 0, duration: 3, series: 1,
+        // Requisito visible: a quién señala la flecha lima al presentarse (§14.bis).
+        requisitoVisible: [ { quien: "ALIADO", zona: "evento", uno: true } ],
         canReplaceEvent: true, // Permite bypass de la regla de 1 evento máximo
         text: "3 turnos. Requiere que tengas un Evento activo. Antes de colocarla, destruye los Eventos de ambos jugadores.",
         abilities: [
@@ -2831,6 +2843,8 @@ const CARD_DB = [
     },
     {
         name: "Shichishito", type: "Ayuda", subtype: "Arma legendaria", tags: ["Equipable", "melé"], rarity: "A", cost: 0, series: 1,
+        // Requisito visible: a quién señala la flecha lima al presentarse (§14.bis).
+        requisitoVisible: [ { quien: "ALIADO", zona: "vanguardia", filtros: [ { campo: "name", op: "contieneTexto", valor: "Karlos" }, { campo: "type", op: "==", valor: "Personaje" } ], uno: true } ],
         text: "Requisito: un Personaje 'Karlos' en tu vanguardia. Anéxasela: +2 de Atq y +2 de Def mientras la lleve. Sólo puedes usar esta carta una vez por partida.",
         abilities: [
             { trigger: "JUGAR", requisitos: [
@@ -3076,6 +3090,8 @@ const CARD_DB = [
     },
     {
         name: "Espada V", type: "Ayuda", subtype: "Arma", tags: ["melé"], cost: 1, rarity: "B", series: 1,
+        // Requisito visible: a quién señala la flecha lima al presentarse (§14.bis).
+        requisitoVisible: [ { quien: "ALIADO", filtros: [ { campo: "type", op: "==", valor: "Personaje" } ], algunFiltro: [ { campo: "name", op: "contieneTexto", valor: "Karlos" }, { campo: "name", op: "==", valor: "Agah" } ], uno: true } ],
         text: "Requisito: un Personaje aliado 'Karlos' o 'Agah'. Anéxasela: +2 de Atq mientras la lleve. Sólo puedes usar esta carta una vez por partida.",
         abilities: [
             { trigger: "JUGAR", requisitos: [
@@ -4458,6 +4474,8 @@ const CARD_DB = [
     },
     {
         name: "Karlos (KL)", hp: 6, def: 7, atk: 6, type: "Personaje", subtype: "Ser vivo", tags: ["Mercenario", "Usuario de VP"], gender: "M", rarity: "A", cost: 4, series: 2,
+        // Requisito visible: a quién señala la flecha lima al presentarse (§14.bis).
+        requisitoVisible: [ { quien: "ALIADO", algunFiltro: [ { campo: "name", op: "==", valor: "Karolina" }, { campo: "name", op: "==", valor: "Karlitos" }, { campo: "name", op: "==", valor: "Igniz" } ], uno: true } ],
         text: "Requisito: Karolina, Karlitos o Igniz en tu campo o bien Coste: 2 de Furor. P: DAME TRABAJOS: Si su Vida <= 3, +2 Atq. A: ULTRA-CHOQUE (2F): Dos ataques normales a vanguardia rival.",
         passiveName: "DAME TRABAJOS", activeName: "ULTRA-CHOQUE", activeCost: 2,
         abilities: [
@@ -4535,6 +4553,8 @@ const CARD_DB = [
     },
     {
         name: "Poder Legado", type: "Ayuda", subtype: "Técnica", tags: ["Equipable"], rarity: "S", cost: 1, series: 2,
+        // Requisito visible: a quién señala la flecha lima al presentarse (§14.bis).
+        requisitoVisible: [ { quien: "ALIADO", zona: "vanguardia", filtros: [ { campo: "name", op: "contieneTexto", valor: "Karlos" }, { campo: "currentHp", op: "<=", valor: 1 } ], uno: true } ],
         text: "Requisito: un 'Karlos' de tu vanguardia con 1 de Vida o menos. Equípaselo: sus stats pasan a 9 y quedan fijas, y quien le ataque pierde 1 de Furor. Al inicio de tu próximo turno el equipo se destruye y Karlos vuelve a tu mano.",
         // Migrada (31-jul-2026), segunda de la tanda de equipos con vida propia. Reutiliza
         // `cuentaAtras` de Súper Evolución (aquí de UN solo turno) y estrena dos piezas:
@@ -4886,6 +4906,8 @@ const CARD_DB = [
     },
     {
         name: "Época de estudio", type: "Evento", rarity: "C", cost: 1, duration: 3, series: 2,
+        // Requisito visible: a quién señala la flecha lima al presentarse (§14.bis).
+        requisitoVisible: [ { quien: "ALIADO", algunFiltro: [ { campo: "tags", op: "includesCI", valor: "estudioso" }, { campo: "tags", op: "includesCI", valor: "estudiosa" } ], uno: true } ],
         text: "3 turnos. Requiere un aliado 'Estudioso' en el campo. Mientras esté en juego, los aliados 'Estudiosos' no ganan Furor al inicio del turno y quedan Ocultos (inmunes a ataques normales). Al expirar, robas 2 cartas por cada aliado afectado.",
         abilities: [
             { trigger: "PREVIEW_GLOBAL", lineas: [ { quien: "ALIADO", algunaEtiqueta: ["Estudioso", "Estudiosa"], texto: "No gana Furor al inicio del turno y permanece {genero?Oculto|Oculta}" } ] },
@@ -7030,6 +7052,9 @@ const DSL = {
         if (z === 'vanguardia') return [...p.vanguard];
         if (z === 'retaguardia') return [...p.rearguard];
         if (z === 'mano') return [...p.hand]; // Matón, 31-jul-2026: "¿tengo más copias en la mano?"
+        // El Evento activo cuenta como carta del campo: hay cartas cuyo requisito ES un Evento
+        // ('Una buena razón' para Xanadu), y la flecha tiene que poder apuntarle.
+        if (z === 'evento') return p.activeEvent ? [p.activeEvent] : [];
         return [...p.vanguard, ...p.rearguard];
     },
     _pool(ownerId, game, spec, selfCard) {
@@ -7305,6 +7330,33 @@ const DSL = {
                     DSL._marcarCoste(game, [objetivo], 'tributo', `Tributa ${d} FUR`);
                 } else DSL._marcarCoste(game, [objetivo], 'coste');
             }
+        }
+    },
+
+    // REQUISITOS VISIBLES: qué carta del campo hace legal esta jugada.
+    //
+    // Un requisito no se pierde, solo se comprueba — pero el jugador merece ver CUÁL lo cumple,
+    // sobre todo cuando hay varias candidatas ('Una buena razón' puede estar en cualquiera de los
+    // dos campos). Se declara en la habilidad JUGAR con `requisitoVisible`, que es una lista de
+    // specs de pool iguales a las de cualquier `target`:
+    //
+    //   requisitoVisible: [ { quien: "ALIADO", filtros: [ { campo: "name", op: "==", valor: "Zoe" } ] } ]
+    //
+    // Solo se marca lo que existe y se puede señalar. Un requisito de RECUENTO ("tu vanguardia
+    // llena", "3 aliados") o NEGATIVO ("Karolina no está") no lleva flecha a propósito: no hay
+    // una carta concreta a la que apuntar, y una flecha a un aliado cualquiera mentiría.
+    _marcarRequisitosVisibles(sourceCard, game) {
+        if (!sourceCard || !game) return;
+        const tmpl = (typeof getCardTemplate === 'function' && getCardTemplate(sourceCard.id)) || {};
+        const ab = (tmpl.abilities || []).find(a => a.trigger === 'JUGAR');
+        const specs = (ab && ab.requisitoVisible) || tmpl.requisitoVisible;
+        if (!specs) return;
+        for (const s of (Array.isArray(specs) ? specs : [specs])) {
+            let pool = DSL._pool(sourceCard.owner, game, s, sourceCard) || [];
+            // `uno`: con varias candidatas basta una para que la jugada sea legal, así que se
+            // señala la primera en vez de llenar el tablero de flechas iguales.
+            if (s.uno) pool = pool.slice(0, 1);
+            if (pool.length) DSL._marcarCoste(game, pool, 'requisito');
         }
     },
 

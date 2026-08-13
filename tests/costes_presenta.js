@@ -225,6 +225,55 @@ async function montar(esc) {
         }
     }
 
+    // ── REQUISITOS VISIBLES (tanda 1) ─────────────────────────────────────────────
+    // `requisitoVisible` dice a qué carta del campo apunta la flecha lima. Se comprueba lo
+    // mismo que en los tributos: que la marca EXISTA cuando la presentación se encola.
+    console.log('\n--- Requisitos visibles: la flecha lima apunta a quien cumple ---');
+    {
+        const casos = [
+            { n: 'Entrenamiento arduo señala a Zoe',
+              esc: { turno: 2, turnoDe: 'p1', empieza: 'p2',
+                     p1: { vanguardia: ['Zoe'], mano: ['Entrenamiento arduo'] }, p2: { vanguardia: ['Mini-tigre'] } },
+              pasos: [{ jugar: 'Entrenamiento arduo' }], quien: 'Zoe' },
+            { n: 'Xanadu señala al Evento, aunque sea del RIVAL',
+              esc: { turno: 2, turnoDe: 'p1', empieza: 'p2',
+                     p1: { vanguardia: ['Mini-tigre'], mano: ['Xanadu'] },
+                     p2: { vanguardia: ['Mini-tigre'], evento: { carta: 'Una buena razón', duracion: 3 } } },
+              pasos: [{ jugar: 'Xanadu' }], quien: 'Una buena razón' },
+            { n: 'Shichishito señala al Karlos de vanguardia',
+              esc: { turno: 2, turnoDe: 'p1', empieza: 'p2',
+                     p1: { vanguardia: [{ carta: 'Karlos', furor: 2 }], mano: ['Shichishito'] }, p2: { vanguardia: ['Mini-tigre'] } },
+              pasos: [{ jugar: 'Shichishito' }, { elegir: ['Karlos'] }], quien: 'Karlos' },
+            { n: 'Giro de guion señala a TU Evento, no al del rival',
+              esc: { turno: 2, turnoDe: 'p1', empieza: 'p2',
+                     p1: { vanguardia: ['Mini-tigre'], mano: ['Giro de guion'], evento: { carta: 'Dáedra', duracion: 2 } },
+                     p2: { vanguardia: ['Mini-tigre'], evento: { carta: 'Una buena razón', duracion: 2 } } },
+              pasos: [{ jugar: 'Giro de guion' }], quien: 'Dáedra' },
+        ];
+        for (const c of casos) {
+            const { ctx, g, marcas } = await montar(c.esc);
+            let alEncolar = null;
+            ctx.sandbox.__vio = (l) => { if (alEncolar === null) alEncolar = l; };
+            require('vm').runInContext("(function(){var o=animarPresentacionCarta;animarPresentacionCarta=function(){"
+                + "__vio(((window.game._costesPresenta)||[]).map(function(m){return m.tipo;}));"
+                + "return o.apply(null,arguments);};})()", ctx.sandbox);
+            for (const p of c.pasos) await ejecutarPaso(ctx, g, p);
+            check(c.n, !!(alEncolar && alEncolar.includes('requisito'))
+                    && marcas.some(m => m.nombre === c.quien && m.tipo === 'requisito'),
+                'al encolar: ' + JSON.stringify(alEncolar) + ' · marcas: ' + JSON.stringify(marcas.map(m => m.nombre + '/' + m.tipo)));
+        }
+        // Un requisito de RECUENTO no lleva flecha a propósito: no hay carta concreta a la que
+        // apuntar, y señalar a un aliado cualquiera mentiría.
+        const { ctx, g, marcas } = await montar({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: ['Mini-tigre', 'Oso con armadura', 'Karlos'], mano: ['Esfuerzo dividido'] },
+            p2: { vanguardia: ['Mini-tigre'] },
+        });
+        await ejecutarPaso(ctx, g, { jugar: 'Esfuerzo dividido' });
+        check('un requisito de RECUENTO (Esfuerzo dividido) NO dibuja flecha',
+            !marcas.some(m => m.tipo === 'requisito'), JSON.stringify(marcas));
+    }
+
     console.log('');
     if (fallos) { console.log(`SUITE costes_presenta: ${fallos} FALLOS de ${total} comprobaciones`); process.exit(1); }
     console.log(`SUITE costes_presenta: ${total}/${total} comprobaciones — COSTES Y REQUISITOS CORRECTOS`);

@@ -99,6 +99,9 @@ for (const c of CARD_DB) {
             if (e.esRequisito && esFurorNegativo) incoherente = 'marcada como requisito pero gasta Furor (es un tributo)';
         }
     }
+    // `requisitoVisible` vive en la plantilla, no en un efecto: dice a qué carta del campo
+    // apunta la flecha lima que hace legal la jugada.
+    if (c.requisitoVisible) marcado = true;
     if (marcaAMano.has(c.name)) marcado = true;
 
     const txt = String(c.text || '');

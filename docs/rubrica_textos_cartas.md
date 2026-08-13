@@ -467,6 +467,14 @@ tocado pagar.
   pagador), no colado detrás de la búsqueda: ese apaño servía para no cobrar mientras aún se
   podía cancelar, pero a cambio retrasaba el flotante hasta el final de todo.
 - `esRequisito: true` — solo anota. Un requisito no se pierde, se comprueba.
+- `requisitoVisible` — en la **plantilla** (o en la habilidad `JUGAR`): a qué carta del campo
+  apunta la flecha lima que hace legal la jugada. Es una lista de specs de pool iguales a las de
+  cualquier `target`, con `uno: true` para señalar solo la primera cuando basta una:
+  `requisitoVisible: [ { quien: "ALIADO", filtros: [ { campo: "name", op: "==", valor: "Zoe" } ], uno: true } ]`.
+  `zona: "evento"` apunta al Evento activo. Solo se marca lo que existe y se puede señalar: un
+  requisito de **recuento** ("tu vanguardia llena", "3 aliados") o **negativo** ("Karolina no
+  está") no lleva flecha a propósito, porque no hay carta concreta y señalar a un aliado
+  cualquiera mentiría.
 
 En una carta imperativa se anota a mano con `DSL._marcarCoste(game, carta, 'coste'|'requisito')`.
 
@@ -520,10 +528,10 @@ cerrado — no dibuja nada y encima se lo come la siguiente presentación de la 
   al final para que cancelar el visor de descartes no cueste nada), la marca se adelanta con
   `esTributo: N` en el ELEGIR y **el cobro no se toca**. Las marcas viven hasta la siguiente
   jugada, así que sobreviven a la búsqueda.
-- Si el pagador se elige **después** del compromiso, hoy no hay flecha posible. Le pasa a **Té
-  helado**: se confirma a quién curas -y ahí se presenta- y solo entonces se pregunta quién paga.
-  Arreglarlo es mover su punto de compromiso a la última elección cancelable, que es lo que §14
-  pide en realidad; está sin hacer.
+- Si tras confirmar el objetivo **queda una elección cancelable** (Té helado pregunta a quién
+  curas y luego quién paga), la presentación se queda **armada** y la dispara esa elección, igual
+  que en una Ayuda no dirigida. §14 pide la ÚLTIMA elección cancelable, no la primera, y esto lo
+  cumple: se deduce de la forma de la lista de efectos, no se declara por carta.
 
 **Dos cosas que no se pueden romper al tocar esto:**
 
