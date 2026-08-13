@@ -851,7 +851,11 @@
             await game.sleep(200);
 
             attackerEl.style.transition = "transform 0.3s ease-out";
-            attackerEl.style.transform = "translate(0, 0) scale(1)";
+            // Se LIMPIA el transform en vez de fijarlo a scale(1): un scale(1) en línea pisa
+            // el scale(1.2) que da `.selected`, así que un atacante que sigue resaltado
+            // encogía al acabar la embestida y volvía a crecer de golpe en el siguiente
+            // repintado - el "rebote como si lo hubieras clicado" (Toto, 13-ago-2026).
+            attackerEl.style.transform = "";
 
             // Limpiamos los efectos
             if (defenderEl) defenderEl.style.animation = "";
@@ -1024,7 +1028,11 @@
             await game.sleep(400);
 
             attackerEl.style.transition = "transform 0.3s ease-out";
-            attackerEl.style.transform = "translate(0, 0) scale(1)";
+            // Se LIMPIA el transform en vez de fijarlo a scale(1): un scale(1) en línea pisa
+            // el scale(1.2) que da `.selected`, así que un atacante que sigue resaltado
+            // encogía al acabar la embestida y volvía a crecer de golpe en el siguiente
+            // repintado - el "rebote como si lo hubieras clicado" (Toto, 13-ago-2026).
+            attackerEl.style.transform = "";
 
             if (defenderEl) defenderEl.style.animation = "";
 
@@ -1073,7 +1081,11 @@
             else await new Promise(r => setTimeout(r, 250));
 
             attackerEl.style.transition = "transform 0.3s ease-out";
-            attackerEl.style.transform = "translate(0, 0) scale(1)";
+            // Se LIMPIA el transform en vez de fijarlo a scale(1): un scale(1) en línea pisa
+            // el scale(1.2) que da `.selected`, así que un atacante que sigue resaltado
+            // encogía al acabar la embestida y volvía a crecer de golpe en el siguiente
+            // repintado - el "rebote como si lo hubieras clicado" (Toto, 13-ago-2026).
+            attackerEl.style.transform = "";
             if (attackerCard) attackerCard.style.filter = "";
 
             if (defenderEl) {
@@ -1205,7 +1217,11 @@
             await game.sleep(200);
 
             attackerEl.style.transition = "transform 0.3s ease-out";
-            attackerEl.style.transform = "translate(0, 0) scale(1)";
+            // Se LIMPIA el transform en vez de fijarlo a scale(1): un scale(1) en línea pisa
+            // el scale(1.2) que da `.selected`, así que un atacante que sigue resaltado
+            // encogía al acabar la embestida y volvía a crecer de golpe en el siguiente
+            // repintado - el "rebote como si lo hubieras clicado" (Toto, 13-ago-2026).
+            attackerEl.style.transform = "";
 
             if (targetHand) targetHand.classList.remove('shake-ui');
 
@@ -1261,26 +1277,37 @@
 
                 const targetEl = item.el;
                 const rect = targetEl.getBoundingClientRect();
-
-                const topPart = targetEl.cloneNode(true);
-                const bottomPart = targetEl.cloneNode(true);
-
-                [topPart, bottomPart].forEach(part => {
-                    part.style.position = 'fixed';
-                    part.style.left = rect.left + 'px';
-                    part.style.top = rect.top + 'px';
-                    part.style.width = rect.width + 'px';
-                    part.style.height = rect.height + 'px';
-                    part.style.margin = '0';
-                    part.style.transition = 'none';
-                    // El portador tiene z-index 2000, las armas 1999, 1998...
-                    part.style.zIndex = (2000 - index).toString(); 
-                    part.classList.remove('interactive', 'selected', 'targetable');
-                    
-                    const btns = part.querySelectorAll('.action-btn-card');
-                    btns.forEach(b => b.remove());
-                    document.body.appendChild(part);
-                });
+                // MARGEN alrededor de la carta (Toto, 13-ago-2026). El clip-path recorta a la
+                // caja del elemento, y hay adornos que viven FUERA de ella: la píldora de Furor
+                // (top:-6px, right:-12px) y el botón de acción del agotado. Se cortaban en seco
+                // al partirse la carta. Se envuelve el clon en una caja más grande y se recorta
+                // ESA, así que todo lo que cuelga entra en las dos mitades.
+                const PAD = 22;
+                const _mitad = () => {
+                    const caja = document.createElement('div');
+                    caja.style.cssText = 'position:fixed; margin:0; transition:none; pointer-events:none;'
+                        + `left:${rect.left - PAD}px; top:${rect.top - PAD}px;`
+                        + `width:${rect.width + PAD * 2}px; height:${rect.height + PAD * 2}px;`
+                        + `z-index:${2000 - index};`;
+                    const clon = targetEl.cloneNode(true);
+                    clon.style.position = 'absolute';
+                    clon.style.left = PAD + 'px';
+                    clon.style.top = PAD + 'px';
+                    clon.style.width = rect.width + 'px';
+                    clon.style.height = rect.height + 'px';
+                    clon.style.margin = '0';
+                    clon.style.transition = 'none';
+                    // Se quitan los estados INTERACTIVOS (reborde, zoom de selección), que no
+                    // pintan nada en un cadáver. Los BOTONES sí se quedan: forman parte de la
+                    // carta y antes se borraban del clon, así que el del agotado desaparecía.
+                    clon.classList.remove('interactive', 'selected', 'targetable');
+                    clon.style.transform = 'none';
+                    caja.appendChild(clon);
+                    document.body.appendChild(caja);
+                    return caja;
+                };
+                const topPart = _mitad();
+                const bottomPart = _mitad();
 
                 topPart.style.clipPath = 'polygon(0 0, 100% 0, 100% 45%, 0 55%)';
                 bottomPart.style.clipPath = 'polygon(0 55%, 100% 45%, 100% 100%, 0 100%)';

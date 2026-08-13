@@ -451,6 +451,19 @@ check('una carta que cambia de tamano no se desliza', !fA.style.transition,
       'transition: ' + fA.style.transition);
 fA.__rect = { left: 50, top: 400, width: 90, height: 126 };
 
+// Un atacante que sigue RESALTADO no puede quedarse con un transform en línea: `.selected` da
+// scale(1.2) por CSS, y un scale(1) inline lo pisa hasta el siguiente repintado, momento en el
+// que la carta pega el estirón. Es el "rebote como si lo hubieras clicado" (Toto, 13-ago-2026).
+const _srcIdx = fs.readFileSync(path.join(RAIZ, 'public/index.html'), 'utf8');
+check('ningun reset de ataque fija scale(1) en linea',
+      !/attackerEl\.style\.transform = "translate\(0, 0\) scale\(1\)"/.test(_srcIdx),
+      'queda algun reset con scale(1) fijo');
+// Y la animacion de muerte no puede borrar los botones del clon: el del agotado forma parte de
+// la carta y desaparecia al partirse.
+check('la animacion de muerte no borra los botones del clon',
+      !/const btns = part\.querySelectorAll\('\.action-btn-card'\)/.test(_srcIdx),
+      'sigue borrando .action-btn-card');
+
 // ---------- salir de la mano (la carta se va, el resto se acomoda) ----------
 // Cuando una carta viaja al escaparate deja de estar en la mano: si nadie la quita del DOM se
 // ve DUPLICADA -en la mano y en el escaparate a la vez- porque el estado ya la sacó pero no se
