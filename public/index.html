@@ -3799,9 +3799,13 @@
             // sobre la que evoluciona mientras esta hace su animación; `cambio` es el
             // intercambio de estado, que corre cuando las dos animaciones han acabado. Lo usan
             // todas las evoluciones para no repetir el montaje (Toto, 13-ago-2026).
-            async evolucionarDesdeMano(card, baseInstanceId, cambio) {
-                await animarPresentacionCarta(card.id, `#${card.owner}-hand`, null,
-                    this.gameMode === 'online' && this.myPlayerId !== card.owner,
+            // `origenSel`: de dónde sale la carta. Casi siempre la mano, pero Zoe (calcinante) la
+            // trae Entrenamiento arduo del MAZO si no la tienes en mano, y entonces debe salir
+            // volando de ahí (Toto, 13-ago-2026).
+            async evolucionarDesdeMano(card, baseInstanceId, cambio, origenSel) {
+                const _duenyo = card.owner || this.activePlayerId;
+                await animarPresentacionCarta(card.id, origenSel || `#${_duenyo}-hand`, null,
+                    this.gameMode === 'online' && this.myPlayerId !== _duenyo,
                     { origenId: card.instanceId, disolverHacia: baseInstanceId, colocar: cambio });
             }
 
@@ -6577,7 +6581,26 @@
                 // El `await` es a propósito: el efecto no debe empezar hasta que se ha visto la
                 // carta. Y el LOG de "juega X" sale ANTES, dentro de la propia jugada, no al
                 // terminar la animación (pedido explícito de Toto).
+                let _eventoColocado = false;
+                let _colocarEvento = () => {};
                 if (card.type === 'Ayuda' || card.type === 'Evento') {
+                    // Colocar el Evento es lo que hace aparecer su tira en la ranura, y eso tiene
+                    // que pasar DENTRO de la presentación, al llegar: si la ranura sigue vacía
+                    // cuando el clon aterriza, no hay versión colocada con la que cruzarse y cae
+                    // al desvanecido de siempre — que es justo lo que había que quitar. Mismo
+                    // contrato que ya usaban filas y pilas (Toto, 13-ago-2026).
+                    _eventoColocado = false;
+                    _colocarEvento = () => {
+                        if (_eventoColocado) return;
+                        _eventoColocado = true;
+                        const _i = p.hand.findIndex(c => c.instanceId === card.instanceId);
+                        if (_i !== -1) p.hand.splice(_i, 1);
+                        this.assignCopyId(card);
+                        p.activeEvent = card;
+                        card.location = 'event';
+                        this.logMsg(`${pName} juega el Evento: ${this.nCarta(card)}`, 'system');
+                        this.render();
+                    };
                     const _origen = `#${card.owner}-hand`;
                     const _destino = card.type === 'Evento' ? `#${card.owner}-event-slot` : `#${card.owner}-discard-stack`;
                     // De dorso SOLO si para MÍ estaba tapada: la juega el rival desde su mano.
@@ -6585,12 +6608,16 @@
                     const _pres = { cardId: card.id, origen: _origen, destino: _destino, deDorso: _deDorso, origenId: card.instanceId,
                         // Un Evento tiene versión colocada (la tira de su ranura): se funde con
                         // ella en vez de desvanecerse y aparecer de golpe.
-                        // El Evento tiene versión colocada (la tira de su ranura) y la pila de
-                        // descartes estrena miniatura cuando estaba vacía: en los dos casos la
-                        // carta se funde con lo que aparece, en vez de desvanecerse y que salga
-                        // de golpe. Con la pila ya poblada no hay nada que estrenar y el
-                        // desvanecido de siempre es lo correcto (Toto, 13-ago-2026).
-                        fundirEn: card.type === 'Evento' ? `#${card.owner}-event-slot`
+                        // PENDIENTE para el EVENTO. La pila de descartes SÍ se funde cuando
+                        // estrena miniatura (una Ayuda la coloca dentro de la presentación, así
+                        // que al llegar el clon ya hay algo con lo que cruzarse). El Evento no:
+                        // se coloca DESPUÉS de que la presentación termine, así que el clon llega
+                        // a una ranura vacía y cae al desvanecido. Dárselo por `colocar` -como
+                        // hacen filas y pilas- lo coloca antes de que `canReplaceEvent` compruebe
+                        // si hay Evento previo, y esa comprobación destruye el recién puesto:
+                        // Giro de guion acaba en el descarte y el viejo se queda en la ranura
+                        // (regresion9/20/62). Eso es lo que falta por entender (13-ago-2026).
+                        fundirEn: card.type === 'Evento' ? null
                                 : (!p.discard || !p.discard.length) ? `#${card.owner}-discard-stack` : null };
                     // MISMA NORMA QUE EL COSTE DE UNA ACTIVA (Toto, 7-ago-2026): nada visible
                     // hasta que deje de poder cancelarse. Enseñar la carta al clicarla SPOILEA la
@@ -6606,7 +6633,8 @@
                                      || typeof template.onBeforePlayAsync === 'function'
                                      || _eleccionCancelable;
                     if (_hayVentana) this._presentacionArmada = _pres;
-                    else await animarPresentacionCarta(_pres.cardId, _pres.origen, _pres.destino, _pres.deDorso, { origenId: _pres.origenId });
+                    else await animarPresentacionCarta(_pres.cardId, _pres.origen, _pres.destino, _pres.deDorso,
+                        { origenId: _pres.origenId, fundirEn: _pres.fundirEn, colocar: _pres.colocar || null });
                 }
                 if (card.type === 'Ayuda') {
                     if (typeof template.onPlay === 'function') {
@@ -6657,22 +6685,27 @@
                     // llega a presentarse, se desarma sola más abajo.
                     if (typeof template.onBeforePlayAsync === 'function') {
                         this._retenerEscaparate = true;
-                        let proceed;
-                        try { proceed = await template.onBeforePlayAsync(card, this, p); }
-                        finally { this._retenerEscaparate = false; }
+                        // OJO: no se limpia aquí. La animación llega a su punto de espera ~1s
+                        // después de dispararse, así que apagar la bandera al terminar el hook
+                        // era una CARRERA: la presentación llegaba al centro con la bandera ya
+                        // en false, no retenía, y seguía viaje colocando el Evento antes de
+                        // tiempo -que `canReplaceEvent` destruía acto seguido, dejando el viejo
+                        // en la ranura y el nuevo en el descarte-. La apaga quien la consume:
+                        // el propio punto de espera, o _soltarYEsperarEscaparate más abajo.
+                        const proceed = await template.onBeforePlayAsync(card, this, p);
                         if (!proceed) { await this._soltarYEsperarEscaparate(); return; }
                     }
                     if (p.activeEvent && template.canReplaceEvent) {
                         await this.destroyEvent(this.activePlayerId);
                     }
+                    // La COLOCACIÓN ocurre DENTRO de la presentación, al llegar a la ranura, no
+                    // después de que termine (§14.quater). Puesta fuera, el clon llegaba a una
+                    // ranura todavía vacía: no había versión colocada con la que cruzarse y caía
+                    // al desvanecido de siempre, que es justo lo que había que quitar. Es el
+                    // mismo contrato que ya usaban las filas y las pilas (Toto, 13-ago-2026).
                     // Ya está todo hecho: la carta puede irse del centro a su ranura.
                     await this._soltarYEsperarEscaparate();
-                    p.hand.splice(cardIndex, 1);
-                    this.assignCopyId(card); // el [n] nace al salir de la mano
-                    p.activeEvent = card;
-                    card.location = 'event';
-                    this.assignCopyId(card);
-                    this.logMsg(`${pName} juega el Evento: ${this.nCarta(card)}`, 'system');
+                    _colocarEvento();
                     
                     if (typeof template.onPlay === 'function') {
                         await template.onPlay(card, this);

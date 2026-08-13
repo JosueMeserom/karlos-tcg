@@ -1681,6 +1681,15 @@ const CARD_DB = [
                         zoe.equippedCards = [];
                     }
 
+                    // La calcinante SE PRESENTA antes de sustituir a Zoe, y sale de donde de
+                    // verdad venía: de tu mano, o volando del mazo si Entrenamiento arduo la
+                    // buscó ahí. Después se deshace sobre Zoe mientras esta evoluciona
+                    // (§14.quater). Va ANTES del intercambio: Zoe tiene que seguir en el tablero
+                    // para poder ser el destino de la disolución (Toto, 13-ago-2026).
+                    if (typeof game.evolucionarDesdeMano === "function") {
+                        await game.evolucionarDesdeMano(calcinante, zoe.instanceId, null,
+                            `#${playerId}-${fromZone === 'deck' ? 'deck-stack' : 'hand'}`);
+                    }
                     calcinante.location = zoe.location;
                     if (zoe.location === 'vanguard') {
                         const idx = p.vanguard.findIndex(c => c.instanceId === zoe.instanceId);
@@ -1691,7 +1700,6 @@ const CARD_DB = [
                     }
 
                     game.render();
-                    try { await animateEvolution(calcinante.instanceId); } catch(e) {}
 
                     // Limpieza universal (Toto, 5-ago-2026, betasteo: la Zoe vieja se veía Oculta,
                     // agotada y todavía afectada por Wolfgang en los descartes). Mismo patrón que
