@@ -13,12 +13,9 @@
 //
 //   node tests/online.js
 //
-// ESTADO (13-ago-2026): EN CONSTRUCCIÓN, y NO forma parte todavía de la pasada estricta. Ya
-// reproduce una asimetría real -al jugar Limo crecido, el modal se abre en el cliente del RIVAL
-// y no en el de quien juega, y el playCard de quien juega se sale sin dejar rastro ni log de
-// error-, que es exactamente la forma del bug que Toto ve en el navegador. Falta encontrar el
-// `return` silencioso que se lo come; el guard de "No es tu turno" no es (se comprobó) y ningún
-// logError salta.
+// ENTRA EN LA PASADA ESTRICTA. Su primer hallazgo: durante una evolución no había ninguna
+// corrutina viva, así que el poller daba la partida por asentada a mitad de los ~2 segundos de
+// animación y volcaba al rival un estado a medias.
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -38,10 +35,22 @@ function check(titulo, ok, detalle) {
     else { fallos++; console.log('  FALLO · ' + titulo + (detalle ? '\n          ' + detalle : '')); }
 }
 
+// LA REGLA QUE HACE QUE ESTO SEA FIEL: el servidor reparte cada acción a LOS DOS clientes,
+// emisor incluido. En online, `playCard` no ejecuta nada en local -solo emite y sale-; la jugada
+// ocurre cuando la acción vuelve ordenada por el servidor. Por eso existe CONVERTED_ACTIONS: de
+// su propio eco, un cliente ejecuta esas y descarta el resto (las que ya corrió en optimista).
+// Mandar la acción solo al rival, como hacía la primera versión de este fichero, deja al que
+// juega sin hacer nada — y eso NO es el bug, es el cable mal puesto (13-ago-2026).
+const CONVERTIDAS = new Set(['END_TURN', 'PLAY_CARD', 'ACTIVATE_ABILITY', 'DIRECT_ATTACK',
+    'CONFIRM_ACTION', 'TYPE_SELECTION', 'FINISH_EARLY_TARGETS', 'OPPONENT_DISCARD',
+    'DEBUG_RETRIBUTION', 'DEBUG_COIN_MODE']);
+
 // Subconjunto de la tubería del servidor que importa para una jugada. Se copia el `else if` de
 // processActionQueue y las tres respuestas inmediatas (que en el cliente real bypasean la cola
 // justo para no bloquearla: la cola espera la Promise y la Promise esperaría a la cola).
 async function entregar(g, data) {
+    // Mi propio eco: solo me interesan las convertidas (el resto ya las ejecuté al emitirlas).
+    if (data._from && data._from === g.myPlayerId && !CONVERTIDAS.has(data.action)) return;
     try {
         switch (data.action) {
             case 'CHOICE_SELECTED':        g.executeChoice(data.index, true); break;
@@ -84,7 +93,10 @@ async function mesaOnline(esc) {
             id: 'sock-' + yo,
             emit: (evt, data) => {
                 if (evt !== 'gameAction' || !data) return;
-                Promise.resolve().then(() => entregar(clientes[otro].g, Object.assign({ _from: yo }, data)));
+                // A LOS DOS, como el servidor: el emisor también recibe su acción de vuelta.
+                for (const dest of ['p1', 'p2']) {
+                    Promise.resolve().then(() => entregar(clientes[dest].g, Object.assign({ _from: yo }, data)));
+                }
             },
             on: () => {},
         };
@@ -150,6 +162,37 @@ async function reposar(clientes, vueltas = 60) {
         check('y la evolución ocurrió de verdad',
             A.g.players.p1.vanguard.some(c => c.name === 'Limo crecido'),
             'vg p1=' + JSON.stringify(A.g.players.p1.vanguard.map(c => c.name)));
+    }
+
+    // ── EL VUELCO A MITAD DE CADENA ───────────────────────────────────────────────
+    // El poller vuelca el estado al rival cuando cree que la partida está ASENTADA. Con tiempos
+    // instantáneos eso no se ve, así que aquí se fuerza: se pregunta si está asentada JUSTO en
+    // mitad de la animación de la evolución. Si dice que sí, volcará un estado a medias — y ese
+    // es exactamente el desincronizado que Toto ve (uno con la carta de vuelta en la mano, el
+    // otro con la evolución hecha). La condición real es `_corrutinasVivas`.
+    console.log('\n--- A mitad de una evolución, la partida NO puede darse por asentada ---');
+    {
+        const cl = await mesaOnline({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: ['Limo artificial'], mano: ['Limo crecido'] },
+            p2: { vanguardia: ['Mini-tigre'] },
+        });
+        const A = cl.p1;
+        let vivasEnMedio = null;
+        // El gancho: se mira el contador cuando la animación de la evolución está corriendo.
+        const orig = A.g.evolucionarDesdeMano.bind(A.g);
+        A.g.evolucionarDesdeMano = async function (...args) {
+            vivasEnMedio = A.g._corrutinasVivas || 0;
+            return orig(...args);
+        };
+        await ejecutarPaso(A.ctx, A.g, { jugar: 'Limo crecido' });
+        await reposar(cl);
+        await ejecutarPaso(A.ctx, A.g, { opcion: 'EVOLUCIONAR LIMO ARTIFICIAL' });
+        await reposar(cl);
+        await ejecutarPaso(A.ctx, A.g, { elegir: ['Limo artificial'] });
+        await reposar(cl);
+        check('durante la evolución hay una corrutina viva (el poller no volcará a medias)',
+            vivasEnMedio > 0, '_corrutinasVivas en mitad de la animación = ' + vivasEnMedio);
     }
 
     console.log('');

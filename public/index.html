@@ -6709,7 +6709,12 @@
                         // tiempo -que `canReplaceEvent` destruía acto seguido, dejando el viejo
                         // en la ranura y el nuevo en el descarte-. La apaga quien la consume:
                         // el propio punto de espera, o _soltarYEsperarEscaparate más abajo.
-                        const proceed = await template.onBeforePlayAsync(card, this, p);
+                        // _seguirCorrutina: mientras esto corre, el poller NO puede dar la partida por asentada y
+                        // volcar estado al rival. Antes no lo veía -playCard AWAITA este hook, así que no hay
+                        // banderín que lo delate- y con las evoluciones, que ahora duran ~2 s de animación, se
+                        // volcaba a mitad: uno acababa con la carta de vuelta en la mano y el otro con la
+                        // evolución hecha. Es el mismo fallo que ya documentó Dobla la ropa (Toto, 13-ago-2026).
+                        const proceed = await this._seguirCorrutina(template.onBeforePlayAsync(card, this, p));
                         if (!proceed) { await this._soltarYEsperarEscaparate(); return; }
                     }
                     if (p.activeEvent && template.canReplaceEvent) {
@@ -6744,7 +6749,12 @@
                     // requisitos, no una elección que aún pueda cancelar la jugada.
                     const _pausaCoste = !!template.pausaEnEscaparate;
                     if (!_pausaCoste && typeof template.onBeforePlayAsync === 'function') {
-                        const proceed = await template.onBeforePlayAsync(card, this, p);
+                        // _seguirCorrutina: mientras esto corre, el poller NO puede dar la partida por asentada y
+                        // volcar estado al rival. Antes no lo veía -playCard AWAITA este hook, así que no hay
+                        // banderín que lo delate- y con las evoluciones, que ahora duran ~2 s de animación, se
+                        // volcaba a mitad: uno acababa con la carta de vuelta en la mano y el otro con la
+                        // evolución hecha. Es el mismo fallo que ya documentó Dobla la ropa (Toto, 13-ago-2026).
+                        const proceed = await this._seguirCorrutina(template.onBeforePlayAsync(card, this, p));
                         if (!proceed) return; 
                     }
 
@@ -6796,7 +6806,7 @@
                         {
                             origenId: card.instanceId,
                             enElEscaparate: _pausaCoste ? async () => {
-                                if (typeof template.onBeforePlayAsync === 'function') await template.onBeforePlayAsync(card, this, p);
+                                if (typeof template.onBeforePlayAsync === 'function') await this._seguirCorrutina(template.onBeforePlayAsync(card, this, p));
                                 _decidirZona();   // ya con el coste pagado: la vanguardia puede haberse vaciado
                             } : null,
                             zonaSel: _filaDe,

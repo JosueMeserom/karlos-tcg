@@ -39,7 +39,7 @@ La batería histórica (r1–r23 + humo) se perdió con los transcripts de chat 
 **Migración al DSL, en curso por tandas** (ver la memoria `estado-migracion-dsl` para el detalle vivo): cada tanda = migrar cartas en `public/cartas.js` + suite viejo-vs-nuevo nueva + pasada estricta + commit + push. Tandas hechas: interceptores (Plan de equipo, Feria del cómic, Deuda con la mafia), tanda 1 (simples), tanda 2 (REACCION). Candidatas siguientes: `AL_MORIR` (onDeath/onAllyDeath), clones/tokens (más arquitectura), y las irreducibles de §6 que se quedan como código. El recuento de hooks de una carta NO es buen proxy de complejidad.
 
 ## Metodología (INNEGOCIABLE)
-1. Tras CUALQUIER cambio en `cartas.js` o el intérprete: pasada estricta de TODAS las suites (`for f in tests/regresion*.js tests/humo.js; do node "$f"; done`), exigiendo el mensaje de éxito explícito de cada una. No vale "parece que pasa".
+1. Tras CUALQUIER cambio en `cartas.js` o el intérprete: pasada estricta de TODAS las suites (`for f in tests/regresion*.js tests/humo.js; do node "$f"; done`, más las de aserción: `nuevas*`, `modales_pilas`, `badge_furor_forzado`, `picker_mano`, `capas_cliente`, `costes_presenta` y **`online`**), exigiendo el mensaje de éxito explícito de cada una. No vale "parece que pasa".
 2. `node --check` tras editar cualquier `.js`.
 3. `index.html` es CRLF: conservar los finales de línea al editar.
 4. Nunca inventar archivos ni rutas no confirmados por el árbol de directorios o por Toto.
