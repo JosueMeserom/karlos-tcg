@@ -296,6 +296,32 @@ async function montar(esc) {
             'descartes=' + JSON.stringify(g.players.p1.discard.map(c => c.name)));
     }
 
+    // ── LO QUE SE HACE "ANTES DE COLOCARLA" OCURRE EN EL ESCAPARATE ───────────────
+    // La presentación se RETIENE en el centro mientras corren esos efectos, y solo entonces la
+    // carta viaja a su sitio. Con Giro de guion se veía al revés: llegaba a la ranura, se
+    // desvanecía, ENTONCES se disolvían los Eventos, y solo después aparecía (Toto, 13-ago-2026).
+    // Lo que se comprueba aquí es lo que puede matar la partida: que la retención SIEMPRE se
+    // suelte. Abre una promesa, y si algo no la resuelve la cadena se cuelga para siempre.
+    console.log('\n--- El "antes de colocarla" retiene la carta, y la retención SIEMPRE se suelta ---');
+    {
+        const { ctx, g } = await montar({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: ['Mini-tigre'], mano: ['Giro de guion'], evento: { carta: 'Dáedra', duracion: 2 } },
+            p2: { vanguardia: ['Mini-tigre'], evento: { carta: 'Una buena razón', duracion: 2 } },
+        });
+        await ejecutarPaso(ctx, g, { jugar: 'Giro de guion' });
+        check('Giro de guion acaba colocado en su ranura',
+            (g.players.p1.activeEvent || {}).name === 'Giro de guion',
+            'evento=' + ((g.players.p1.activeEvent || {}).name || '(ninguno)'));
+        check('...el Evento anterior propio se ha ido al descarte',
+            g.players.p1.discard.some(c => c.name === 'Dáedra'),
+            'descartes=' + JSON.stringify(g.players.p1.discard.map(c => c.name)));
+        check('...y el del rival ha desaparecido', !g.players.p2.activeEvent);
+        check('la retención queda suelta (si no, la siguiente cadena se cuelga)',
+            !g._retenerEscaparate && !g._soltarEscaparate && !g._restoPresentacion,
+            'retener=' + !!g._retenerEscaparate + ' soltar=' + !!g._soltarEscaparate + ' resto=' + !!g._restoPresentacion);
+    }
+
     console.log('');
     if (fallos) { console.log(`SUITE costes_presenta: ${fallos} FALLOS de ${total} comprobaciones`); process.exit(1); }
     console.log(`SUITE costes_presenta: ${total}/${total} comprobaciones — COSTES Y REQUISITOS CORRECTOS`);

@@ -1815,6 +1815,22 @@
             // 2) Pose.
             await g.sleep(PRESENTA_POSE);
 
+            // 2.bis) PUNTO DE ESPERA (Toto, 13-ago-2026). Una carta que hace algo "antes de
+            // colocarla" lo hace AQUÍ, con la carta enseñada y quieta en el centro, y solo
+            // después viaja a su sitio. Con Giro de guion se veía al revés: la carta llegaba a
+            // la ranura, se desvanecía, ENTONCES se disolvían los Eventos, y solo después
+            // aparecía colocada.
+            // Quien retiene marca `_retenerEscaparate` ANTES de que la presentación se dispare;
+            // aquí se avisa de que la carta ya está en el centro (`_escaparateLlegada`) y se
+            // espera a que lo suelten. Sin nadie reteniendo esto no cuesta nada.
+            if (g._retenerEscaparate) {
+                g._retenerEscaparate = false;
+                await new Promise(soltar => {
+                    g._soltarEscaparate = () => { g._soltarEscaparate = null; soltar(); };
+                    if (g._avisarLlegadaEscaparate) { const av = g._avisarLlegadaEscaparate; g._avisarLlegadaEscaparate = null; av(); }
+                });
+            }
+
             // Las flechas se van en cuanto arranca el viaje al destino, no antes.
             if (flechas) {
                 flechas.capa.style.transition = `opacity ${PRESENTA_FLECHA_MS}ms ease`;
@@ -4826,6 +4842,10 @@
                 this._costesPresenta = [];
                 this._cobrosPendientes = [];
                 this._presentacionArmada = null;
+                this._retenerEscaparate = false;
+                if (this._soltarEscaparate) this._soltarEscaparate();
+                if (this._avisarLlegadaEscaparate) { const av = this._avisarLlegadaEscaparate; this._avisarLlegadaEscaparate = null; av(); }
+                this._restoPresentacion = null;
                 this._ayudaEnCurso = null;
                 this.abilityContext = null;
                 this.selectedCard = null;
@@ -6548,13 +6568,22 @@
                     // La rama Evento NUNCA consultaba este hook: la Deuda imperativa entraba
                     // sin deudor (sin silencio ni corte de Furor). Bug latente compartido,
                     // detectado al migrar la carta al DSL en feat/interceptores.
+                    // Lo que la carta hace "antes de colocarla" ocurre CON ELLA ENSEÑADA en el
+                    // centro, no después de haberla guardado (§14.ter). Se pide la retención
+                    // antes de que nada dispare la presentación; si la jugada se cancela o no
+                    // llega a presentarse, se desarma sola más abajo.
                     if (typeof template.onBeforePlayAsync === 'function') {
-                        const proceed = await template.onBeforePlayAsync(card, this, p);
-                        if (!proceed) return;
+                        this._retenerEscaparate = true;
+                        let proceed;
+                        try { proceed = await template.onBeforePlayAsync(card, this, p); }
+                        finally { this._retenerEscaparate = false; }
+                        if (!proceed) { await this._soltarYEsperarEscaparate(); return; }
                     }
                     if (p.activeEvent && template.canReplaceEvent) {
                         await this.destroyEvent(this.activePlayerId);
                     }
+                    // Ya está todo hecho: la carta puede irse del centro a su ranura.
+                    await this._soltarYEsperarEscaparate();
                     p.hand.splice(cardIndex, 1);
                     this.assignCopyId(card); // el [n] nace al salir de la mano
                     p.activeEvent = card;
@@ -7904,7 +7933,27 @@
                 // viéndose en la mano.
                 const _o = { origenId: p.origenId || null };
                 if (p.colocar) _o.colocar = () => { p.colocar(); return null; };
-                return animarPresentacionCarta(p.cardId, p.origen, p.destino, p.deDorso, _o);
+                const _anim = animarPresentacionCarta(p.cardId, p.origen, p.destino, p.deDorso, _o);
+                // Con retención, esto resuelve al LLEGAR al centro, no al final: la cadena que
+                // debe correr con la carta enseñada tiene que poder arrancar. Si esperásemos al
+                // final, la animación esperaría a la cadena y la cadena a la animación.
+                if (this._retenerEscaparate) {
+                    this._restoPresentacion = _anim;   // el viaje al destino sigue vivo detrás
+                    return new Promise(av => { this._avisarLlegadaEscaparate = av; });
+                }
+                return _anim;
+            }
+
+            // Suelta la carta retenida en el escaparate y espera a que termine su viaje. Inocuo
+            // si nadie estaba reteniendo (una carta sin efectos previos, o una jugada cancelada
+            // antes de presentarse).
+            async _soltarYEsperarEscaparate() {
+                this._retenerEscaparate = false;
+                if (this._soltarEscaparate) this._soltarEscaparate();
+                if (this._avisarLlegadaEscaparate) { const av = this._avisarLlegadaEscaparate; this._avisarLlegadaEscaparate = null; av(); }
+                const resto = this._restoPresentacion;
+                this._restoPresentacion = null;
+                if (resto) { try { await resto; } catch (e) {} }
             }
 
             _purgarBanderasSync() {

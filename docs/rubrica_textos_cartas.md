@@ -547,3 +547,27 @@ cerrado — no dibuja nada y encima se lo come la siguiente presentación de la 
 3. **`modifyStat` ya pinta su propio flotante** al cambiar un stat. Declarar además un `floating`
    con el mismo texto ("-1 FUR") lo saca **dos veces**. Un `floating` propio solo se pone si dice
    algo DISTINTO ("CAÑÓN DE POSITRONES", "-1 FUR (Aura)").
+
+
+## 14.ter. LO QUE SE HACE "ANTES DE COLOCARLA" OCURRE EN EL ESCAPARATE (Toto, 13-ago-2026)
+
+Si una carta hace algo antes de colocarse **como parte de su propio efecto** -Giro de guion
+destruye los dos Eventos, Némesis aniquila su vanguardia-, eso pasa **con la carta enseñada y
+quieta en el centro**, y solo cuando termina viaja a su sitio. Antes se veía al revés: la carta
+llegaba a su ranura, se desvanecía, *entonces* ocurría el efecto, y *después* aparecía colocada.
+
+Mecánicamente la presentación se **retiene**: quien va a correr esos efectos marca
+`_retenerEscaparate` antes de que nada la dispare, y `_dispararPresentacion` pasa a resolver **al
+llegar al centro** en vez de al final -si esperase al final, la animación esperaría a la cadena y
+la cadena a la animación-. El viaje al destino sigue vivo detrás y lo suelta
+`_soltarYEsperarEscaparate()`.
+
+**La retención SIEMPRE se suelta.** Abre una promesa: si una rama de salida se la deja puesta -una
+jugada cancelada, un escenario cargado a media cadena- la partida se cuelga sin ruido. Por eso la
+suelta también el `finally` del hook y el cierre de emergencia (`cerrarTodoYCancelar`), y por eso
+la suite lo comprueba explícitamente en vez de fiarse del resultado.
+
+Esto NO afecta a lo cancelable: una elección previa que aún permita retirar la jugada sigue
+ocurriendo antes, sin carta enseñada, porque `_comprometer` ya traza esa línea sola (la
+presentación queda ARMADA, no disparada, mientras haya una ventana cancelable delante). No hay
+nada que declarar por carta.
