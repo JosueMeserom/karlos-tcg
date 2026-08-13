@@ -478,7 +478,11 @@ carta tiene elemento en el tablero, no lo declara la carta:
   está y le **crece** una flecha hacia el escaparate mientras la carta viaja; cuando la carta se
   posa, la flecha ya está entera con su punta y su etiqueta sobre la mitad de su longitud.
 
-En los dos casos las flechas se desvanecen en cuanto arranca el viaje al destino, nunca antes.
+En los dos casos las flechas se desvanecen en cuanto arranca el viaje al destino, nunca antes, y
+van **por encima** del escaparate (z-index 3950): sobre todo lo demás, pero bajo los modales.
+Y el coste que acompaña **sale de su hueco**, que se tapa mientras el clon vuela — la zona a la
+que pertenece la decide el motor (`zona`), nunca la presencia de la carta en el DOM: una carta ya
+descartada sigue dibujada en la mano hasta el siguiente render.
 Colores de la misma familia pero distinguibles: **coste ámbar, requisito lima** — de un vistazo
 se lee si algo se ha *perdido* o solo se ha *comprobado*.
 
@@ -488,6 +492,10 @@ se lee si algo se ha *perdido* o solo se ha *comprobado*.
    `.catch`, así que un fallo dibujando una flecha se llevaba por delante un cobro entero -y el
    aterrizaje de la carta- sin dejar rastro. El dibujo va blindado y el drenaje de cobros tiene
    red de seguridad en `_comprometer`: lo cobre el escaparate o lo cobre él, se cobra una vez.
-2. **`modifyStat` ya pinta su propio flotante** al cambiar un stat. Declarar además un `floating`
+2. Si la carta pregunta **cómo** se paga (Wolfgang: Aniceto o Manzanahoria), esa pregunta es una
+   **ventana cancelable**: lleva CANCELAR y no puede cambiar nada hasta que se responde. Un modal
+   así necesita además su descriptor `pendingInteraction` de tipo `choice`, o al reconectar se
+   pierde y la jugada se queda colgada esperando un `CHOICE_SELECTED` que ya nadie manda.
+3. **`modifyStat` ya pinta su propio flotante** al cambiar un stat. Declarar además un `floating`
    con el mismo texto ("-1 FUR") lo saca **dos veces**. Un `floating` propio solo se pone si dice
    algo DISTINTO ("CAÑÓN DE POSITRONES", "-1 FUR (Aura)").

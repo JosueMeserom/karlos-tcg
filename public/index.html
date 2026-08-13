@@ -1521,12 +1521,13 @@
             return _colaPresenta;
         }
 
-        // Capa de flechas de la presentación: por DEBAJO de las cartas del escaparate (3900) y
-        // por encima de todo lo demás del campo, que es donde Toto la quiere.
+        // Capa de flechas de la presentación.
         function _capaFlechasPresenta() {
             const capa = document.createElement('div');
             capa.id = 'presenta-arrows';
-            capa.style.cssText = 'position:fixed; inset:0; z-index:3895; pointer-events:none;';
+            // 3950: POR ENCIMA de las cartas del escaparate (3900) y por debajo de los visores
+            // de pila y los modales (4000+). Toto lo quiere sobre todo lo demás salvo modales.
+            capa.style.cssText = 'position:fixed; inset:0; z-index:3950; pointer-events:none;';
             const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
             svg.setAttribute('style', 'position:absolute; inset:0; width:100%; height:100%; overflow:visible;');
             const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
@@ -1632,13 +1633,15 @@
             };
 
             // ── Reparto de los costes/requisitos ─────────────────────────────────────────
-            // El criterio es DÓNDE está la carta en este instante, no lo que declare el motor:
-            // si tiene elemento en el tablero se queda ahí y le sale una flecha; si no lo tiene
-            // (venía de la mano y ya está en el descarte) acompaña a la carta al escaparate.
+            // El criterio es la ZONA que anotó el motor, no si la carta tiene elemento pintado:
+            // una carta ya descartada sigue dibujada en la mano hasta el siguiente render, así
+            // que mirar el DOM dejaba a la Manzanahoria de Wolfgang clasificada como "en el
+            // campo" -se quedaba en la mano con una flecha saliendo de ella- (13-ago-2026).
             const costes = (opts && opts.costes) || [];
             const _elDe = (c) => document.querySelector(`.card[data-id="${c.id}"]`);
-            const enCampo = costes.filter(c => !!_elDe(c));
-            const acomp   = costes.filter(c => !_elDe(c));
+            const _enTablero = (c) => c.zona === 'vanguard' || c.zona === 'rearguard' || c.zona === 'event';
+            const enCampo = costes.filter(_enTablero);
+            const acomp   = costes.filter(c => !_enTablero(c));
 
             // El BLOQUE (carta + acompañantes) va centrado en el campo, no la carta principal.
             const paso = W * PRESENTA_ZOOM + PRESENTA_GAP;
@@ -1650,7 +1653,11 @@
             const acompCl = acomp.map((c, i) => {
                 const inst = getCardTemplate(c.cardId);
                 if (!inst) return null;
-                const rOrig = _rect(`#${c.owner}-hand`);
+                // Sale de SU hueco exacto si todavía está pintada (lo normal: el motor ya la ha
+                // movido de zona pero aún no se ha repintado); si no, del centro de la mano.
+                const propio = _elDe(c);
+                const rOrig = propio ? propio.getBoundingClientRect() : _rect(`#${c.owner}-hand`);
+                if (propio) propio.style.visibility = 'hidden';   // el clon ocupa su sitio mientras vuela
                 const cc = _clon(inst, false, rOrig);
                 return { ref: c, cont: cc.cont, flip: cc.flip, x: mx + (i + 1) * paso };
             }).filter(Boolean);
@@ -7462,6 +7469,15 @@
                     }
                 } else {
                     this.pendingReaction = null;
+                    // Descriptor SERIALIZABLE del modal normal (el de reacción va por
+                    // pendingReaction, arriba). Sin esto, reconectar con un modal abierto -el de
+                    // Wolfgang, por ejemplo- lo perdía y la jugada se quedaba colgada: la
+                    // corrutina del reconectado muere, pero la del RIVAL sigue viva esperando un
+                    // CHOICE_SELECTED que ya nadie podía mandar (Toto, 13-ago-2026).
+                    // Solo online y fuera del setup, como el resto de descriptores.
+                    if (this.gameMode === 'online' && this.activePlayerId !== 'setup') {
+                        this.pendingInteraction = { tipo: 'choice', chooserId: intendedPlayer, titulo: title, opciones: choices.map(c => c.label) };
+                    }
                 }
                 document.getElementById('choice-title').innerText = title;
 
@@ -7651,6 +7667,7 @@
                 }
 
                 this.pendingReaction = null; // este prompt ya se resolvió (si en cadena hay otro, se re-fijará al mostrarlo)
+                if (this.pendingInteraction && this.pendingInteraction.tipo === 'choice') this.pendingInteraction = null;
                 const _ch = this.currentChoices; this.currentChoices = null; // IMPRESCINDIBLE: si no, bloquea el re-mostrado del siguiente prompt de la cadena
                 if (_ch && _ch[index]) {
                     _ch[index].action();
@@ -10494,6 +10511,13 @@
                     // openDeckSearchViewer, con playerId === yo, monta el visor real; sus clics
                     // ya emiten VISUAL_SEARCH_CONFIRM. La Promise que crea queda huérfana (inocua).
                     this.openDeckSearchViewer(pi.playerId, elegibles, pi.titulo, pi.aviso, pi.maxCount || 1, pi.zona || 'deck');
+                } else if (pi.tipo === 'choice') {
+                    // Re-monto el modal con las MISMAS etiquetas y en el mismo orden. Los
+                    // `action` no viajan (son funciones), y no hacen falta: el clic emite
+                    // CHOICE_SELECTED con el índice y quien ejecuta de verdad es la corrutina
+                    // viva del rival, igual que en el camino normal. La rama local no encuentra
+                    // currentChoices y no hace nada, que es justo lo que debe pasar.
+                    this.openChoiceModal(pi.titulo, (pi.opciones || []).map(l => ({ label: l, action: () => {} })), pi.chooserId);
                 } else if (pi.tipo === 'coin') {
                     // Re-monto la moneda (soy quien lanza). Se REANUDA en la fase exacta que trae
                     // el descriptor: si la tirada ya había caído, NO se vuelve a lanzar -eso

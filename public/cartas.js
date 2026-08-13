@@ -1854,9 +1854,13 @@ const CARD_DB = [
             };
             if (hasAniceto && manzanahoria) {
                 return await new Promise(resolve => {
+                    // CANCELAR (Toto, 13-ago-2026): elegir CÓMO se paga sigue siendo una ventana
+                    // cancelable -no ha cambiado nada todavía, la carta sigue en la mano-, así
+                    // que §14 exige poder arrepentirse. `false` aborta la jugada sin coste.
                     game.openChoiceModal('INVOCAR A WOLFGANG', [
                         { label: 'USAR PRESENCIA DE ANICETO', action: () => { DSL._marcarCoste(game, _aniceto, 'requisito'); resolve(true); } },
-                        { label: 'DESCARTAR MANZANAHORIA', action: () => { _pagarConManzanahoria(); resolve(true); } }
+                        { label: 'DESCARTAR MANZANAHORIA', action: () => { _pagarConManzanahoria(); resolve(true); } },
+                        { label: 'CANCELAR', action: () => resolve(false) }
                     ]);
                 });
             } else if (manzanahoria) {
@@ -7307,7 +7311,12 @@ const DSL = {
         for (const c of lista) {
             if (!c || !c.instanceId) continue;
             if (game._costesPresenta.some(x => x.id === c.instanceId)) continue;
-            game._costesPresenta.push({ id: c.instanceId, cardId: c.id, tipo: tipo, owner: c.owner });
+            // `zona`: dónde está la carta EN ESTE INSTANTE. Es lo que decide si acompaña a la
+            // presentación o si se queda con una flecha. No vale mirar el DOM (era lo que hacía
+            // el cliente): una carta ya descartada sigue dibujada en la mano hasta el siguiente
+            // render, así que la Manzanahoria de Wolfgang se clasificaba como "en el campo" y se
+            // quedaba en la mano con una flecha saliendo de ella (Toto, 13-ago-2026).
+            game._costesPresenta.push({ id: c.instanceId, cardId: c.id, tipo: tipo, owner: c.owner, zona: c.location });
         }
     },
 

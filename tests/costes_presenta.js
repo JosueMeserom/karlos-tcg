@@ -137,6 +137,30 @@ async function montar(esc) {
             marcas.some(m => m.nombre === 'Aniceto' && m.tipo === 'requisito'), JSON.stringify(marcas));
     }
 
+    console.log('\n--- Wolfgang con las dos opciones: se puede CANCELAR ---');
+    {
+        const { ctx, g, marcas } = await montar({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: ['Aniceto'], mano: ['Wolfgang', 'Manzanahoria'] },
+            p2: {},
+        });
+        await ejecutarPaso(ctx, g, { jugar: 'Wolfgang' });
+        const pend = ctx.pendientes[0] || {};
+        check('con Aniceto Y Manzanahoria se pregunta cómo pagar', pend.tipo === 'opcion', 'tipo=' + pend.tipo);
+        check('...y una de las opciones es CANCELAR',
+            (pend.etiquetas || []).includes('CANCELAR'), JSON.stringify(pend.etiquetas));
+        await ejecutarPaso(ctx, g, { opcion: 'CANCELAR' });
+        // Cancelar es cancelar: ni carta jugada, ni Manzanahoria descartada, ni nada marcado.
+        check('al cancelar, Wolfgang sigue en la mano',
+            g.players.p1.hand.some(c => c.name === 'Wolfgang'),
+            'mano=' + g.players.p1.hand.map(c => c.name).join(','));
+        check('al cancelar, la Manzanahoria NO se descarta', !g.players.p1.discard.length,
+            'descartes=' + g.players.p1.discard.map(c => c.name).join(','));
+        check('al cancelar no queda nada marcado como coste ni requisito',
+            !marcas.length && !(g._costesPresenta || []).length, JSON.stringify(marcas));
+        check('y no queda ninguna presentación armada', !g._presentacionArmada);
+    }
+
     console.log('');
     if (fallos) { console.log(`SUITE costes_presenta: ${fallos} FALLOS de ${total} comprobaciones`); process.exit(1); }
     console.log(`SUITE costes_presenta: ${total}/${total} comprobaciones — COSTES Y REQUISITOS CORRECTOS`);
