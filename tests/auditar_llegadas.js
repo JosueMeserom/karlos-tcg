@@ -12,11 +12,17 @@
 //   2. VOLTEA SEGÚN QUIÉN MIRA — sale de dorso y se gira a la cara solo si la mano de destino es
 //      visible para ese cliente (la tuya siempre; la del rival solo con SEGUIMIENTO).
 //
-// Hoy hay DOS caminos legítimos, y los dos las cumplen por construcción:
-//   · `volarALaMano`  — el helper único de index.html (retribución, animateStackToHand).
-//   · el `aMano` del op BUSCAR en cartas.js — pasa por la presentación, con zonaSel y
-//     `ocultarAlLlegar`.
-// Cualquier `hand.push` fuera de esos dos sale aquí para mirarlo.
+// Y una tercera, que no es de forma sino de FONDO: sacar una carta CONOCIDA de una pila es un
+// evento PÚBLICO y pasa por el escaparate, para que la vean los dos jugadores. Solo la
+// retribución llega a la mano sin presentarse, porque no es una búsqueda: es tuya y nadie más
+// tiene por qué verla.
+//
+// Hoy hay DOS caminos legítimos, y los dos cumplen las reglas por construcción:
+//   · el `aMano` del op BUSCAR en cartas.js — presenta, con zonaSel y `ocultarAlLlegar`.
+//   · `animateStackToHand` — hace lo mismo para las cuatro cartas imperativas que aún no han
+//     migrado a BUSCAR (Escudo mágico x2, La Bestia, Igniz); delega en la presentación.
+//     Sin carta conocida cae a `volarALaMano`, el vuelo simple que usa la retribución.
+// Cualquier `hand.push` fuera de esos sale aquí para mirarlo.
 //
 //   node tests/auditar_llegadas.js            # resumen
 //   node tests/auditar_llegadas.js --detalle  # con el contexto de cada sitio

@@ -1443,10 +1443,27 @@
             if (nuevoEl) nuevoEl.style.visibility = '';
         }
 
-        // Envoltorios finos: las cartas siguen llamando por su nombre de siempre.
+        // Sacar una carta CONOCIDA de una pila es un evento PÚBLICO: pasa por el escaparate y la
+        // ven los dos jugadores, y solo después viaja a la mano -volteándose de vuelta si esa
+        // mano no es visible para quien mira-. Es la misma regla que ya cumplía el `aMano` del op
+        // BUSCAR; estas cuatro cartas (Escudo mágico x2, La Bestia, Igniz) se la saltaban y la
+        // carta llegaba a la mano sin que el rival llegara a verla (Toto, 13-ago-2026).
+        // Sin `cardId` (carta desconocida) no hay nada que presentar: vuelo simple.
         async function animateStackToHand(sourceId, playerId, cardId = null, colocar = null, carta = null) {
             const _c = carta || (cardId !== null ? { id: cardId } : null);
-            return volarALaMano(`#${sourceId}`, playerId, _c, colocar, 600);
+            if (!_c || typeof animarPresentacionCarta !== 'function') {
+                return volarALaMano(`#${sourceId}`, playerId, _c, colocar, 600);
+            }
+            const g = window.game;
+            const handSel = `#${playerId}-hand`;
+            const manoVisible = !g || g.gameMode !== 'online' || g.myPlayerId === playerId
+                || g.myPlayerId === 'spectator'
+                || (g.players[playerId] && g.players[playerId].handExposedTo === g.myPlayerId);
+            return animarPresentacionCarta(_c.id, `#${sourceId}`, handSel, /* deDorso */ true, {
+                zonaSel: handSel,
+                ocultarAlLlegar: !manoVisible,
+                colocar: () => (typeof colocar === 'function') ? colocar() : null,
+            });
         }
 
         // ─────────────────────────────────────────────────────────────────────────────────

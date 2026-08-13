@@ -615,8 +615,11 @@ callback para hacerla a mitad del vuelo.
 Estaba solo para vanguardia y retaguardia, y a la mano la carta se desvanecía sobre la zona sin
 aparecer hasta que todo terminaba (Toto lo vio con la búsqueda de Goodman al morir).
 
-Ese patrón vive en **un solo sitio**, `volarALaMano` (index.html), del que cuelgan la retribución
-y `animateStackToHand`. El otro camino legítimo es el `aMano` del op `BUSCAR`, que va por la
+**Sacar una carta CONOCIDA de una pila es PÚBLICO**: pasa por el escaparate y la ven los dos
+jugadores, y solo después viaja a la mano. Vale para el `aMano` del op `BUSCAR` y para las cuatro
+cartas imperativas que aún usan `animateStackToHand` (Escudo mágico ×2, La Bestia, Igniz), que
+delega en la presentación. La única llegada que NO se presenta es la **retribución**: no es una
+búsqueda, es tuya y nadie más tiene por qué verla — esa usa `volarALaMano`, el vuelo simple. El otro camino legítimo es el `aMano` del op `BUSCAR`, que va por la
 presentación. **Cualquier otra forma de meter una carta en la mano es sospechosa**, y
 `node tests/auditar_llegadas.js` las enumera: hoy 15 correctas, 5 exentas (reparto, robo,
 utilidades de debug) y **0 por revisar**. Esa auditoría nació de arreglarlas de una en una según
