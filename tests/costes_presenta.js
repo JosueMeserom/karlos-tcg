@@ -514,6 +514,40 @@ async function montar(esc) {
             JSON.stringify(marcas.map(m => m.tipo + '/' + m.etiqueta)));
     }
 
+    // ── LO QUE VA A LA MANO ATERRIZA EN ELLA, NO SE DESVANECE ENCIMA ──────────────
+    // El aterrizaje con deslizamiento estaba solo para las FILAS. A la mano, la carta se
+    // desvanecía sobre la zona y no entraba hasta que terminaba toda la cadena; Toto lo vio con
+    // la búsqueda de Goodman al morir (13-ago-2026). La mano es una fila más.
+    console.log('\n--- Lo que va a la mano entra en ella al aterrizar ---');
+    {
+        const { ctx, g } = await montar({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'Karlos', furor: 3 }], mano: ['Pago por adelantado'],
+                  mazo: ['Gladiador', 'Mini-tigre'] },
+            p2: { vanguardia: ['Mini-tigre'] },
+        });
+        let enManoAlAterrizar = null;
+        ctx.sandbox.__vio = (v) => { if (enManoAlAterrizar === null) enManoAlAterrizar = v; };
+        // El gancho mira el estado DENTRO de la animación, cuando el clon llega a su hueco: es
+        // ahí donde la carta tiene que existir ya en la mano, no al final de la cadena.
+        require('vm').runInContext("(function(){var o=animarPresentacionCarta;"
+            + "animarPresentacionCarta=function(id,org,dst,dor,opts){"
+            + "  if(opts&&opts.colocar&&String(dst||'').indexOf('-hand')!==-1){"
+            + "    var c=opts.colocar; opts=Object.assign({},opts,{colocar:function(){"
+            + "      var r=c.apply(null,arguments);"
+            + "      __vio(window.game.players.p1.hand.some(function(x){return x.name==='Gladiador';}));"
+            + "      return r; }});}"
+            + "  return o.call(null,id,org,dst,dor,opts);};})()", ctx.sandbox);
+        await ejecutarPaso(ctx, g, { jugar: 'Pago por adelantado' });
+        await ejecutarPaso(ctx, g, { elegir: ['Karlos'] });
+        await ejecutarPaso(ctx, g, { elegir: ['Gladiador'] });
+        check('la carta entra en la mano DENTRO de la animación, no al final de la cadena',
+            enManoAlAterrizar === true, 'estaba en la mano al aterrizar = ' + enManoAlAterrizar);
+        check('...y acaba efectivamente en la mano',
+            g.players.p1.hand.some(c => c.name === 'Gladiador'),
+            'mano=' + JSON.stringify(g.players.p1.hand.map(c => c.name)));
+    }
+
     console.log('');
     if (fallos) { console.log(`SUITE costes_presenta: ${fallos} FALLOS de ${total} comprobaciones`); process.exit(1); }
     console.log(`SUITE costes_presenta: ${total}/${total} comprobaciones — COSTES Y REQUISITOS CORRECTOS`);

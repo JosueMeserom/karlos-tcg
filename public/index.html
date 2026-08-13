@@ -1913,7 +1913,14 @@
                 cont.style.left = _pz(destino.left + destino.width / 2) - W / 2 + 'px';
                 cont.style.top  = _pz(destino.top + destino.height / 2) - H / 2 + 'px';
             }
-            flip.style.transform = `rotateY(0deg) scale(${(1 / PRESENTA_ZOOM).toFixed(4)})`;
+            // `ocultarAlLlegar`: la carta se enseña en el escaparate -del mazo sale de dorso y se
+            // voltea para que la vean los dos- pero aterriza en una mano que ESTE cliente no ve.
+            // Entonces se vuelve a voltear en el último tramo y acaba de dorso, como la pinta esa
+            // mano. Si la mano SÍ es visible (la tuya, o una expuesta por SEGUIMIENTO) no se
+            // voltea: sería tapar algo que se está viendo (Toto, 13-ago-2026).
+            flip.style.transform = (opts && opts.ocultarAlLlegar)
+                ? `rotateY(180deg) scale(${(1 / PRESENTA_ZOOM).toFixed(4)})`
+                : `rotateY(0deg) scale(${(1 / PRESENTA_ZOOM).toFixed(4)})`;
             // `disolverHacia`: no hay destino, hay una carta que EVOLUCIONA. La presentada viaja
             // hacia ella deshaciéndose -desenfoque y encogimiento crecientes- mientras la base
             // hace su propia animación de evolución, y el intercambio de estado ocurre cuando

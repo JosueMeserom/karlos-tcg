@@ -605,6 +605,17 @@ Y la regla que hace que esto funcione: **la llamada va ANTES del intercambio**. 
 ha sustituido en su fila, no queda nada en el tablero hacia lo que disolverse. La suite lo
 comprueba mirando que la carta base siga en mesa en el instante de presentar, no el estado final.
 
+**La MANO es una fila más.** Una carta que llega a la mano tras presentarse **entra en ella al
+aterrizar** -mientras el resto de la mano se aparta deslizándose-, no al final de la cadena.
+Estaba solo para vanguardia y retaguardia, y a la mano la carta se desvanecía sobre la zona sin
+aparecer hasta que todo terminaba (Toto lo vio con la búsqueda de Goodman al morir).
+
+**Y el volteo cuenta la verdad en los DOS tramos.** Del mazo la carta sale de dorso y se voltea al
+escaparate: ahí la ven los dos jugadores. Del escaparate a la mano, **se vuelve a voltear solo si
+esa mano no es visible para quien mira** (`ocultarAlLlegar`), y acaba de dorso como la pinta la
+mano. Si la mano sí se ve -la tuya, o una expuesta por SEGUIMIENTO- no se voltea: sería tapar algo
+que se está viendo.
+
 **Las flechas de coste/requisito se van al ACABAR LA POSE**, siempre con el mismo tiempo, retenga
 o no la carta después. Si esperasen al viaje al destino, una carta que se queda pagando costes en
 el centro las arrastraría durante toda esa animación.

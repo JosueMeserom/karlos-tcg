@@ -7915,16 +7915,35 @@ const DSL = {
                         // presentación: así el tramo final aterriza en el hueco real y las cartas
                         // que ya estaban se apartan deslizándose (Toto, 7-ago-2026).
                         const _aFila = e.destino === 'RETAGUARDIA' || e.destino === 'CAMPO';
-                        const _opts = _aFila ? {
+                        // La MANO es una fila más (Toto, 13-ago-2026). Sin esto la carta se
+                        // desvanecía sobre la zona y no aparecía hasta que terminaba TODA la
+                        // cadena -Toto lo vio con la búsqueda de Goodman al morir-, en vez de
+                        // entrar en su hueco mientras el resto de la mano se aparta deslizándose.
+                        const _aMano = !e.destino || e.destino === 'MANO';
+                        // ¿La mano de destino es visible para QUIEN MIRA? Si no lo es, la carta
+                        // vuelve a voltearse en el último tramo y aterriza de dorso, como la
+                        // pinta esa mano. `handExposedTo` es SEGUIMIENTO (Erasmo): con él, la
+                        // mano rival se ve boca arriba y no hay nada que tapar.
+                        const _manoVisible = game.gameMode !== 'online' || _yo === pid
+                            || _yo === 'spectator' || (game.players[pid] && game.players[pid].handExposedTo === _yo);
+                        const _opts = (_aFila || _aMano) ? {
+                            ocultarAlLlegar: _aMano && !_manoVisible,
                             zonaSel: _destino,
-                            colocar: () => { _colocarEnCampo(t); if (typeof game.render === 'function') game.render(); return t.instanceId; },
+                            colocar: () => {
+                                if (_aMano) { t.location = 'hand'; p.hand.push(t); }
+                                else _colocarEnCampo(t);
+                                if (typeof game.render === 'function') game.render();
+                                return t.instanceId;
+                            },
                         } : null;
                         await animarPresentacionCarta(t.id, _origen, _destino, _deDorso, _opts);
-                        if (_aFila) { _yaColocada = true; }
+                        if (_aFila || _aMano) { _yaColocada = true; }
                     }
-                    if (!e.destino || e.destino === 'MANO') {
-                        // Sin animateStackToHand: la presentación de arriba YA hace ese viaje
-                        // (pila -> centro -> mano). Encadenarlas mostraba la carta dos veces.
+                    if ((!e.destino || e.destino === 'MANO') && !_yaColocada) {
+                        // Solo si la presentación no la colocó ya al aterrizar (animación
+                        // desactivada, o sin cliente). Sin animateStackToHand: la presentación
+                        // YA hace ese viaje (pila -> centro -> mano); encadenarlas mostraba la
+                        // carta dos veces.
                         t.location = 'hand';
                         p.hand.push(t);
                     } else if (e.destino === 'EQUIPADO') {
