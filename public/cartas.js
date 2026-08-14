@@ -2700,6 +2700,9 @@ const CARD_DB = [
     },
     {
         name: "Cápsula de bio-regeneración", type: "Ayuda", subtype: "Tecnología", tags: ["Consumible"], rarity: "B", series: 2, cost: 0,
+        // Requisito visible: un requisito de RECUENTO tambien tiene a QUIEN apuntar -las
+        // cartas concretas que lo cumplen-, y son TODAS, sin `uno` (Toto, 14-ago-2026).
+        requisitoVisible: [ { quien: "ALIADO", zona: "vanguardia" } ],
         text: "Requisito: Tu vanguardia llena. Elige de tu descarte un 'Ser vivo' sin condiciones de colocación y colócalo en retaguardia.",
         abilities: [
             { trigger: "JUGAR", requisitos: [
@@ -2732,6 +2735,9 @@ const CARD_DB = [
     },
     {
         name: "Esfuerzo dividido", type: "Evento", rarity: "A", series: 1, cost: 1, duration: 4,
+        // Requisito visible: un requisito de RECUENTO tambien tiene a QUIEN apuntar -las
+        // cartas concretas que lo cumplen-, y son TODAS, sin `uno` (Toto, 14-ago-2026).
+        requisitoVisible: [ { quien: "ALIADO", zona: "vanguardia" } ],
         text: "4 turnos. Requiere 3 aliados en vanguardia. Al colocarla, escoge 2: no pueden atacar ni usar Activas y ganan Oculto. Mientras esté en juego, si uno de ellos muere, esta carta se destruye. Al expirar, el rival roba 1 retribución.",
         // Migrada a DSL (tanda de eventos, 21-jul-2026). Piezas nuevas del intérprete
         // que estrena: ELEGIR guardaIdsEnSelf (guarda los 2 elegidos como lista),
@@ -3585,6 +3591,10 @@ const CARD_DB = [
         text: "Coste: Tu vanguardia llena, que se destruye al colocar esta carta. P: NACIMIENTO DE DIVINIDAD: Una vez por turno, puedes destruir un aliado para curarla 1 Vida. A: OBLITERACIÓN (3F): Ataque especial que ignora completamente la Def del enemigo.",
         passiveName: "NACIMIENTO DE DIVINIDAD", activeName: "OBLITERACIÓN", activeCost: 3,
         // Coste de colocación migrado (31-jul-2026). Usa JUGAR requisitos (vanguardia llena) +
+        // Su vanguardia entera es el COSTE: cada una manda su flecha ámbar a Némesis mientras
+        // espera en el centro, y solo entonces empiezan a caer. Se declara aquí y no en el efecto
+        // porque el efecto corre DENTRO del escaparate, cuando las marcas ya se han consumido.
+        costeVisible: [ { quien: "ALIADO", zona: "vanguardia" } ],
         // pausaEnEscaparate (Toto, 13-ago-2026): su coste son CARTAS DEL CAMPO que se destruyen,
         // y eso hay que verlo. La carta se queda enseñada y quieta en el centro mientras su
         // vanguardia se aniquila, y solo entonces viaja a su hueco. Su ZONA se decide DESPUÉS de
@@ -3616,11 +3626,10 @@ const CARD_DB = [
             { trigger: "ANTES_DE_JUGAR", pausaEnEscaparate: true,
               log: "¡Némesis desciende y aniquila a toda su propia vanguardia como tributo!",
               efectos: [
-                // esCoste: son su COSTE, no un efecto — de cada una sale una flecha ámbar hacia
-                // Némesis mientras espera en el escaparate. Ámbar y no rojo porque lo que se
-                // pierde son CARTAS, no Furor (§14.bis). Toto, 14-ago-2026.
+                // La flecha la declara `costeVisible` arriba, no un `esCoste` aquí: este efecto
+                // corre DENTRO del escaparate y allí las marcas ya se han consumido.
                 { op: "MODIFICAR_STAT", target: { quien: "ALIADO", zona: "VANGUARDIA" }, stat: "currentHp",
-                  vaciar: true, sinRetribucion: true, comprobarMuerte: true, esCoste: true } ] }
+                  vaciar: true, sinRetribucion: true, comprobarMuerte: true } ] }
         ],
         onStartTurn: function(card, game) {
             card.nemesisHealUsed = false; // Reseteamos la habilidad pasiva
@@ -3807,6 +3816,9 @@ const CARD_DB = [
     },
     {
         name: "Plan de equipo", type: "Evento", rarity: "C", cost: 1, duration: 1, series: 1,
+        // Requisito visible: un requisito de RECUENTO tambien tiene a QUIEN apuntar -las
+        // cartas concretas que lo cumplen-, y son TODAS, sin `uno` (Toto, 14-ago-2026).
+        requisitoVisible: [ { quien: "ALIADO", zona: "vanguardia" } ],
         text: "1 turno. Requiere no haber atacado este turno y tener 2 o más aliados. Mientras esté en juego, solo puedes atacar 1 vez: el Atq del atacante será la suma del Atq de 2 aliados que elijas.",
         // Migrada al DSL sobre el punto único de intercepción (§11). Cambio de estado
         // deliberado respecto a la imperativa: el candado de un-ataque vive en la
@@ -4155,6 +4167,9 @@ const CARD_DB = [
     },
     {
         name: "Berry", hp: 2, def: 1, atk: 1, type: "Personaje", subtype: "Ser vivo", tags: ["Usuaria de VP"], gender: "F", rarity: "S", cost: 1, series: 1,
+        // Requisito visible: un requisito de RECUENTO tambien tiene a QUIEN apuntar -las
+        // cartas concretas que lo cumplen-, y son TODAS, sin `uno` (Toto, 14-ago-2026).
+        requisitoVisible: [ { quien: "ALIADO", zona: "vanguardia" } ],
         text: "Requisito: Tu vanguardia llena; se coloca en retaguardia. P: IDOL A DISTANCIA: Siempre Oculta. Desde la retaguardia: Gana 1 de Furor en la Fase de Furor y puede usar su Activa. A: INTERFAZ (1F): Busca 'Rebobinar', 'Cambio de canal' o 'Publicidad mental' en mazo o descarte. Baraja si buscas en mazo.",
         passiveName: "IDOL A DISTANCIA", activeName: "INTERFAZ", activeCost: 1,
         
@@ -7433,14 +7448,22 @@ const DSL = {
         if (!sourceCard || !game) return;
         const tmpl = (typeof getCardTemplate === 'function' && getCardTemplate(sourceCard.id)) || {};
         const ab = (tmpl.abilities || []).find(a => a.trigger === 'JUGAR');
-        const specs = (ab && ab.requisitoVisible) || tmpl.requisitoVisible;
-        if (!specs) return;
-        for (const s of (Array.isArray(specs) ? specs : [specs])) {
-            let pool = DSL._pool(sourceCard.owner, game, s, sourceCard) || [];
-            // `uno`: con varias candidatas basta una para que la jugada sea legal, así que se
-            // señala la primera en vez de llenar el tablero de flechas iguales.
-            if (s.uno) pool = pool.slice(0, 1);
-            if (pool.length) DSL._marcarCoste(game, pool, 'requisito');
+        // `costeVisible`: igual que requisitoVisible pero ÁMBAR, para un coste que se paga con
+        // cartas del campo. Hace falta declararlo aquí y no en el efecto porque esas cartas se
+        // destruyen DENTRO del escaparate (pausaEnEscaparate), o sea después de que la
+        // presentación haya consumido las marcas: si se marcan allí, la flecha no llega a
+        // dibujarse nunca. Es el caso de Némesis (Toto, 14-ago-2026).
+        for (const [campo, tipo] of [['requisitoVisible', 'requisito'], ['costeVisible', 'coste']]) {
+            const specs = (ab && ab[campo]) || tmpl[campo];
+            if (!specs) continue;
+            for (const s of (Array.isArray(specs) ? specs : [specs])) {
+                let pool = DSL._pool(sourceCard.owner, game, s, sourceCard) || [];
+                // `uno`: con varias candidatas basta una para que la jugada sea legal, así que se
+                // señala la primera en vez de llenar el tablero de flechas iguales. Un coste, en
+                // cambio, se paga con TODAS: ahí no se recorta.
+                if (s.uno) pool = pool.slice(0, 1);
+                if (pool.length) DSL._marcarCoste(game, pool, tipo);
+            }
         }
     },
 

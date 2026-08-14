@@ -262,16 +262,18 @@ async function montar(esc) {
                     && marcas.some(m => m.nombre === c.quien && m.tipo === 'requisito'),
                 'al encolar: ' + JSON.stringify(alEncolar) + ' · marcas: ' + JSON.stringify(marcas.map(m => m.nombre + '/' + m.tipo)));
         }
-        // Un requisito de RECUENTO no lleva flecha a propósito: no hay carta concreta a la que
-        // apuntar, y señalar a un aliado cualquiera mentiría.
+        // Un requisito de RECUENTO sí lleva flecha, y a TODAS las que lo cumplen: "3 aliados en
+        // vanguardia" lo cumplen tres cartas concretas, no ninguna. La comprobación decía lo
+        // contrario y fijaba un criterio que Toto corrigió (14-ago-2026).
         const { ctx, g, marcas } = await montar({
             turno: 2, turnoDe: 'p1', empieza: 'p2',
             p1: { vanguardia: ['Mini-tigre', 'Oso con armadura', 'Karlos'], mano: ['Esfuerzo dividido'] },
             p2: { vanguardia: ['Mini-tigre'] },
         });
         await ejecutarPaso(ctx, g, { jugar: 'Esfuerzo dividido' });
-        check('un requisito de RECUENTO (Esfuerzo dividido) NO dibuja flecha',
-            !marcas.some(m => m.tipo === 'requisito'), JSON.stringify(marcas));
+        check('un requisito de RECUENTO (Esfuerzo dividido) señala a los tres aliados',
+            marcas.filter(m => m.tipo === 'requisito').length === 3,
+            JSON.stringify(marcas.map(m => m.nombre + '/' + m.tipo)));
     }
 
     // ── UNA AYUDA QUE SE EQUIPA NO SE DESCARTA ────────────────────────────────────

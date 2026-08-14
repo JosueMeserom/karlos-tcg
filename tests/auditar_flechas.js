@@ -102,9 +102,10 @@ for (const c of CARD_DB) {
             if (e.esRequisito && esFurorNegativo) incoherente = 'marcada como requisito pero gasta Furor (es un tributo)';
         }
     }
-    // `requisitoVisible` vive en la plantilla, no en un efecto: dice a qué carta del campo
-    // apunta la flecha lima que hace legal la jugada.
-    if (c.requisitoVisible) marcado = true;
+    // `requisitoVisible` y `costeVisible` viven en la plantilla, no en un efecto: dicen a qué
+    // cartas del campo apuntan la flecha lima (lo que hace legal la jugada) y la ámbar (lo que
+    // se pierde al hacerla).
+    if (c.requisitoVisible || c.costeVisible) marcado = true;
     if (marcaAMano.has(c.name)) marcado = true;
 
     const txt = String(c.text || '');
@@ -125,19 +126,16 @@ for (const c of CARD_DB) {
 // Tres motivos, y ninguno es pereza:
 //   · La condición gobierna una ACTIVA, no la colocación. Una Activa no se presenta, así que no
 //     hay escaparate donde dibujar nada.
-//   · Es un requisito de RECUENTO o de ESTADO ("vanguardia llena", "3 aliados", "no haber
-//     atacado"): no hay UNA carta concreta a la que apuntar, y señalar a un aliado cualquiera
-//     mentiría.
+//   · (RETIRADO 14-ago-2026) Los requisitos de RECUENTO sí tienen a quién apuntar: las cartas
+//     concretas que lo cumplen, y son TODAS. Lo dijo Toto y tenía razón - "vanguardia llena" lo
+//     cumplen cuatro cartas, no ninguna. Berry, Cápsula, Esfuerzo dividido y Plan de equipo
+//     pasaron a llevar flecha.
 //   · Es NEGATIVO ("Karolina no está", "tu rival no tiene Evento"): lo que lo cumple es una
 //     ausencia, y a una ausencia no se le puede apuntar.
 const NO_PROCEDE = {
     'Kami': 'su requisito gobierna la ACTIVA (SACRIFICIO EQUIVALENTE), no la colocación',
     'Meca EBA': 'su requisito gobierna la ACTIVA (EMPLAZAR PILOTO), no la colocación',
     'Neo': 'su requisito es contextual (un cebo que ataque o vaya a sufrir daño), no una carta concreta al jugarla',
-    'Cápsula de bio-regeneración': 'requisito de RECUENTO: "tu vanguardia llena"',
-    'Berry': 'requisito de RECUENTO: "tu vanguardia llena"',
-    'Esfuerzo dividido': 'requisito de RECUENTO: "3 aliados en vanguardia"',
-    'Plan de equipo': 'requisito de RECUENTO y de estado: "no haber atacado y 2 o más aliados"',
     'Arthas': 'requisito NEGATIVO: lo cumple la AUSENCIA de Karolina, y a una ausencia no se apunta',
     'Una buena razón': 'requisito NEGATIVO: que el rival NO tenga Evento',
     'Chaqueta metálica defensiva de la muerte': 'el aliado que cumple el requisito es el MISMO al que se anexa: la flecha sería redundante con el propio equipo',
