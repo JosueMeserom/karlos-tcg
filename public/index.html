@@ -11166,7 +11166,10 @@
             // Karolina se gana con su Activa y que lee su propia Pasiva): no tendrían quién los
             // leyera en la entrante. En la práctica da igual, porque ganarlos exige haber actuado
             // y eso descalifica a la carta como cebo.
-            sustituirEnCampo(saliente, entrante) {
+            // `async` desde que la saliente VUELA a la mano en vez de aparecer allí (Toto,
+            // 14-ago-2026). Quien no la espere sigue funcionando: la animación es adorno y el
+            // estado queda igual de cerrado al terminar.
+            async sustituirEnCampo(saliente, entrante) {
                 const p = this.players[saliente.owner];
                 const zona = saliente.location === 'rearguard' ? 'rearguard' : 'vanguard';
                 const lista = p[zona];
@@ -11180,10 +11183,25 @@
                 saliente.tempEffects = [];
 
                 const mano = p.hand;
+                // La saliente VUELVE VOLANDO a la mano, con su aterrizaje y su volteo, en vez de
+                // aparecer allí de golpe: es una carta que llega a una mano como cualquier otra
+                // (§14.quater). El origen es su hueco REAL en el campo, que aún existe: se mide
+                // antes de sacarla de la fila.
+                const _origenSel = `.card[data-id="${saliente.instanceId}"]`;
+                const _hayHueco = typeof document !== 'undefined' && document.querySelector(_origenSel);
                 lista.splice(idx, 1);
                 if (typeof this.resetCard === 'function') this.resetCard(saliente);
-                saliente.location = 'hand';
-                mano.push(saliente);
+                const _aLaMano = () => {
+                    saliente.location = 'hand';
+                    mano.push(saliente);
+                    this.render();
+                    return saliente.instanceId;
+                };
+
+                if (_hayHueco && typeof volarALaMano === 'function' && !this.isSkippingAnim) {
+                    try { await volarALaMano(_origenSel, saliente.owner, saliente, _aLaMano, 500); }
+                    catch (e) { console.error(e); _aLaMano(); }
+                } else { _aLaMano(); }
 
                 const iMano = mano.findIndex(c => c.instanceId === entrante.instanceId);
                 if (iMano !== -1) mano.splice(iMano, 1);

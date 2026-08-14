@@ -7049,8 +7049,8 @@ const NEO = {
         // que tiene que pasar, y viaja a su sitio cuando ha terminado.
         game.logMsg(`¡IMAGINACIÓN HIPERACTIVA! ${game.getCardNameWithOwner(cebo)} no era más que un señuelo: ${game.nCarta(neo)} ocupa su lugar.`, 'ability');
         if (typeof DSL !== 'undefined' && DSL._marcarCoste) DSL._marcarCoste(game, cebo, 'requisito', 'Cebo');
-        const _cambio = () => {
-            game.sustituirEnCampo(cebo, neo);
+        const _cambio = async () => {
+            await game.sustituirEnCampo(cebo, neo);
             if (typeof showFloatingText === 'function') showFloatingText(neo.instanceId, '¡NEO!', 'ft-purple', -40);
             return neo.instanceId;
         };
