@@ -4497,22 +4497,24 @@
                     let _txtBase = card.text;
                     let resultHtml = "";
                     const _obien = (v) => v.split(/\s+o bien\s+/i).map(s => s.trim()).join('<span class="coste-obien">o bien</span>');
-                    // Cajas tipo stats de cabecera (COSTE / REQUISITO / DURACIÓN): el label va en una
-                    // COLUMNA de ancho FIJO con el texto centrado, de modo que los centros de COSTE,
-                    // REQUISITO y DURACIÓN queden alineados en el mismo eje (Toto, 23-jul-2026), con
-                    // el mismo padding a la izquierda para todas. El posicionamiento del valor lo fija
-                    // valStyle fija la ZONA del valor. Coste/Requisito (_VS): texto largo, ocupa la
-                    // franja derecha (hasta 62%) alineado a la derecha. DURACIÓN (_VSD): mismo ancho
-                    // de franja (62% a la derecha) pero el "X turnos" CENTRADO en ella, de modo que
-                    // cae sobre la misma zona reservada al texto amarillo de Coste/Requisito, sin
-                    // hueco muerto ni a un lado ni al otro (Toto, 23-jul-2026).
+                    // Cajas de cabecera (COSTE / REQUISITO / DURACIÓN): DOS COLUMNAS de verdad, cada
+                    // una con su contenido CENTRADO y con un hueco fijo entre ambas (Toto,
+                    // 14-ago-2026). Antes la izquierda ya iba centrada en su columna, pero la
+                    // derecha se empujaba con `margin-left:auto` y se alineaba a la derecha: el
+                    // resultado dependía de lo largo que fuera el texto, así que DURACIÓN
+                    // ("2 turnos", corto) y REQUISITO (una frase) no caían en el mismo sitio y la
+                    // caja se veía descuadrada.
+                    // Ahora: la etiqueta ocupa su ancho fijo, el valor ocupa TODO lo que queda
+                    // (`flex:1`) y se centra dentro. Sale igual con textos de cualquier largo.
+                    // GAP es el hueco entre columnas; ANCHO_LABEL, la columna de la etiqueta.
+                    const GAP = 14, ANCHO_LABEL = '6em';
                     const _filaStat = (label, valorHtml, valStyle) =>
-                        `<span class="ev-dur-label" style="width:6em; text-align:center; flex-shrink:0;">${label}</span>`
-                        + `<span class="ev-dur-value" style="${valStyle || ''}">${valorHtml}</span>`;
-                    const _VS = 'margin-left:auto; text-align:right; font-size:0.78rem; max-width:62%; line-height:1.35;';
-                    const _VSD = 'margin-left:auto; width:62%; text-align:center;';
+                        `<span class="ev-dur-label" style="width:${ANCHO_LABEL}; text-align:center; flex-shrink:0;">${label}</span>`
+                        + `<span class="ev-dur-value" style="flex:1; min-width:0; margin-left:${GAP}px; text-align:center; ${valStyle || ''}">${valorHtml}</span>`;
+                    const _VS = 'font-size:0.78rem; line-height:1.35;';
+                    const _VSD = '';
                     const _cajaStat = (label, valorHtml, valStyle) =>
-                        `<div class="ev-dur-box" style="justify-content:flex-start; padding-left:10px;">${_filaStat(label, valorHtml, valStyle)}</div>`;
+                        `<div class="ev-dur-box" style="justify-content:flex-start; padding-left:10px; padding-right:10px;">${_filaStat(label, valorHtml, valStyle)}</div>`;
                     // 1) HÍBRIDA "Requisito: X o bien Coste: Y." -> UNA caja apilada: Requisito arriba,
                     //    "o bien" centrado (padding vertical simétrico propio; sin el gap ni el
                     //    transform del .coste-obien, que lo descentraban), Coste debajo. El requisito
@@ -4520,9 +4522,9 @@
                     let _mH;
                     while ((_mH = _txtBase.match(/^Requisito:\s*(.+?)\s+o bien\s+Coste:\s*(.+?)\.\s*/i))) {
                         resultHtml += `<div class="ev-dur-box" style="flex-direction:column; align-items:stretch; gap:0;">`
-                            + `<div style="display:flex; align-items:center; padding-left:10px;">${_filaStat('REQUISITO', _obien(_mH[1]), _VS)}</div>`
+                            + `<div style="display:flex; align-items:center; padding-left:10px; padding-right:10px;">${_filaStat('REQUISITO', _obien(_mH[1]), _VS)}</div>`
                             + `<div style="text-align:center; padding:12px 0; line-height:1;"><span class="coste-obien" style="margin:0; transform:none; vertical-align:baseline;">o bien</span></div>` /* <-- padding vertical del "o bien": subir/bajar el 12px */
-                            + `<div style="display:flex; align-items:center; padding-left:10px;">${_filaStat('COSTE', _obien(_mH[2]), _VS)}</div>`
+                            + `<div style="display:flex; align-items:center; padding-left:10px; padding-right:10px;">${_filaStat('COSTE', _obien(_mH[2]), _VS)}</div>`
                             + `</div>`;
                         _txtBase = _txtBase.slice(_mH[0].length);
                     }

@@ -133,13 +133,22 @@ for (const c of CARD_DB) {
 //   · Es NEGATIVO ("Karolina no está", "tu rival no tiene Evento"): lo que lo cumple es una
 //     ausencia, y a una ausencia no se le puede apuntar.
 const NO_PROCEDE = {
-    'Kami': 'su requisito gobierna la ACTIVA (SACRIFICIO EQUIVALENTE), no la colocación',
-    'Meca EBA': 'su requisito gobierna la ACTIVA (EMPLAZAR PILOTO), no la colocación',
+    // NO son costes ni requisitos de COLOCACIÓN: son condiciones de una Habilidad, como que
+    // BI-CHOQUE de Karlos pida 2 enemigos. Que sus textos usen la palabra "Requiere" no las
+    // convierte en lo mismo, y yo las metí aquí por leer el vocabulario en vez de la mecánica
+    // (Toto, 14-ago-2026). No es que "no puedan" tener flecha: es que no pintan nada en esta
+    // lista. El día que las Activas se presenten, se revisan como lo que son.
+    'Kami': 'condición de una HABILIDAD (SACRIFICIO EQUIVALENTE), no un requisito de colocación',
+    'Meca EBA': 'condición de una HABILIDAD (EMPLAZAR PILOTO), no un requisito de colocación',
     'Neo': 'su requisito es contextual (un cebo que ataque o vaya a sufrir daño), no una carta concreta al jugarla',
     'Arthas': 'requisito NEGATIVO: lo cumple la AUSENCIA de Karolina, y a una ausencia no se apunta',
     'Una buena razón': 'requisito NEGATIVO: que el rival NO tenga Evento',
     'Chaqueta metálica defensiva de la muerte': 'el aliado que cumple el requisito es el MISMO al que se anexa: la flecha sería redundante con el propio equipo',
-    'Zoe (calcinante)': 'su requisito es haber completado un Evento que ya expiró; no queda carta en el campo que señalar',
+    // Zoe SÍ se presenta al evolucionar (§14.quater) — eso se hizo el 13-ago. Lo que no tiene es
+    // a QUIÉN apuntar: su requisito es haber completado Entrenamiento arduo, y ese Evento acaba
+    // de expirar e irse al descarte, que es justo lo que dispara la evolución. Son dos cosas
+    // distintas y las mezclé al justificarlo.
+    'Zoe (calcinante)': 'se presenta, pero su requisito es un Evento que YA expiró al dispararla: no queda carta en el campo que señalar',
 };
 
 const conFlecha = filas.filter(f => f.marcado);
