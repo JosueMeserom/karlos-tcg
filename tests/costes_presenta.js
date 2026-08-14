@@ -611,6 +611,25 @@ async function montar(esc) {
             'mazo=' + JSON.stringify(g.players.p1.deck.map(c => c.name)));
     }
 
+    // ── NÉMESIS: SU COSTE SON CARTAS, ASÍ QUE LA FLECHA ES ÁMBAR ──────────────────
+    // Es la única carta cuyo coste DESTRUYE cartas propias del campo. Ámbar y no rojo: lo que se
+    // pierde son CARTAS, no Furor (§14.bis). Y una flecha por cada una (Toto, 14-ago-2026).
+    console.log('\n--- Némesis marca como COSTE a toda la vanguardia que aniquila ---');
+    {
+        const { ctx, g, marcas } = await montar({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: ['Mini-tigre', 'Oso con armadura', 'Karlos', 'Agah'], mano: ['Némesis'] },
+            p2: { vanguardia: ['Mini-tigre'] },
+        });
+        await ejecutarPaso(ctx, g, { jugar: 'Némesis' });
+        check('las cuatro sacrificadas quedan marcadas', marcas.length === 4, JSON.stringify(marcas.map(m => m.nombre)));
+        check('...como COSTE (ámbar), no como tributo de Furor',
+            marcas.every(m => m.tipo === 'coste'), JSON.stringify(marcas.map(m => m.tipo)));
+        check('...y Némesis acaba sola en su vanguardia',
+            g.players.p1.vanguard.length === 1 && g.players.p1.vanguard[0].name === 'Némesis',
+            JSON.stringify(g.players.p1.vanguard.map(c => c.name)));
+    }
+
     console.log('');
     if (fallos) { console.log(`SUITE costes_presenta: ${fallos} FALLOS de ${total} comprobaciones`); process.exit(1); }
     console.log(`SUITE costes_presenta: ${total}/${total} comprobaciones — COSTES Y REQUISITOS CORRECTOS`);

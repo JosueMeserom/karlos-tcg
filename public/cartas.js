@@ -3616,8 +3616,11 @@ const CARD_DB = [
             { trigger: "ANTES_DE_JUGAR", pausaEnEscaparate: true,
               log: "¡Némesis desciende y aniquila a toda su propia vanguardia como tributo!",
               efectos: [
+                // esCoste: son su COSTE, no un efecto — de cada una sale una flecha ámbar hacia
+                // Némesis mientras espera en el escaparate. Ámbar y no rojo porque lo que se
+                // pierde son CARTAS, no Furor (§14.bis). Toto, 14-ago-2026.
                 { op: "MODIFICAR_STAT", target: { quien: "ALIADO", zona: "VANGUARDIA" }, stat: "currentHp",
-                  vaciar: true, sinRetribucion: true, comprobarMuerte: true } ] }
+                  vaciar: true, sinRetribucion: true, comprobarMuerte: true, esCoste: true } ] }
         ],
         onStartTurn: function(card, game) {
             card.nemesisHealUsed = false; // Reseteamos la habilidad pasiva

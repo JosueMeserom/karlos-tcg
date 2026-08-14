@@ -57,7 +57,10 @@ const SRC = fs.readFileSync(path.join(RAIZ, 'public/cartas.js'), 'utf8');
 const LINEAS = SRC.split('\n');
 const marcaAMano = new Set();
 LINEAS.forEach((l, i) => {
-    if (!/DSL\._marcarCoste\s*\(/.test(l) || /^\s*\/\//.test(l)) return;
+    // `DSL.tributoFuror` marca por dentro: las nueve cartas que lo usan tienen su flecha aunque
+    // en su propio bloque no aparezca ningún _marcarCoste. Sin esto salían como pendientes -un
+    // falso negativo que hacía que la lista de "por decidir" mintiera (Toto, 14-ago-2026).
+    if (!/DSL\._marcarCoste\s*\(|DSL\.tributoFuror\s*\(/.test(l) || /^\s*\/\//.test(l)) return;
     for (let j = i; j >= 0; j--) {
         const m = LINEAS[j].match(/^\s*(?:id:\s*\d+,\s*)?name:\s*"([^"]+)"/);
         if (m) { marcaAMano.add(m[1]); return; }
@@ -117,14 +120,43 @@ for (const c of CARD_DB) {
     });
 }
 
+// NO PROCEDE: cartas cuyo coste o requisito no puede tener flecha, con el porqué. Se apartan de
+// "por decidir" para que esa lista sea trabajo REAL y no ruido permanente (Toto, 14-ago-2026).
+// Tres motivos, y ninguno es pereza:
+//   · La condición gobierna una ACTIVA, no la colocación. Una Activa no se presenta, así que no
+//     hay escaparate donde dibujar nada.
+//   · Es un requisito de RECUENTO o de ESTADO ("vanguardia llena", "3 aliados", "no haber
+//     atacado"): no hay UNA carta concreta a la que apuntar, y señalar a un aliado cualquiera
+//     mentiría.
+//   · Es NEGATIVO ("Karolina no está", "tu rival no tiene Evento"): lo que lo cumple es una
+//     ausencia, y a una ausencia no se le puede apuntar.
+const NO_PROCEDE = {
+    'Kami': 'su requisito gobierna la ACTIVA (SACRIFICIO EQUIVALENTE), no la colocación',
+    'Meca EBA': 'su requisito gobierna la ACTIVA (EMPLAZAR PILOTO), no la colocación',
+    'Neo': 'su requisito es contextual (un cebo que ataque o vaya a sufrir daño), no una carta concreta al jugarla',
+    'Cápsula de bio-regeneración': 'requisito de RECUENTO: "tu vanguardia llena"',
+    'Berry': 'requisito de RECUENTO: "tu vanguardia llena"',
+    'Esfuerzo dividido': 'requisito de RECUENTO: "3 aliados en vanguardia"',
+    'Plan de equipo': 'requisito de RECUENTO y de estado: "no haber atacado y 2 o más aliados"',
+    'Arthas': 'requisito NEGATIVO: lo cumple la AUSENCIA de Karolina, y a una ausencia no se apunta',
+    'Una buena razón': 'requisito NEGATIVO: que el rival NO tenga Evento',
+    'Chaqueta metálica defensiva de la muerte': 'el aliado que cumple el requisito es el MISMO al que se anexa: la flecha sería redundante con el propio equipo',
+    'Zoe (calcinante)': 'su requisito es haber completado un Evento que ya expiró; no queda carta en el campo que señalar',
+};
+
 const conFlecha = filas.filter(f => f.marcado);
-const sinFlecha = filas.filter(f => !f.marcado);
+const noProcede = filas.filter(f => !f.marcado && NO_PROCEDE[f.nombre]);
+const sinFlecha = filas.filter(f => !f.marcado && !NO_PROCEDE[f.nombre]);
 const malas = filas.filter(f => f.incoherente);
 
 console.log('AUDITORÍA DE FLECHAS DE COSTE / TRIBUTO / REQUISITO\n');
 console.log(`## Con flecha (${conFlecha.length})`);
 console.log('   Enseñan de dónde sale lo que pagan al presentarse.');
 conFlecha.forEach(f => console.log(`   · ${f.nombre}${detalle ? '  — ' + f.motivo : ''}`));
+
+console.log(`\n## No procede (${noProcede.length})`);
+console.log('   No pueden tenerla, y por qué. Apartadas para que "por decidir" sea trabajo real.');
+noProcede.forEach(f => console.log(`   · ${f.nombre} — ${NO_PROCEDE[f.nombre]}`));
 
 console.log(`\n## SIN flecha (${sinFlecha.length})`);
 console.log('   Pagan o exigen algo, pero al presentarse no lo enseñan. No es un bug: marcar una');
@@ -136,5 +168,5 @@ if (malas.length) {
     malas.forEach(f => console.log(`   · ${f.nombre}: ${f.incoherente}`));
 }
 
-console.log(`\nTOTAL: ${filas.length} cartas con coste/tributo/requisito · ${conFlecha.length} con flecha · ${sinFlecha.length} sin ella`);
+console.log(`\nTOTAL: ${filas.length} cartas · ${conFlecha.length} con flecha · ${noProcede.length} no procede · ${sinFlecha.length} POR DECIDIR`);
 if (malas.length) { console.log('\nHAY MARCAJES INCOHERENTES.'); process.exit(1); }
