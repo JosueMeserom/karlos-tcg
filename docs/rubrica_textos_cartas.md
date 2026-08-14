@@ -572,9 +572,13 @@ la suite lo comprueba explícitamente en vez de fiarse del resultado.
 - **A un HUECO**: `requisitoZona` en la plantilla. *Una buena razón* es legal porque el rival **no
   tiene Evento**, así que la flecha sale de su ranura vacía. Lo que cumple el requisito es la
   ausencia, y la ausencia tiene sitio en el tablero.
-- **TARDE, a propósito**: Neo marca su cebo cuando **se revela**, no al jugarse. Su gracia es
-  pillar desprevenido y señalarlo antes lo delataría. Etiqueta propia -"Cebo"- pero el lima del
-  requisito: es una condición que se cumple, no algo que se pierda.
+- **TARDE, a propósito**: Neo **se presenta al revelarse**, no al jugarse. Marcar el cebo antes no
+  servía de nada -el intercambio lo manda a la mano al instante, así que cuando iba a dibujarse
+  ya no había a quién apuntar-. Presentándose, el orden se ordena solo: Neo sale de la mano al
+  escaparate (el rival la ve por primera vez ahí, así que la sorpresa se conserva), el cebo -que
+  sigue en el campo- le manda su flecha "Cebo", y **solo entonces** se hace el intercambio dentro
+  del escaparate. Etiqueta propia pero el lima del requisito: es una condición que se cumple, no
+  algo que se pierda.
 
 **`pausaEnEscaparate`** es la marca que lo pide, en la habilidad `ANTES_DE_JUGAR`. Solo la llevan
 las dos cartas cuyo coste **destruye cartas del campo**, que es lo que tiene animación que merezca

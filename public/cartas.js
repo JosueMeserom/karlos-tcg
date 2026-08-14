@@ -6710,7 +6710,7 @@ const CARD_DB = [
             const ok = await NEO.preguntar(handCard, atacante, game,
                 `¿Cambiar a ${game.getCardNameWithOwner(atacante)} por Neo para atacar?`);
             if (!ok) return null;
-            NEO.revelar(handCard, atacante, game);
+            await NEO.revelar(handCard, atacante, game);
             return { nuevoAtacante: handCard };
         },
 
@@ -6723,7 +6723,7 @@ const CARD_DB = [
             const ok = await NEO.preguntar(handCard, objetivo, game,
                 `¿Cambiar a ${game.getCardNameWithOwner(objetivo)} por Neo para recibir el golpe?`);
             if (!ok) return null;
-            NEO.revelar(handCard, objetivo, game);
+            await NEO.revelar(handCard, objetivo, game);
             return { nuevoObjetivo: handCard };
         },
     },
@@ -7034,15 +7034,35 @@ const NEO = {
         });
     },
 
-    revelar(neo, cebo, game) {
-        // La flecha del cebo sale AQUÍ, cuando Neo se revela, y no al jugarla: su gracia es pillar
-        // al rival desprevenido, y señalar al cebo antes lo delataría (Toto, 14-ago-2026).
-        // Etiqueta propia -"Cebo"- pero el lima del requisito: es una condición que se cumple, no
-        // algo que se pierda.
-        if (typeof DSL !== 'undefined' && DSL._marcarCoste) DSL._marcarCoste(game, cebo, 'requisito', 'Cebo');
+    async revelar(neo, cebo, game) {
+        // Neo SE PRESENTA al revelarse (Toto, 14-ago-2026). Es lo que arregla el problema de la
+        // flecha: marcar el cebo no servía de nada porque el intercambio lo manda a la mano al
+        // instante, así que cuando se iba a dibujar ya no había a quién apuntar.
+        // Presentándose, el orden se ordena solo y encaja con todo lo demás:
+        //   1. Neo sale de tu mano al escaparate — el rival la ve por primera vez AQUÍ, o sea que
+        //      la sorpresa no se pierde: no se delata nada antes de que ocurra.
+        //   2. Con ella quieta en el centro, el cebo -que TODAVÍA está en el campo- le manda su
+        //      flecha "Cebo".
+        //   3. Solo entonces se hace el intercambio, dentro del escaparate: el cebo vuelve a la
+        //      mano y Neo aterriza en su hueco.
+        // Mismo mecanismo que Némesis (§14.ter): la carta espera en el centro mientras pasa lo
+        // que tiene que pasar, y viaja a su sitio cuando ha terminado.
         game.logMsg(`¡IMAGINACIÓN HIPERACTIVA! ${game.getCardNameWithOwner(cebo)} no era más que un señuelo: ${game.nCarta(neo)} ocupa su lugar.`, 'ability');
-        game.sustituirEnCampo(cebo, neo);
-        if (typeof showFloatingText === 'function') showFloatingText(neo.instanceId, '¡NEO!', 'ft-purple', -40);
+        if (typeof DSL !== 'undefined' && DSL._marcarCoste) DSL._marcarCoste(game, cebo, 'requisito', 'Cebo');
+        const _cambio = () => {
+            game.sustituirEnCampo(cebo, neo);
+            if (typeof showFloatingText === 'function') showFloatingText(neo.instanceId, '¡NEO!', 'ft-purple', -40);
+            return neo.instanceId;
+        };
+        const _fila = `#${neo.owner}-${cebo.location === 'rearguard' ? 'rearguard' : 'vanguard'}`;
+        if (typeof animarPresentacionCarta === 'function') {
+            // De dorso: para el rival, Neo estaba en una mano que no ve. El volteo ES la sorpresa.
+            const _deDorso = game.gameMode === 'online' && game.myPlayerId !== neo.owner;
+            try {
+                await animarPresentacionCarta(neo.id, `#${neo.owner}-hand`, _fila, _deDorso,
+                    { origenId: neo.instanceId, zonaSel: _fila, enElEscaparate: async () => {}, colocar: _cambio });
+            } catch (e) { console.error(e); _cambio(); }
+        } else { _cambio(); }
     },
 };
 
