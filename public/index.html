@@ -11198,8 +11198,13 @@
                     return saliente.instanceId;
                 };
 
+                // SIN await (Toto, 14-ago-2026): el vuelo de la saliente y la llegada de la
+                // entrante son EL MISMO gesto -un relevo- y tienen que verse a la vez. Esperando,
+                // el cebo se iba entero y solo después bajaba Neo, que se lee como dos cosas.
+                // Es seguro no esperar: `volarALaMano` llama a `colocar` ANTES de su primer
+                // await, así que el estado queda cerrado ya; lo que sigue en vuelo es el adorno.
                 if (_hayHueco && typeof volarALaMano === 'function' && !this.isSkippingAnim) {
-                    try { await volarALaMano(_origenSel, saliente.owner, saliente, _aLaMano, 500); }
+                    try { volarALaMano(_origenSel, saliente.owner, saliente, _aLaMano, 500).catch(e => console.error(e)); }
                     catch (e) { console.error(e); _aLaMano(); }
                 } else { _aLaMano(); }
 
