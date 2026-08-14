@@ -6745,6 +6745,9 @@ const CARD_DB = [
         // jugarla + un requisito sobre ese campo del JUGADOR-, y por vivir en el jugador y no
         // en la carta, sale gratis que sea por jugador y no global.
         name: "Una buena razón", type: "Evento", rarity: "A", cost: 0, duration: 2, series: 1,
+        // Lo que hace legal esta jugada es un HUECO: que el rival no tenga Evento. La flecha
+        // sale de su ranura vacía (Toto, 14-ago-2026).
+        requisitoZona: [ { sel: "#{RIVAL}-event-slot", siVacia: "RIVAL" } ],
         text: "2 turnos. Requiere que tu rival no tenga Evento en juego. Al expirar, no puedes volver a jugarla en toda la partida.",
         abilities: [
             { trigger: "JUGAR", requisitos: [
@@ -6754,7 +6757,7 @@ const CARD_DB = [
                   msg: "No puedes jugarla mientras tu rival tenga un Evento en juego." } ] },
             { trigger: "AL_JUGAR", log: "{jugador} tiene una buena razón para todo esto.", logTipo: "ability",
               efectos: [ { op: "MARCAR_JUGADOR", campo: "usadaUnaBuenaRazon", valor: true } ] },
-            { trigger: "AL_CADUCAR", log: "La buena razón se ha desvanecido, y no volverá.", logTipo: "system" }
+            { trigger: "AL_CADUCAR", log: "{carta} de {jugador} se ha desvanecido, y no volverá.", logTipo: "system" }
         ],
     },
     {
@@ -7032,6 +7035,11 @@ const NEO = {
     },
 
     revelar(neo, cebo, game) {
+        // La flecha del cebo sale AQUÍ, cuando Neo se revela, y no al jugarla: su gracia es pillar
+        // al rival desprevenido, y señalar al cebo antes lo delataría (Toto, 14-ago-2026).
+        // Etiqueta propia -"Cebo"- pero el lima del requisito: es una condición que se cumple, no
+        // algo que se pierda.
+        if (typeof DSL !== 'undefined' && DSL._marcarCoste) DSL._marcarCoste(game, cebo, 'requisito', 'Cebo');
         game.logMsg(`¡IMAGINACIÓN HIPERACTIVA! ${game.getCardNameWithOwner(cebo)} no era más que un señuelo: ${game.nCarta(neo)} ocupa su lugar.`, 'ability');
         game.sustituirEnCampo(cebo, neo);
         if (typeof showFloatingText === 'function') showFloatingText(neo.instanceId, '¡NEO!', 'ft-purple', -40);
@@ -7453,6 +7461,13 @@ const DSL = {
         // destruyen DENTRO del escaparate (pausaEnEscaparate), o sea después de que la
         // presentación haya consumido las marcas: si se marcan allí, la flecha no llega a
         // dibujarse nunca. Es el caso de Némesis (Toto, 14-ago-2026).
+        // `requisitoZona`: lo que hace legal la jugada es un HUECO, no una carta.
+        for (const z of (tmpl.requisitoZona ? (Array.isArray(tmpl.requisitoZona) ? tmpl.requisitoZona : [tmpl.requisitoZona]) : [])) {
+            const rival = sourceCard.owner === 'p1' ? 'p2' : 'p1';
+            const sel = String(z.sel || '').replace('{RIVAL}', rival).replace('{YO}', sourceCard.owner);
+            if (z.siVacia && game.players[z.siVacia === 'RIVAL' ? rival : sourceCard.owner].activeEvent) continue;
+            DSL._marcarZona(game, sel, z.tipo || 'requisito', z.etiqueta);
+        }
         for (const [campo, tipo] of [['requisitoVisible', 'requisito'], ['costeVisible', 'coste']]) {
             const specs = (ab && ab[campo]) || tmpl[campo];
             if (!specs) continue;
@@ -7503,6 +7518,16 @@ const DSL = {
     // que sustituye al apaño de colocar el MODIFICAR_STAT detrás del BUSCAR: aquel
     // conseguía "no cobrar mientras se pueda cancelar" moviendo el efecto de sitio, y
     // el precio era que el flotante salía al final de toda la cadena.
+    // Marca una ZONA en vez de una carta. Hace falta cuando lo que cumple el requisito no es una
+    // carta sino un HUECO: 'Una buena razón' es legal porque el rival NO tiene Evento, así que la
+    // flecha sale de su ranura vacía (Toto, 14-ago-2026).
+    _marcarZona(game, zonaSel, tipo, etiqueta) {
+        if (!game || !zonaSel) return;
+        game._costesPresenta = game._costesPresenta || [];
+        if (game._costesPresenta.some(x => x.zonaSel === zonaSel)) return;
+        game._costesPresenta.push({ zonaSel, tipo, etiqueta, zona: 'zona' });
+    },
+
     _marcarCoste(game, cartas, tipo, etiqueta) {
         if (!game || !cartas) return;
         const lista = Array.isArray(cartas) ? cartas : [cartas];

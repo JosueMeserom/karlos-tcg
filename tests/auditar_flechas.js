@@ -105,7 +105,10 @@ for (const c of CARD_DB) {
     // `requisitoVisible` y `costeVisible` viven en la plantilla, no en un efecto: dicen a qué
     // cartas del campo apuntan la flecha lima (lo que hace legal la jugada) y la ámbar (lo que
     // se pierde al hacerla).
-    if (c.requisitoVisible || c.costeVisible) marcado = true;
+    if (c.requisitoVisible || c.costeVisible || c.requisitoZona) marcado = true;
+    // Neo marca su cebo cuando SE REVELA, no al jugarse: su gracia es pillar desprevenido, y
+    // señalarlo antes lo delataría. La marca vive en NEO.revelar, no en la plantilla.
+    if (c.name === 'Neo') marcado = true;
     if (marcaAMano.has(c.name)) marcado = true;
 
     const txt = String(c.text || '');
@@ -140,9 +143,7 @@ const NO_PROCEDE = {
     // lista. El día que las Activas se presenten, se revisan como lo que son.
     'Kami': 'condición de una HABILIDAD (SACRIFICIO EQUIVALENTE), no un requisito de colocación',
     'Meca EBA': 'condición de una HABILIDAD (EMPLAZAR PILOTO), no un requisito de colocación',
-    'Neo': 'su requisito es contextual (un cebo que ataque o vaya a sufrir daño), no una carta concreta al jugarla',
     'Arthas': 'requisito NEGATIVO: lo cumple la AUSENCIA de Karolina, y a una ausencia no se apunta',
-    'Una buena razón': 'requisito NEGATIVO: que el rival NO tenga Evento',
     'Chaqueta metálica defensiva de la muerte': 'el aliado que cumple el requisito es el MISMO al que se anexa: la flecha sería redundante con el propio equipo',
     // Zoe SÍ se presenta al evolucionar (§14.quater) — eso se hizo el 13-ago. Lo que no tiene es
     // a QUIÉN apuntar: su requisito es haber completado Entrenamiento arduo, y ese Evento acaba

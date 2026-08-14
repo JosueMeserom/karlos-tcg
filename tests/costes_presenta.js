@@ -653,6 +653,38 @@ async function montar(esc) {
             'vanguardia=' + JSON.stringify(vg) + ' retaguardia=' + JSON.stringify(g.players.p1.rearguard.map(c => c.name)));
     }
 
+    // ── FLECHAS QUE NO APUNTAN A UNA CARTA ────────────────────────────────────────
+    console.log('\n--- Apuntar a un hueco, y apuntar tarde a propósito ---');
+    {
+        // 'Una buena razón' es legal porque el rival NO tiene Evento: lo que cumple el requisito
+        // es un HUECO, así que la flecha sale de su ranura vacía (Toto, 14-ago-2026).
+        const { ctx, g, marcas } = await montar({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: ['Mini-tigre'], mano: ['Una buena razón'] },
+            p2: { vanguardia: ['Mini-tigre'] },
+        });
+        let alEncolar = null;
+        ctx.sandbox.__vio = (l) => { if (alEncolar === null) alEncolar = l; };
+        require('vm').runInContext("(function(){var o=animarPresentacionCarta;animarPresentacionCarta=function(){"
+            + "__vio(((window.game._costesPresenta)||[]).map(function(m){return m.tipo+':'+(m.zonaSel||m.id);}));"
+            + "return o.apply(null,arguments);};})()", ctx.sandbox);
+        await ejecutarPaso(ctx, g, { jugar: 'Una buena razón' });
+        check('la flecha sale de la ranura de Evento VACÍA del rival',
+            !!(alEncolar && alEncolar.some(x => x === 'requisito:#p2-event-slot')),
+            JSON.stringify(alEncolar));
+    }
+    {
+        // Y con el rival CON Evento la carta no es legal, así que no debe marcarse nada.
+        const { ctx, g, marcas } = await montar({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: ['Mini-tigre'], mano: ['Una buena razón'] },
+            p2: { vanguardia: ['Mini-tigre'], evento: { carta: 'Dáedra', duracion: 2 } },
+        });
+        await ejecutarPaso(ctx, g, { jugar: 'Una buena razón' });
+        check('con el rival CON Evento no se marca ningún hueco',
+            !(g._costesPresenta || []).some(m => m.zonaSel), JSON.stringify(g._costesPresenta || []));
+    }
+
     console.log('');
     if (fallos) { console.log(`SUITE costes_presenta: ${fallos} FALLOS de ${total} comprobaciones`); process.exit(1); }
     console.log(`SUITE costes_presenta: ${total}/${total} comprobaciones — COSTES Y REQUISITOS CORRECTOS`);

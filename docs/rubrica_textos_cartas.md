@@ -567,6 +567,15 @@ jugada cancelada, un escenario cargado a media cadena- la partida se cuelga sin 
 suelta también el `finally` del hook y el cierre de emergencia (`cerrarTodoYCancelar`), y por eso
 la suite lo comprueba explícitamente en vez de fiarse del resultado.
 
+**Una flecha no siempre apunta a una carta.** Dos casos que estrenaron pieza (14-ago-2026):
+
+- **A un HUECO**: `requisitoZona` en la plantilla. *Una buena razón* es legal porque el rival **no
+  tiene Evento**, así que la flecha sale de su ranura vacía. Lo que cumple el requisito es la
+  ausencia, y la ausencia tiene sitio en el tablero.
+- **TARDE, a propósito**: Neo marca su cebo cuando **se revela**, no al jugarse. Su gracia es
+  pillar desprevenido y señalarlo antes lo delataría. Etiqueta propia -"Cebo"- pero el lima del
+  requisito: es una condición que se cumple, no algo que se pierda.
+
 **`pausaEnEscaparate`** es la marca que lo pide, en la habilidad `ANTES_DE_JUGAR`. Solo la llevan
 las dos cartas cuyo coste **destruye cartas del campo**, que es lo que tiene animación que merezca
 verse: **Némesis** (su vanguardia) y **Giro de guion** (los Eventos). Un coste de Furor no la

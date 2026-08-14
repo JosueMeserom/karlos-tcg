@@ -1770,9 +1770,12 @@
             // El Evento activo NO se pinta como `.card[data-id]`: vive en su RANURA. Sin este
             // segundo intento, Xanadu, Diego Antonio, Silhouette y Giro de guion marcaban
             // correctamente y la flecha no aparecía jamás (Toto, 13-ago-2026).
-            const _elDe = (c) => document.querySelector(`.card[data-id="${c.id}"]`)
+            // `zonaSel`: la marca apunta a un HUECO, no a una carta ('Una buena razón' es legal
+            // porque la ranura de Evento del rival está VACÍA). Se resuelve por selector.
+            const _elDe = (c) => (c.zonaSel ? document.querySelector(c.zonaSel) : null)
+                || document.querySelector(`.card[data-id="${c.id}"]`)
                 || (c.zona === 'event' ? document.getElementById(`${c.owner}-event-slot`) : null);
-            const _enTablero = (c) => c.zona === 'vanguard' || c.zona === 'rearguard' || c.zona === 'event';
+            const _enTablero = (c) => c.zona === 'zona' || c.zona === 'vanguard' || c.zona === 'rearguard' || c.zona === 'event';
             const enCampo = costes.filter(_enTablero);
             const acomp   = costes.filter(c => !_enTablero(c));
 
