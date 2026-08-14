@@ -8784,6 +8784,14 @@ const DSL = {
             // se queda en 0, ese no entra en la lista (pedido de Toto).
             const _resumen = e.logResumen ? [] : null;
             const _campoResumen = (e.logResumen && e.logResumen.campo) || 'currentHp';
+            // CANDADO DE RECOLOCACIÓN (Toto, 14-ago-2026): si este efecto puede matar a VARIOS a
+            // la vez, la retaguardia no sube hasta que hayan caído todos. Si no, los de atrás se
+            // van metiendo en los huecos entre muerte y muerte -con Némesis, en los que ella
+            // venía a ocupar-. Se echa aquí, en el bucle de objetivos, porque es EL punto por el
+            // que pasa cualquier efecto de grupo; no hace falta tocar ninguna carta.
+            const _puedeMatarVarios = targets.length > 1 && e.op === 'MODIFICAR_STAT'
+                && e.stat === 'currentHp' && (e.vaciar || e.comprobarMuerte);
+            const _correrObjetivos = async () => {
             for (const t of targets) {
                 // ifObjetivo (Imp mayor, 31-jul-2026): condición evaluada sobre EL OBJETIVO en
                 // vez de la carta fuente -complementa a `e.if`, que mira la fuente-. Hacía falta
@@ -8793,13 +8801,19 @@ const DSL = {
                 if (e.ifObjetivo && !DSL._match(t, e.ifObjetivo)) continue;
                 const _antesResumen = _resumen ? DSL._field(t, _campoResumen) : null;
                 const r = await DSL._doEffect(e, sourceCard, t, game, ownerId, habilidad);
-                if (r === false) return { ok: false, anyApplied };
+                if (r === false) return { ok: false };   // aborta el lote; lo propaga _rc, abajo
                 if (r === true) anyApplied = true;
                 if (_resumen && r === true) {
                     const delta = DSL._field(t, _campoResumen) - _antesResumen;
                     if (delta > 0) _resumen.push({ nombre: DSL._nombre(game, t), delta });
                 }
             }
+            return { ok: true };
+            };
+            const _rc = (_puedeMatarVarios && typeof game.sinRecolocarHasta === 'function')
+                ? await game.sinRecolocarHasta(_correrObjetivos)
+                : await _correrObjetivos();
+            if (_rc && _rc.ok === false) return { ok: false, anyApplied };
             if (_resumen && _resumen.length) {
                 const mismos = _resumen.every(x => x.delta === _resumen[0].delta);
                 // "A, B y C" (NEO._enumerar hace lo mismo, pero vive en otro objeto del fichero).

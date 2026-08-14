@@ -662,3 +662,24 @@ entrecomillado contra la lista REAL de etiquetas y la de nombres de carta, sacad
 Si coincide con una etiqueta y no con un nombre, exige el prefijo. Ese es el método correcto para
 esta familia de comprobaciones, y la lección de haber buscado *"Energía Adán"* como nombre de
 carta -no existe- cuando era una etiqueta de Igniz y Yuriy.
+
+
+## 16. VARIAS MUERTES A LA VEZ NO RECOLOCAN HASTA EL FINAL (Toto, 14-ago-2026)
+
+Cuando un hueco se abre en vanguardia, alguien de retaguardia sube a cubrirlo. Pero **si varias
+cartas mueren en el mismo instante lógico, los huecos no se recalculan hasta que hayan muerto
+todas** — aunque el motor por dentro las mate una a una.
+
+Sin esta regla la retaguardia iba subiendo *entre* muerte y muerte: con Némesis, que aniquila su
+propia vanguardia como coste, los de atrás se metían en los huecos que ella venía a ocupar y se
+veía un baile en vez de *"caen las cuatro, entra Némesis, y entonces sube el resto"*.
+
+**No es una excepción de Némesis**: vale para cualquier efecto que destruya en grupo (un Cañón que
+mate a dos, una Granada que mate a tres). Lo echa el propio DSL en el bucle de objetivos, así que
+ninguna carta tiene que declarar nada; y `game.sinRecolocarHasta(fn)` lo abre a mano cuando hace
+falta abarcar más -en Némesis, toda la presentación, para que su aterrizaje también entre dentro-.
+
+Dos detalles que costaron un rojo cada uno:
+- Los huecos se cuentan **por jugador**. Con un contador global, el primero al que se le recoloca
+  se come los del otro (lo destapó TORMENTA PERFECTA, que golpea a los dos bandos a la vez).
+- Sube **uno por hueco**, no uno por tanda: si caen cuatro, suben cuatro (los que haya y quepan).

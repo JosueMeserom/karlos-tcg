@@ -6886,7 +6886,10 @@
                     p.hand.splice(cardIndex, 1);
                     this.assignCopyId(card); // el [n] nace al salir de la mano
                     const _filaDe = () => card.location === 'rearguard' ? `#${card.owner}-rearguard` : `#${card.owner}-vanguard`;
-                    await animarPresentacionCarta(card.id, `#${card.owner}-hand`, _filaDe(),
+                    // Con el coste pagado en el escaparate, el candado abarca TODA la presentación:
+                    // las muertes y el aterrizaje. Si se soltara antes, la retaguardia subiría al
+                    // hueco que la propia carta viene a ocupar (Némesis; Toto, 14-ago-2026).
+                    const _presentar = () => animarPresentacionCarta(card.id, `#${card.owner}-hand`, _filaDe(),
                         this.gameMode === 'online' && this.myPlayerId !== card.owner,
                         {
                             origenId: card.instanceId,
@@ -6905,6 +6908,8 @@
                                 return card.instanceId;
                             },
                         });
+                    if (_pausaCoste && typeof this.sinRecolocarHasta === 'function') await this.sinRecolocarHasta(_presentar);
+                    else await _presentar();
 
                     this.placedUnitThisTurn = true;
                     this.updatePassives();
@@ -8868,20 +8873,25 @@
                         p.vanguard = p.vanguard.filter(c => c.instanceId !== card.instanceId);
                         p.rearguard = p.rearguard.filter(c => c.instanceId !== card.instanceId);
 
-                        if (wasInVanguard && p.rearguard.length > 0) {
-                            const vanguardChars = p.vanguard.filter(c => c.type === 'Personaje').length;
-                            
-                            const candidateIdx = p.rearguard.findIndex(c => 
-                                c.type === 'Esbirro' || (c.type === 'Personaje' && vanguardChars < 2)
-                            );
-
-                            if (candidateIdx !== -1) {
-                                const moved = p.rearguard.splice(candidateIdx, 1)[0];
-                                moved.location = 'vanguard';
-                                p.vanguard.push(moved);
-                                this.logMsg(`${this.getCardNameWithOwner(moved)} avanza a la vanguardia para cubrir el hueco.`, 'system');
-                            }
+                        // CANDADO DE RECOLOCACIÓN (Toto, 14-ago-2026). Si varias cartas mueren en
+                        // el MISMO instante lógico, los huecos no se recalculan hasta que hayan
+                        // muerto todas. Sin esto la retaguardia iba subiendo entre muerte y
+                        // muerte: con Némesis, que aniquila su propia vanguardia como coste, los
+                        // de atrás se metían en los huecos que ella venía a ocupar, y el jugador
+                        // veía un baile en vez de "caen las cuatro, entra Némesis, y entonces
+                        // sube el resto".
+                        // NO es una excepción de Némesis: vale para cualquier efecto que destruya
+                        // en grupo (un Cañón que mate a dos, una Granada que mate a tres). Lo
+                        // abre y lo cierra quien provoca la tanda; sin candado, se recoloca al
+                        // momento, como siempre.
+                        // POR JUGADOR: con un contador global, el primero al que se le recoloca se
+                        // come los huecos del otro. Lo destapó TORMENTA PERFECTA, que golpea a los
+                        // dos bandos a la vez (regresion41).
+                        if (wasInVanguard) {
+                            this._recolocarPendiente = this._recolocarPendiente || {};
+                            this._recolocarPendiente[card.owner] = (this._recolocarPendiente[card.owner] || 0) + 1;
                         }
+                        if (!this._candadoRecolocar) this._recolocarHuecos(p);
 
                         if (!p.discard) p.discard = [];
                         p.discard.push(card);
@@ -8916,6 +8926,44 @@
                     }
                 } catch (e) {
                     console.error("Error en checkDeath:", e);
+                }
+            }
+
+            // Sube de retaguardia a vanguardia a quien pueda, si hay hueco. Único sitio donde
+            // ocurre: así el candado tiene un solo cierre que ejecutar.
+            _recolocarHuecos(p) {
+                // Se sube UNO POR HUECO abierto, no uno por tanda: si caen cuatro, suben cuatro
+                // (los que haya y quepan). Con el candado echado los huecos se acumulan aquí.
+                if (!p || !p.rearguard) return;
+                const bolsa = this._recolocarPendiente || {};
+                let pendientes = bolsa[p.id] || 0;
+                bolsa[p.id] = 0;
+                while (pendientes-- > 0) {
+                    if (!p.rearguard.length || p.vanguard.length >= 4) return;
+                    const vanguardChars = p.vanguard.filter(c => c.type === 'Personaje').length;
+                    const candidateIdx = p.rearguard.findIndex(c =>
+                        c.type === 'Esbirro' || (c.type === 'Personaje' && vanguardChars < 2));
+                    if (candidateIdx === -1) return;
+                    const moved = p.rearguard.splice(candidateIdx, 1)[0];
+                    moved.location = 'vanguard';
+                    p.vanguard.push(moved);
+                    this.logMsg(`${this.getCardNameWithOwner(moved)} avanza a la vanguardia para cubrir el hueco.`, 'system');
+                }
+            }
+
+            // Corre `fn` con el candado echado: nadie sube de retaguardia hasta que termine, y al
+            // terminar se recoloca UNA vez. Lo usa cualquier efecto que destruya en grupo.
+            async sinRecolocarHasta(fn) {
+                const antes = this._candadoRecolocar;
+                this._candadoRecolocar = true;
+                try { return await fn(); }
+                finally {
+                    this._candadoRecolocar = antes;
+                    if (!this._candadoRecolocar) {
+                        for (const pid of ['p1', 'p2']) this._recolocarHuecos(this.players[pid]);
+                        this.updatePassives();
+                        this.render();
+                    }
                 }
             }
 

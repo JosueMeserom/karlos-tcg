@@ -632,6 +632,27 @@ async function montar(esc) {
             JSON.stringify(g.players.p1.vanguard.map(c => c.name)));
     }
 
+    // ── CANDADO DE RECOLOCACIÓN ───────────────────────────────────────────────────
+    // Si varias cartas mueren en el mismo instante lógico, la retaguardia NO sube hasta que hayan
+    // caído todas. Sin esto los de atrás se metían en los huecos entre muerte y muerte -con
+    // Némesis, en los que ella venía a ocupar- y se veía un baile (Toto, 14-ago-2026).
+    console.log('\n--- La retaguardia no sube hasta que caen todos ---');
+    {
+        const { ctx, g } = await montar({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: ['Mini-tigre', 'Oso con armadura', 'Karlos', 'Agah'],
+                  retaguardia: ['Droide antidisturbios', 'Robot de seguridad SP'], mano: ['Némesis'] },
+            p2: { vanguardia: ['Mini-tigre'] },
+        });
+        await ejecutarPaso(ctx, g, { jugar: 'Némesis' });
+        const vg = g.players.p1.vanguard.map(c => c.name);
+        check('Némesis ocupa el hueco ANTES que nadie de retaguardia',
+            vg[0] === 'Némesis', 'vanguardia=' + JSON.stringify(vg));
+        check('...y luego suben TODOS los que caben, uno por hueco',
+            vg.length === 3 && !g.players.p1.rearguard.length,
+            'vanguardia=' + JSON.stringify(vg) + ' retaguardia=' + JSON.stringify(g.players.p1.rearguard.map(c => c.name)));
+    }
+
     console.log('');
     if (fallos) { console.log(`SUITE costes_presenta: ${fallos} FALLOS de ${total} comprobaciones`); process.exit(1); }
     console.log(`SUITE costes_presenta: ${total}/${total} comprobaciones — COSTES Y REQUISITOS CORRECTOS`);
