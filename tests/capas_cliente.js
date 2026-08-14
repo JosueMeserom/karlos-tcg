@@ -483,6 +483,20 @@ vm.runInContext('_deslizarFila', sandbox)('#p1-vanguard', fotoTodo, null);
 check('la carta que sube de retaguardia se desliza, no salta',
       /transform \d+ms/.test(rSube.style.transition || ''), 'transition: ' + rSube.style.transition);
 
+// Una carta cuyo clon esta VOLANDO a la mano no puede verse tambien en la mano: el original se
+// marca en el JUEGO (_enVuelo), no con un visibility sobre el nodo, porque entre medias hay mas
+// repintados y un estilo suelto no sobrevive a ninguno. Es el mismo patron que _muriendo, y sin
+// el se veia el duplicado durante todo el relevo de Neo (Toto, 14-ago-2026).
+check('el original en vuelo se marca en el juego, no solo en el nodo',
+      /_enVuelo\s*=\s*g\._enVuelo\s*\|\|\s*new Set\(\)/.test(_srcIdx),
+      'volarALaMano no marca _enVuelo');
+check('y createCardEl lo respeta en cada repintado',
+      /this\._enVuelo && this\._enVuelo\.has\(card\.instanceId\)/.test(_srcIdx),
+      'createCardEl no mira _enVuelo');
+check('la marca se retira al aterrizar',
+      /g\._enVuelo\.delete\(idEntrante\)/.test(_srcIdx),
+      'la marca de vuelo no se limpia');
+
 // El reborde del atacante es un RELEVO, no una propiedad fija de la carta: si Neo sustituye al
 // cebo que estaba atacando, el resaltado pasa a Neo. Se comprueba en el fuente porque es estado
 // de UI que no se ve en el tablero (Toto, 14-ago-2026).

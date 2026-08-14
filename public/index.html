@@ -1462,6 +1462,10 @@
 
             const foto = _fotoFila(handSel);
             const idEntrante = (typeof colocar === 'function') ? colocar() : null;
+            // Se marca EN EL JUEGO, no solo en el nodo: entre medias hay más repintados -el propio
+            // sustituirEnCampo hace otro al colocar la entrante- y un `visibility` sobre el nodo
+            // no sobrevive a ninguno. Ver createCardEl.
+            if (idEntrante && g) { g._enVuelo = g._enVuelo || new Set(); g._enVuelo.add(idEntrante); }
             const nuevoEl = idEntrante && document.querySelector(`${handSel} .card[data-id="${idEntrante}"]`);
             if (nuevoEl) nuevoEl.style.visibility = 'hidden';   // el clon ocupa su sitio mientras llega
             _deslizarFila(handSel, foto, idEntrante);
@@ -1481,7 +1485,10 @@
 
             if (g) await g.sleep(ms); else await new Promise(r => setTimeout(r, ms));
             cont.remove();
-            if (nuevoEl) nuevoEl.style.visibility = '';
+            if (idEntrante && g && g._enVuelo) g._enVuelo.delete(idEntrante);
+            // Se destapa el nodo ACTUAL, que puede no ser el que se ocultó (ha habido repintados).
+            const _real = idEntrante && document.querySelector(`.card[data-id="${idEntrante}"]`);
+            if (_real) _real.style.visibility = '';
         }
 
         // SIN USUARIOS desde que Garret, La Bestia e Igniz pasaron al op BUSCAR (13-ago-2026).
@@ -10268,6 +10275,13 @@
                 // Muriendo: sus mitades ya vuelan por la capa de animación, así que el original
                 // debe seguir invisible aunque este repintado lo acabe de crear. Ver animateDeath.
                 if (this._muriendo && this._muriendo.has(card.instanceId)) el.style.opacity = '0';
+                // EN VUELO: su clon está viajando a la mano, así que el original tiene que seguir
+                // invisible aunque este repintado lo acabe de crear. Mismo problema que
+                // `_muriendo` y misma solución: marcarlo por ID en el juego, no con un
+                // `visibility` sobre el nodo, que cualquier render posterior se lleva por delante.
+                // Sin esto se veía el DUPLICADO -el clon volando y la carta ya puesta en la mano-
+                // durante toda la animación del relevo de Neo (Toto, 14-ago-2026).
+                if (this._enVuelo && this._enVuelo.has(card.instanceId)) el.style.visibility = 'hidden';
 
                 if (this.isDebugOpen && this.debugSelectedCard && this.debugSelectedCard.instanceId === card.instanceId) {
                     el.classList.add('debug-mode-active');
