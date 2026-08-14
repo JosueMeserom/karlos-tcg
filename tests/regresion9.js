@@ -90,6 +90,7 @@ const escenarios = [
             { finTurno: true }, // pasa a p2: al empezar, la Canceladora lo agota
         ],
         logsIntencionados: [
+            { de: '¡Alumno con VP', a: '¡Alumno con VP [1] de J2 (Jugador 2)', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado. Mismo mensaje, nombre completo' },
             { de: 'se equipa con Infusión de maná!', a: 'se equipa con Infusión de maná de J1 (Jugador 1)!', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado' },
             { de: '¡La Canceladora golpea a Alumno con VP! Perderá', a: '¡La Canceladora golpea a Alumno con VP [1] de J2 (Jugador 2)! Perderá',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba target.name a secas; la nueva rellena {objetivo} con DSL._nombre' },

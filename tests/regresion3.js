@@ -86,6 +86,7 @@ const escenarios = [
             { finTurno: true },   // vuelve a p1 (roba Mini-tigre): el Overclock se apaga
         ],
         logsIntencionados: [
+            { de: 'de seguridad SP', a: 'de seguridad SP [1] de J1 (Jugador 1)', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado. Mismo mensaje, nombre completo' },
             { de: '¡Robot de seguridad SP recibe Overclock!', a: '¡Robot de seguridad SP [1] de J1 (Jugador 1) recibe Overclock!',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba target.name a secas; la nueva rellena {objetivo} con DSL._nombre' },
         ],

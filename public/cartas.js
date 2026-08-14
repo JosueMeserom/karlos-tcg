@@ -593,7 +593,7 @@ const CARD_DB = [
                         const diff = newMax - card.maxHp;
                         card.maxHp = newMax;
                         showFloatingText(card.instanceId, `+${diff} VIDA MÁX.`, "ft-green", -20);
-                        game.logMsg(`${card.name} expande su Vida máxima a ${newMax} (RAÍCES NINJA)`, 'ability');
+                        game.logMsg(`${game.getCardNameWithOwner(card)} expande su Vida máxima a ${newMax} (RAÍCES NINJA)`, 'ability');
                     }
                 }
             }
@@ -652,7 +652,7 @@ const CARD_DB = [
             
             const doDesanexar = () => {
                 game.modifyStat(card, 'furor', -1);
-                game.logMsg(`${card.name} deshace todos sus anexos.`, "ability");
+                game.logMsg(`${game.getCardNameWithOwner(card)} deshace todos sus anexos.`, "ability");
                 card.attachments.forEach(allyId => {
                     const ally = game.findCard(allyId);
                     if (ally) {
@@ -882,7 +882,7 @@ const CARD_DB = [
             // El sigilo dura durante el turno del rival. Al empezar mi turno, se desvanece.
             if (card.owner === game.activePlayerId && card.stealth) {
                 card.stealth = false;
-                game.logMsg(`${card.name} apaga su Camuflaje Óptico.`, 'system');
+                game.logMsg(`${game.getCardNameWithOwner(card)} apaga su Camuflaje Óptico.`, 'system');
             }
         },
 
@@ -1004,7 +1004,7 @@ const CARD_DB = [
             const r2 = game.abilityContext.targets[2];
 
             showFloatingText(card.instanceId, "MOTOCICLETA", "ft-ability", -30);
-            game.logMsg(`${card.name} y ${vanAlly.name} suben a la Motocicleta e intercambian posición con ${r1.name} y ${r2.name}.`, 'ability');
+            game.logMsg(`${game.getCardNameWithOwner(card)} y ${game.getCardNameWithOwner(vanAlly)} suben a la Motocicleta e intercambian posición con ${game.getCardNameWithOwner(r1)} y ${game.getCardNameWithOwner(r2)}.`, 'ability');
             
             game.inputState = 'EXECUTING';
             game.render();
@@ -1072,7 +1072,7 @@ const CARD_DB = [
                 game.applyStatus(enemy, 'dot', 1, card);
                 await game.sleep(500); 
             } else {
-                game.logMsg(`${card.name} decide no irradiar a nadie este turno.`, 'system');
+                game.logMsg(`${game.getCardNameWithOwner(card)} decide no irradiar a nadie este turno.`, 'system');
             }
         },
 
@@ -1311,12 +1311,12 @@ const CARD_DB = [
             if (card.lastLocation !== card.location) {
                 if (card.location === 'vanguard') {
                     game.modifyCounters(card, 'kino_paciencia', 2, 'Contadores', card, '⚙️', 'POCA PACIENCIA');
-                    game.logMsg(`¡${card.name} entra a vanguardia y gana 2 Contadores!`, 'ability');
+                    game.logMsg(`¡${game.getCardNameWithOwner(card)} entra a vanguardia y gana 2 Contadores!`, 'ability');
                 } else if (card.location === 'rearguard') {
                     if (card.counters && card.counters['kino_paciencia']) {
                         game.modifyCounters(card, 'kino_paciencia', -card.counters['kino_paciencia'].count);
                     }
-                    game.logMsg(`¡${card.name} se retira y pierde sus Contadores!`, 'ability');
+                    game.logMsg(`¡${game.getCardNameWithOwner(card)} se retira y pierde sus Contadores!`, 'ability');
                 }
                 card.lastLocation = card.location;
             }
@@ -1327,13 +1327,13 @@ const CARD_DB = [
             
             game.modifyCounters(card, 'kino_paciencia', -1, 'Contadores', card, '⚙️', 'POCA PACIENCIA');
             const countLeft = card.counters && card.counters['kino_paciencia'] ? card.counters['kino_paciencia'].count : 0;
-            game.logMsg(`¡${card.passiveName}! ${card.name} pierde 1 Contador (quedan ${countLeft}).`, 'ability');
+            game.logMsg(`¡${card.passiveName}! ${game.getCardNameWithOwner(card)} pierde 1 Contador (quedan ${countLeft}).`, 'ability');
             showFloatingText(card.instanceId, "-1 CONTADOR", "ft-red-stat");
             game.render();
             await game.sleep(600);
 
             if (countLeft === 0) {
-                game.logMsg(`¡A ${card.name} se le ha agotado la paciencia!`, 'ability');
+                game.logMsg(`¡A ${game.getCardNameWithOwner(card)} se le ha agotado la paciencia!`, 'ability');
                 const p = game.players[card.owner];
                 const rearguardAllies = p.rearguard;
                 
@@ -1350,11 +1350,11 @@ const CARD_DB = [
                         p.rearguard.splice(rIdx, 1, card);
                         card.location = 'rearguard';
                         ally.location = 'vanguard';
-                        game.logMsg(`${card.name} fuerza un intercambio con ${ally.name}.`, 'ability');
+                        game.logMsg(`${game.getCardNameWithOwner(card)} fuerza un intercambio con ${game.getCardNameWithOwner(ally)}.`, 'ability');
                         game.render();
                     }
                 } else {
-                    game.logMsg(`No hay aliados en retaguardia. ¡${card.name} se auto-destruye!`, 'ability');
+                    game.logMsg(`No hay aliados en retaguardia. ¡${game.getCardNameWithOwner(card)} se auto-destruye!`, 'ability');
                     showFloatingText(card.instanceId, "DESTRUIDO", "ft-red-stat");
                     card.currentHp = 0;
                     await game.checkDeath(card, false); 
@@ -1639,7 +1639,7 @@ const CARD_DB = [
                 }
                 
                 if (calcinante) {
-                    game.logMsg(`¡Zoe evoluciona a ${calcinante.name}!`, 'ability');
+                    game.logMsg(`¡Zoe evoluciona a ${game.getCardNameWithOwner(calcinante)}!`, 'ability');
                     showFloatingText(zoe.instanceId, "¡EVOLUCIÓN!", "ft-purple", -40);
                     
                     const baseZoe = getCardTemplate(zoe.id);
@@ -2037,7 +2037,7 @@ const CARD_DB = [
             // 2. EJECUCIÓN DE LA SUSTITUCIÓN
             const sadame = [...p.vanguard, ...p.rearguard].find(c => c.name === 'Sadame');
             if (sadame) {
-                game.logMsg(`¡Sadame ve a Erasmo y se convierte en ${card.name}!`, 'ability');
+                game.logMsg(`¡Sadame ve a Erasmo y se convierte en ${game.getCardNameWithOwner(card)}!`, 'ability');
                 // (TRANSFORMACIÓN se anuncia al empezar la transformación de verdad, más abajo)
                 
                 card.location = sadame.location;
@@ -2169,7 +2169,7 @@ const CARD_DB = [
                 recovered.furor = 0;
                 recovered.exhausted = false;
                 
-                game.logMsg(`¡${recovered.name} vuelve a la vida automáticamente en tu ${placeText}!`, 'ability'); 
+                game.logMsg(`¡${game.getCardNameWithOwner(recovered)} vuelve a la vida automáticamente en tu ${placeText}!`, 'ability'); 
                 
                 game.render();
                 try { await animateResurrect(card.owner, recovered.instanceId); } catch(e){}
@@ -2264,7 +2264,7 @@ const CARD_DB = [
             game.modifyStat(card, 'furor', -2);
             showFloatingText(card.instanceId, "DOMINIO", "ft-ability", -30);
             
-            game.logMsg(`¡${card.name} toma el control de ${puppet.name} y le obliga a atacar a ${victim.name}!`, 'ability');
+            game.logMsg(`¡${game.getCardNameWithOwner(card)} toma el control de ${game.getCardNameWithOwner(puppet)} y le obliga a atacar a ${game.getCardNameWithOwner(victim)}!`, 'ability');
             
             game.inputState = 'EXECUTING';
             game.isActionLocked = true;
@@ -2292,7 +2292,7 @@ const CARD_DB = [
             const p2Event = game.players.p2.activeEvent;
             const eventActive = (p1Event && p1Event.name === "Una buena razón") || (p2Event && p2Event.name === "Una buena razón");
             if (!eventActive) {
-                game.logMsg(`No puedes colocar a ${card.name} si 'Una buena razón' no está en juego.`, 'system');
+                game.logMsg(`No puedes colocar a ${game.getCardNameWithOwner(card)} si 'Una buena razón' no está en juego.`, 'system');
                 return false;
             }
             return true;
@@ -2310,7 +2310,7 @@ const CARD_DB = [
             if (isSpecial) return false; // REPULSIÓN ABSOLUTA solo repele ataques normales
             const attackerTemplate = getCardTemplate(attacker.id);
             if (attackerTemplate.uncounterable) {
-                game.logMsg(`${attacker.name} ignora las defensas evasivas gracias a su pasiva.`, 'system');
+                game.logMsg(`${game.getCardNameWithOwner(attacker)} ignora las defensas evasivas gracias a su pasiva.`, 'system');
                 return false;
             }
             if (defender.furor >= 1) {
@@ -2327,7 +2327,7 @@ const CARD_DB = [
                 });
                 if (used) {
                     game.modifyStat(defender, 'furor', -1);
-                    game.logMsg(`¡${defender.passiveName}! ${defender.name} repele el ataque de ${attacker.name}.`, 'ability');
+                    game.logMsg(`¡${defender.passiveName}! ${game.getCardNameWithOwner(defender)} repele el ataque de ${game.getCardNameWithOwner(attacker)}.`, 'ability');
                     showFloatingText(defender.instanceId, "REPELIDO", "ft-ability", -30);
                     try { await animateRepel(attacker.instanceId, defender.instanceId); } catch(e){}
                     return true;
@@ -2441,7 +2441,7 @@ const CARD_DB = [
             game.render();
 
             if (game.abilityContext.targets.length === 1) {
-                game.logMsg(`¡ESTORNUDO DEVASTADOR! El vendaval lanza a ${target.name} de vuelta a la mano rival.`, 'ability');
+                game.logMsg(`¡ESTORNUDO DEVASTADOR! El vendaval lanza a ${game.getCardNameWithOwner(target)} de vuelta a la mano rival.`, 'ability');
                 try { await animateSpinToHand(target.instanceId, enemyId); } catch(e){}
                 enemyP.vanguard = enemyP.vanguard.filter(c => c.instanceId !== target.instanceId);
                 game.unequipAll(target); // Desequipa lo que tenga el objetivo
@@ -2451,7 +2451,7 @@ const CARD_DB = [
                 enemyP.hand.push(target);
             } else {
                 const swapTarget = game.abilityContext.targets[1];
-                game.logMsg(`¡ESTORNUDO DEVASTADOR atrapa a ${target.name} y ${swapTarget.name} en un tornado y los intercambia!`, 'ability');
+                game.logMsg(`¡ESTORNUDO DEVASTADOR atrapa a ${game.getCardNameWithOwner(target)} y ${game.getCardNameWithOwner(swapTarget)} en un tornado y los intercambia!`, 'ability');
                 try { await animateTornadoSwap(target.instanceId, swapTarget.instanceId); } catch(e){}
                 const vIdx = enemyP.vanguard.findIndex(x => x.instanceId === target.instanceId);
                 const rIdx = enemyP.rearguard.findIndex(x => x.instanceId === swapTarget.instanceId);
@@ -2481,7 +2481,7 @@ const CARD_DB = [
         onBeforePlayAsync: async function(card, game, p) {
             const eventActive = (game.players.p1.activeEvent?.name === "Una buena razón") || (game.players.p2.activeEvent?.name === "Una buena razón");
             if (!eventActive) {
-                game.logMsg(`No puedes colocar a ${card.name} sin el evento 'Una buena razón' en juego.`, 'system');
+                game.logMsg(`No puedes colocar a ${game.getCardNameWithOwner(card)} sin el evento 'Una buena razón' en juego.`, 'system');
                 return false;
             }
             return true;
@@ -2517,7 +2517,7 @@ const CARD_DB = [
         onBeforeTakeDamage: async function(defender, attacker, dmg, isSpecial, game) {
             if (!isSpecial) {
                 showFloatingText(defender.instanceId, "INVERSIÓN", "ft-ability", -30);
-                game.logMsg(`¡${defender.passiveName}! ${defender.name} invierte el ataque normal de ${attacker.name}.`, 'ability');
+                game.logMsg(`¡${defender.passiveName}! ${game.getCardNameWithOwner(defender)} invierte el ataque normal de ${game.getCardNameWithOwner(attacker)}.`, 'ability');
                 
                 let counterDmg = defender.currentAtk - attacker.currentDef;
                 if (counterDmg <= 0) counterDmg = (defender.type === 'Esbirro' && attacker.type === 'Personaje') ? 0.5 : 1;
@@ -2525,7 +2525,7 @@ const CARD_DB = [
                 // Retraso de 400ms para sincronizar el daño visual con el choque de las cartas
                 setTimeout(() => {
                     game.modifyStat(attacker, 'currentHp', -counterDmg);
-                    game.logMsg(`> ${attacker.name} recibe ${counterDmg} de daño por su propia imprudencia.`, 'combat');
+                    game.logMsg(`> ${game.getCardNameWithOwner(attacker)} recibe ${counterDmg} de daño por su propia imprudencia.`, 'combat');
                     setTimeout(() => game.checkDeath(attacker), 100);
                 }, 400);
 
@@ -2544,7 +2544,7 @@ const CARD_DB = [
         onBeforePlayAsync: async function(card, game, p) {
             const eventActive = (game.players.p1.activeEvent?.name === "Una buena razón") || (game.players.p2.activeEvent?.name === "Una buena razón");
             if (!eventActive) {
-                game.logMsg(`No puedes colocar a ${card.name} sin el evento 'Una buena razón' en juego.`, 'system');
+                game.logMsg(`No puedes colocar a ${game.getCardNameWithOwner(card)} sin el evento 'Una buena razón' en juego.`, 'system');
                 return false;
             }
             return true;
@@ -2560,7 +2560,7 @@ const CARD_DB = [
                 if (heal > 0) {
                     showFloatingText(card.instanceId, "REINA DEL COSPLAY", "ft-ability", -40);
                     game.modifyStat(card, 'currentHp', heal);
-                    game.logMsg(`¡${card.passiveName}! ${card.name} se cura ${heal} Vida.`, 'ability');
+                    game.logMsg(`¡${card.passiveName}! ${game.getCardNameWithOwner(card)} se cura ${heal} Vida.`, 'ability');
                 }
             }
         },
@@ -2617,7 +2617,7 @@ const CARD_DB = [
             if (diffDef > 0) showFloatingText(card.instanceId, `+${diffDef} DEF`, "ft-green", 0);
             else if (diffDef < 0) showFloatingText(card.instanceId, `${diffDef} DEF`, "ft-red-stat", 0);
 
-            game.logMsg(`¡${card.name} copia los stats base de ${target.name}! (ATQ: ${card.copiedBaseAtk}, DEF: ${card.copiedBaseDef})`, 'ability');
+            game.logMsg(`¡${game.getCardNameWithOwner(card)} copia los stats base de ${game.getCardNameWithOwner(target)}! (ATQ: ${card.copiedBaseAtk}, DEF: ${card.copiedBaseDef})`, 'ability');
             
             card.exhausted = true;
             game.isActionLocked = false;
@@ -2806,7 +2806,7 @@ const CARD_DB = [
         onStartTurnTempEffect: function(target, effect, game, currentTurnPlayerId) {
             if (currentTurnPlayerId === target.owner) {
                 target.exhausted = true; // ¡Lo agotamos automáticamente!
-                game.logMsg(`¡${target.name} sufre los efectos del PEM y no podrá actuar este turno!`, 'system');
+                game.logMsg(`¡${game.getCardNameWithOwner(target)} sufre los efectos del PEM y no podrá actuar este turno!`, 'system');
                 return false; 
             }
             return true; 
@@ -2873,7 +2873,7 @@ const CARD_DB = [
         },
         onStartTurnTempEffect: function(target, effect, game, currentTurnPlayerId) {
             if (currentTurnPlayerId === effect.ownerId) {
-                game.logMsg(`El Overclock de ${target.name} se ha apagado.`, 'system');
+                game.logMsg(`El Overclock de ${game.getCardNameWithOwner(target)} se ha apagado.`, 'system');
                 return false; 
             }
             return true;
@@ -3040,7 +3040,7 @@ const CARD_DB = [
         },
         onStartTurnTempEffect: function(target, effect, game, currentTurnPlayerId) {
             if (currentTurnPlayerId === effect.ownerId) {
-                game.logMsg(`${target.name} sale del humo creado por Simon.`, 'system');
+                game.logMsg(`${game.getCardNameWithOwner(target)} sale del humo creado por Simon.`, 'system');
                 return false; 
             }
             return true;
@@ -3246,7 +3246,7 @@ const CARD_DB = [
                 
                 // 3. ¿Sigue el objetivo vivo Y en el campo?
                 if (currentTarget && (currentTarget.location === 'vanguard' || currentTarget.location === 'rearguard') && currentTarget.currentHp > 0) {
-                    game.logMsg(`Corte ${i+1} a ${currentTarget.name}...`, 'combat');
+                    game.logMsg(`Corte ${i+1} a ${game.getCardNameWithOwner(currentTarget)}...`, 'combat');
                     
                     await game.performAttack(card, currentTarget);
                     await game.sleep(300);
@@ -3286,7 +3286,7 @@ const CARD_DB = [
             let targetZone = 'vanguard';
             if (p.vanguard.length >= 4) targetZone = 'rearguard';
             
-            game.logMsg(`¡${card.name} traza unos sellos con las manos y se multiplica!`, 'ability');
+            game.logMsg(`¡${game.getCardNameWithOwner(card)} traza unos sellos con las manos y se multiplica!`, 'ability');
             
             // --- ¿Quién está usando esto? ¿Unmei o NoName? ---
             const cloneId = card.name === "NoName" ? 901 : 900;
@@ -3534,12 +3534,12 @@ const CARD_DB = [
             
             // Si está sola ante el peligro
             if (totalAllies === 1) {
-                game.logMsg(`¡${card.name} está sola en el campo! Su escondite flaquea...`, 'system');
+                game.logMsg(`¡${game.getCardNameWithOwner(card)} está sola en el campo! Su escondite flaquea...`, 'system');
                 const results = await game.triggerCoinFlips(1, card.owner);
                 
                 if (results && results[0] === 'tails') {
                     card.edrielleExposed = true; // Marca que anula el sigilo
-                    game.logMsg(`Moneda: CRUZ - ¡${card.name} queda expuesta a plena vista!`, 'ability');
+                    game.logMsg(`Moneda: CRUZ - ¡${game.getCardNameWithOwner(card)} queda expuesta a plena vista!`, 'ability');
                     showFloatingText(card.instanceId, "EXPUESTA", "ft-red-stat", -30);
                     // Fix (betasteo de Toto, 30-jul-2026): el badge de Oculto lo pinta render() a
                     // partir de card.stealth, y ese campo SOLO se recalcula en onUpdatePassive —
@@ -3549,7 +3549,7 @@ const CARD_DB = [
                     game.updatePassives();
                     game.render();
                 } else {
-                    game.logMsg(`Moneda: CARA - ¡${card.name} logra mantenerse oculta en las sombras!`, 'neutral');
+                    game.logMsg(`Moneda: CARA - ¡${game.getCardNameWithOwner(card)} logra mantenerse oculta en las sombras!`, 'neutral');
                     card.edrielleExposed = false;
                 }
             } else {
@@ -3692,7 +3692,7 @@ const CARD_DB = [
             game.render();
 
             if (ctx.name === 'SACRIFICIO_NEMESIS') {
-                game.logMsg(`¡Némesis consume a ${target.name} para curarse!`, 'ability');
+                game.logMsg(`¡Némesis consume a ${game.getCardNameWithOwner(target)} para curarse!`, 'ability');
                 // Flotantes (betasteo de Toto, 31-jul-2026): "razón" (el nombre de la Pasiva que
                 // lo provoca) sobre Némesis y DESTRUIDO/A sobre el aliado consumido — mismo
                 // criterio y mismo orden que Kami. Ya no daba NINGÚN flotante: ponía currentHp=0
@@ -3722,7 +3722,7 @@ const CARD_DB = [
             // OBLITERACIÓN
             game.modifyStat(card, 'furor', -3);
             showFloatingText(card.instanceId, "OBLITERACIÓN", "ft-ability", -30);
-            game.logMsg(`¡Némesis OBLITERA a ${target.name} ignorando su defensa!`, 'ability');
+            game.logMsg(`¡Némesis OBLITERA a ${game.getCardNameWithOwner(target)} ignorando su defensa!`, 'ability');
             
             // Ignora DEF: El daño es directamente el ATQ de Némesis
             await game.dealDamage(card, target, card.currentAtk, true);
@@ -3762,7 +3762,7 @@ const CARD_DB = [
         onStartTurnTempEffect: function(target, effect, game, currentTurnPlayerId) {
             // Expira al INICIO del próximo turno del dueño del frasco
             if (currentTurnPlayerId === effect.ownerId) {
-                game.logMsg(`El efecto del Frasco maldito sobre ${target.name} desaparece.`, 'system');
+                game.logMsg(`El efecto del Frasco maldito sobre ${game.getCardNameWithOwner(target)} desaparece.`, 'system');
                 return false; 
             }
             return true;
@@ -3920,7 +3920,7 @@ const CARD_DB = [
         onStartTurnTempEffect: function(target, effect, game, currentTurnPlayerId) {
             if (currentTurnPlayerId === target.owner) {
                 target.exhausted = true; // No puede actuar
-                game.logMsg(`¡${target.name} no puede actuar este turno debido a la Canceladora!`, 'system');
+                game.logMsg(`¡${game.getCardNameWithOwner(target)} no puede actuar este turno debido a la Canceladora!`, 'system');
                 return false; // El efecto se elimina tras hacerle perder el turno
             }
             return true;
@@ -4088,14 +4088,14 @@ const CARD_DB = [
             if (!isSpecial) {
                 // Ataque normal: Solo pierde vida si rawDiff >= 2
                 if (rawDiff < 2) {
-                    game.logMsg(`¡${card.passiveName}! ${card.name} absorbe el golpe normal sin inmutarse.`, 'ability');
+                    game.logMsg(`¡${card.passiveName}! ${game.getCardNameWithOwner(card)} absorbe el golpe normal sin inmutarse.`, 'ability');
                     showFloatingText(card.instanceId, "BLOQUEADO", "ft-ability", -30);
                     return 0; // Anula el daño por completo
                 }
             } else {
                 // Ataque especial: Solo pierde vida si rawDiff >= 1
                 if (rawDiff < 1) {
-                    game.logMsg(`¡${card.passiveName}! ${card.name} resiste el ataque especial gracias a su Hueso Duro.`, 'ability');
+                    game.logMsg(`¡${card.passiveName}! ${game.getCardNameWithOwner(card)} resiste el ataque especial gracias a su Hueso Duro.`, 'ability');
                     showFloatingText(card.instanceId, "BLOQUEADO", "ft-ability", -30);
                     return 0;
                 }
@@ -4127,7 +4127,7 @@ const CARD_DB = [
             const target = game.abilityContext.targets[0];
             game.modifyStat(card, 'furor', -2);
             showFloatingText(card.instanceId, card.activeName, "ft-ability", -30);
-            game.logMsg(`¡Karolina lanza una HOSTIA MÁGICA TERRIBLE a ${target.name}!`, 'ability');
+            game.logMsg(`¡Karolina lanza una HOSTIA MÁGICA TERRIBLE a ${game.getCardNameWithOwner(target)}!`, 'ability');
             
             game.inputState = 'EXECUTING';
             game.render();
@@ -4382,7 +4382,7 @@ const CARD_DB = [
             if (defender.currentHp <= 0) {
                 game.modifyCounters(attacker, 'xidachane_kills', 1, 'Bajas', attacker, '💀', 'PIRATA GALÁCTICO');
                 if (attacker.counters['xidachane_kills'] && attacker.counters['xidachane_kills'].count >= 3) {
-                    game.logMsg(`¡${attacker.name} ha reunido botín suficiente y escapa a la mano!`, 'ability');
+                    game.logMsg(`¡${game.getCardNameWithOwner(attacker)} ha reunido botín suficiente y escapa a la mano!`, 'ability');
                     showFloatingText(attacker.instanceId, "ESCAPA", "ft-purple", -30);
                     
                     const p = game.players[attacker.owner];
@@ -4420,7 +4420,7 @@ const CARD_DB = [
 
             // Si el objetivo no perdió vida (lo esquivó, escudo, inmunidad...)
             if (target.currentHp >= startHp) {
-                game.logMsg(`¡El ataque no tuvo éxito! La frustración invade a ${card.name} y se hace más fuerte.`, 'ability');
+                game.logMsg(`¡El ataque no tuvo éxito! La frustración invade a ${game.getCardNameWithOwner(card)} y se hace más fuerte.`, 'ability');
                 if (!card.xidachaneBoosts) card.xidachaneBoosts = 0;
                 card.xidachaneBoosts++;
                 card.maxHp += 2;
@@ -4752,7 +4752,7 @@ const CARD_DB = [
             }
 
             // 3. Colocación y Activación
-            game.logMsg(`¡Igniz llama a su ${mecaToPlay.name}!`, 'ability');
+            game.logMsg(`¡Igniz llama a su ${game.getCardNameWithOwner(mecaToPlay)}!`, 'ability');
 
             const placeChoice = p.vanguard.length < 4 ? 'vanguard' : 'rearguard';
             // El Meca va AL CAMPO, no a la mano: antes usaba animateStackToHand -la animación de
@@ -4831,7 +4831,7 @@ const CARD_DB = [
         
         onBeforeGainFuror: function(card, amount, source, game) {
             if (source === 'fase_furor' && !card.pilotoEmplazado) {
-                game.logMsg(`${card.name} no recupera energía pasivamente.`, 'system');
+                game.logMsg(`${game.getCardNameWithOwner(card)} no recupera energía pasivamente.`, 'system');
                 return 0; // Anula la ganancia pasiva en la fase de furor
             }
             return amount;
@@ -4904,9 +4904,9 @@ const CARD_DB = [
                 if (typeof game.resetCard === 'function') game.resetCard(pilot);
                 p.discard.push(pilot);
                 pilot.location = 'discard';
-                game.logMsg(`¡${pilot.name} aborda el ${card.name} saltando desde la mano!`, 'ability');
+                game.logMsg(`¡${game.getCardNameWithOwner(pilot)} aborda el ${game.getCardNameWithOwner(card)} saltando desde la mano!`, 'ability');
             } else {
-                game.logMsg(`¡${pilot.name} corre a abordar el ${card.name} en el campo!`, 'ability');
+                game.logMsg(`¡${game.getCardNameWithOwner(pilot)} corre a abordar el ${game.getCardNameWithOwner(card)} en el campo!`, 'ability');
                 
                 if (typeof game.animateSwap === 'function') {
                     await game.animateSwap(card.instanceId, pilot.instanceId);
@@ -4932,7 +4932,7 @@ const CARD_DB = [
             }
 
             card.pilotoEmplazado = true;
-            game.logMsg(`${card.name} ahora tiene piloto. CONSUMO DESMESURADO desactivado.`, 'system');
+            game.logMsg(`${game.getCardNameWithOwner(card)} ahora tiene piloto. CONSUMO DESMESURADO desactivado.`, 'system');
 
             card.exhausted = true;
             game.isActionLocked = false;
@@ -5162,7 +5162,7 @@ const CARD_DB = [
             }
             
             if (!placeChoice) {
-                game.logMsg(`¡${hostCard.name} cae, pero no hay hueco para Arthas (límite de Personajes)! Arthas se pierde en los descartes.`, 'system');
+                game.logMsg(`¡${game.getCardNameWithOwner(hostCard)} cae, pero no hay hueco para Arthas (límite de Personajes)! Arthas se pierde en los descartes.`, 'system');
                 equipCard.equippedTo = null;
                 return false; // Devuelve false -> El motor lo manda a descartes
             }
@@ -5193,7 +5193,7 @@ const CARD_DB = [
         
         onGlobalBeforeTakeDamage: function(vCard, attacker, defender, dmg, isSpecial, game) {
             if (vCard.location === 'vanguard' && attacker.owner !== vCard.owner && isSpecial) {
-                game.logMsg(`¡ABSORCIÓN DE MAGIA! NoName desintegra el daño del ataque especial de ${attacker.name}.`, 'ability');
+                game.logMsg(`¡ABSORCIÓN DE MAGIA! NoName desintegra el daño del ataque especial de ${game.getCardNameWithOwner(attacker)}.`, 'ability');
                 return 0;
             }
             return dmg;
@@ -5286,7 +5286,7 @@ const CARD_DB = [
                 }
             }
 
-            game.logMsg(`¡NoName escanea y replica [${mimicTemplate.activeName}] de ${target.name}!`, 'ability');
+            game.logMsg(`¡NoName escanea y replica [${mimicTemplate.activeName}] de ${game.getCardNameWithOwner(target)}!`, 'ability');
             showFloatingText(card.instanceId, "RÉPLICA", "ft-ability", -40);
             
             await game.sleep(500);
@@ -5681,7 +5681,7 @@ const CARD_DB = [
             });
 
             if (used) {
-                game.logMsg(`¡${card.passiveName}! Guardaespaldas se arroja heroicamente frente al ataque de ${attacker.name}.`, 'ability');
+                game.logMsg(`¡${card.passiveName}! Guardaespaldas se arroja heroicamente frente al ataque de ${game.getCardNameWithOwner(attacker)}.`, 'ability');
                 showFloatingText(card.instanceId, "¡NOOO!", "ft-purple", -30);
                 
                 card.currentHp = 0;
@@ -6028,7 +6028,7 @@ const CARD_DB = [
             game.modifyStat(card, 'furor', -1);
             showFloatingText(card.instanceId, card.activeName, "ft-ability", -30);
             
-            game.logMsg(`¡${card.name} invoca ilusiones y lanza 2 monedas!`, 'ability');
+            game.logMsg(`¡${game.getCardNameWithOwner(card)} invoca ilusiones y lanza 2 monedas!`, 'ability');
             game.isActionLocked = true;
             const results = await game.triggerCoinFlips(2, card.owner);
             if (!results) { game.cancelAction(); return; }
@@ -6043,7 +6043,7 @@ const CARD_DB = [
                 return;
             }
             
-            game.logMsg(`${heads} CARAS. ${card.name} realizará ${heads} ráfagas de 2 ataques.`, 'ability');
+            game.logMsg(`${heads} CARAS. ${game.getCardNameWithOwner(card)} realizará ${heads} ráfagas de 2 ataques.`, 'ability');
             game.selectedCard = card;
             game.inputState = 'SELECT_ABILITY_TARGETS';
             game.abilityContext = { targets: [], maxTargets: heads, name: 'DOMINANCIA ILUSORIA', targetType: 'enemy', isNormalAttack: true, cannotCancel: true };
@@ -6068,7 +6068,7 @@ const CARD_DB = [
                 
                 // Comprobamos Vida y UBICACIÓN (que siga en el campo)
                 if (realTarget && (realTarget.location === 'vanguard' || realTarget.location === 'rearguard') && realTarget.currentHp > 0) {
-                    game.logMsg(`¡Tengu dirige una ráfaga de 2 ataques hacia ${realTarget.name}!`, 'ability');
+                    game.logMsg(`¡Tengu dirige una ráfaga de 2 ataques hacia ${game.getCardNameWithOwner(realTarget)}!`, 'ability');
                     
                     for (let i = 0; i < 2; i++) {
                         // Antes de cada guantazo, doble comprobación
@@ -6270,7 +6270,7 @@ const CARD_DB = [
             });
 
             if (wantUse) {
-                game.logMsg(`¡Uniojo aprovecha el vacío de ${deadCard.name} y entra al campo!`, 'ability');
+                game.logMsg(`¡Uniojo aprovecha el vacío de ${game.getCardNameWithOwner(deadCard)} y entra al campo!`, 'ability');
                 const p = game.players[handCard.owner];
                 
                 handCard.location = deadCard.location;

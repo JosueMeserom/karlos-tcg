@@ -54,6 +54,10 @@ const escenarios = [
         p2: { vanguardia: ['Mini-tigre'] },
         monedas: ['cruz'],
         pasos: [ { finTurno: true } ],
+        logsIntencionados: [
+            { de: 'CRUZ - ¡Edrielle', a: 'CRUZ - ¡Edrielle de J1 (Jugador 1)', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado. Mismo mensaje, nombre completo' },
+            { de: '[system] ¡Edrielle', a: '[system] ¡Edrielle de J1 (Jugador 1)', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado. Mismo mensaje, nombre completo' },
+        ],
     },
     {
         nombre: 'BELLEZA INCOMPARABLE, cara: se mantiene Oculta',
@@ -62,6 +66,10 @@ const escenarios = [
         p2: { vanguardia: ['Mini-tigre'] },
         monedas: ['cara'],
         pasos: [ { finTurno: true } ],
+        logsIntencionados: [
+            { de: 'CARA - ¡Edrielle', a: 'CARA - ¡Edrielle de J1 (Jugador 1)', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado. Mismo mensaje, nombre completo' },
+            { de: '[system] ¡Edrielle', a: '[system] ¡Edrielle de J1 (Jugador 1)', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado. Mismo mensaje, nombre completo' },
+        ],
     },
 ];
 

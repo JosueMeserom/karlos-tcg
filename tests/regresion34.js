@@ -45,7 +45,7 @@ const escenarios = [
             { soloEn: 'vieja', opcion: 'NO' }, // la nueva nunca llega a ofrecer el modal
         ],
         logsSoloNueva: [
-            { linea: 'Aniceto ignora las defensas evasivas gracias a su pasiva.',
+            { linea: 'ignora las defensas evasivas gracias a su pasiva.',
               motivo: 'exención de uncounterable (SAPIENCIA MÁGICA) que Xanadu no comprobaba; Águila ya la tenía desde el 28-jul-2026' },
         ],
     },
