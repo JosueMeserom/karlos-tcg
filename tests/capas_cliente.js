@@ -464,6 +464,25 @@ check('la animacion de muerte no borra los botones del clon',
       !/const btns = part\.querySelectorAll\('\.action-btn-card'\)/.test(_srcIdx),
       'sigue borrando .action-btn-card');
 
+// Una carta que CAMBIA DE FILA (retaguardia -> vanguardia al cubrir un hueco) tambien se
+// desliza: la foto del FLIP es UNA para las cuatro filas, asi que la carta tiene un "antes"
+// aunque venga de otro contenedor. Con una foto por fila se colocaba de golpe (Toto, 14-ago-2026).
+const retaEl = Nodo('div'); retaEl.setAttribute('id', 'p1-rearguard'); raiz.appendChild(retaEl);
+const rSube = Nodo('div'); rSube.classList.add('card'); rSube.setAttribute('data-id', 'RS');
+rSube.__rect = { left: 100, top: 600, width: 90, height: 126 }; retaEl.appendChild(rSube);
+// Foto conjunta, como la hace render().
+const fotoTodo = new Map();
+['#p1-vanguard', '#p1-rearguard'].forEach(sel => {
+    vm.runInContext('_fotoFila', sandbox)(sel).forEach((r, id) => fotoTodo.set(id, r));
+});
+// La carta sube: cambia de contenedor y de sitio.
+retaEl.removeChild(rSube); filaEl.appendChild(rSube);
+rSube.__rect = { left: 300, top: 400, width: 90, height: 126 };
+rSube.style.transition = '';
+vm.runInContext('_deslizarFila', sandbox)('#p1-vanguard', fotoTodo, null);
+check('la carta que sube de retaguardia se desliza, no salta',
+      /transform \d+ms/.test(rSube.style.transition || ''), 'transition: ' + rSube.style.transition);
+
 // ---------- salir de la mano (la carta se va, el resto se acomoda) ----------
 // Cuando una carta viaja al escaparate deja de estar en la mano: si nadie la quita del DOM se
 // ve DUPLICADA -en la mano y en el escaparate a la vez- porque el estado ya la sacó pero no se

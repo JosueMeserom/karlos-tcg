@@ -9376,10 +9376,16 @@
             // Se respeta lo que ya esté animándose: `_deslizarFila` salta las cartas con un
             // transform inline puesto (embestida, muerte, aterrizaje), que van por su cuenta.
             render() {
-                const _fotos = ['#p1-vanguard', '#p1-rearguard', '#p2-vanguard', '#p2-rearguard']
-                    .map(sel => [sel, _fotoFila(sel)]);
+                // UNA SOLA FOTO para las cuatro filas, no una por fila. Con una foto por fila, una
+                // carta que CAMBIA de fila -la retaguardia que sube a cubrir un hueco- no aparece
+                // en el "antes" de su fila nueva, así que el FLIP la daba por recién llegada y se
+                // colocaba de golpe. Con la foto compartida sí tiene de dónde venir, y se desliza
+                // desde su sitio viejo aunque sea de otra fila (Toto, 14-ago-2026).
+                const _filas = ['#p1-vanguard', '#p1-rearguard', '#p2-vanguard', '#p2-rearguard'];
+                const _foto = new Map();
+                _filas.forEach(sel => _fotoFila(sel).forEach((r, id) => _foto.set(id, r)));
                 this._renderInterno();
-                if (!this.isSkippingAnim) _fotos.forEach(([sel, foto]) => _deslizarFila(sel, foto, null));
+                if (!this.isSkippingAnim) _filas.forEach(sel => _deslizarFila(sel, _foto, null));
             }
 
             _renderInterno() {

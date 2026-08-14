@@ -644,6 +644,11 @@ esa mano no es visible para quien mira** (`ocultarAlLlegar`), y acaba de dorso c
 mano. Si la mano sí se ve -la tuya, o una expuesta por SEGUIMIENTO- no se voltea: sería tapar algo
 que se está viendo.
 
+**La foto del FLIP es UNA para las cuatro filas**, no una por fila. Una carta que **cambia de
+fila** -la retaguardia que sube a cubrir un hueco- no aparece en el "antes" de su fila nueva, así
+que con fotos separadas el FLIP la daba por recién llegada y se colocaba de golpe. Con la foto
+compartida tiene de dónde venir y se desliza, aunque venga de otro contenedor.
+
 **El FLIP no toca lo que cambia de TAMAÑO.** Compara esquinas, así que una carta que crece o
 encoge -el zoom de selección al clicarla o al cancelar- saldría desviada: aparecía arriba a la
 izquierda y saltaba a su sitio en unos frames. Un cambio de tamaño no es una recolocación.
