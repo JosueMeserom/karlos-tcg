@@ -11224,6 +11224,12 @@
                 // otra mitad entra en el que llega, para que se lea como un relevo.
                 const _eraSeleccionada = !!(this.selectedCard && this.selectedCard.instanceId === saliente.instanceId);
                 if (_eraSeleccionada) this.selectedCard = entrante;
+                // La ENTRANTE sale de la mano ANTES de que la saliente empiece a volar (Toto,
+                // 14-ago-2026). Si no, el destino se mide con las DOS en la mano y la carta
+                // aterriza corrida a la derecha, para saltar a su sitio en cuanto la entrante se
+                // va. Con manos pequeñas -sin solape- se nota mucho.
+                const iMano = mano.findIndex(c => c.instanceId === entrante.instanceId);
+                if (iMano !== -1) mano.splice(iMano, 1);
                 const _hayHueco = typeof document !== 'undefined' && document.querySelector(_origenSel);
                 lista.splice(idx, 1);
                 if (typeof this.resetCard === 'function') this.resetCard(saliente);
@@ -11244,8 +11250,6 @@
                     catch (e) { console.error(e); _aLaMano(); }
                 } else { _aLaMano(); }
 
-                const iMano = mano.findIndex(c => c.instanceId === entrante.instanceId);
-                if (iMano !== -1) mano.splice(iMano, 1);
                 entrante.location = zona;
                 entrante.equippedCards = equipos;
                 equipos.forEach(eq => { eq.equippedTo = entrante.instanceId; });
