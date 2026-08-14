@@ -1409,7 +1409,10 @@
         //  2. VOLTEA SEGÚN QUIÉN MIRA. Sale de DORSO -viene de una pila oculta- y se gira a la
         //     cara solo si la mano de destino es visible para este cliente: la tuya siempre, la
         //     del rival solo con SEGUIMIENTO (handExposedTo). Si no la ve, se queda de dorso.
-        async function volarALaMano(origenSel, playerId, carta, colocar, ms = 600) {
+        // `resaltada`: la carta salía RESALTADA (era el atacante). Su clon nace con el reborde y
+        // lo pierde en la PRIMERA MITAD del vuelo, mientras la que la releva lo gana en la
+        // segunda: se lee como un traspaso y no como un parpadeo (Toto, 14-ago-2026).
+        async function volarALaMano(origenSel, playerId, carta, colocar, ms = 600, resaltada = false) {
             const sourceEl = document.querySelector(origenSel);
             const handSel = `#${playerId}-hand`;
             const handEl = document.querySelector(handSel);
@@ -1445,6 +1448,17 @@
             if (g && typeof g.adjustCardHeaders === 'function') g.adjustCardHeaders();
             void cont.offsetWidth;
             if (veLaCara && tmpl) flip.style.transform = 'rotateY(0deg)';
+            if (resaltada) {
+                const _cara = flip.firstChild;
+                if (_cara && _cara.style) {
+                    _cara.style.border = '3px solid yellow';
+                    _cara.style.boxShadow = '0 0 20px yellow';
+                    void _cara.offsetWidth;
+                    _cara.style.transition = `border-color ${Math.round(ms / 2)}ms ease, box-shadow ${Math.round(ms / 2)}ms ease`;
+                    _cara.style.borderColor = 'transparent';
+                    _cara.style.boxShadow = 'none';
+                }
+            }
 
             const foto = _fotoFila(handSel);
             const idEntrante = (typeof colocar === 'function') ? colocar() : null;
@@ -11188,6 +11202,14 @@
                 // (§14.quater). El origen es su hueco REAL en el campo, que aún existe: se mide
                 // antes de sacarla de la fila.
                 const _origenSel = `.card[data-id="${saliente.instanceId}"]`;
+                // RELEVO DEL RESALTADO (Toto, 14-ago-2026). Si la saliente era la carta
+                // seleccionada -el reborde amarillo del que ataca-, ese reborde le pertenece ahora
+                // a la ENTRANTE: es ella quien va a dar el golpe. Sin esto se quedaba pegado al
+                // cebo, que además ya está en la mano, y Neo atacaba sin él.
+                // Se traspasa con un fundido: la mitad de la animación se va del que sale, la
+                // otra mitad entra en el que llega, para que se lea como un relevo.
+                const _eraSeleccionada = !!(this.selectedCard && this.selectedCard.instanceId === saliente.instanceId);
+                if (_eraSeleccionada) this.selectedCard = entrante;
                 const _hayHueco = typeof document !== 'undefined' && document.querySelector(_origenSel);
                 lista.splice(idx, 1);
                 if (typeof this.resetCard === 'function') this.resetCard(saliente);
@@ -11204,7 +11226,7 @@
                 // Es seguro no esperar: `volarALaMano` llama a `colocar` ANTES de su primer
                 // await, así que el estado queda cerrado ya; lo que sigue en vuelo es el adorno.
                 if (_hayHueco && typeof volarALaMano === 'function' && !this.isSkippingAnim) {
-                    try { volarALaMano(_origenSel, saliente.owner, saliente, _aLaMano, 500).catch(e => console.error(e)); }
+                    try { volarALaMano(_origenSel, saliente.owner, saliente, _aLaMano, 500, _eraSeleccionada).catch(e => console.error(e)); }
                     catch (e) { console.error(e); _aLaMano(); }
                 } else { _aLaMano(); }
 
@@ -11218,7 +11240,23 @@
                 this.assignCopyId(entrante);
                 this.updatePassives();
                 this.render();
+                if (_eraSeleccionada) this._resaltarConFundido(entrante.instanceId, 250);
                 return true;
+            }
+
+            // El reborde de la entrante ENTRA con un fundido en vez de aparecer de golpe: se pinta
+            // sin borde y se le deja llegar al suyo con la transición de `.card`. La mitad de la
+            // animación compartida, para que encaje con el desvanecido del que sale.
+            _resaltarConFundido(instanceId, ms) {
+                const el = document.querySelector(`.card[data-id="${instanceId}"]`);
+                if (!el) return;
+                el.style.transition = `border-color ${ms}ms ease, box-shadow ${ms}ms ease`;
+                el.style.borderColor = 'transparent';
+                el.style.boxShadow = 'none';
+                void el.offsetWidth;
+                el.style.borderColor = '';
+                el.style.boxShadow = '';
+                setTimeout(() => { if (el.style) el.style.transition = ''; }, ms + 60);
             }
 
             // Cierra el overlay de una moneda re-montada como ESPECTADOR cuya tirada ya había

@@ -483,6 +483,19 @@ vm.runInContext('_deslizarFila', sandbox)('#p1-vanguard', fotoTodo, null);
 check('la carta que sube de retaguardia se desliza, no salta',
       /transform \d+ms/.test(rSube.style.transition || ''), 'transition: ' + rSube.style.transition);
 
+// El reborde del atacante es un RELEVO, no una propiedad fija de la carta: si Neo sustituye al
+// cebo que estaba atacando, el resaltado pasa a Neo. Se comprueba en el fuente porque es estado
+// de UI que no se ve en el tablero (Toto, 14-ago-2026).
+check('sustituirEnCampo traspasa la seleccion a la entrante',
+      /_eraSeleccionada[\s\S]{0,120}this\.selectedCard = entrante/.test(_srcIdx),
+      'no se traspasa selectedCard');
+check('el reborde entra con fundido en la entrante',
+      /_resaltarConFundido\(entrante\.instanceId/.test(_srcIdx),
+      'no se llama a _resaltarConFundido');
+check('y el clon que vuela lo pierde en su primera mitad',
+      /resaltada[\s\S]{0,400}ms \/ 2/.test(_srcIdx),
+      'el clon no desvanece el reborde a media animacion');
+
 // ---------- salir de la mano (la carta se va, el resto se acomoda) ----------
 // Cuando una carta viaja al escaparate deja de estar en la mano: si nadie la quita del DOM se
 // ve DUPLICADA -en la mano y en el escaparate a la vez- porque el estado ya la sacó pero no se

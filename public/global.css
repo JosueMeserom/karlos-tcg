@@ -144,7 +144,10 @@ body {
     box-sizing: border-box;
     position: relative;
     cursor: pointer;
-    transition: transform 0.2s, box-shadow 0.2s, margin 0.2s;
+    /* border-color entra en la transicion (Toto, 14-ago-2026): el reborde amarillo del
+       atacante tiene que poder DESVANECERSE al pasar de una carta a otra -Neo releva al
+       cebo- y no aparecer y desaparecer de golpe. box-shadow ya estaba. */
+    transition: transform 0.2s, box-shadow 0.2s, margin 0.2s, border-color 0.2s;
     border: 2px solid #000;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
     z-index: 1;
