@@ -52,6 +52,7 @@ const escenarios = [
             { seleccionar: 'Karlos' }, // cura 2 -> Vida 3->5: desactiva
         ],
         logsIntencionados: [
+            { de: '[ability] Manzanahoria', a: '[ability] Manzanahoria [1] de J1 (Jugador 1)', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado. Mismo mensaje, nombre completo' },
             { de: '¡Habilidad pasiva de Karlos de J1 (Jugador 1): MEGADRENALINA tiene lugar! (+2 de Atq por tener Vida <= 3)',
               a: '¡Habilidad pasiva de Karlos de J1 (Jugador 1): MEGADRENALINA tiene lugar! (+2 de Atq)',
               motivo: 'PASIVA_CONTINUA (motor) anuncia con un mensaje genérico (nombre + delta) que no incluye la cláusula de motivo que Karlos redactaba a mano ("por tener Vida <= 3")' },
@@ -75,7 +76,8 @@ const escenarios = [
             { jugar: 'Manzanahoria' },
             { seleccionar: 'Karlos (KL)' }, // cura 2 -> Vida 3->5: desactiva, CON anuncio
         ],
-        logsIntencionados: [],
+        logsIntencionados: [
+            { de: '[ability] Manzanahoria', a: '[ability] Manzanahoria [1] de J1 (Jugador 1)', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado. Mismo mensaje, nombre completo' },],
         // Las dos reglas deben ser DISTINGUIBLES entre sí: desde que la desactivación usa la
         // misma cabecera que la activación ("Habilidad pasiva de <carta>: ..."), filtrar por esa
         // cabecera se tragaba las dos líneas y dejaba la segunda regla sin nada que casar.

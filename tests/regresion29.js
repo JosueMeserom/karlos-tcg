@@ -30,6 +30,7 @@ const { correrSuite } = require('./harness');
 const escenarios = [
     {
         nombre: 'Lolita: NOCIONES DE OCULTISMO (ataque especial + 2 Atq)',
+        logsIntencionados: [ { de: 'motiva profundamente a Mini-tigre.', a: 'motiva profundamente a Mini-tigre [1] de J1 (Jugador 1).', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado' } ],
         p1: { vanguardia: [{ carta: 'Lolita', furor: 1 }] },
         p2: { vanguardia: [{ carta: 'Robot de seguridad SP', vida: 4 }] },
         pasos: [ { habilidad: 'Lolita' }, { confirmar: true }, { elegir: ['Robot de seguridad SP'] } ],
@@ -42,6 +43,7 @@ const escenarios = [
         // ataque especial (el primer bug, ya documentado en el escenario anterior de esta
         // suite) — el resultado neto es idéntico en ambas bases.
         nombre: 'Lolita: NOCIONES DE OCULTISMO contra Águila — nunca esquiva un ataque especial',
+        logsIntencionados: [ { de: 'motiva profundamente a Mini-tigre.', a: 'motiva profundamente a Mini-tigre [1] de J1 (Jugador 1).', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado' } ],
         p1: { vanguardia: [{ carta: 'Lolita', furor: 1 }] },
         p2: { vanguardia: ['Águila'] },
         pasos: [ { habilidad: 'Lolita' }, { confirmar: true }, { elegir: ['Águila'] } ],
@@ -51,6 +53,7 @@ const escenarios = [
         // tanda anterior): performAttack ya resetea currentAtk internamente, así que el
         // "-= 2" a mano tras el ataque lo resta dos veces.
         nombre: 'Hawke: PUÑO DE NEUTRONES (ataque normal + 2 Atq)',
+        logsIntencionados: [ { de: 'motiva profundamente a Mini-tigre.', a: 'motiva profundamente a Mini-tigre [1] de J1 (Jugador 1).', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado' } ],
         p1: { vanguardia: [{ carta: 'Hawke', furor: 1 }] },
         p2: { vanguardia: ['Mini-tigre'] },
         pasos: [ { habilidad: 'Hawke' }, { confirmar: true }, { elegir: ['Mini-tigre'] } ],
@@ -68,6 +71,7 @@ const escenarios = [
         p2: { vanguardia: [{ carta: 'Oso con armadura', vida: 3 }] }, // Def 5: un ataque normal no le haría nada
         pasos: [ { habilidad: 'Eris' }, { confirmar: true }, { elegir: ['Oso con armadura'] } ],
         logsIntencionados: [
+            { de: 'motiva profundamente a Mini-tigre.', a: 'motiva profundamente a Mini-tigre [1] de J1 (Jugador 1).', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado' },
             { de: '¡Eris de J1 (Jugador 1) usa TIRO FINAL! (Ignora Defensa)',
               a: '¡Eris usa TIRO FINAL! (Ignora Defensa)',
               motivo: 'el log de activación de ACTIVA nombra a la propia carta a secas (sin dueño), mismo criterio que el resto de auto-referencias del DSL (Hawke, etc.)' },
@@ -82,6 +86,7 @@ const escenarios = [
         pasos: [ { habilidad: 'Eris' }, { confirmar: true }, { elegir: ['Oso con armadura'] } ],
         monedas: ['cruz'], // Confusión, cruz = se ataca a sí misma
         logsIntencionados: [
+            { de: 'motiva profundamente a Mini-tigre.', a: 'motiva profundamente a Mini-tigre [1] de J1 (Jugador 1).', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado' },
             { de: '¡Eris de J1 (Jugador 1) usa TIRO FINAL! (Ignora Defensa)',
               a: '¡Eris usa TIRO FINAL! (Ignora Defensa)',
               motivo: 'idem: log de activación sin dueño' },
@@ -93,6 +98,8 @@ const escenarios = [
         p2: { vanguardia: ['Robot de seguridad SP'] },
         pasos: [ { habilidad: 'Capitán Guardia Real' }, { confirmar: true }, { elegir: ['Mini-tigre'] } ],
         logsIntencionados: [
+            { de: 'motiva profundamente a Mini-tigre.', a: 'motiva profundamente a Mini-tigre [1] de J1 (Jugador 1).', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado' },
+            { de: 'Capitán Guardia Real', a: 'Capitán Guardia Real [1] de J1 (Jugador 1)', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado. Mismo mensaje, nombre completo' },
             { de: 'Capitán Guardia Real motiva profundamente a Mini-tigre. (+2 ATQ temporal)',
               a: 'Capitán Guardia Real motiva profundamente a Mini-tigre [1] de J1 (Jugador 1). (+2 ATQ temporal)',
               motivo: 'la vieja usaba target.name a secas; la nueva rellena {objetivo} con DSL._nombre (formato "de JX")' },
@@ -113,6 +120,8 @@ const escenarios = [
             { finTurno: true }, // p1 -> p2: el Liderazgo (hastaFinDeTurnoPropio) caduca aquí mismo
         ],
         logsIntencionados: [
+            { de: 'motiva profundamente a Mini-tigre.', a: 'motiva profundamente a Mini-tigre [1] de J1 (Jugador 1).', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado' },
+            { de: 'Capitán Guardia Real', a: 'Capitán Guardia Real [1] de J1 (Jugador 1)', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado. Mismo mensaje, nombre completo' },
             { de: 'Capitán Guardia Real motiva profundamente a Mini-tigre. (+2 ATQ temporal)',
               a: 'Capitán Guardia Real motiva profundamente a Mini-tigre [1] de J1 (Jugador 1). (+2 ATQ temporal)',
               motivo: 'idem: cambio de formato de nombre' },
@@ -123,6 +132,7 @@ const escenarios = [
     },
     {
         nombre: 'Capitán Guardia Real: LIDERAZGO rechazado si el único aliado en vanguardia ya atacó',
+        logsIntencionados: [ { de: 'motiva profundamente a Mini-tigre.', a: 'motiva profundamente a Mini-tigre [1] de J1 (Jugador 1).', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado' } ],
         p1: { vanguardia: [{ carta: 'Capitán Guardia Real', furor: 1 }, { carta: 'Mini-tigre', agotada: true, campos: { hasAttackedThisTurn: true } }] },
         p2: { vanguardia: ['Robot de seguridad SP'] },
         pasos: [ { habilidad: 'Capitán Guardia Real' }, { confirmar: true } ],

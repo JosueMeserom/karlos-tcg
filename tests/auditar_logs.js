@@ -8,10 +8,9 @@
 // log a mano con `card.name` o `{carta}` a secas.
 //
 // Qué mira, y por qué así:
-//   · En el DSL, un `log` que use `{carta}` u `{objetivo}` está bien: los rellena DSL._fill con
-//     el nombre completo. Lo sospechoso es `{carta}` SIN `{jugador}` en un log que habla de algo
-//     que le pasa a esa carta — ahí el jugador se pierde. Se avisa solo cuando el log NO nombra
-//     al jugador de ninguna forma.
+//   · En el DSL ya NO hay nada que mirar: desde el 14-ago-2026 `{carta}` resuelve al nombre
+//     COMPLETO con dueño (DSL._nombre), igual que `{objetivo}`. Era el arreglo de fondo y se
+//     hizo en una línea; lo caro fueron las 16 suites que hubo que documentar.
 //   · En código imperativo, `${card.name}` / `${target.name}` a secas: el nombre pelado, sin
 //     dueño ni copyId. `getCardNameWithOwner(...)` y `nCarta(...)` son los correctos.
 //
@@ -47,13 +46,8 @@ const cartaDe = (i) => {
 lineas.forEach((l, i) => {
     if (/^\s*\/\//.test(l) || EXENTO.test(l)) return;
 
-    // (a) DSL: un `log:` con {carta} y sin ninguna mención al jugador.
-    const mDsl = l.match(/\blog(?:Intro|Despues|No|NoValidas|Cero|Si|)?\s*:\s*["'`]([^"'`]+)["'`]/);
-    if (mDsl && /\{carta\}/.test(mDsl[1]) && !NOMBRA_JUGADOR.test(mDsl[1])) {
-        hallazgos.push({ carta: cartaDe(i), linea: i + 1, tipo: 'DSL sin {jugador}', texto: mDsl[1] });
-        return;
-    }
-    // (b) Imperativo: nombre pelado interpolado dentro de un logMsg.
+    // Imperativo: nombre pelado interpolado dentro de un logMsg. Es lo único que queda por
+    // revisar, porque el DSL ya lo resuelve solo.
     if (/logMsg\(/.test(l) && /\$\{[A-Za-z_][\w.]*\.name\}/.test(l) && !NOMBRA_JUGADOR.test(l)) {
         const m = l.match(/logMsg\(\s*[`'"]([^`'"]*)[`'"]/);
         hallazgos.push({ carta: cartaDe(i), linea: i + 1, tipo: 'nombre pelado', texto: (m ? m[1] : l.trim()).slice(0, 90) });

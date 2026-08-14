@@ -7392,13 +7392,13 @@ const DSL = {
             const v = DSL._value(ownerId, game, e.valor, sourceCard, { self: sourceCard, objetivo: target });
             game.modifyStat(target, e.stat, v);
             if (e.floating && typeof showFloatingText === 'function') showFloatingText(target.instanceId, e.floating, e.floatingStyle || 'ft-green', e.offsetFloating !== undefined ? e.offsetFloating : -20);
-            if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
+            if (e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
             return true;
         }
         if (e.op === 'APLICAR_ESTADO') {
             game.applyStatus(target, e.estado, e.duracion, e.fuente !== undefined ? e.fuente : sourceCard, null);
             if (e.floating && typeof showFloatingText === 'function') showFloatingText(target.instanceId, e.floating, e.floatingStyle || 'ft-red-stat', e.offsetFloating !== undefined ? e.offsetFloating : -20);
-            if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
+            if (e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
             return true;
         }
         if (e.op === 'MODIFICAR_CONTADORES') {
@@ -7407,7 +7407,7 @@ const DSL = {
             // Pasivas/Activas, así que los Eventos/Ayudas no meten el "por HABILIDAD" que la
             // norma les prohíbe (sus triggers no llevan nombre de habilidad).
             game.modifyCounters(target, e.contador, e.delta, e.nombreContador, e.fuente !== undefined ? e.fuente : sourceCard, e.icono, habilidad || null);
-            if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
+            if (e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
             return true;
         }
         console.error('[DSL] AL_ENTRAR solo admite efectos síncronos (MODIFICAR_STAT, APLICAR_ESTADO, MODIFICAR_CONTADORES):', e.op);
@@ -7613,7 +7613,7 @@ const DSL = {
             // Furor y demás cambios sin comprobarMuerte: el flotante custom se queda en su
             // posición ORIGINAL (después del cambio de stat) — sin reordenar (ver nota arriba).
             if (e.floating && !e.comprobarMuerte && typeof showFloatingText === 'function') showFloatingText(target.instanceId, String(e.floating.texto).split('{delta}').join(Math.abs(d)), e.floating.estilo || 'ft-green', e.floating.offset !== undefined ? e.floating.offset : -20);
-            if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: DSL._nombre(game, target), antes, despues: target[e.stat] }), e.logTipo || 'ability');
+            if (e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target), antes, despues: target[e.stat] }), e.logTipo || 'ability');
             // sinRetribucion (Cañón de positrones/Kami, 30-jul-2026): "destrucción" directa, no
             // muerte en combate — la vieja llamaba a checkDeath(target, false) a mano para que
             // la víctima NO diera Retribución. comprobarMuerte por defecto SÍ la da (checkDeath
@@ -7653,14 +7653,14 @@ const DSL = {
                 sourceCard._dslBonoAtaque = (sourceCard._dslBonoAtaque || 0) + v;
             }
             if (e.floating && typeof showFloatingText === 'function') showFloatingText(sourceCard.instanceId, String(e.floating.texto).split('{delta}').join(Math.abs(v)), e.floating.estilo || 'ft-green', e.floating.offset !== undefined ? e.floating.offset : -20);
-            if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: target ? DSL._nombre(game, target) : '' }), e.logTipo || 'combat');
+            if (e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), objetivo: target ? DSL._nombre(game, target) : '' }), e.logTipo || 'combat');
             return true;
         }
         if (e.op === 'NO_CONSUMIR') {
             DSL._vars = DSL._vars || {};
             (DSL._vars[sourceCard.instanceId] = DSL._vars[sourceCard.instanceId] || {}).__noConsumir = true;
             // {jugador}: el log va en 3ª persona con dueño, como todo lo visible por ambos.
-            if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: target ? DSL._nombre(game, target) : '',
+            if (e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), objetivo: target ? DSL._nombre(game, target) : '',
                 jugador: (typeof game.getDisplayName === 'function' ? game.getDisplayName(sourceCard.owner) : sourceCard.owner) }), e.logTipo || 'ability');
             return true;
         }
@@ -7669,7 +7669,7 @@ const DSL = {
                 // Restauración total directa (sin onBeforeHealed ni modifyStat)
                 if (target.currentHp >= target.maxHp) return 'skip';
                 target.currentHp = target.maxHp;
-                if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
+                if (e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
                 if (typeof showFloatingText === 'function') showFloatingText(target.instanceId, e.floating || 'CURADO', e.floatingStyle || 'ft-green', e.offsetFloating !== undefined ? e.offsetFloating : -30);
                 return true;
             }
@@ -7684,7 +7684,7 @@ const DSL = {
                 // veces seguidas, porque los flotantes van en COLA de 400 ms por carta.
                 if (e.floating && typeof showFloatingText === 'function') showFloatingText(target.instanceId, e.floating, e.floatingStyle || 'ft-green', e.offsetFloating !== undefined ? e.offsetFloating : -40);
                 game.modifyStat(target, 'currentHp', amount, e.offsetY !== undefined ? e.offsetY : 0, e.fuente !== undefined ? e.fuente : sourceCard);
-                if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: DSL._nombre(game, target) }), 'ability');
+                if (e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target) }), 'ability');
                 return true;
             }
             // Variante estándar (Ingeribles): passthrough onBeforeHealed + tope + fallo si vida completa.
@@ -7699,12 +7699,12 @@ const DSL = {
             const heal = Math.min(amount, missing);
             if (typeof showFloatingText === 'function') showFloatingText(target.instanceId, e.floating || sourceCard.name.toUpperCase(), 'ft-ability', -40);
             game.modifyStat(target, 'currentHp', heal);
-            if (e.log) game.logMsg(DSL._fill(e.log, Object.assign({}, (DSL._vars && DSL._vars[sourceCard.instanceId]) || {}, ctx, { carta: sourceCard.name, objetivo: DSL._nombre(game, target), antes, despues: target.currentHp })), 'ability');
+            if (e.log) game.logMsg(DSL._fill(e.log, Object.assign({}, (DSL._vars && DSL._vars[sourceCard.instanceId]) || {}, ctx, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target), antes, despues: target.currentHp })), 'ability');
             return true;
         }
         if (e.op === 'DAÑO') {
             const d = DSL._value(ownerId, game, e.valor, sourceCard, ctx);
-            if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: DSL._nombre(game, target) }), 'ability');
+            if (e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target) }), 'ability');
             await game.dealDamage(sourceCard, target, d, e.directo !== false); // daño de efecto: directo por defecto
             await game.checkDeath(target);
             return true;
@@ -7714,7 +7714,7 @@ const DSL = {
             // ya lo tenían MODIFICAR_STAT (arriba) y la variante de APLICAR_ESTADO que usa
             // _runReaccion — sin él, un log que quisiera salir como 'system' (Moneda: CARA/CRUZ)
             // se colaba siempre como 'ability'.
-            if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
+            if (e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
             game.applyStatus(target, e.estado, e.duracion, e.fuente !== undefined ? e.fuente : sourceCard, habilidad || null);
             return true;
         }
@@ -7730,7 +7730,7 @@ const DSL = {
             // ops — un contador que sube en la propia Pasiva de la carta se notaba en el
             // registro de "Afectado por:" pero no en el tablero en el momento en que ocurre.
             if (e.floating && typeof showFloatingText === 'function') showFloatingText(target.instanceId, e.floating.texto, e.floating.estilo || 'ft-ability', e.floating.offset !== undefined ? e.floating.offset : -40);
-            if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: DSL._nombre(game, target) }), 'ability');
+            if (e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target) }), 'ability');
             return true;
         }
         if (e.op === 'ATACAR') {
@@ -7798,13 +7798,13 @@ const DSL = {
         if (e.op === 'MONEDA') {
             // log (Muñeca del mal, 31-jul-2026): anuncio ANTES de lanzar la moneda (p. ej. "lanza
             // una maldición final..."), distinto de logCara/logCruz (que anuncian el resultado).
-            if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: target ? DSL._nombre(game, target) : '' }), e.logTipo || 'ability');
+            if (e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), objetivo: target ? DSL._nombre(game, target) : '' }), e.logTipo || 'ability');
             const res = await game.triggerCoinFlips(e.cantidad || 1, ownerId);
             const cruz = res && res[0] === 'tails'; // sin resultado (cancelado) => rama de cara, como las cartas originales
             const dnM = typeof game.getDisplayName === 'function' ? game.getDisplayName(ownerId) : ownerId;
             // objetivo (Muñeca del mal, 31-jul-2026): faltaba en el fill de logCara/logCruz.
             // objetivoG (Cogorza, 31-jul-2026): su código de género, para {objetivoG?masc|fem}.
-            const FM = (t) => DSL._fill(t, { carta: sourceCard.name, jugador: dnM, objetivo: target ? DSL._nombre(game, target) : '', objetivoG: target ? target.gender : undefined });
+            const FM = (t) => DSL._fill(t, { carta: DSL._nombre(game, sourceCard), jugador: dnM, objetivo: target ? DSL._nombre(game, target) : '', objetivoG: target ? target.gender : undefined });
             if (cruz) {
                 if (e.logCruz) game.logMsg(FM(e.logCruz.msg), e.logCruz.tipo || 'combat');
                 if (Array.isArray(e.cruz)) await DSL._runEffectList(e.cruz, sourceCard, game, ownerId, [target], habilidad);
@@ -7817,7 +7817,7 @@ const DSL = {
         if (e.op === 'ROBAR') {
             const n = DSL._value(ownerId, game, e.cantidad, sourceCard, ctx) || 1;
             const pid = e.jugador === 'RIVAL' ? (ownerId === 'p1' ? 'p2' : 'p1') : ownerId;
-            if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, jugador: (typeof game.getDisplayName === 'function' ? game.getDisplayName(pid) : pid), cantidad: n }), e.logTipo || 'ability');
+            if (e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), jugador: (typeof game.getDisplayName === 'function' ? game.getDisplayName(pid) : pid), cantidad: n }), e.logTipo || 'ability');
             for (let i = 0; i < n; i++) {
                 if (e.soloSiHayMazo && game.players[pid].deck.length === 0) continue; // sin rebarajar el descarte
                 await game.drawCard(pid, e.sinAnimacion || false, e.velocidad);
@@ -7845,7 +7845,7 @@ const DSL = {
                 const zonas = _zonasNombre.map(_nz);
                 const zona = zonas[0]; // zona "principal": la que se baraja y la que ve el visor de mazo
                 const dn = typeof game.getDisplayName === 'function' ? game.getDisplayName(pid) : pid;
-                const F = (txt) => DSL._fill(txt, { carta: sourceCard.name, jugador: dn });
+                const F = (txt) => DSL._fill(txt, { carta: DSL._nombre(game, sourceCard), jugador: dn });
                 const _todas = zonas.reduce((acc, z) => acc.concat(z), []);
                 let lista = _todas.filter(x => (e.filtros || []).every(f => DSL._match(x, f)) &&
                                              (!e.algunFiltro || e.algunFiltro.some(f => DSL._match(x, f))));
@@ -7971,7 +7971,7 @@ const DSL = {
                         _colocarEnCampo(t);
                         if (typeof game.render === 'function') game.render();
                     }
-                    if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: DSL._nombre(game, t), jugador: dn }), e.logTipo || 'ability');
+                    if (e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, t), jugador: dn }), e.logTipo || 'ability');
                 };
                 const baraja = async () => {
                     if (!e.barajarDespues) return;
@@ -8190,7 +8190,7 @@ const DSL = {
             if (typeof game.resetCard === 'function') game.resetCard(d); // lavada antes de tocar los descartes
             d.location = 'discard';
             p.discard.push(d);
-            if (e.log) game.logError(DSL._fill(e.log, { carta: sourceCard.name, objetivo: d.name })); // privado: solo el actor
+            if (e.log) game.logError(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), objetivo: d.name })); // privado: solo el actor
             return true;
         }
         if (e.op === 'MARCAR') {
@@ -8198,7 +8198,7 @@ const DSL = {
             // carta en vez de fijarlo — mismo criterio que el `delta` ya añadido a MARCAR_JUGADOR.
             if (typeof e.delta === 'number') target[e.campo] = (target[e.campo] || 0) + e.delta;
             else target[e.campo] = e.valor;
-            if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
+            if (e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
             return true;
         }
         if (e.op === 'FIJAR_STAT') {
@@ -8209,7 +8209,7 @@ const DSL = {
             const v = DSL._value(ownerId, game, e.valor, sourceCard, { self: sourceCard, vars });
             if (v === undefined || v === null || Number.isNaN(v)) return 'skip';
             target[e.stat] = v;
-            const relleno = Object.assign({}, vars, { carta: sourceCard.name, objetivo: DSL._nombre(game, target), valor: v });
+            const relleno = Object.assign({}, vars, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target), valor: v });
             if (e.log) game.logMsg(DSL._fill(e.log, relleno), e.logTipo || 'ability');
             if (e.floating && typeof showFloatingText === 'function') showFloatingText(target.instanceId, DSL._fill(e.floating.texto, relleno), e.floating.estilo || 'ft-ability', e.floating.offset !== undefined ? e.floating.offset : -40);
             return true;
@@ -8219,7 +8219,7 @@ const DSL = {
             // fijar un valor — para contadores "por turno" que no viven en ninguna carta.
             if (typeof e.delta === 'number') game.players[ownerId][e.campo] = (game.players[ownerId][e.campo] || 0) + e.delta;
             else game.players[ownerId][e.campo] = e.valor !== undefined ? e.valor : true;
-            if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name }), e.logTipo || 'ability');
+            if (e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard) }), e.logTipo || 'ability');
             return true;
         }
         if (e.op === 'ESQUIVAR') {
@@ -8233,7 +8233,7 @@ const DSL = {
             // sinAnimacion (Neo, 31-jul-2026): PARED FALSA no esquiva, se desvanece — el quiebro
             // lateral de animateDodge contaba otra cosa. El efecto de reglas es idéntico.
             if (!e.sinAnimacion && typeof animateDodge === 'function') { try { await animateDodge(target.instanceId, sourceCard.instanceId); } catch (err) {} }
-            if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, defensor: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target) }), e.logTipo || 'combat');
+            if (e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), defensor: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target) }), e.logTipo || 'combat');
             return true;
         }
         // Los dos ops siguientes solo tienen sentido dentro de EQUIPO_ANTES_DE_ATACAR, que es
@@ -8248,7 +8248,7 @@ const DSL = {
             game._dslEquipoAtaque.dmgMod = (game._dslEquipoAtaque.dmgMod || 0) + v;
             const _anc = e.enAtacante && game._dslEquipoAtacante ? game._dslEquipoAtacante : sourceCard;
             if (e.floating && typeof showFloatingText === 'function') showFloatingText(_anc.instanceId, DSL._fill(e.floating.texto, { valor: Math.abs(v) }), e.floating.estilo || (v >= 0 ? 'ft-green' : 'ft-red-stat'), e.floating.offset !== undefined ? e.floating.offset : -20);
-            if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, valor: Math.abs(v) }), e.logTipo || 'combat');
+            if (e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), valor: Math.abs(v) }), e.logTipo || 'combat');
             return true;
         }
         if (e.op === 'REDIRIGIR_ATAQUE') {
@@ -8256,7 +8256,7 @@ const DSL = {
             if (!target) return 'skip';
             game._dslEquipoAtaque = game._dslEquipoAtaque || {};
             game._dslEquipoAtaque.newDefender = target;
-            if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: DSL._nombre(game, target) }), e.logTipo || 'combat');
+            if (e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target) }), e.logTipo || 'combat');
             return true;
         }
         // SECUESTRAR_STAT / DEVOLVER_STAT (Bancarrota, 31-jul-2026): guardan un stat "en el
@@ -8319,7 +8319,7 @@ const DSL = {
             // jugador ni de una carta -p. ej. game.placedUnitThisTurn, el candado de "1 unidad
             // colocada por turno", que es global y no vive en players[x] (Matón, 31-jul-2026).
             game[e.campo] = e.valor !== undefined ? e.valor : true;
-            if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name }), e.logTipo || 'ability');
+            if (e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard) }), e.logTipo || 'ability');
             return true;
         }
         if (e.op === 'FLOTANTE') {
@@ -8327,7 +8327,7 @@ const DSL = {
             // log (Karlitos, 31-jul-2026): le faltaba, a diferencia de casi todos los demás ops.
             // Un flotante suele venir acompañado de su línea de log, y sin esto había que meter
             // un efecto aparte solo para eso.
-            if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
+            if (e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
             return true;
         }
         if (e.op === 'VOLVER_A_MANO') {
@@ -8350,7 +8350,7 @@ const DSL = {
             // (§14.quater). Sin esto, la carta que vuelve del campo aparecía de golpe y las
             // demás daban un salto de un frame (Toto, 13-ago-2026).
             if (typeof game.render === 'function') game.render();
-            if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
+            if (e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
             return true;
         }
         if (e.op === 'EQUIPAR') {
@@ -8372,7 +8372,7 @@ const DSL = {
                 // no sourceCard -ver la nota de `invertido` arriba-.
                 if (typeof game.assignCopyId === 'function') game.assignCopyId(target);
                 if (typeof showFloatingText === 'function') (e.floats || []).forEach(f => showFloatingText(sourceCard.instanceId, f.texto, f.estilo || 'ft-green', f.offset !== undefined ? f.offset : -20));
-                if (e.log) game.logMsg(DSL._fill(e.log, Object.assign({}, (DSL._vars && DSL._vars[sourceCard.instanceId]) || {}, { carta: sourceCard.name, objetivo: DSL._nombre(game, target) })), e.logTipo || 'ability');
+                if (e.log) game.logMsg(DSL._fill(e.log, Object.assign({}, (DSL._vars && DSL._vars[sourceCard.instanceId]) || {}, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target) })), e.logTipo || 'ability');
                 if (typeof game.updatePassives === 'function') game.updatePassives();
                 return true;
             }
@@ -8396,7 +8396,7 @@ const DSL = {
             }
             sourceCard.equippedTo = target.instanceId;
             if (typeof showFloatingText === 'function') (e.floats || []).forEach(f => showFloatingText(target.instanceId, f.texto, f.estilo || 'ft-green', f.offset !== undefined ? f.offset : -20));
-            if (e.log) game.logMsg(DSL._fill(e.log, Object.assign({}, (DSL._vars && DSL._vars[sourceCard.instanceId]) || {}, { carta: sourceCard.name, objetivo: DSL._nombre(game, target) })), e.logTipo || 'ability');
+            if (e.log) game.logMsg(DSL._fill(e.log, Object.assign({}, (DSL._vars && DSL._vars[sourceCard.instanceId]) || {}, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target) })), e.logTipo || 'ability');
             if (!e.soloAnexar && typeof game.updatePassives === 'function') game.updatePassives();
             // animacion: la de evolución la lanzaba a mano la Súper Evolución imperativa. Va tras
             // updatePassives para que la carta ya se pinte con sus stats nuevos.
@@ -8426,7 +8426,7 @@ const DSL = {
             const pd = game.players[sourceCard.owner];
             if (!pd.discard) pd.discard = [];
             if (!pd.discard.some(c => c.instanceId === sourceCard.instanceId)) pd.discard.push(sourceCard);
-            if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: host ? DSL._nombre(game, host) : '' }), e.logTipo || 'system');
+            if (e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), objetivo: host ? DSL._nombre(game, host) : '' }), e.logTipo || 'system');
             if (e.floating && host && typeof showFloatingText === 'function') showFloatingText(host.instanceId, e.floating.texto || e.floating, e.floating.estilo || 'ft-red-stat', e.floating.offset !== undefined ? e.floating.offset : -30);
             if (typeof game.updatePassives === 'function') game.updatePassives();
             return true;
@@ -8489,7 +8489,7 @@ const DSL = {
             // falta para "tributa 2 Furor de un aliado O Gárgola se destruye": ni pool vacío ni
             // decline tenían hasta ahora forma de disparar un efecto de verdad.
             if (!pool.length) {
-                if (e.logSiVacio) game.logMsg(DSL._fill(e.logSiVacio, Object.assign({}, (DSL._vars && DSL._vars[sourceCard.instanceId]) || {}, { carta: sourceCard.name })), e.logSiVacioTipo || 'ability');
+                if (e.logSiVacio) game.logMsg(DSL._fill(e.logSiVacio, Object.assign({}, (DSL._vars && DSL._vars[sourceCard.instanceId]) || {}, { carta: DSL._nombre(game, sourceCard) })), e.logSiVacioTipo || 'ability');
                 if (e.siNoElegido) { const r = await DSL._runEffectList(e.siNoElegido, sourceCard, game, ownerId, null, habilidad); return !(r && r.ok === false); }
                 return 'skip';
             }
@@ -8500,7 +8500,7 @@ const DSL = {
             // "AL-FÉNIX" apilados). Va sobre la carta FUENTE, que es quien actúa.
             const _floatAntes = () => {
                 if (!e.floatingAntes || typeof showFloatingText !== 'function') return;
-                showFloatingText(sourceCard.instanceId, DSL._fill(e.floatingAntes.texto, { carta: sourceCard.name }),
+                showFloatingText(sourceCard.instanceId, DSL._fill(e.floatingAntes.texto, { carta: DSL._nombre(game, sourceCard) }),
                     e.floatingAntes.estilo || 'ft-ability', e.floatingAntes.offset !== undefined ? e.floatingAntes.offset : -30);
             };
             const _logAntes = (lista) => {
@@ -8510,7 +8510,7 @@ const DSL = {
                 _floatAntes();
                 if (!e.logAntes) return;
                 const els = lista.map(x => DSL._nombre(game, x)).join(' y ');
-                game.logMsg(DSL._fill(e.logAntes, Object.assign({}, (DSL._vars && DSL._vars[sourceCard.instanceId]) || {}, { carta: sourceCard.name, elegidos: els })), e.logAntesTipo || 'ability');
+                game.logMsg(DSL._fill(e.logAntes, Object.assign({}, (DSL._vars && DSL._vars[sourceCard.instanceId]) || {}, { carta: DSL._nombre(game, sourceCard), elegidos: els })), e.logAntesTipo || 'ability');
             };
             // guardaSuma/guardaNombres: dejan en vars el agregado de los elegidos para
             // efectos posteriores (p. ej. FIJAR_STAT con {REF:"vars.x"}). Se limpian
@@ -8536,7 +8536,7 @@ const DSL = {
             // F incluye las vars propias de ESTA MISMA elección (p. ej. guardaEn: "maestro"
             // guardado un poco más abajo) para que logDespues pueda referenciarlas — antes
             // solo _logAntes las incluía (Toto, 27-jul-2026, migración de Kazuo/Gladiador).
-            const F = (t) => DSL._fill(t, Object.assign({}, (DSL._vars && DSL._vars[sourceCard.instanceId]) || {}, { carta: sourceCard.name, jugador: dn }));
+            const F = (t) => DSL._fill(t, Object.assign({}, (DSL._vars && DSL._vars[sourceCard.instanceId]) || {}, { carta: DSL._nombre(game, sourceCard), jugador: dn }));
             // elegidoPor: "RIVAL" -> quien clica/decide es el rival del dueño de la
             // carta (p. ej. ACERTIJO en cruz). El pool sigue siendo relativo al
             // DUEÑO (de:"ENEMIGOS" = el rival, elija quien elija); solo cambia el
@@ -8582,7 +8582,7 @@ const DSL = {
                 // OK, y cupo por fila además del total. `hastaCantidad` NO servía para esto:
                 // aquel ajusta el cupo a los objetivos disponibles, pero no deja al jugador
                 // plantarse cuando quiera teniendo más objetivos a mano.
-                const sel = await game.pickBoardTargets(pool, n, DSL._fill(e.titulo || 'Elige objetivo', { carta: sourceCard.name }) + _texto, sourceCard, chooserId, e.cancelable !== false,
+                const sel = await game.pickBoardTargets(pool, n, DSL._fill(e.titulo || 'Elige objetivo', { carta: DSL._nombre(game, sourceCard) }) + _texto, sourceCard, chooserId, e.cancelable !== false,
                     { permitirParar: !!e.permitirParar, maxPorZona: e.maxPorZona || null, mano: _esMano });
                 if (!sel) {
                     if (e.logCancela && !e.opcional) game.logError(F(e.logCancela));
@@ -8686,7 +8686,7 @@ const DSL = {
             }
             target.tempEffects.push(marca);
             if (e.floating && typeof showFloatingText === 'function') showFloatingText(target.instanceId, e.floating.texto || e.floating, e.floating.estilo || e.floatingStyle || 'ft-ability', (e.floating.offset !== undefined ? e.floating.offset : (e.offsetFloating !== undefined ? e.offsetFloating : -40)));
-            if (e.log) game.logMsg(DSL._fill(e.log, { carta: sourceCard.name, objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
+            if (e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
             if (e.actualizaPasivas && typeof game.updatePassives === 'function') game.updatePassives();
             return true;
         }
@@ -8762,7 +8762,7 @@ const DSL = {
             }
             const tspec = e.target;
             const targets = (!tspec || tspec === 'OBJETIVO') ? (Array.isArray(fallbackTargets) ? fallbackTargets : [fallbackTargets]) : DSL._pool(ownerId, game, tspec, sourceCard);
-            if (!targets.length && e.logSiVacio) game.logMsg(DSL._fill(e.logSiVacio, Object.assign({}, (DSL._vars && DSL._vars[sourceCard.instanceId]) || {}, { carta: sourceCard.name })), e.logSiVacioTipo || 'system');
+            if (!targets.length && e.logSiVacio) game.logMsg(DSL._fill(e.logSiVacio, Object.assign({}, (DSL._vars && DSL._vars[sourceCard.instanceId]) || {}, { carta: DSL._nombre(game, sourceCard) })), e.logSiVacioTipo || 'system');
             // guardaIdsEnSelf (Cogorza, 31-jul-2026): deja en la carta fuente los instanceId del
             // pool que este efecto ha resuelto, para que efectos POSTERIORES puedan volver a
             // alcanzar EXACTAMENTE a esos mismos (target:{selfLista} / AURA soloSelfLista) aunque
@@ -8867,7 +8867,7 @@ const DSL = {
                                       : _enum(_resumen.map(x => `${x.nombre} (+${x.delta})`));
                 const msg = mismos ? (e.logResumen.msg || e.logResumen.msgVariado)
                                     : (e.logResumen.msgVariado || e.logResumen.msg);
-                game.logMsg(DSL._fill(msg, { carta: sourceCard.name, delta: _resumen[0].delta, lista, n: _resumen.length }),
+                game.logMsg(DSL._fill(msg, { carta: DSL._nombre(game, sourceCard), delta: _resumen[0].delta, lista, n: _resumen.length }),
                     e.logResumen.tipo || 'ability');
             }
         }

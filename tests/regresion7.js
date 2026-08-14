@@ -76,7 +76,8 @@ const escenarios = [
             { elegir: ['Manzanahoria', 'Longaniza', 'Té helado'] },
         ],
         logsIntencionados: [
-            { de: 'Dobla la ropa activada: Robas 3 cartas.', a: 'Dobla la ropa activada: J1 (Jugador 1) roba 3 cartas.',
+            { de: 'Dobla la ropa', a: 'Dobla la ropa de J1 (Jugador 1)', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado. Mismo mensaje, nombre completo' },
+            { de: 'activada: Robas 3 cartas.', a: 'activada: J1 (Jugador 1) roba 3 cartas.',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño/jugador): la vieja usaba nombres a secas o 2ª persona; la nueva usa DSL._nombre / {jugador}' },
         ],
     },

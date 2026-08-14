@@ -59,6 +59,9 @@ const escenarios = [
         ],
         logsSoloVieja: [ AVISO_SISTEMA_VIEJA ],
         logsIntencionados: [
+            { de: 'fan número 1 de Agah y', a: 'fan número 1 de Agah de J1 (Jugador 1) y', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es. La vieja usaba el nombre pelado' },
+                    { de: 'fan número 1 de Karlos y', a: 'fan número 1 de Karlos de J1 (Jugador 1) y', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado' },
+            { de: '[ability] ¡Frikazo', a: '[ability] ¡Frikazo [1] de J1 (Jugador 1)', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado. Mismo mensaje, nombre completo' },
             { de: '¡Frikazo se vuelve el fan número 1 de Karlos y lo protegerá con su vida!',
               a: '¡Frikazo se vuelve el fan número 1 de Karlos de J1 (Jugador 1) y lo protegerá con su vida!',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba target.name a secas; la nueva rellena {objetivo} con DSL._nombre' },
@@ -69,6 +72,7 @@ const escenarios = [
     },
     {
         nombre: 'FIJACIÓN rechazada: no hay Personajes aliados a los que proteger',
+        logsIntencionados: [ { de: 'fan número 1 de Karlos y', a: 'fan número 1 de Karlos de J1 (Jugador 1) y', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado' } ],
         turno: 2, turnoDe: 'p1', empieza: 'p2',
         p1: { vanguardia: [{ carta: 'Frikazo', furor: 1 }, 'Mini-tigre'] },
         p2: {},
@@ -86,11 +90,13 @@ const escenarios = [
         ],
         logsSoloVieja: [ AVISO_SISTEMA_VIEJA ],
         logsIntencionados: [
+            { de: 'fan número 1 de Karlos y', a: 'fan número 1 de Karlos de J1 (Jugador 1) y', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado' },
+            { de: '[ability] ¡Frikazo', a: '[ability] ¡Frikazo [1] de J1 (Jugador 1)', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado. Mismo mensaje, nombre completo' },
             { de: '¡Frikazo se vuelve el fan número 1 de Karlos y lo protegerá con su vida!',
               a: '¡Frikazo se vuelve el fan número 1 de Karlos de J1 (Jugador 1) y lo protegerá con su vida!',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño)' },
-            { de: '¡Frikazo se vuelve el fan número 1 de Agah y lo protegerá con su vida!',
-              a: '¡Frikazo se vuelve el fan número 1 de Agah de J1 (Jugador 1) y lo protegerá con su vida!',
+            { de: 'fan número 1 de Agah y lo protegerá',
+              a: 'fan número 1 de Agah de J1 (Jugador 1) y lo protegerá',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño)' },
         ],
     },
@@ -98,6 +104,7 @@ const escenarios = [
     // ---------------- Gárgola (PRUEBA DE CARÁCTER) ----------------
     {
         nombre: 'PRUEBA DE CARÁCTER: CARA drena Furor a un enemigo elegido, CRUZ paga el tributo con un aliado',
+        logsIntencionados: [ { de: 'fan número 1 de Karlos y', a: 'fan número 1 de Karlos de J1 (Jugador 1) y', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado' } ],
         turno: 2, turnoDe: 'p1', empieza: 'p2',
         p1: { vanguardia: [{ carta: 'Mini-tigre', furor: 3 }], mano: ['Gárgola'] },
         p2: { vanguardia: [{ carta: 'Robot de seguridad SP', furor: 5 }] },
@@ -111,6 +118,7 @@ const escenarios = [
     },
     {
         nombre: 'PRUEBA DE CARÁCTER: CARA+CARA — drena Furor y Gárgola queda satisfecha (sin tributo)',
+        logsIntencionados: [ { de: 'fan número 1 de Karlos y', a: 'fan número 1 de Karlos de J1 (Jugador 1) y', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado' } ],
         turno: 2, turnoDe: 'p1', empieza: 'p2',
         p1: { vanguardia: [{ carta: 'Mini-tigre', furor: 3 }], mano: ['Gárgola'] },
         p2: { vanguardia: [{ carta: 'Robot de seguridad SP', furor: 5 }] },
@@ -129,6 +137,7 @@ const escenarios = [
         monedas: ['cruz', 'cruz'],
         pasos: [ { jugar: 'Gárgola' } ],
         logsIntencionados: [
+            { de: 'fan número 1 de Karlos y', a: 'fan número 1 de Karlos de J1 (Jugador 1) y', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado' },
             { de: '¡No hay aliados con suficiente Furor! Gárgola se hace pedazos.',
               a: '¡Nadie paga el tributo! Gárgola se hace pedazos.',
               motivo: 'simplificación aceptada (ver nota de cabecera): siNoElegido no distingue "sin pagadores válidos" de "declinas la elección", un único texto para ambos casos' },
@@ -151,6 +160,7 @@ const escenarios = [
         monedas: ['cruz', 'cruz'],
         pasos: [ { jugar: 'Gárgola' }, { cancelar: true } ],
         logsIntencionados: [
+            { de: 'fan número 1 de Karlos y', a: 'fan número 1 de Karlos de J1 (Jugador 1) y', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado' },
             { de: '¡Nadie pagó el tributo! Gárgola se hace pedazos.',
               a: '¡Nadie paga el tributo! Gárgola se hace pedazos.',
               motivo: 'simplificación aceptada (ver nota de cabecera): mismo texto único de siNoElegido' },

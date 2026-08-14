@@ -79,6 +79,7 @@ const escenarios = [
               motivo: 'aviso genérico de handleAbilityTargetSelection (camino RAW de abilityContext de la vieja); la nueva elige el enemigo con ELEGIR/pickBoardTargets, que no pasa por ahí' },
         ],
         logsIntencionados: [
+            { de: '[ability] ¡Karlitos', a: '[ability] ¡Karlitos de J1 (Jugador 1)', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado. Mismo mensaje, nombre completo' },
             { de: 'se equipa velozmente con Espada V y', a: 'se equipa velozmente con Espada V de J1 (Jugador 1) y',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba weapon.name a secas' },
             { de: 'se equipa velozmente con Espada V de J1 (Jugador 1) y', a: 'se equipa velozmente con Espada V [1] de J1 (Jugador 1) y',
@@ -105,6 +106,7 @@ const escenarios = [
             { linea: 'Objetivos listos. ¡Ejecutando habilidad!', motivo: 'ver escenario anterior' },
         ],
         logsIntencionados: [
+            { de: '[ability] ¡Karlitos', a: '[ability] ¡Karlitos de J1 (Jugador 1)', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado. Mismo mensaje, nombre completo' },
             { de: 'se equipa velozmente con Shichishito y', a: 'se equipa velozmente con Shichishito de J1 (Jugador 1) y',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño)' },
             { de: 'Shichishito de J1 (Jugador 1) y', a: 'Shichishito [1] de J1 (Jugador 1) y',
@@ -145,6 +147,7 @@ const escenarios = [
             { soloEn: 'nueva', opcion: 'BUSCAR EN EL MAZO' }, { soloEn: 'nueva', elegir: [NOM_NUEVO] },
         ],
         logsIntencionados: [
+            { de: '[ability] ¡Karlitos', a: '[ability] ¡Karlitos de J1 (Jugador 1)', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado. Mismo mensaje, nombre completo' },
             { de: `Añades ${NOM_VIEJO} a tu mano.`, a: `Añades ${NOM_NUEVO} de J1 (Jugador 1) a tu mano.`,
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba target.name a secas; el acento de "Súper" es el renombrado de Toto (ver cabecera)' },
             { de: 'Barajando el mazo...', a: 'Barajando el mazo de J1 (Jugador 1)...',
@@ -159,6 +162,9 @@ const escenarios = [
         p2: {},
         pasos: [ ...SEIS_TURNOS, { opcion: 'NO BUSCAR' } ],
         flotantesSoloNueva: [ FLOTANTE_PRACTICA ],
+        logsIntencionados: [
+            { de: '[ability] ¡Karlitos', a: '[ability] ¡Karlitos de J1 (Jugador 1)', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado. Mismo mensaje, nombre completo' },
+        ],
     },
     {
         // También la encuentra en los DESCARTES: es lo que exige el texto ("mazo o descarte") y
@@ -177,6 +183,7 @@ const escenarios = [
             { soloEn: 'nueva', opcion: 'BUSCAR EN LOS DESCARTES' },
         ],
         logsIntencionados: [
+            { de: '[ability] ¡Karlitos', a: '[ability] ¡Karlitos de J1 (Jugador 1)', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado. Mismo mensaje, nombre completo' },
             { de: `Añades ${NOM_VIEJO} a tu mano.`, a: `Añades ${NOM_NUEVO} de J1 (Jugador 1) a tu mano.`,
               motivo: 'norma del proyecto (logs en 3ª persona con dueño); el acento de "Súper" es el renombrado de Toto (ver cabecera)' },
         ],
@@ -203,6 +210,9 @@ const escenarios = [
               motivo: 'la vieja se rendía sola y lo anunciaba; la nueva ofrece igualmente mirar el MAZO (ocultar el botón delataría que ahí no queda nada), así que ya no hay nada que anunciar de antemano' },
         ],
         flotantesSoloNueva: [ FLOTANTE_PRACTICA ],
+        logsIntencionados: [
+            { de: '[ability] ¡Karlitos', a: '[ability] ¡Karlitos de J1 (Jugador 1)', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado. Mismo mensaje, nombre completo' },
+        ],
     },
     {
         // El entrenamiento es de UNA vez: tras completarlo, `karlitosEntrenado` corta la Pasiva
@@ -217,6 +227,9 @@ const escenarios = [
               motivo: 'la vieja se rendía sola y lo anunciaba; la nueva ofrece igualmente mirar el MAZO (ocultar el botón delataría que ahí no queda nada), así que ya no hay nada que anunciar de antemano' },
         ],
         flotantesSoloNueva: [ FLOTANTE_PRACTICA ],
+        logsIntencionados: [
+            { de: '[ability] ¡Karlitos', a: '[ability] ¡Karlitos de J1 (Jugador 1)', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado. Mismo mensaje, nombre completo' },
+        ],
     },
 ];
 

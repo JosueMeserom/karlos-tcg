@@ -41,6 +41,7 @@ const escenarios = [
             { seleccionar: 'Kyle' }, // cura 2 -> Vida 3->5: activa la pasiva
         ],
         logsIntencionados: [
+            { de: '[ability] Manzanahoria', a: '[ability] Manzanahoria [1] de J1 (Jugador 1)', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado. Mismo mensaje, nombre completo' },
             { de: '¡Habilidad pasiva de Kyle de J1 (Jugador 1): ENTEREZA DEL INGENUO activa! (+2 ATQ y +2 DEF)',
               a: '¡Habilidad pasiva de Kyle de J1 (Jugador 1): ENTEREZA DEL INGENUO tiene lugar! (+2 de Def, +2 de Atq)',
               motivo: 'el anuncio pasa al genérico de PASIVA_CONTINUA (mismo formato que Karlos/Zoe), con los stats en orden Def -> Atq como en la cara de la carta' },

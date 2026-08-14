@@ -21,6 +21,9 @@ const escenarios = [
             { finTurno: true }, // p1→p2
             { finTurno: true }, // p2→p1: INICIO_TURNO propio
         ],
+        logsIntencionados: [
+            { de: 'MISIÓN! Sadame (retornada)', a: 'MISIÓN! Sadame (retornada) de J1 (Jugador 1)', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado. Mismo mensaje, nombre completo' },
+        ],
     },
     {
         nombre: 'Sadame (retornada) ya con la Vida completa: ÚLTIMA MISIÓN no hace nada',

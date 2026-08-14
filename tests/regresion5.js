@@ -30,6 +30,7 @@ const escenarios = [
             { finTurno: true }, // p2 pasa → inicio p1: duración 1→0 → caduca
         ],
         logsIntencionados: [
+            { de: 'activo: De compras', a: 'activo: De compras de J1 (Jugador 1)', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado. Mismo mensaje, nombre completo' },
             { de: 'Barajando el mazo...', a: 'Barajando el mazo de J1 (Jugador 1)...',
               motivo: 'atribución de jugador pedida por Toto (21-jul-2026): los logs de zonas ocultas dicen de quién son; la vieja decía "Barajando el mazo..." a secas' },
             { de: 'Has comprado: Longaniza.', a: 'J1 (Jugador 1) ha comprado: Longaniza de J1 (Jugador 1).',

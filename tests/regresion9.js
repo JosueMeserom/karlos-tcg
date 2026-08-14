@@ -25,6 +25,8 @@ const escenarios = [
             { seleccionar: 'Oso con armadura' },
         ],
         logsIntencionados: [
+            { de: 'se equipa con Infusión de maná!', a: 'se equipa con Infusión de maná de J1 (Jugador 1)!', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado' },
+            { de: '¡Oso con armadura', a: '¡Oso con armadura [1] de J1 (Jugador 1)', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado. Mismo mensaje, nombre completo' },
             { de: '¡Oso con armadura canaliza maná puro', a: '¡Oso con armadura [1] de J1 (Jugador 1) canaliza maná puro',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba target.name a secas; la nueva rellena {objetivo} con DSL._nombre' },
         ],
@@ -45,6 +47,7 @@ const escenarios = [
             { elegir: ['Némesis'] },
         ],
         logsIntencionados: [
+            { de: 'se equipa con Infusión de maná!', a: 'se equipa con Infusión de maná de J1 (Jugador 1)!', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado' },
             { de: '¡La deidad Némesis acude a tu mano!', a: '¡La deidad Némesis de J1 (Jugador 1) acude a la mano de J1 (Jugador 1)!',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño/jugador): la vieja usaba nombres a secas o 2ª persona; la nueva usa DSL._nombre / {jugador}' },
         ],
@@ -55,6 +58,7 @@ const escenarios = [
     },
     {
         nombre: 'Rezo en grupo sin Dioses/Diosas en el mazo: falla la búsqueda pero baraja igualmente',
+        logsIntencionados: [ { de: 'se equipa con Infusión de maná!', a: 'se equipa con Infusión de maná de J1 (Jugador 1)!', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado' } ],
         flotantesSoloVieja: [ { linea: '-1 FUR', consecutivo: true, motivo: 'la vieja pintaba DOS veces el mismo flotante de Furor: el suyo escrito a mano MÁS el automático de modifyStat. La nueva ya no declara el suyo (Toto lo vio con Rezo en grupo, 8-ago-2026); el flotante que queda es el del motor, idéntico' } ],
         semilla: 6,
         p1: {
@@ -86,12 +90,14 @@ const escenarios = [
             { finTurno: true }, // pasa a p2: al empezar, la Canceladora lo agota
         ],
         logsIntencionados: [
+            { de: 'se equipa con Infusión de maná!', a: 'se equipa con Infusión de maná de J1 (Jugador 1)!', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado' },
             { de: '¡La Canceladora golpea a Alumno con VP! Perderá', a: '¡La Canceladora golpea a Alumno con VP [1] de J2 (Jugador 2)! Perderá',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba target.name a secas; la nueva rellena {objetivo} con DSL._nombre' },
         ],
     },
     {
         nombre: 'Giro de guion: sustituye el propio evento y destruye el del rival',
+        logsIntencionados: [ { de: 'se equipa con Infusión de maná!', a: 'se equipa con Infusión de maná de J1 (Jugador 1)!', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado' } ],
         p1: {
             vanguardia: ['Oso con armadura'],
             evento: { carta: 'De compras', duracion: 2 },

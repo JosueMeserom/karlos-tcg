@@ -64,7 +64,7 @@ const escenarios = [
             { elegir: ['Escudo mágico'], soloEn: 'nueva' },   // la nueva abre el visor del mazo
         ],
         logsSoloVieja: [ ...YD_VIEJA, { linea: 'Garret añade Escudo mágico del mazo a la mano.', motivo: ML } ],
-        logsSoloNueva: [ ...YD_NUEVA, { linea: 'Garret atrae un Escudo mágico a la mano', motivo: ML } ],
+        logsSoloNueva: [ ...YD_NUEVA, { linea: 'atrae un Escudo mágico a la mano', motivo: ML } ],
     },
     {
         // Con un Escudo en los DESCARTES aparece la tercera opción. Es la única forma de que
@@ -85,7 +85,7 @@ const escenarios = [
             { opcion: 'BUSCAR EN DESCARTES' },
         ],
         logsSoloVieja: [ ...YD_VIEJA, { linea: 'Garret recupera Escudo mágico de los descartes.', motivo: ML } ],
-        logsSoloNueva: [ ...YD_NUEVA, { linea: 'Garret atrae un Escudo mágico a la mano', motivo: ML } ],
+        logsSoloNueva: [ ...YD_NUEVA, { linea: 'atrae un Escudo mágico a la mano', motivo: ML } ],
     },
     {
         // Declinar la búsqueda: Garret entra igual y no se toca ninguna pila.

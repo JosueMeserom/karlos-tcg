@@ -37,6 +37,7 @@ const escenarios = [
         p2: { vanguardia: [{ carta: 'Achmay', vida: 8 }] },
         pasos: [ { atacar: 'Mini-tigre', objetivo: 'Achmay' } ],
         logsIntencionados: [
+            { de: 'insulta a Mini-tigre!', a: 'insulta a Mini-tigre [1] de J2 (Jugador 2)!', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado' },
             { de: '¡YOLOLO! Mini-tigre se pincha con la barrera de Achmay.',
               a: '¡YOLOLO! Mini-tigre [1] de J1 (Jugador 1) se pincha con la barrera de Achmay.',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba attacker.name a secas; la nueva rellena {objetivo} con DSL._nombre' },
@@ -51,6 +52,7 @@ const escenarios = [
     {
         // Ataque ESPECIAL contra Achmay: YOLOLO NO debe dispararse (soloAtaqueNormal).
         nombre: 'YOLOLO no se dispara tras un ataque ESPECIAL (CHIRIBITA de Hechicero)',
+        logsIntencionados: [ { de: 'insulta a Mini-tigre!', a: 'insulta a Mini-tigre [1] de J2 (Jugador 2)!', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado' } ],
         turno: 2, turnoDe: 'p1', empieza: 'p2',
         p1: { vanguardia: [{ carta: 'Hechicero', furor: 1 }] },
         p2: { vanguardia: [{ carta: 'Achmay', vida: 8 }] },
@@ -68,6 +70,8 @@ const escenarios = [
         // emite el motor COMPARTIDO (handleAbilityTargetSelection) en AMBAS bases por igual;
         // no es una diferencia de la migración.
         logsIntencionados: [
+            { de: 'insulta a Mini-tigre!', a: 'insulta a Mini-tigre [1] de J2 (Jugador 2)!', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado' },
+            { de: '[ability] ¡Achmay', a: '[ability] ¡Achmay de J1 (Jugador 1)', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado. Mismo mensaje, nombre completo' },
             { de: '¡Achmay insulta a Mini-tigre! ¡Deberá atacarle en su próximo turno!',
               a: '¡Achmay insulta a Mini-tigre [1] de J2 (Jugador 2)! ¡Deberá atacarle en su próximo turno!',
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba target.name a secas; la nueva rellena {objetivo} con DSL._nombre' },
@@ -97,6 +101,8 @@ const escenarios = [
             { finTurno: true },
         ],
         logsIntencionados: [
+            { de: 'insulta a Mini-tigre!', a: 'insulta a Mini-tigre [1] de J2 (Jugador 2)!', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado' },
+            { de: '[ability] ¡Achmay', a: '[ability] ¡Achmay de J1 (Jugador 1)', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado. Mismo mensaje, nombre completo' },
             { de: '¡Achmay insulta a Mini-tigre! ¡Deberá atacarle en su próximo turno!',
               a: '¡Achmay insulta a Mini-tigre [1] de J2 (Jugador 2)! ¡Deberá atacarle en su próximo turno!',
               motivo: 'ver escenario anterior' },
@@ -110,6 +116,7 @@ const escenarios = [
     },
     {
         nombre: 'PÉGAME, PERRA rechazada: no hay enemigos en el campo',
+        logsIntencionados: [ { de: 'insulta a Mini-tigre!', a: 'insulta a Mini-tigre [1] de J2 (Jugador 2)!', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado' } ],
         turno: 2, turnoDe: 'p1', empieza: 'p2',
         p1: { vanguardia: [{ carta: 'Achmay', furor: 2 }] },
         p2: {},
