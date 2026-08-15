@@ -6795,9 +6795,6 @@ const CARD_DB = [
         name: "Publicidad mental", type: "Evento", rarity: "C", cost: 0, duration: 2, series: 1,
         text: "2 turnos. Al colocarla, elige un aliado de tu vanguardia. Mientras esté en juego, ese aliado y todos los enemigos pierden 2 de Atq.",
         abilities: [
-            { trigger: "PREVIEW_GLOBAL", lineas: [
-                { campoSelfId: "objetivoPublicidad", texto: "-2 de Atq por la publicidad" },
-                { quien: "ENEMIGO", texto: "-2 de Atq por la publicidad" } ] },
             { trigger: "JUGAR", requisitos: [
                 { count: { zona: "VANGUARDIA" }, op: ">=", valor: 1,
                   msg: "Necesitas un aliado en vanguardia al que anunciar." } ] },
@@ -6818,9 +6815,6 @@ const CARD_DB = [
         name: "Exhibicionismo", type: "Evento", rarity: "C", cost: 0, duration: 2, series: 1,
         text: "2 turnos. Al colocarla, elige un aliado de tu vanguardia. Mientras esté en juego, ese aliado y todos los enemigos pierden 2 de Def.",
         abilities: [
-            { trigger: "PREVIEW_GLOBAL", lineas: [
-                { campoSelfId: "objetivoExhibicion", texto: "-2 de Def por la exhibición" },
-                { quien: "ENEMIGO", texto: "-2 de Def por la exhibición" } ] },
             { trigger: "JUGAR", requisitos: [
                 { count: { zona: "VANGUARDIA" }, op: ">=", valor: 1,
                   msg: "Necesitas un aliado en vanguardia que se exhiba." } ] },

@@ -737,3 +737,29 @@ ve. Esos casos van al `NO_PROCEDE` de `tests/auditar_fases.js` con su motivo esc
 lista de pendientes sea trabajo real.
 
 `node tests/auditar_fases.js` tiene que salir en 0 POR ANOTAR.
+
+
+## §18. Nunca escribas a mano una línea de detalle que el motor ya escribe
+
+El detalle cuenta lo que afecta a una carta por dos caminos, y **no son alternativos**:
+
+1. **Automático.** `updatePassives` fotografía los stats de toda la mesa antes y después de
+   aplicar las pasivas y anota cada diferencia en `_statMods` con su fuente. De ahí salen las
+   líneas con la gramática de §13 y sus flechas, sin que la carta declare nada.
+2. **A mano**, con `PREVIEW_GLOBAL` + `lineas: [{ texto }]`. Es para lo que el automático **no
+   puede ver**: «Silenciado», «No gana Furor al inicio del turno», «Puede retirarse sin coste».
+   Nada de eso mueve un stat, así que la foto no lo detecta.
+
+**Usar el 2 para algo que ya cuenta el 1 saca la entrada dos veces, y la flecha también.** Le pasó
+a Publicidad mental y a Exhibicionismo: declaraban «-2 de Atq por la publicidad» teniendo ya un
+`AURA` con `stats: { atk: -2 }` que lo pinta solo, y encima con peor redacción (la de la carta se
+salta la gramática de §13).
+
+Regla práctica: **si la línea nombra Vida, Def o Atq, casi siempre sobra.** El Furor es la
+excepción — `_statMods` solo fotografía `currentAtk`, `currentDef`, `stealth` e `isSilenced`, así
+que lo que toque el Furor sí hay que escribirlo a mano.
+
+`node tests/auditar_preview.js` lo comprueba, y **devuelve error** (a diferencia de las auditorías
+informativas): duplicar una línea no es una decisión de diseño, es un defecto. Si una línea nombra
+un stat sin modificarlo de verdad, va a su `EXENTAS` con el motivo **verificado en el código**, no
+supuesto.
