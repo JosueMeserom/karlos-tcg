@@ -59,7 +59,10 @@
 
     <div id="action-banner"></div>
 
-    <div id="phase-banner">J1: FASE PRINCIPAL</div>
+    <div id="phase-banner">
+        <span id="pb-jugador">J1</span>
+        <span id="pb-fase">FASE PRINCIPAL</span>
+    </div>
 
     <div id="type-select-modal">
         <div style="margin-bottom: 30px; font-size: 2rem; font-weight: bold; color:white;">ELIGE UN TIPO</div>
@@ -766,9 +769,18 @@
         let bannerResolve = null;
         let furorResolve = null;
 
-        function showPhaseBanner(text) {
+        // Dos piezas, no una cadena ya montada: el banner las pinta en dos renglones (el
+        // jugador arriba, pequeño; la fase debajo, grande). Se escriben con innerText en
+        // dos <span> que ya existen, nunca con innerHTML: `jugador` lleva dentro el nick,
+        // que en online lo escribe otra persona.
+        function showPhaseBanner(jugador, fase) {
             const banner = document.getElementById('phase-banner');
-            banner.innerText = text;
+            document.getElementById('pb-jugador').innerText = jugador;
+            document.getElementById('pb-fase').innerText = fase;
+            // El renglon del jugador se tiñe del color de su lado, el mismo azul/rojo que usa
+            // la caja de turno para el jugador activo. Mismo idioma, no uno nuevo.
+            const _pid = window.game && window.game.activePlayerId;
+            document.getElementById('pb-jugador').style.color = _pid === 'p2' ? '#ef4444' : '#3b82f6';
             banner.classList.remove('anim-phase');
             void banner.offsetWidth;
             banner.classList.add('anim-phase');
@@ -6173,21 +6185,21 @@
                 this.updatePassives();
 
                 this.updatePhaseDisplay('ROBO');
-                await showPhaseBanner(`${pName}: FASE DE ROBO`);
+                await showPhaseBanner(pName, 'FASE DE ROBO');
 
                 if (this.turn > 1 || this.activePlayerId === 'p2') {
                     await this.drawCard(this.activePlayerId);
                 }
 
                 this.updatePhaseDisplay('EFECTOS INICIALES');
-                await showPhaseBanner(`${pName}: FASE DE EFECTOS INICIALES`);
+                await showPhaseBanner(pName, 'FASE DE EFECTOS INICIALES');
                 await this.processStartPhaseEffects(this.activePlayerId); 
 
                 this.updatePhaseDisplay('EVENTO');
-                await showPhaseBanner(`${pName}: FASE DE EVENTO`);
+                await showPhaseBanner(pName, 'FASE DE EVENTO');
 
                 this.updatePhaseDisplay('FUROR');
-                await showPhaseBanner(`${pName}: FASE DE FUROR`);
+                await showPhaseBanner(pName, 'FASE DE FUROR');
 
                 // --- Eventos activos: hook global de inicio de turno, ANTES de ganar Furor (p. ej. Apuesta) ---
                 for (let evPid of ['p1', 'p2']) {
@@ -6238,7 +6250,7 @@
                 if (furorGained) await waitForFurorAnimation();
 
                 this.updatePhaseDisplay('PRINCIPAL');
-                await showPhaseBanner(`${pName}: FASE PRINCIPAL`);
+                await showPhaseBanner(pName, 'FASE PRINCIPAL');
 
                 this.phase = 'PRINCIPAL';
                 this.inputState = 'IDLE';
@@ -6481,7 +6493,7 @@
                 this.pendingFurorSkip = false;
                 
                 this.updatePhaseDisplay('EFECTOS FINALES');
-                await showPhaseBanner(`${pName}: FASE DE EFECTOS FINALES`);
+                await showPhaseBanner(pName, 'FASE DE EFECTOS FINALES');
 
                 const p = this.players[this.activePlayerId];
 

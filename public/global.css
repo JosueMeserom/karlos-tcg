@@ -17,6 +17,9 @@
     /* Tope de ancho de una fila de juego. Lo comparten .zone-row y el banner de fase,
        que se recorta a la misma anchura para no invadir la columna derecha. */
     --fila-max: 600px;
+    /* Alto del banner de fase. Sube si algún día lleva un tercer renglón: el centrado
+       vertical se ajusta solo, porque se calcula a partir de aquí. */
+    --banner-alto: 84px;
     --stack-offset: 210px;
 
     /* ===== LOS DOS MANDOS DE LA COLUMNA DERECHA =====================================
@@ -502,24 +505,28 @@ body {
    que la de .zone-row: 90% de lo que queda tras los dos huecos de las pilas, con tope. */
 #phase-banner {
     position: fixed;
-    top: 45%;
+    /* Centrado de verdad, no "45% y que caiga donde caiga": quedaba justo por encima de la
+       línea que separa los campos y se notaba. El centrado va por margen negativo -la mitad
+       del alto- y NO por translateY, porque el transform se lo queda la animación de
+       barrido. Mismo truco que el centrado horizontal de aquí al lado. */
+    top: 50%;
+    margin-top: calc(var(--banner-alto) / -2);
     left: 50%;
     width: min(var(--fila-max), calc((100% - 2 * var(--stack-offset)) * 0.9));
     margin-left: calc(-0.5 * min(var(--fila-max), calc((100% - 2 * var(--stack-offset)) * 0.9)));
-    height: 60px;
+    height: var(--banner-alto);
     background: rgba(0, 0, 0, 0.9);
     color: #fbbf24;
     display: flex;
     align-items: center;
     justify-content: center;
-    /* 1.4rem, no 2rem: el banner ya no ocupa la ventana entera, y "JX (Nick): FASE DE
-       EFECTOS INICIALES" -el más largo de los seis- no cabía en una fila. Rompía línea, y
-       con `height: 60px` la segunda se salía por abajo cortada. `nowrap` para que no lo
-       vuelva a intentar y `overflow: hidden` por si el nick es larguísimo: entonces se
-       recorta, y como el recorte cae en la zona difuminada del mask, no se nota.
-       Si con tu nick se ve grande o se recorta, este es el único valor que hay que tocar. */
-    font-size: 1.4rem;
-    font-weight: 900;
+    /* Dos renglones (ver #pb-jugador / #pb-fase): el jugador es CONTEXTO y la fase es lo
+       que se anuncia, así que dejan de competir por el mismo tamaño. De paso la línea larga
+       pasa de "JX (Nick): FASE DE EFECTOS INICIALES" (38 caracteres, no cabían) a "FASE DE
+       EFECTOS INICIALES" (25), y la fase puede volver a ser grande. */
+    flex-direction: column;
+    gap: 1px;
+    line-height: 1.15;
     text-transform: uppercase;
     white-space: nowrap;
     overflow: hidden;
@@ -529,8 +536,29 @@ body {
     border-bottom: 2px solid #fbbf24;
     box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
     display: none;
-    mask-image: linear-gradient(to right, transparent, black 4%, black 96%, transparent);
-    -webkit-mask-image: linear-gradient(to right, transparent, black 4%, black 96%, transparent);
+    mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
+    -webkit-mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
+}
+
+/* El jugador: contexto, no titular. Pequeño y muy espaciado, con el color de SU LADO -azul J1,
+   rojo J2- porque es el mismo idioma que ya habla la caja de turno, donde el nombre del jugador
+   activo se pinta con esos dos colores. Lo pone showPhaseBanner. Las dos rayitas que lo flanquean
+   salen de currentColor, así que se tiñen solas: es un rótulo de capítulo, no una etiqueta. */
+#pb-jugador {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 0.8rem; font-weight: 700; letter-spacing: 0.18em;
+    color: #3b82f6;   /* respaldo: showPhaseBanner lo sobrescribe con el del jugador activo */
+    opacity: 0.95;
+}
+#pb-jugador::before, #pb-jugador::after {
+    content: ''; width: 26px; height: 1px; background: currentColor; opacity: 0.45;
+}
+/* La fase: el titular. Recupera el tamaño que tenía antes de estrechar el banner, porque ahora va
+   sola en su renglón, y se queda el ámbar y el resplandor para ella sola. Este es el valor a
+   tocar si se ve grande o pequeña. */
+#pb-fase {
+    font-size: 1.8rem; font-weight: 900; color: #fbbf24;
+    text-shadow: 0 0 18px rgba(251, 191, 36, 0.45), 1px 1px 0 #000;
 }
 
 @keyframes phaseSwipe {
