@@ -338,7 +338,7 @@
              contenido y de alto. -->
         <div id="cp-reposo">
             <div class="cpr-tit">FASE ACTUAL</div>
-            <div class="cpr-fase" id="cpr-fase">Inicio</div>
+            <div class="cpr-fase" id="cpr-fase">PREPARACIÓN</div>
             <div class="cpr-base" id="cpr-base"></div>
             <div id="cpr-entradas"></div>
         </div>
@@ -5123,9 +5123,14 @@
                 const techo = (manoArriba ? manoArriba.getBoundingClientRect().bottom : 150) + AIRE;
                 const suelo = (manoAbajo ? manoAbajo.getBoundingClientRect().top : VH - 150) - AIRE;
 
-                const UI_BASE = 245, CENTRO_BASE = 0.50;   // 0.50 = la línea que separa los dos campos
+                // Los dos mandos viven en :root (global.css) y se leen de ahí: si el JS llevara su
+                // propia copia, tocar el CSS solo cambiaría la posición hasta el primer hover.
+                const _raiz = getComputedStyle(document.documentElement);
+                const UI_BASE = parseFloat(_raiz.getPropertyValue('--ui-top-base')) || 300;
+                const _c = _raiz.getPropertyValue('--cp-centro').trim();
+                const CENTRO_PX = _c.endsWith('%') ? VH * parseFloat(_c) / 100 : (parseFloat(_c) || VH * 0.58);
                 const altoUi = ui.getBoundingClientRect().height;
-                let uiTop = UI_BASE, centro = VH * CENTRO_BASE;
+                let uiTop = UI_BASE, centro = CENTRO_PX;
                 // Lo que le falta al detalle por arriba respecto al fondo de la zona de botones.
                 const deficit = (uiTop + altoUi + AIRE) - (centro - h / 2);
                 if (deficit > 0) {
@@ -6352,6 +6357,7 @@
             // dos jugadores.
             
             FASE_BASE = {
+                'PREPARACIÓN': 'Se montan los mazos y se reparten las manos iniciales.',
                 'ROBO': 'Roba una carta del mazo y la añade a su mano.',
                 'EFECTOS INICIALES': 'Se resuelven los efectos que se disparan al empezar el turno.',
                 'EVENTO': 'El Evento en juego consume un turno. Si se le acaba el tiempo, expira.',
@@ -6403,7 +6409,7 @@
                 const f = document.getElementById('cpr-fase'), b = document.getElementById('cpr-base');
                 if (!f || !b) return;
                 if (text) this._faseTexto = text;   // render() repinta sin saber la fase
-                const fase = this._faseTexto || '';
+                const fase = this._faseTexto || 'PREPARACIÓN';   // antes de la primera fase real
                 f.innerText = fase;
                 b.innerText = this.FASE_BASE[fase] || '';
                 const e = document.getElementById('cpr-entradas');
