@@ -1437,7 +1437,7 @@ const CARD_DB = [
         // debe pagar ADEMÁS este coste por ataque. Como PUEDE_ATACAR ya garantiza furor>=1 antes
         // de que este hook se dispare, el efecto solo necesita restar, no comprobar de nuevo.
         abilities: [
-            { trigger: "PUEDE_ATACAR", si: { campo: "furor", op: ">=", valor: 1 } },
+            { trigger: "PUEDE_ATACAR", resumenFase: "Sus ataques normales cuestan 1 de Furor", porHabilidad: "ENERGÍA DEMONÍACA", si: { campo: "furor", op: ">=", valor: 1 } },
             { trigger: "GLOBAL_ANTES_DE_ATAQUE", soloAtacante: "SELF", soloAtaqueDirecto: true,
               efectos: [ { op: "MODIFICAR_STAT", stat: "furor", delta: -1 } ] },
             { trigger: "ACTIVA", nombre: "DEVASTACIÓN AGAH", coste: { furor: 2 }, ataqueNormal: true,
@@ -1547,7 +1547,7 @@ const CARD_DB = [
         id: 30, name: "Infundir desesperación", type: "Evento", rarity: "A", text: "3 turnos. Mientras esté en juego, los enemigos no ganan Furor al inicio del turno. Al expirar, da 3 de Furor a los enemigos de vanguardia.", cost: 1, duration: 3,
         abilities: [
             { trigger: "PREVIEW_GLOBAL", lineas: [ { quien: "ENEMIGO", soloTipos: ["Personaje", "Esbirro"], texto: "No gana Furor al inicio del turno" } ] },
-            { trigger: "AL_CADUCAR", log: "Efecto de expiración de Infundir desesperación: Enemigos en vanguardia ganan 3 de Furor.",
+            { trigger: "AL_CADUCAR", resumenFase: "Al expirar, Zoe (calcinante) ocupará el lugar de Zoe", log: "Efecto de expiración de Infundir desesperación: Enemigos en vanguardia ganan 3 de Furor.",
               efectos: [ { op: "MODIFICAR_STAT", stat: "furor", delta: 3, target: { quien: "ENEMIGO", zona: "vanguardia", modo: "TODOS" } } ] }
         ]
     },
@@ -2083,7 +2083,7 @@ const CARD_DB = [
             // silencioso: la vieja nunca anunciaba esta parte de la pasiva.
             { trigger: "PASIVA_CONTINUA", nombre: "ÚLTIMA MISIÓN", silencioso: true,
               then: [ { op: "SUELO_STAT", stat: "def" }, { op: "SUELO_STAT", stat: "atk" } ] },
-            { trigger: "INICIO_TURNO", soloTurnoPropio: true,
+            { trigger: "INICIO_TURNO", resumenFase: "Restaura toda su Vida", porHabilidad: "ÚLTIMA MISIÓN", soloTurnoPropio: true,
               efectos: [
                 { op: "CURAR", completa: true, log: "¡ÚLTIMA MISIÓN! {carta} restaura toda su Vida.", floating: "RESTAURADA", floatingStyle: "ft-green", offsetFloating: -30,
                   target: { quien: "SELF" } } ] }
@@ -2499,7 +2499,7 @@ const CARD_DB = [
                 { op: "MODIFICAR_STAT", target: { quien: "SELF" }, stat: "furor", delta: 1 },
                 { op: "MODIFICAR_CONTADORES", target: { quien: "SELF" }, contador: "diego_timer",
                   delta: 3, nombreContador: "Turnos de Cólera", icono: "⏳" } ] },
-            { trigger: "FIN_TURNO",
+            { trigger: "FIN_TURNO", resumenFase: "Pierde 1 Contador; a 0 muere", porHabilidad: "CÓLERA INFINITA", 
               efectos: [
                 { if: { campo: "location", op: "==", valor: "vanguard" },
                   op: "CUENTA_ATRAS", target: { quien: "SELF" },
@@ -2721,7 +2721,7 @@ const CARD_DB = [
         name: "De compras", type: "Evento", rarity: "B", series: 1, cost: 1, duration: 2,
         text: "2 turnos. Mientras esté en juego, al final de tu turno revela cartas del mazo hasta hallar un 'Ayuda - Ingerible', 'Arma' o 'Vestimenta': la añades a la mano y barajas (si no hay, solo barajas).",
         abilities: [
-            { trigger: "FIN_TURNO", soloTurnoPropio: true,
+            { trigger: "FIN_TURNO", resumenFase: "Revela cartas del mazo hasta hallar un Ingerible, Arma o Vestimenta y se lo lleva a la mano", soloTurnoPropio: true,
               efectos: [
                 { op: "BUSCAR", en: "MAZO", seleccion: "PRIMERA", cantidad: 1, destino: "MANO",
                   logIntro: "¡Evento activo: {carta}! Buscando un chollo...",
@@ -2765,7 +2765,7 @@ const CARD_DB = [
                 { op: "MARCAR", target: { selfLista: "chosenAllies" }, campo: "stealth", valor: false },
                 { op: "MARCAR", target: { selfLista: "chosenAllies" }, campo: "exhausted", valor: false } ] },
             // Expira: misma limpieza + el rival coge 1 Retribución.
-            { trigger: "AL_CADUCAR", log: "Esfuerzo dividido expira naturalmente. ¡El rival coge 1 Retribución!", logTipo: "ability",
+            { trigger: "AL_CADUCAR", resumenFase: "Al expirar, su rival roba 1 retribución", log: "Esfuerzo dividido expira naturalmente. ¡El rival coge 1 Retribución!", logTipo: "ability",
               efectos: [
                 { op: "MARCAR", target: { selfLista: "chosenAllies" }, campo: "stealth", valor: false },
                 { op: "MARCAR", target: { selfLista: "chosenAllies" }, campo: "exhausted", valor: false },
@@ -3079,7 +3079,7 @@ const CARD_DB = [
                   // quedaba null y refCarta() nunca llegaba a construir la línea.
                   cruz: [ { op: "APLICAR_ESTADO", estado: "confusion", duracion: 2 } ] } ] },
             { trigger: "AURA", quien: "ALIADO", soloSelfLista: "affectedAllies", stats: { def: 2 } },
-            { trigger: "AL_CADUCAR",
+            { trigger: "AL_CADUCAR", resumenFase: "Al expirar, cura 1 de Vida a cada aliado de su vanguardia", 
               efectos: [
                 { op: "MODIFICAR_STAT", stat: "currentHp", delta: 1, offsetY: -20, fuente: "Cogorza",
                   target: { selfLista: "affectedAllies" },
@@ -3112,7 +3112,7 @@ const CARD_DB = [
         duration: 2,
         abilities: [
             { trigger: "AL_JUGAR", log: "¡{jugador} ha iniciado una Caza del tesoro!", logTipo: "system" },
-            { trigger: "AL_CADUCAR", log: "¡La Caza del tesoro ha concluido!", logTipo: "ability",
+            { trigger: "AL_CADUCAR", resumenFase: "Al expirar, ambos jugadores pueden buscar un Arma, Arma legendaria o Vestimenta en su mazo", log: "¡La Caza del tesoro ha concluido!", logTipo: "ability",
               efectos: [
                 { op: "BUSCAR", en: "MAZO", deQuien: "AMBOS", cantidad: 1, destino: "MANO", sinAnimacion: true, autoSeleccion: true,
                   filtros: [ { campo: "type", op: "==", valor: "Ayuda" } ],
@@ -3903,7 +3903,7 @@ const CARD_DB = [
         text: "P: INAMOVIBLE: Mientras tenga 0 de Atq, no puede realizar ataques normales.",
         passiveName: "INAMOVIBLE",
         abilities: [
-            { trigger: "PUEDE_ATACAR", si: { campo: "currentAtk", op: ">", valor: 0 },
+            { trigger: "PUEDE_ATACAR", resumenFase: "Con 0 de Atq no puede realizar ataques normales", porHabilidad: "INAMOVIBLE", si: { campo: "currentAtk", op: ">", valor: 0 },
               msg: "INAMOVIBLE: {carta} no puede atacar mientras su ATQ sea 0 o menor." }
         ],
     },
@@ -3946,7 +3946,7 @@ const CARD_DB = [
         // `karlitosEntrenado` se queda como campo propio (la vieja lo inicializaba en
         // onAfterPlayAsync; aquí basta con que empiece indefinido: `truthy`+`no` lo trata igual).
         abilities: [
-            { trigger: "INICIO_TURNO", soloTurnoPropio: true,
+            { trigger: "INICIO_TURNO", resumenFase: "Gana 1 Contador; al tercero busca Súper Evolución", porHabilidad: "PRÁCTICA CONSTANTE", soloTurnoPropio: true,
               si: [ { campo: "karlitosEntrenado", op: "truthy", no: true } ],
               efectos: [
                 // Sin `fuente`: por defecto es sourceCard.name ("Karlitos"), que al coincidir
@@ -4286,7 +4286,7 @@ const CARD_DB = [
         // `accion.multiplicar`, hermana de `fijar`/`sumar`. El resto (si.objetivoDe,
         // si.algunaEtiqueta, log con {objetivo}, preview) ya existía.
         abilities: [
-            { trigger: "GLOBAL_MODIFICAR_FUROR", reglas: [
+            { trigger: "GLOBAL_MODIFICAR_FUROR", resumenFase: "Los aliados con etiqueta 'Usuario de magia' o 'Monstruo' reciben el doble de Furor", reglas: [
                 { si: { objetivoDe: "PROPIO", algunaEtiqueta: ["Usuario de magia", "Usuaria de magia", "Monstruo"] },
                   log: { msg: "¡Dáedra potencia la recuperación de {objetivo}! (+1 Furor extra)", tipo: "ability" },
                   preview: "Doble Furor al inicio del turno",
@@ -4817,7 +4817,7 @@ const CARD_DB = [
               efectos: [
                 { op: "MODIFICAR_STAT", target: { quien: "SELF" }, stat: "furor", delta: 1,
                   floating: { texto: "CONSUMO DESMESURADO", estilo: "ft-ability", offset: -30 } } ] },
-            { trigger: "FIN_TURNO",
+            { trigger: "FIN_TURNO", resumenFase: "Pierde 1 de Furor; si baja a 0 así, se destruye", porHabilidad: "CONSUMO DESMESURADO", 
               efectos: [
                 { op: "CUENTA_ATRAS", target: { quien: "SELF" }, stat: "furor",
                   salvoSi: { campo: "pilotoEmplazado", op: "truthy" },
@@ -5383,7 +5383,7 @@ const CARD_DB = [
             { trigger: "AL_ENTRAR", si: { quien: "ALIADO", algunaEtiqueta: ["Guardia Real"] }, marcador: "llamadaBuffed",
               efectos: [ { op: "MODIFICAR_STAT", stat: "furor", valor: 1, floating: "+1 FUR", floatingStyle: "ft-green", offsetFloating: -20,
                            log: "¡Llamada del deber inspira a {objetivo}!" } ] },
-            { trigger: "FIN_TURNO", soloTurnoPropio: true,
+            { trigger: "FIN_TURNO", resumenFase: "Puede buscar una carta con etiqueta 'Guardia Real' en su mazo", soloTurnoPropio: true,
               efectos: [
                 { op: "BUSCAR", en: "MAZO", cantidad: 1, destino: "MANO",
                   filtros: [ { campo: "tags", op: "includes", valor: "Guardia Real" } ],
@@ -5522,13 +5522,13 @@ const CARD_DB = [
         text: "3 turnos. Mientras esté en juego, los aliados con etiqueta 'Científico' ganan +1 de Furor al inicio del turno (incluso en retaguardia). Al expirar, robas 3 cartas y recuperas un Esbirro 'No-muerto' o con etiqueta 'Creación artificial' del descarte.",
         abilities: [
             { trigger: "AL_JUGAR", log: "¡La investigación comienza!" },
-            { trigger: "GLOBAL_MODIFICAR_FUROR", reglas: [
+            { trigger: "GLOBAL_MODIFICAR_FUROR", resumenFase: "Los aliados con etiqueta 'Científico' ganan 1 de Furor adicional, incluso en retaguardia", reglas: [
                 { si: { origen: "fase_furor", objetivoDe: "PROPIO", algunaEtiqueta: ["Científico", "Científica"] },
                   preview: "+1 de Furor extra en tu fase de Furor",
                   log: { msg: "¡{objetivo} investiga y gana Furor extra!", tipo: "ability" },
                   accion: { sumar: 1 } }
             ] },
-            { trigger: "AL_CADUCAR", log: "¡La investigación concluye! {jugador} roba 3 cartas.", logTipo: "ability",
+            { trigger: "AL_CADUCAR", resumenFase: "Al expirar, roba 3 cartas y recupera un Esbirro 'No-muerto' o 'Creación artificial'", log: "¡La investigación concluye! {jugador} roba 3 cartas.", logTipo: "ability",
               efectos: [
                 { op: "ROBAR", cantidad: 3, sinAnimacion: true, velocidad: 200, soloSiHayMazo: true },
                 { op: "BUSCAR", en: "DESCARTES", cantidad: 1, destino: "MANO",
@@ -5599,7 +5599,7 @@ const CARD_DB = [
                 { quien: "CUALQUIERA", soloTipos: ["Personaje", "Esbirro"],
                   filtros: [ { no: true, campo: "tags", op: "includes", valor: "Otaku" }, { no: true, campo: "tags", op: "includes", valor: "otaku" } ],
                   texto: "{genero?Silenciado|Silenciada}" } ] },
-            { trigger: "FIN_TURNO", soloTurnoPropio: true, log: "Feria del cómic: Buscando merchandising exclusivo...", logTipo: "system",
+            { trigger: "FIN_TURNO", resumenFase: "Moneda: con cara, busca una carta con etiqueta 'Otaku' en su mazo", soloTurnoPropio: true, log: "Feria del cómic: Buscando merchandising exclusivo...", logTipo: "system",
               efectos: [
                 { op: "MONEDA",
                   logCara: { msg: "Moneda: CARA - ¡{jugador} ha encontrado algo genial en la Feria!", tipo: "ability" },
@@ -5613,7 +5613,7 @@ const CARD_DB = [
                       logNoValidas: "{jugador} ha mirado en todos los puestos, pero no quedan cartas Otaku en su mazo.",
                       barajarDespues: { log: "Barajando el mazo de {jugador}..." } } ],
                   logCruz: { msg: "Moneda: CRUZ - Había demasiada cola y {jugador} se fue con las manos vacías.", tipo: "neutral" } } ] },
-            { trigger: "AL_CADUCAR", log: "La Feria del cómic cierra sus puertas.", logTipo: "system" }
+            { trigger: "AL_CADUCAR", resumenFase: "Al expirar, los Silenciados se liberan", log: "La Feria del cómic cierra sus puertas.", logTipo: "system" }
         ],
     },
     {
@@ -5636,9 +5636,9 @@ const CARD_DB = [
             { trigger: "AL_JUGAR", log: "¡{deudor} se ha endeudado con la mafia! Queda {deudorG?silenciado|silenciada} y sin cobrar Furor." },
             { trigger: "AURA", quien: "ALIADO", soloSelfId: "mafiaTargetId",
               marcar: { campo: "isSilenced", valor: true } },
-            { trigger: "GLOBAL_MODIFICAR_FUROR", reglas: [
+            { trigger: "GLOBAL_MODIFICAR_FUROR", resumenFase: "El aliado elegido no gana Furor", reglas: [
                 { si: { origen: "fase_furor", objetivoSelfId: "mafiaTargetId" }, accion: { fijar: 0 } } ] },
-            { trigger: "AL_CADUCAR", log: "¡La Deuda ha sido saldada! Ambos jugadores pueden contactar a la Mafia.",
+            { trigger: "AL_CADUCAR", resumenFase: "Al expirar, ambos jugadores pueden buscar una carta con etiqueta 'Mafia' en su mazo", log: "¡La Deuda ha sido saldada! Ambos jugadores pueden contactar a la Mafia.",
               efectos: [
                 { op: "BUSCAR", en: "MAZO", deQuien: "AMBOS", cantidad: 1, destino: "MANO",
                   algunFiltro: [ { campo: "tags", op: "includes", valor: "Mafia" }, { campo: "tags", op: "includes", valor: "mafia" } ],
@@ -5660,7 +5660,7 @@ const CARD_DB = [
             // (Esta ability estaba además DUPLICADA, lo que la listaba dos veces.)
             { trigger: "PREVIEW_GLOBAL", lineas: [ { quien: "ALIADO", zona: "VANGUARDIA", soloTipos: ["Personaje", "Esbirro"], texto: "Puede retirarse sin coste de Furor" } ] },
             { trigger: "AL_JUGAR", log: "¡Bomba de humo! El campo se llena de niebla.", logTipo: "ability" },
-            { trigger: "AL_CADUCAR", log: "La niebla se disipa.", logTipo: "system",
+            { trigger: "AL_CADUCAR", resumenFase: "Al expirar, cura 3 de Vida a cada aliado con etiqueta 'Ninja'", log: "La niebla se disipa.", logTipo: "system",
               efectos: [ { op: "CURAR", valor: 3, conBeforeHealed: false, soloSiHerido: true,
                            floating: "CURADO", floatingStyle: "ft-green", offsetY: -20, fuente: "healing",
                            target: { quien: "ALIADO", filtros: [ { campo: "tags", op: "includes", valor: "Ninja" } ] } } ],
@@ -5841,7 +5841,7 @@ const CARD_DB = [
         name: "Apuesta", type: "Evento", rarity: "C", cost: 1, duration: 2, series: 2,
         text: "2 turnos. Mientras esté en juego, tu rival echa una moneda al inicio de cada turno suyo, antes de ganar Furor: con cruz, cada Personaje suyo que debiera ganarlo pierde 1 de Furor. Al expirar, cada aliado de tu vanguardia gana 1 de Furor por cada cruz sacada.",
         abilities: [
-            { trigger: "GLOBAL_INICIO_TURNO", turnoDe: "RIVAL",
+            { trigger: "GLOBAL_INICIO_TURNO", resumenFase: "Su rival echa una moneda antes de ganar Furor", turnoDe: "RIVAL",
               log: { msg: "¡Apuesta activa! El azar decide el destino de la energía de {jugador}...", tipo: "ability" },
               moneda: {
                 cruz: { log: { msg: "Moneda: CRUZ - ¡Mala suerte! Sus Personajes perderán el Furor de este turno.", tipo: "combat" },
@@ -5849,13 +5849,13 @@ const CARD_DB = [
                 cara: { log: { msg: "Moneda: CARA - Mantiene su energía intacta.", tipo: "neutral" },
                         marcar: [ { campo: "apuestaFailed", valor: false } ] }
               } },
-            { trigger: "GLOBAL_MODIFICAR_FUROR", reglas: [
+            { trigger: "GLOBAL_MODIFICAR_FUROR", resumenFase: "Con cruz, cada Personaje del rival que debiera ganar Furor pierde 1", reglas: [
                 { si: { origen: "fase_furor", objetivoDe: "RIVAL", campoObjetivo: { campo: "type", op: "==", valor: "Personaje" }, campoSelf: { campo: "apuestaFailed", op: "truthy" } },
                   preview: "Perderá 1 de Furor al recibirlo este turno (cruz de Apuesta)",
                   floating: { texto: "APUESTA FALLIDA", estilo: "ft-red-stat", offset: -30 },
                   accion: { fijar: -1 } }
             ] },
-            { trigger: "AL_CADUCAR", log: "La mesa de apuestas se cierra.", logTipo: "system",
+            { trigger: "AL_CADUCAR", resumenFase: "Al expirar, cada aliado de su vanguardia gana 1 de Furor", log: "La mesa de apuestas se cierra.", logTipo: "system",
               efectos: [
                 { if: { campo: "apuestaCruces", op: ">", valor: 0 },
                   op: "MODIFICAR_STAT", stat: "furor", delta: { REF: "self.apuestaCruces" }, fuente: null,
@@ -5914,7 +5914,7 @@ const CARD_DB = [
               lineas: [
                 { soloTipos: ["Personaje", "Esbirro"], valorCampo: "bankruptStoredFuror",
                   texto: "Furor agotado (originalmente {valor})" } ] },
-            { trigger: "AL_CADUCAR", log: "La Bancarrota ha terminado. El Furor vuelve a fluir a sus dueños.", logTipo: "system",
+            { trigger: "AL_CADUCAR", resumenFase: "Al expirar, se restablece el Furor original de todos", log: "La Bancarrota ha terminado. El Furor vuelve a fluir a sus dueños.", logTipo: "system",
               efectos: [
                 { op: "DEVOLVER_STAT", target: { quien: "TODOS" }, stat: "furor",
                   guardadoEn: "bankruptStoredFuror" } ] },
@@ -6645,7 +6645,7 @@ const CARD_DB = [
         id: 993, name: "Biblioteca de prueba", type: "Evento", rarity: "C", cost: 0, duration: 2, series: 1,
         text: "2 turnos. Al expirar, robas 2 cartas.",
         abilities: [
-            { trigger: "AL_CADUCAR", log: "La biblioteca cierra: te llevas lo aprendido.",
+            { trigger: "AL_CADUCAR", resumenFase: "Al expirar, roba 2 cartas", log: "La biblioteca cierra: te llevas lo aprendido.",
               efectos: [ { op: "ROBAR", cantidad: 2 } ] }
         ]
     },
@@ -6757,7 +6757,7 @@ const CARD_DB = [
                   msg: "No puedes jugarla mientras tu rival tenga un Evento en juego." } ] },
             { trigger: "AL_JUGAR", log: "{jugador} tiene una buena razón para todo esto.", logTipo: "ability",
               efectos: [ { op: "MARCAR_JUGADOR", campo: "usadaUnaBuenaRazon", valor: true } ] },
-            { trigger: "AL_CADUCAR", log: "{carta} de {jugador} se ha desvanecido, y no volverá.", logTipo: "system" }
+            { trigger: "AL_CADUCAR", resumenFase: "Al expirar, no podrá volver a jugarse en toda la partida", log: "{carta} de {jugador} se ha desvanecido, y no volverá.", logTipo: "system" }
         ],
     },
     {
@@ -6773,7 +6773,7 @@ const CARD_DB = [
         name: "Fusión de planos", type: "Evento", rarity: "S", cost: 0, duration: 3, series: 1,
         text: "3 turnos. Al expirar, todos los enemigos pierden 2 de Furor.",
         abilities: [
-            { trigger: "AL_CADUCAR", log: "¡Los planos se separan de nuevo, drenando a los enemigos!", logTipo: "ability",
+            { trigger: "AL_CADUCAR", resumenFase: "Al expirar, todos los enemigos pierden 2 de Furor", log: "¡Los planos se separan de nuevo, drenando a los enemigos!", logTipo: "ability",
               efectos: [
                 { op: "MODIFICAR_STAT", target: { quien: "ENEMIGO" }, stat: "furor", delta: -2 } ] }
         ],
@@ -6784,7 +6784,7 @@ const CARD_DB = [
         name: "Cambio de canal", type: "Evento", rarity: "C", cost: 0, duration: 3, series: 1,
         text: "3 turnos. Al expirar, robas 3 cartas.",
         abilities: [
-            { trigger: "AL_CADUCAR", log: "Cambio de canal: {jugador} se pone al día y roba 3 cartas.", logTipo: "ability",
+            { trigger: "AL_CADUCAR", resumenFase: "Al expirar, roba 3 cartas", log: "Cambio de canal: {jugador} se pone al día y roba 3 cartas.", logTipo: "ability",
               efectos: [ { op: "ROBAR", cantidad: 3 } ] }
         ],
     },
@@ -6864,7 +6864,7 @@ const CARD_DB = [
         name: "Consagración", type: "Evento", rarity: "A", cost: 0, duration: 3, series: 1,
         text: "3 turnos. Mientras esté en juego, cura 1 de Vida a cada aliado al final de tu turno. Al expirar, cura 1 de Vida a cada aliado.",
         abilities: [
-            { trigger: "FIN_TURNO",
+            { trigger: "FIN_TURNO", resumenFase: "Cura 1 de Vida a cada aliado", 
               efectos: [
                 { op: "CURAR", valor: 1, conBeforeHealed: false, soloSiHerido: true,
                   offsetY: -20, fuente: "healing",
@@ -6875,7 +6875,7 @@ const CARD_DB = [
                   logResumen: { msg: "La luz de Consagración cura +{delta} de Vida a {lista}.",
                                 msgVariado: "La luz de Consagración recorre el campo, curando a {lista}.",
                                 tipo: "healing" } } ] },
-            { trigger: "AL_CADUCAR", log: "Consagración se desvanece con una última bendición.", logTipo: "ability",
+            { trigger: "AL_CADUCAR", resumenFase: "Al expirar, cura 1 de Vida a cada aliado", log: "Consagración se desvanece con una última bendición.", logTipo: "ability",
               efectos: [
                 { op: "CURAR", valor: 1, conBeforeHealed: false, soloSiHerido: true,
                   offsetY: -20, fuente: "healing",
@@ -6890,7 +6890,7 @@ const CARD_DB = [
         text: "P: SOBRECALENTAMIENTO: Al final de cada turno en el que tenga 2 o más de Furor, pierde 3 de Vida.",
         passiveName: "SOBRECALENTAMIENTO",
         abilities: [
-            { trigger: "FIN_TURNO",
+            { trigger: "FIN_TURNO", resumenFase: "Con 2 o más de Furor, pierde 3 de Vida", porHabilidad: "SOBRECALENTAMIENTO", 
               efectos: [
                 { if: { campo: "furor", op: ">=", valor: 2 },
                   op: "MODIFICAR_STAT", target: { quien: "SELF" }, stat: "currentHp", delta: -3, comprobarMuerte: true,

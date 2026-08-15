@@ -701,3 +701,39 @@ Dos detalles que costaron un rojo cada uno:
 - Los huecos se cuentan **por jugador**. Con un contador global, el primero al que se le recoloca
   se come los del otro (lo destapó TORMENTA PERFECTA, que golpea a los dos bandos a la vez).
 - Sube **uno por hueco**, no uno por tanda: si caen cuatro, suben cuatro (los que haya y quepan).
+
+
+## §17. `resumenFase`: qué anuncia el rectángulo de fase
+
+El rectángulo de la columna derecha dice, en reposo, la regla base de la fase actual y qué efectos
+concretos la alteran ahora mismo. Esas entradas **no se deducen del código**: un efecto de fase es
+un hook, y para saber qué hace habría que ejecutarlo. Cada habilidad declara la suya.
+
+```js
+{ trigger: "FIN_TURNO", resumenFase: "Pierde 1 de Furor; si baja a 0 así, se destruye",
+  porHabilidad: "CONSUMO DESMESURADO", efectos: [ ... ] }
+```
+
+**Qué entra.** Solo los seis triggers de fase: `INICIO_TURNO` y `GLOBAL_INICIO_TURNO` (efectos
+iniciales), `GLOBAL_MODIFICAR_FUROR` (furor), `AL_CADUCAR` (evento), `FIN_TURNO` (efectos finales)
+y `PUEDE_ATACAR` (principal).
+
+**Qué NO entra, y es la regla que hace útil el panel:** *dice lo que cambia las REGLAS de la fase,
+no lo que cambia los NÚMEROS de una carta*. `PASIVA_CONTINUA` y `AURA` se quedan fuera aunque se
+apliquen cada turno: ya tienen su sitio en los badges y en el «Afectado por» de cada carta, y
+repetirlos aquí sería la duplicación que este rectángulo existe para evitar.
+
+**Redacción.** Es una afección de la gramática de §13, así que se construye con `lineaEfecto()` y
+sale como `<resumen>[ por HABILIDAD], fuente: <refCarta>`. En 3ª persona, sin sujeto (lo pone la
+fuente): «Roba 2 cartas», no «El jugador roba 2 cartas». `porHabilidad` **solo** si lo causa una
+Pasiva o una Activa: en un Evento o una Ayuda se omite, igual que en §13.
+
+**Un `AL_CADUCAR` solo se anuncia el turno en que a ese Evento se le acaba el tiempo.** Anunciarlo
+antes sería mentir tres turnos seguidos.
+
+**Qué no se declara.** La limpieza al expirar (el Evento deja de aplicar lo que aplicaba: §11 ya
+dice que un Evento no anuncia su propia destrucción) y la contabilidad interna que el jugador no
+ve. Esos casos van al `NO_PROCEDE` de `tests/auditar_fases.js` con su motivo escrito, para que la
+lista de pendientes sea trabajo real.
+
+`node tests/auditar_fases.js` tiene que salir en 0 POR ANOTAR.

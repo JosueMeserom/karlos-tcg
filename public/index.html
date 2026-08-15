@@ -501,8 +501,7 @@
                 style="background:rgba(0,0,0,0.8); padding:5px; border-radius:5px; text-align:center; border: 1px solid #475569; min-width: 120px;">
                 <div style="font-size:0.7rem; color:#94a3b8;">TURNO ACTUAL</div>
                 <div style="font-size:1.2rem; font-weight:bold; color:#fff;" id="active-player-disp">J1</div>
-                <div style="font-size:0.8rem; color:#fbbf24; margin-top:2px;" id="phase-display">Inicio</div>
-                <div style="font-size:0.6rem; color:#64748b;">T: <span id="turn-counter">1</span></div>
+                <div style="font-size:0.8rem; color:#64748b;">T: <span id="turn-counter">1</span></div>
             </div>
 
             <button class="game-btn" id="btn-direct-attack" style="display:none;" onclick="game.performDirectAttack()">¡ATAQUE
@@ -5068,10 +5067,10 @@
             // en vez de por un evento que puede no llegar nunca.
             // NOTA para el futuro: si algún día hay que enseñar el detalle SIN hover (fijarlo,
             // un modo inspección…), este vigilante es lo primero que habrá que condicionar.
-            // --- La columna derecha: rectangulo de fase <-> detalle de carta -------------------
-            // El panel ya no aparece y desaparece: esta siempre, y lo que cambia es su CONTENIDO y su
-            // ALTO. Se expande desde su centro (translateY(-50%) en el CSS), asi que un detalle de
-            // tamano normal no mueve absolutamente nada mas.
+            // --- La columna derecha: rectángulo de fase <-> detalle de carta -------------------
+            // El panel ya no aparece y desaparece: está siempre, y lo que cambia es su CONTENIDO y su
+            // ALTO. Se expande desde su centro (translateY(-50%) en el CSS), así que un detalle de
+            // tamaño normal no mueve absolutamente nada más.
             PREVIEW_MORPH_MS = 200;
 
             // Alto en dos pasos, como el FLIP de las filas: se mide el alto de destino con el contenido
@@ -5098,7 +5097,7 @@
 
                 this._acomodarColumnaDerecha(h1);
                 panel.style.height = h0 + 'px';
-                void panel.offsetHeight;                       // reflow: sin esto no hay transicion
+                void panel.offsetHeight;                       // reflow: sin esto no hay transición
                 panel.style.transition = `height ${this.PREVIEW_MORPH_MS}ms ease-out, top 220ms ease-out`;
                 panel.style.height = h1 + 'px';
                 requestAnimationFrame(() => { entra.style.opacity = '1'; });
@@ -5109,10 +5108,10 @@
                 }, this.PREVIEW_MORPH_MS + 20);
             }
 
-            // Hueco para el detalle SIN mover nada mientras quepa. Si no cabe, el deficit se reparte
+            // Hueco para el detalle SIN mover nada mientras quepa. Si no cabe, el déficit se reparte
             // entre los dos bloques -bajando el centro del detalle y subiendo la zona de botones-, en
-            // vez de empujar solo a uno (peticion de Toto: que la zona de botones se mueva lo minimo,
-            // que es pequena pero importantisima). Los topes son la mano de J2 arriba y la de J1 abajo.
+            // vez de empujar solo a uno (petición de Toto: que la zona de botones se mueva lo mínimo,
+            // que es pequeña pero importantísima). Los topes son la mano de J2 arriba y la de J1 abajo.
             _acomodarColumnaDerecha(altoDetalle) {
                 const panel = document.getElementById('card-preview');
                 const ui = document.getElementById('ui-layer');
@@ -5124,7 +5123,7 @@
                 const techo = (manoArriba ? manoArriba.getBoundingClientRect().bottom : 150) + AIRE;
                 const suelo = (manoAbajo ? manoAbajo.getBoundingClientRect().top : VH - 150) - AIRE;
 
-                const UI_BASE = 245, CENTRO_BASE = 0.60;
+                const UI_BASE = 245, CENTRO_BASE = 0.50;   // 0.50 = la línea que separa los dos campos
                 const altoUi = ui.getBoundingClientRect().height;
                 let uiTop = UI_BASE, centro = VH * CENTRO_BASE;
                 // Lo que le falta al detalle por arriba respecto al fondo de la zona de botones.
@@ -6172,14 +6171,14 @@
                     await this.drawCard(this.activePlayerId);
                 }
 
-                this.updatePhaseDisplay('FASE DE EFECTOS');
+                this.updatePhaseDisplay('EFECTOS INICIALES');
                 await showPhaseBanner(`${pName}: FASE DE EFECTOS INICIALES`);
                 await this.processStartPhaseEffects(this.activePlayerId); 
 
-                this.updatePhaseDisplay('FASE DE EVENTO');
+                this.updatePhaseDisplay('EVENTO');
                 await showPhaseBanner(`${pName}: FASE DE EVENTO`);
 
-                this.updatePhaseDisplay('FASE DE FUROR');
+                this.updatePhaseDisplay('FUROR');
                 await showPhaseBanner(`${pName}: FASE DE FUROR`);
 
                 // --- Eventos activos: hook global de inicio de turno, ANTES de ganar Furor (p. ej. Apuesta) ---
@@ -6230,7 +6229,7 @@
                 this.render();
                 if (furorGained) await waitForFurorAnimation();
 
-                this.updatePhaseDisplay('FASE PRINCIPAL');
+                this.updatePhaseDisplay('PRINCIPAL');
                 await showPhaseBanner(`${pName}: FASE PRINCIPAL`);
 
                 this.phase = 'PRINCIPAL';
@@ -6348,31 +6347,75 @@
                 this.forceSync(); // <--- MARTILLO TRAS RESOLVER TODO EL INICIO DE TURNO
             }
 
-            // Lo que hace CADA fase, en una linea. De momento es la regla base y nada mas: las
-            // "entradas" con los efectos concretos que la alteran (#cpr-entradas) son la fase 2 de
-            // esto, y piden que cada habilidad declare su propio resumen -no se puede deducir de un
-            // hook sin ejecutarlo-. Redaccion en 3a persona, como todo lo que ven los dos jugadores.
+            // Lo que hace CADA fase, en una línea. Junto a las entradas de `entradasFase`, que dicen
+            // qué efectos concretos la alteran hoy. Redacción en 3ª persona, como todo lo que ven los
+            // dos jugadores.
+            
             FASE_BASE = {
-                'ROBO': 'Roba una carta del mazo y la anade a su mano.',
-                'FASE DE EFECTOS': 'Se resuelven los efectos que se disparan al empezar el turno.',
-                'FASE DE EVENTO': 'El Evento en juego consume un turno. Si se le acaba el tiempo, expira.',
-                'FASE DE FUROR': 'Cada aliado de la vanguardia gana 1 de Furor, hasta su maximo.',
-                'FASE PRINCIPAL': 'Juega cartas, usa Habilidades y ataca. Termina al pasar el turno.',
+                'ROBO': 'Roba una carta del mazo y la añade a su mano.',
+                'EFECTOS INICIALES': 'Se resuelven los efectos que se disparan al empezar el turno.',
+                'EVENTO': 'El Evento en juego consume un turno. Si se le acaba el tiempo, expira.',
+                'FUROR': 'Cada aliado de la vanguardia gana 1 de Furor, hasta su máximo.',
+                'PRINCIPAL': 'Juega cartas, usa Habilidades y ataca. Termina al pasar el turno.',
                 'EFECTOS FINALES': 'Se resuelven los efectos que se disparan al acabar el turno.',
             };
+
+            // Qué trigger altera QUÉ fase. Es el mapa entero: lo que no está aquí no es un efecto de
+            // fase (JUGAR, ACTIVA, AL_MORIR... pasan cuando pasan, no en un punto del turno).
+            FASE_DE = {
+                INICIO_TURNO: 'EFECTOS INICIALES', GLOBAL_INICIO_TURNO: 'EFECTOS INICIALES',
+                GLOBAL_MODIFICAR_FUROR: 'FUROR', AL_CADUCAR: 'EVENTO',
+                FIN_TURNO: 'EFECTOS FINALES', PUEDE_ATACAR: 'PRINCIPAL',
+            };
+            // Estos solo se disparan en el turno de SU DUEÑO: el Matón del rival no hace nada en tu
+            // fase de efectos. Los GLOBAL_* sí (Bancarrota le toca el Furor a los dos).
+            SOLO_TURNO_PROPIO = new Set(['INICIO_TURNO', 'FIN_TURNO', 'PUEDE_ATACAR']);
+
+            // Lo que va a pasar en esta fase, además de la regla base. NO se deduce de los hooks -para
+            // saber qué hace uno habría que ejecutarlo, y ejecutarlo tiene efectos-: cada habilidad
+            // declara su propia línea en `resumenFase`, igual que declara su `text`. Lo que se olvide
+            // de declararla sale en tests/auditar_fases.js.
+            entradasFase(fase) {
+                const out = [];
+                if (!fase || !this.players) return out;
+                for (const pid of ['p1', 'p2']) {
+                    const p = this.players[pid];
+                    if (!p) continue;
+                    const enJuego = [...(p.vanguard || []), ...(p.rearguard || [])];
+                    if (p.activeEvent) enJuego.push(p.activeEvent);
+                    for (const c of enJuego) {
+                        const tmpl = getCardTemplate(c.id);
+                        for (const ab of ((tmpl && tmpl.abilities) || [])) {
+                            if (!ab.resumenFase || this.FASE_DE[ab.trigger] !== fase) continue;
+                            if (this.SOLO_TURNO_PROPIO.has(ab.trigger) && c.owner !== this.activePlayerId) continue;
+                            // Un AL_CADUCAR no ocurre "en la fase de Evento": ocurre el turno en que a ESE
+                            // Evento se le acaba el tiempo. Anunciarlo antes sería mentir tres turnos.
+                            if (ab.trigger === 'AL_CADUCAR'
+                                && !(c.owner === this.activePlayerId && (c.duration || 0) <= 1)) continue;
+                            out.push(this.lineaEfecto(ab.resumenFase, { habilidad: ab.porHabilidad, ref: this.refCarta(c) }));
+                        }
+                    }
+                }
+                return out;
+            }
 
             pintarReposoFase(text) {
                 const f = document.getElementById('cpr-fase'), b = document.getElementById('cpr-base');
                 if (!f || !b) return;
-                f.innerText = text;
-                b.innerText = this.FASE_BASE[text] || '';
+                if (text) this._faseTexto = text;   // render() repinta sin saber la fase
+                const fase = this._faseTexto || '';
+                f.innerText = fase;
+                b.innerText = this.FASE_BASE[fase] || '';
+                const e = document.getElementById('cpr-entradas');
+                if (e) e.innerHTML = this.entradasFase(fase).map(l => this._htmlLineaEfecto(l)).join('');
             }
 
             updatePhaseDisplay(text) {
                 const pName = this.getDisplayName(this.activePlayerId);
                 document.getElementById('active-player-disp').innerText = pName;
                 document.getElementById('active-player-disp').style.color = this.activePlayerId === 'p1' ? '#3b82f6' : '#ef4444';
-                document.getElementById('phase-display').innerText = text;
+                // La fase ya NO se pinta aquí: vivía a la vez en esta caja y en el rectángulo de
+                // la derecha, que además la explica. Se queda en un solo sitio (Toto, 15-ago-2026).
                 this.pintarReposoFase(text);
             }
 
@@ -9515,6 +9558,9 @@
                 _filas.forEach(sel => _fotoFila(sel).forEach((r, id) => _foto.set(id, r)));
                 this._renderInterno();
                 if (!this.isSkippingAnim) _filas.forEach(sel => _deslizarFila(sel, _foto, null));
+                // Las entradas del rectángulo dependen de lo que hay EN LA MESA, no solo de la fase:
+                // un Evento que expira este turno, un aliado que acaba de entrar. Se repintan aquí.
+                this.pintarReposoFase();
             }
 
             _renderInterno() {
@@ -9535,8 +9581,7 @@
         <div style="background:rgba(0,0,0,0.8); padding:5px; border-radius:5px; text-align:center; border: 1px solid #475569; min-width: 160px;">
             <div style="font-size:0.7rem; color:#94a3b8;">TURNO ACTUAL</div>
             <div style="font-size:1.2rem; font-weight:bold; color:#fff;" id="active-player-disp">${playerDisplay}</div>
-            <div style="font-size:0.8rem; color:#fbbf24; margin-top:2px;" id="phase-display">${this.phase}</div>
-            <div style="font-size:0.6rem; color:#64748b;">T: <span id="turn-counter">${this.turn}</span></div>
+            <div style="font-size:0.8rem; color:#64748b;">T: <span id="turn-counter">${this.turn}</span></div>
         </div>`;
 
                 if (isMyTurn && this.phase === 'PRINCIPAL' && this.checkDirectAttackOpportunity() && this.inputState !== 'CONFIRM_ABILITY') {
@@ -10112,7 +10157,7 @@
                     }
                 }
                 layer.innerHTML = '';
-                // Las flechas entran con el MISMO fundido y la misma duracion que el detalle al
+                // Las flechas entran con el MISMO fundido y la misma duración que el detalle al
                 // expandirse, para que las dos cosas se sientan como un solo movimiento.
                 layer.style.transition = `opacity ${this.PREVIEW_MORPH_MS}ms ease-out`;
                 layer.style.opacity = '0';

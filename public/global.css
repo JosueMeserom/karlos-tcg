@@ -811,7 +811,7 @@ button.game-btn:disabled { background: #64748b; cursor: not-allowed; opacity: 0.
    solo el CONTENIDO, asi que la caja se pasaba 34px (15+15 de padding + 2+2 de borde)
    durante toda la animacion y pegaba un salto seco al soltarla. 294 = 260 + esos 34:
    el ancho visible no cambia ni un pixel. */
-#card-preview { box-sizing: border-box; position: absolute; right: 10px; left: auto; top: var(--cp-top, 60%); transform: translateY(-50%); width: 294px; min-height: 60px; height: auto; background: rgba(15, 23, 42, 0.95); border: 2px solid #94a3b8; border-radius: 10px; z-index: 5000; display: flex; flex-direction: column; padding: 15px; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5); pointer-events: none; overflow: hidden; transition: top 220ms ease-out; }
+#card-preview { box-sizing: border-box; position: absolute; right: 10px; left: auto; top: var(--cp-top, 50%); transform: translateY(-50%); width: 294px; min-height: 60px; height: auto; background: rgba(15, 23, 42, 0.95); border: 2px solid #94a3b8; border-radius: 10px; z-index: 5000; display: flex; flex-direction: column; padding: 15px; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5); pointer-events: none; overflow: hidden; transition: top 220ms ease-out; }
 
 /* El rectángulo en reposo. Deliberadamente sobrio: es lo que se ve el 90% del tiempo y no
    puede competir con el tablero. */
