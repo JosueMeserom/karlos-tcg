@@ -14,6 +14,9 @@
        AMBOS lados (ver .rows-container y .hand-zone) para que el campo quede en el centro REAL
        de la ventana sin llegar a pisarlas. Antes eran 120px solo a la izquierda: ni tapaba las
        pilas ni centraba, y dejaba las filas y las manos 60px corridas a la derecha. */
+    /* Tope de ancho de una fila de juego. Lo comparten .zone-row y el banner de fase,
+       que se recorta a la misma anchura para no invadir la columna derecha. */
+    --fila-max: 600px;
     --stack-offset: 210px;
 
     /* ===== LOS DOS MANDOS DE LA COLUMNA DERECHA =====================================
@@ -21,13 +24,12 @@
          --ui-top-base : a cuántos px del borde superior arranca la caja de turno+botones.
                          Súbelo para bajarla. Tope duro: ~150px, donde acaba la mano de J2.
          --cp-centro   : dónde cae el CENTRO del rectángulo de detalle, en % de la altura.
-                         50% = la línea que separa los campos. Súbelo para bajarlo; el
-                         banner de cambio de fase ocupa la franja 45%..45%+60px, así que
-                         cuanto más abajo, menos lo pisa.
+                         50% = la línea que separa los campos, que es donde va. El banner
+                         de cambio de fase ya no llega hasta aquí (ver #phase-banner).
        Si un detalle no cabe entre los dos, _acomodarColumnaDerecha() reparte el déficit
        sola: no hace falta tocar nada más. ============================================ */
-    --ui-top-base: 300px;
-    --cp-centro: 58%;
+    --ui-top-base: 448px;
+    --cp-centro: 50%;
 }
 
 body {
@@ -99,7 +101,7 @@ body {
     border-radius: 8px;
     background: rgba(0, 0, 0, 0.2);
     width: 90%;
-    max-width: 600px;
+    max-width: var(--fila-max);
     justify-content: center;
     align-items: center;
     position: relative;
@@ -492,11 +494,18 @@ body {
 .ft-ability { color: #22d3ee; font-size: 1.2rem; text-shadow: 0 0 10px #0891b2, 1px 1px 0 #000; letter-spacing: 1px; }
 
 /* Phase Banner */
+/* Ocupaba el ancho ENTERO de la ventana y se comía el rectángulo de detalle cada vez que
+   cambiaba la fase. Ahora se recorta al ancho de una fila de juego y se centra con margen
+   negativo -no con transform, que se lo queda la animación de barrido-, así que el
+   difuminado de los bordes (el mask de abajo, 10%/90%) cae DENTRO de ese ancho: el banner
+   entero, contando la difuminación, mide lo mismo que la vanguardia. La cuenta es la misma
+   que la de .zone-row: 90% de lo que queda tras los dos huecos de las pilas, con tope. */
 #phase-banner {
     position: fixed;
     top: 45%;
-    left: 0;
-    width: 100%;
+    left: 50%;
+    width: min(var(--fila-max), calc((100% - 2 * var(--stack-offset)) * 0.9));
+    margin-left: calc(-0.5 * min(var(--fila-max), calc((100% - 2 * var(--stack-offset)) * 0.9)));
     height: 60px;
     background: rgba(0, 0, 0, 0.9);
     color: #fbbf24;
