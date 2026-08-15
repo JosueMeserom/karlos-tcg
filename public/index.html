@@ -4495,7 +4495,6 @@
 
             startPreview(card) {
                 if (this.previewTimer) clearTimeout(this.previewTimer);
-                this._vigilarPreview(); // cierra el detalle si el ratón deja de estar sobre una carta
                 this.previewTimer = setTimeout(() => {
                     const panel = document.getElementById('card-preview');
                     document.getElementById('cp-name').innerText = card.name;
@@ -4989,6 +4988,10 @@
                         if (_super) _super.style.display = 'none';
                     }
                     this._morphPreview(true);
+                    // El vigilante ARRANCA AQUÍ, no al entrar en startPreview: se guía por el
+                    // display de #cp-carta, y durante los 500ms de espera ese display sigue en
+                    // 'none', así que se mataba en su primer tick y no vigilaba nunca nada.
+                    this._vigilarPreview(); // cierra el detalle si el ratón deja de estar sobre una carta
                 }, 500);
             }
 
