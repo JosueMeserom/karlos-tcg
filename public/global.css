@@ -708,9 +708,14 @@ body {
 #volume-slider { width: 100px; cursor: pointer; }
 #volume-icon { font-size: 1.2rem; cursor: pointer; user-select: none; }
 
+/* Columna derecha, bloque de arriba. Ancla por el BORDE SUPERIOR a 190px, no centrado:
+   el detalle vive ahora debajo (ver #card-preview) y los dos tienen que convivir. 190 es lo
+   más arriba que puede ir sin rozar la mano de J2, que acaba sobre los 150px. La variable
+   la mueve `_acomodarColumnaDerecha()` cuando un detalle enorme no cabe, y solo entonces. */
 #ui-layer {
-    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    position: absolute; right: 10px; top: var(--ui-top, 190px); transform: none;
     display: flex; flex-direction: column; gap: 8px; z-index: 200;
+    transition: top 220ms ease-out;
 }
 
 button.game-btn {
@@ -792,7 +797,24 @@ button.game-btn:disabled { background: #64748b; cursor: not-allowed; opacity: 0.
 .btn-reset-log { background: #64748b; border: none; color: white; font-size: 0.6rem; padding: 2px 5px; border-radius: 3px; cursor: pointer; }
 
 /* PREVIEW SIDEBAR */
-#card-preview { position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 260px; min-height: 100px; height: auto; background: rgba(15, 23, 42, 0.95); border: 2px solid #94a3b8; border-left: none; border-radius: 0 10px 10px 0; z-index: 5000; display: none; flex-direction: column; padding: 15px; box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.5); pointer-events: none; }
+/* EL DETALLE. Vivía pegado al borde IZQUIERDO, y ahí tapaba siempre la columna de pilas
+   (mazo / descartes / retribución / evento, 0..210px): las flechas de coste de una
+   presentación y las de "Afectado por" que nacen o mueren en una pila quedaban medio
+   escondidas. A la derecha no tapa nada. Las flechas no se anclan al panel -se dibujan
+   carta a carta con getBoundingClientRect-, así que mudarlo no rompe ninguna.
+
+   Ya no se oculta: es un rectángulo FIJO que en reposo enseña la fase (#cp-reposo) y al
+   hacer hover se expande y se puebla con la carta (#cp-carta). Crece SIMÉTRICO desde su
+   centro gracias al translateY(-50%), así que un detalle normal no mueve nada más. */
+#card-preview { position: absolute; right: 10px; left: auto; top: var(--cp-top, 60%); transform: translateY(-50%); width: 260px; min-height: 60px; height: auto; background: rgba(15, 23, 42, 0.95); border: 2px solid #94a3b8; border-radius: 10px; z-index: 5000; display: flex; flex-direction: column; padding: 15px; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5); pointer-events: none; overflow: hidden; transition: top 220ms ease-out; }
+
+/* El rectángulo en reposo. Deliberadamente sobrio: es lo que se ve el 90% del tiempo y no
+   puede competir con el tablero. */
+#cp-reposo .cpr-tit { font-size: .58rem; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: #64748b; }
+#cp-reposo .cpr-fase { font-size: 1.05rem; font-weight: bold; color: #fbbf24; margin: 2px 0 5px; }
+#cp-reposo .cpr-base { font-size: .72rem; color: #cbd5e1; line-height: 1.35; }
+/* Contenido que se cambia: el fundido lo sincroniza `_morphPreview` con el de las flechas. */
+#cp-reposo, #cp-carta { transition: opacity 200ms ease-out; }
 .preview-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 5px; border-bottom: 1px solid #475569; }
 .preview-title { font-size: 1.2rem; font-weight: bold; color: #fbbf24; }
 /* El [n] de copia iba a 0.8rem en gris oscuro y pasaba desapercibido, aunque es justo lo que

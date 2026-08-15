@@ -333,6 +333,16 @@
     </div>
 
     <div id="card-preview">
+        <!-- Rectangulo en REPOSO: lo que se ve cuando no hay hover. El panel ya no se
+             oculta (vive fijo en la columna derecha, ver global.css), solo cambia de
+             contenido y de alto. -->
+        <div id="cp-reposo">
+            <div class="cpr-tit">FASE ACTUAL</div>
+            <div class="cpr-fase" id="cpr-fase">Inicio</div>
+            <div class="cpr-base" id="cpr-base"></div>
+            <div id="cpr-entradas"></div>
+        </div>
+        <div id="cp-carta" style="display:none;">
         <div class="preview-header">
             <div class="preview-title" id="cp-name">Nombre</div>
             <div class="preview-id" id="cp-id"></div>
@@ -428,6 +438,7 @@
              distinguirla sin salirse de la paleta. Solo se muestra si la carta tiene
              superStats en su plantilla (Toto, 27-jul-2026). -->
         <div class="preview-stats preview-stats-super" id="cp-stats-super" style="display:none;"></div>
+        </div>
     </div>
 
     <div id="log-container" onclick="event.stopPropagation()">
@@ -4978,14 +4989,14 @@
                         const _super = document.getElementById('cp-stats-super');
                         if (_super) _super.style.display = 'none';
                     }
-                    panel.style.display = 'flex';
+                    this._morphPreview(true);
                 }, 500);
             }
 
             stopPreview() {
                 if (this.previewTimer) clearTimeout(this.previewTimer);
                 if (this._vigilaPreview) { clearInterval(this._vigilaPreview); this._vigilaPreview = null; }
-                document.getElementById('card-preview').style.display = 'none'; if (this.clearModArrows) this.clearModArrows();
+                this._morphPreview(false); if (this.clearModArrows) this.clearModArrows();
             }
 
             // stopPreview cierra lo que YA está abierto y cancela el temporizador pendiente, pero
@@ -5057,11 +5068,87 @@
             // en vez de por un evento que puede no llegar nunca.
             // NOTA para el futuro: si algún día hay que enseñar el detalle SIN hover (fijarlo,
             // un modo inspección…), este vigilante es lo primero que habrá que condicionar.
+            // --- La columna derecha: rectangulo de fase <-> detalle de carta -------------------
+            // El panel ya no aparece y desaparece: esta siempre, y lo que cambia es su CONTENIDO y su
+            // ALTO. Se expande desde su centro (translateY(-50%) en el CSS), asi que un detalle de
+            // tamano normal no mueve absolutamente nada mas.
+            PREVIEW_MORPH_MS = 200;
+
+            // Alto en dos pasos, como el FLIP de las filas: se mide el alto de destino con el contenido
+            // ya puesto, se vuelve al de origen y se transiciona. No se puede animar `height:auto`.
+            _morphPreview(mostrarCarta) {
+                const panel = document.getElementById('card-preview');
+                const carta = document.getElementById('cp-carta');
+                const reposo = document.getElementById('cp-reposo');
+                if (!panel || !carta || !reposo) return;
+                const entra = mostrarCarta ? carta : reposo, sale = mostrarCarta ? reposo : carta;
+                // Sin layout de verdad (el harness monta un DOM de mentira: su `style` es un objeto
+                // pelado y todos los rects miden 0) no hay nada que animar: se cambia el contenido.
+                if (typeof panel.style.setProperty !== 'function') {
+                    sale.style.display = 'none'; entra.style.display = ''; return;
+                }
+                if (entra.style.display !== 'none' && !panel.style.height) { this._acomodarColumnaDerecha(); return; }
+
+                const h0 = panel.getBoundingClientRect().height;
+                sale.style.display = 'none';
+                entra.style.display = '';
+                entra.style.opacity = '0';
+                panel.style.height = 'auto';
+                const h1 = panel.getBoundingClientRect().height;
+
+                this._acomodarColumnaDerecha(h1);
+                panel.style.height = h0 + 'px';
+                void panel.offsetHeight;                       // reflow: sin esto no hay transicion
+                panel.style.transition = `height ${this.PREVIEW_MORPH_MS}ms ease-out, top 220ms ease-out`;
+                panel.style.height = h1 + 'px';
+                requestAnimationFrame(() => { entra.style.opacity = '1'; });
+
+                clearTimeout(this._morphTimer);
+                this._morphTimer = setTimeout(() => {
+                    panel.style.height = ''; panel.style.transition = '';
+                }, this.PREVIEW_MORPH_MS + 20);
+            }
+
+            // Hueco para el detalle SIN mover nada mientras quepa. Si no cabe, el deficit se reparte
+            // entre los dos bloques -bajando el centro del detalle y subiendo la zona de botones-, en
+            // vez de empujar solo a uno (peticion de Toto: que la zona de botones se mueva lo minimo,
+            // que es pequena pero importantisima). Los topes son la mano de J2 arriba y la de J1 abajo.
+            _acomodarColumnaDerecha(altoDetalle) {
+                const panel = document.getElementById('card-preview');
+                const ui = document.getElementById('ui-layer');
+                if (!panel || !ui || typeof panel.style.setProperty !== 'function') return;
+                const h = altoDetalle || panel.getBoundingClientRect().height;
+                const VH = window.innerHeight, AIRE = 20;
+                const manoArriba = document.getElementById('p2-hand');
+                const manoAbajo = document.getElementById('p1-hand');
+                const techo = (manoArriba ? manoArriba.getBoundingClientRect().bottom : 150) + AIRE;
+                const suelo = (manoAbajo ? manoAbajo.getBoundingClientRect().top : VH - 150) - AIRE;
+
+                const UI_BASE = 190, CENTRO_BASE = 0.60;
+                const altoUi = ui.getBoundingClientRect().height;
+                let uiTop = UI_BASE, centro = VH * CENTRO_BASE;
+                // Lo que le falta al detalle por arriba respecto al fondo de la zona de botones.
+                const deficit = (uiTop + altoUi + AIRE) - (centro - h / 2);
+                if (deficit > 0) {
+                    // Mitad bajando el detalle (topado por la mano de abajo), el resto subiendo los
+                    // botones (topados por la mano de arriba). Lo que no quepa, no cabe: el panel tiene
+                    // su propio overflow y esos detalles son excepcionales.
+                    const bajaMax = Math.max(0, suelo - (centro + h / 2));
+                    const baja = Math.min(deficit / 2, bajaMax);
+                    centro += baja;
+                    uiTop = Math.max(techo, uiTop - (deficit - baja));
+                }
+                panel.style.setProperty('--cp-top', centro + 'px');
+                ui.style.setProperty('--ui-top', uiTop + 'px');
+            }
+
             _vigilarPreview() {
                 if (this._vigilaPreview) return;
                 this._vigilaPreview = setInterval(() => {
-                    const panel = document.getElementById('card-preview');
-                    if (!panel || panel.style.display === 'none') {
+                    // El panel ya no se oculta nunca (vive fijo en la columna derecha): lo que
+                    // dice si hay detalle abierto es #cp-carta, no el display del panel.
+                    const carta = document.getElementById('cp-carta');
+                    if (!carta || carta.style.display === 'none') {
                         clearInterval(this._vigilaPreview); this._vigilaPreview = null; return;
                     }
                     // Si el puntero ya no está sobre NINGUNA carta, fuera el detalle.
@@ -6261,11 +6348,32 @@
                 this.forceSync(); // <--- MARTILLO TRAS RESOLVER TODO EL INICIO DE TURNO
             }
 
+            // Lo que hace CADA fase, en una linea. De momento es la regla base y nada mas: las
+            // "entradas" con los efectos concretos que la alteran (#cpr-entradas) son la fase 2 de
+            // esto, y piden que cada habilidad declare su propio resumen -no se puede deducir de un
+            // hook sin ejecutarlo-. Redaccion en 3a persona, como todo lo que ven los dos jugadores.
+            FASE_BASE = {
+                'ROBO': 'Roba una carta del mazo y la anade a su mano.',
+                'FASE DE EFECTOS': 'Se resuelven los efectos que se disparan al empezar el turno.',
+                'FASE DE EVENTO': 'El Evento en juego consume un turno. Si se le acaba el tiempo, expira.',
+                'FASE DE FUROR': 'Cada aliado de la vanguardia gana 1 de Furor, hasta su maximo.',
+                'FASE PRINCIPAL': 'Juega cartas, usa Habilidades y ataca. Termina al pasar el turno.',
+                'EFECTOS FINALES': 'Se resuelven los efectos que se disparan al acabar el turno.',
+            };
+
+            pintarReposoFase(text) {
+                const f = document.getElementById('cpr-fase'), b = document.getElementById('cpr-base');
+                if (!f || !b) return;
+                f.innerText = text;
+                b.innerText = this.FASE_BASE[text] || '';
+            }
+
             updatePhaseDisplay(text) {
                 const pName = this.getDisplayName(this.activePlayerId);
                 document.getElementById('active-player-disp').innerText = pName;
                 document.getElementById('active-player-disp').style.color = this.activePlayerId === 'p1' ? '#3b82f6' : '#ef4444';
                 document.getElementById('phase-display').innerText = text;
+                this.pintarReposoFase(text);
             }
 
             async destroyEvent(playerId) {
@@ -10004,6 +10112,11 @@
                     }
                 }
                 layer.innerHTML = '';
+                // Las flechas entran con el MISMO fundido y la misma duracion que el detalle al
+                // expandirse, para que las dos cosas se sientan como un solo movimiento.
+                layer.style.transition = `opacity ${this.PREVIEW_MORPH_MS}ms ease-out`;
+                layer.style.opacity = '0';
+                requestAnimationFrame(() => { layer.style.opacity = '1'; });
                 this._modArrowCard = card;
                 const GRIS = '#cbd5e1';
                 const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
@@ -10170,9 +10283,7 @@
                     } else {
                         // El ratón ya no está sobre la carta (p. ej. tras cancelar un prompt): el detalle
                         // y las flechas se cierran por el mismo cauce que el mouseleave normal.
-                        const _pv = document.getElementById('card-preview');
-                        if (_pv) _pv.style.display = 'none';
-                        this.clearModArrows();
+                        this.stopPreview();
                     }
                 }, 0); }
                 
