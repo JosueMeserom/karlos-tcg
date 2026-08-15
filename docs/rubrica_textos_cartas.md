@@ -763,3 +763,35 @@ que lo que toque el Furor sí hay que escribirlo a mano.
 informativas): duplicar una línea no es una decisión de diseño, es un defecto. Si una línea nombra
 un stat sin modificarlo de verdad, va a su `EXENTAS` con el motivo **verificado en el código**, no
 supuesto.
+
+
+## §19. Toda cadena cancelable termina comprometiendo
+
+§14 dice que nada es visible hasta el punto de compromiso. El cliente lo cumple **armando** la
+presentación (`_presentacionArmada`) en vez de dispararla al clicar, y la dispara `DSL._comprometer`
+en cuanto ocurre algo irreversible: un efecto que no sea `ELEGIR`/`BUSCAR`, un `esCoste` aparcado,
+o un `BUSCAR` en el mazo al abrir el visor.
+
+**La trampa**: una cadena que es `ELEGIR`/`BUSCAR` **de principio a fin** no tiene ninguno de esos.
+El `ELEGIR` se salta `_comprometer` a propósito — mientras eliges aún puedes arrepentirte — y si la
+lista se acaba ahí, no queda nadie que lo llame: la carta se coloca sin pasar por el escaparate.
+Pasaba con Publicidad mental y Exhibicionismo (su `ELEGIR` solo apunta a quién, y el efecto real es
+un `AURA` continua, que no es un efecto de la lista) y con Líquido mortal y Cápsula de
+bio-regeneración (un `BUSCAR` en los descartes y nada más).
+
+**La garantía es estructural**: los tres compiladores de cadena de jugada — `ANTES_DE_JUGAR`,
+`AL_CONSUMIR` y `AL_EQUIPAR` — llaman a `DSL._comprometer` al terminar, pase lo que pase. Es
+idempotente (lo primero que hace `_dispararPresentacion` es vaciar `_presentacionArmada`), así que
+no dispara dos veces si un efecto anterior ya lo hizo.
+
+Al añadir un trigger nuevo a `_hayVentana` en `index.html`, **hay que añadir el `_comprometer` al
+final de su compilador**. `node tests/auditar_presenta.js` compara las dos listas leyéndolas del
+fuente y **devuelve error** si se desincronizan.
+
+### Elegir a quién afecta la carta es un Requisito, no un «Al colocarla»
+
+Si el `ELEGIR` solo **señala** a quién afectará la carta y ese aliado no pierde nada, es un
+**Requisito** (§ Coste vs Requisito): lleva `esRequisito: true`, y entonces el elegido sale con su
+flecha lima **«Req. cumplido»** en la presentación. Eso les dice a los dos jugadores *cuál* de los
+aliados va a quedar afectado, que antes solo se sabía abriendo el detalle. El texto se redacta
+`Requiere elegir un aliado de tu vanguardia.`, no `Al colocarla, elige…`.

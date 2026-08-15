@@ -6793,7 +6793,7 @@ const CARD_DB = [
         // se hacen juntas porque comparten estructura EXACTA, que es justo el criterio de
         // familias de la §9 de la rúbrica — misma mecánica, misma redacción.
         name: "Publicidad mental", type: "Evento", rarity: "C", cost: 0, duration: 2, series: 1,
-        text: "2 turnos. Al colocarla, elige un aliado de tu vanguardia. Mientras esté en juego, ese aliado y todos los enemigos pierden 2 de Atq.",
+        text: "2 turnos. Requiere elegir un aliado de tu vanguardia. Mientras esté en juego, ese aliado y todos los enemigos pierden 2 de Atq.",
         abilities: [
             { trigger: "JUGAR", requisitos: [
                 { count: { zona: "VANGUARDIA" }, op: ">=", valor: 1,
@@ -6801,7 +6801,7 @@ const CARD_DB = [
             { trigger: "ANTES_DE_JUGAR", efectos: [
                 { op: "ELEGIR", de: "ALIADOS", zona: "vanguardia", cantidad: 1,
                   titulo: "¿A QUIÉN LE PONEMOS LOS ANUNCIOS?",
-                  guardaIdEnSelf: "objetivoPublicidad", guardaEn: "anunciado" } ] },
+                  guardaIdEnSelf: "objetivoPublicidad", guardaEn: "anunciado", esRequisito: true } ] },
             { trigger: "AL_JUGAR", log: "¡Publicidad mental! {anunciado} y todos los enemigos se distraen." },
             { trigger: "AURA", quien: "ALIADO", soloSelfId: "objetivoPublicidad", stats: { atk: -2 } },
             { trigger: "AURA", quien: "ENEMIGO", stats: { atk: -2 } },
@@ -6813,7 +6813,7 @@ const CARD_DB = [
         // ninguna carta, pero entra aquí porque escribirla aparte habría costado más que
         // copiar la de al lado, y así las dos nacen redactadas igual (rúbrica §9).
         name: "Exhibicionismo", type: "Evento", rarity: "C", cost: 0, duration: 2, series: 1,
-        text: "2 turnos. Al colocarla, elige un aliado de tu vanguardia. Mientras esté en juego, ese aliado y todos los enemigos pierden 2 de Def.",
+        text: "2 turnos. Requiere elegir un aliado de tu vanguardia. Mientras esté en juego, ese aliado y todos los enemigos pierden 2 de Def.",
         abilities: [
             { trigger: "JUGAR", requisitos: [
                 { count: { zona: "VANGUARDIA" }, op: ">=", valor: 1,
@@ -6821,7 +6821,7 @@ const CARD_DB = [
             { trigger: "ANTES_DE_JUGAR", efectos: [
                 { op: "ELEGIR", de: "ALIADOS", zona: "vanguardia", cantidad: 1,
                   titulo: "¿QUIÉN SE EXHIBE?",
-                  guardaIdEnSelf: "objetivoExhibicion", guardaEn: "exhibido" } ] },
+                  guardaIdEnSelf: "objetivoExhibicion", guardaEn: "exhibido", esRequisito: true } ] },
             { trigger: "AL_JUGAR", log: "¡Exhibicionismo! {exhibido} y todos los enemigos bajan la guardia." },
             { trigger: "AURA", quien: "ALIADO", soloSelfId: "objetivoExhibicion", stats: { def: -2 } },
             { trigger: "AURA", quien: "ENEMIGO", stats: { def: -2 } },
@@ -9294,6 +9294,14 @@ const DSL = {
                 game._ayudaEnCurso = null;
                 // Elección cancelada: no ha pasado nada, así que la Ayuda vuelve a la mano.
                 if (res && res.ok === false) { game._ayudaEnCurso = null; await _volverAMano(); game.cancelAction(); if (typeof game.render === 'function') game.render(); return; }
+                // PUNTO DE COMPROMISO (§14), el mismo que al final de ANTES_DE_JUGAR: la cadena
+                // cancelable ha terminado y la Ayuda se consume, así que se presenta pase lo que
+                // pase. Sin esto, una cadena que sea ELEGIR/BUSCAR de principio a fin no tiene
+                // ningún efecto que llame a _comprometer y la carta va al descarte sin pasar por
+                // el escaparate — le pasaba a Líquido mortal y a Cápsula de bio-regeneración.
+                // Va ANTES de _alDescarte porque la presentación lleva ese mismo `colocar`
+                // dentro: si se descarta primero, el escaparate ya no tiene de dónde salir.
+                await DSL._comprometer(card, game);
                 // NO_CONSUMIR: la vuelta del viaje de ida (Atomización tras rematar).
                 if (!_equipa) _alDescarte();   // no-op si la presentación ya la movió
                 // Las anotaciones de `guardaIdsEnSelf` (quién pagaba, a quién se eligió) son
@@ -9314,6 +9322,11 @@ const DSL = {
             tmpl.onPlay = async function (card, game) {
                 const res = await DSL._runEffectList(equipar.efectos || [], card, game, card.owner, null);
                 if (res && res.ok === false) { game.cancelAction(); return; } // cancelado: la carta sigue en mano
+                // Mismo punto de compromiso que en las otras dos cadenas. Hoy ninguna carta de
+                // AL_EQUIPAR lo necesita -todas acaban en un op EQUIPAR, que ya dispara-, pero
+                // la garantía es estructural aquí y solo una comprobación en la auditoría si se
+                // deja fuera. Es idempotente: si ya se disparó, no hace nada.
+                await DSL._comprometer(card, game);
                 game.cancelAction();
                 if (typeof game.render === 'function') game.render();
             };
@@ -10354,7 +10367,21 @@ const DSL = {
                 // ANTES de que la carta se coloque (p. ej. "aniquila su propia vanguardia").
                 if (antesJugar.log) game.logMsg(DSL._fill(antesJugar.log, { carta: card.name }), antesJugar.logTipo || 'ability');
                 const res = await DSL._runEffectList(antesJugar.efectos || [], card, game, card.owner, null, _habDeCarta(antesJugar));
-                return !(res && res.ok === false);
+                const ok = !(res && res.ok === false);
+                // PUNTO DE COMPROMISO (§14). La presentación queda ARMADA al empezar a jugar la
+                // carta y la dispara el primer efecto que ya no se pueda cancelar. Pero una
+                // cadena que es ELEGIR de principio a fin no tiene ninguno: el ELEGIR se salta
+                // _comprometer a propósito -mientras eliges, aún puedes arrepentirte- y si la
+                // lista se acaba ahí no queda nadie que lo llame. Publicidad mental y
+                // Exhibicionismo eran justo eso (su ELEGIR solo APUNTA a quién, y el efecto real
+                // es un AURA continua, que no es un efecto de la lista): se colocaban sin
+                // presentarse (Toto, 15-ago-2026).
+                // Aquí la cadena cancelable ya terminó y la carta se va a colocar, así que es el
+                // punto de compromiso pase lo que pase. _comprometer es idempotente -lo primero
+                // que hace _dispararPresentacion es vaciar _presentacionArmada-, así que si un
+                // efecto anterior ya lo disparó, esto no hace nada.
+                if (ok) await DSL._comprometer(card, game);
+                return ok;
             };
         }
 
