@@ -6356,6 +6356,9 @@
             // qué efectos concretos la alteran hoy. Redacción en 3ª persona, como todo lo que ven los
             // dos jugadores.
             
+            // Respaldo cuando el titulo fino ha caducado: la fase del MOTOR, que siempre esta al dia.
+            FASE_DE_MOTOR = { INICIO: 'PREPARACIÓN', FASES_INICIALES: 'EFECTOS INICIALES', PRINCIPAL: 'PRINCIPAL' };
+
             FASE_BASE = {
                 'PREPARACIÓN': 'Se montan los mazos y se reparten las manos iniciales.',
                 'ROBO': 'Roba una carta del mazo y la añade a su mano.',
@@ -6408,8 +6411,16 @@
             pintarReposoFase(text) {
                 const f = document.getElementById('cpr-fase'), b = document.getElementById('cpr-base');
                 if (!f || !b) return;
-                if (text) this._faseTexto = text;   // render() repinta sin saber la fase
-                const fase = this._faseTexto || 'PREPARACIÓN';   // antes de la primera fase real
+                // El titulo fino (ROBO, FUROR...) lo pone updatePhaseDisplay, porque `this.phase`
+                // no baja a ese detalle: se queda en FASES_INICIALES durante las cuatro primeras.
+                // Pero eso lo convierte en una SEGUNDA fuente de verdad, y hay caminos que cambian
+                // this.phase sin pasar por ahi -reiniciar la partida, cargar un escenario (4254) o
+                // un savestate (11041)-: el rectangulo se quedaba con el titulo del turno anterior
+                // (Toto, 15-ago-2026). Se recuerda a QUE this.phase pertenece el titulo fino; si el
+                // motor ha cambiado de fase por su cuenta, caduca y manda this.phase.
+                if (text) { this._faseTexto = text; this._faseTextoDe = this.phase; }
+                const fase = (this._faseTexto && this._faseTextoDe === this.phase)
+                    ? this._faseTexto : (this.FASE_DE_MOTOR[this.phase] || 'PREPARACIÓN');
                 f.innerText = fase;
                 b.innerText = this.FASE_BASE[fase] || '';
                 const e = document.getElementById('cpr-entradas');
