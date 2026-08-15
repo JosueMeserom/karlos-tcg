@@ -28,7 +28,7 @@
                          de cambio de fase ya no llega hasta aquí (ver #phase-banner).
        Si un detalle no cabe entre los dos, _acomodarColumnaDerecha() reparte el déficit
        sola: no hace falta tocar nada más. ============================================ */
-    --ui-top-base: 448px;
+    --ui-top-base: 300px;
     --cp-centro: 50%;
 }
 
@@ -512,17 +512,25 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 2rem;
+    /* 1.4rem, no 2rem: el banner ya no ocupa la ventana entera, y "JX (Nick): FASE DE
+       EFECTOS INICIALES" -el más largo de los seis- no cabía en una fila. Rompía línea, y
+       con `height: 60px` la segunda se salía por abajo cortada. `nowrap` para que no lo
+       vuelva a intentar y `overflow: hidden` por si el nick es larguísimo: entonces se
+       recorta, y como el recorte cae en la zona difuminada del mask, no se nota.
+       Si con tu nick se ve grande o se recorta, este es el único valor que hay que tocar. */
+    font-size: 1.4rem;
     font-weight: 900;
     text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
     z-index: 9000;
     transform: translateX(100%);
     border-top: 2px solid #fbbf24;
     border-bottom: 2px solid #fbbf24;
     box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
     display: none;
-    mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
-    -webkit-mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+    mask-image: linear-gradient(to right, transparent, black 4%, black 96%, transparent);
+    -webkit-mask-image: linear-gradient(to right, transparent, black 4%, black 96%, transparent);
 }
 
 @keyframes phaseSwipe {
