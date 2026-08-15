@@ -5163,6 +5163,20 @@
 
             _vigilarPreview() {
                 if (this._vigilaPreview) return;
+                // QUIÉN está bajo el ratón, el elemento concreto, no una lista de selectores.
+                // Antes preguntaba por `.card:hover, .card-back:hover`, y esa lista se queda
+                // corta en cuanto algo nuevo abre el detalle. Se quedó: el Evento en su ranura
+                // es `.stack-card active-event-card`, no encajaba en ninguno de los dos, y el
+                // vigilante lo daba por "ya no hay nadie" y cerraba el detalle a los 150ms.
+                // Como el ratón seguía dentro, no llegaba otro mouseenter y no volvía a abrirse
+                // hasta salir y entrar (Toto, 15-ago-2026). Con el elemento no hay lista que
+                // mantener: valga lo que valga, se vigila ESE.
+                // querySelectorAll(':hover') da la cadena desde <html>; el último es el más
+                // hondo, que es el que ha disparado el mouseenter.
+                const bajoElRaton = Array.from(document.querySelectorAll(':hover')).pop() || null;
+                // Sin nada bajo el ratón, el detalle se ha abierto por código: no es asunto de
+                // este vigilante cerrarlo.
+                if (!bajoElRaton) return;
                 this._vigilaPreview = setInterval(() => {
                     // El panel ya no se oculta nunca (vive fijo en la columna derecha): lo que
                     // dice si hay detalle abierto es #cp-carta, no el display del panel.
@@ -5170,8 +5184,12 @@
                     if (!carta || carta.style.display === 'none') {
                         clearInterval(this._vigilaPreview); this._vigilaPreview = null; return;
                     }
-                    // Si el puntero ya no está sobre NINGUNA carta, fuera el detalle.
-                    if (!document.querySelector('.card:hover, .card-back:hover')) this.stopPreview();
+                    // Fuera el detalle si el ratón se ha ido de ese elemento, o si el elemento
+                    // ya no está en el documento -un render lo ha sustituido-. Cerrar en ese
+                    // segundo caso es lo mismo que hace ya la reconstrucción de flechas tras
+                    // un repintado: si el tablero ha cambiado debajo, el detalle se rehace con
+                    // el siguiente hover.
+                    if (!document.contains(bajoElRaton) || !bajoElRaton.matches(':hover')) this.stopPreview();
                 }, 150);
             }
 
