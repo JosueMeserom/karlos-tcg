@@ -709,11 +709,11 @@ body {
 #volume-icon { font-size: 1.2rem; cursor: pointer; user-select: none; }
 
 /* Columna derecha, bloque de arriba. Ancla por el BORDE SUPERIOR a 190px, no centrado:
-   el detalle vive ahora debajo (ver #card-preview) y los dos tienen que convivir. 190 es lo
-   más arriba que puede ir sin rozar la mano de J2, que acaba sobre los 150px. La variable
+   el detalle vive ahora debajo (ver #card-preview) y los dos tienen que convivir. El tope duro son los ~150px
+   donde acaba la mano de J2; 245 deja aire de sobra y no queda desplazado. La variable
    la mueve `_acomodarColumnaDerecha()` cuando un detalle enorme no cabe, y solo entonces. */
 #ui-layer {
-    position: absolute; right: 10px; top: var(--ui-top, 190px); transform: none;
+    position: absolute; right: 10px; top: var(--ui-top, 245px); transform: none;
     display: flex; flex-direction: column; gap: 8px; z-index: 200;
     transition: top 220ms ease-out;
 }
@@ -806,7 +806,12 @@ button.game-btn:disabled { background: #64748b; cursor: not-allowed; opacity: 0.
    Ya no se oculta: es un rectángulo FIJO que en reposo enseña la fase (#cp-reposo) y al
    hacer hover se expande y se puebla con la carta (#cp-carta). Crece SIMÉTRICO desde su
    centro gracias al translateY(-50%), así que un detalle normal no mueve nada más. */
-#card-preview { position: absolute; right: 10px; left: auto; top: var(--cp-top, 60%); transform: translateY(-50%); width: 260px; min-height: 60px; height: auto; background: rgba(15, 23, 42, 0.95); border: 2px solid #94a3b8; border-radius: 10px; z-index: 5000; display: flex; flex-direction: column; padding: 15px; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5); pointer-events: none; overflow: hidden; transition: top 220ms ease-out; }
+/* box-sizing: la animacion de alto mide con getBoundingClientRect (caja de BORDE) y
+   luego escribe ese numero en `height`. Con el box-sizing por defecto ese `height` es
+   solo el CONTENIDO, asi que la caja se pasaba 34px (15+15 de padding + 2+2 de borde)
+   durante toda la animacion y pegaba un salto seco al soltarla. 294 = 260 + esos 34:
+   el ancho visible no cambia ni un pixel. */
+#card-preview { box-sizing: border-box; position: absolute; right: 10px; left: auto; top: var(--cp-top, 60%); transform: translateY(-50%); width: 294px; min-height: 60px; height: auto; background: rgba(15, 23, 42, 0.95); border: 2px solid #94a3b8; border-radius: 10px; z-index: 5000; display: flex; flex-direction: column; padding: 15px; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5); pointer-events: none; overflow: hidden; transition: top 220ms ease-out; }
 
 /* El rectángulo en reposo. Deliberadamente sobrio: es lo que se ve el 90% del tiempo y no
    puede competir con el tablero. */
