@@ -3302,6 +3302,13 @@
 
             applyStatus(card, type, duration, sourceCard, sourceAbility) {
                 if (getCardTemplate(card.id).isAvatar) return; 
+                // Inmunidad concedida por un equipo (Hagoromo). Va aquí, con la de los Avatares,
+                // porque este es el único sitio por el que pasan TODOS los estados alterados:
+                // comprobarlo en cada carta que los aplica seria dejarse la mitad.
+                if (card.inmuneAEstados) {
+                    this.logMsg(`${this.getCardNameWithOwner(card)} es inmune a los estados alterados.`, 'system');
+                    return;
+                }
 
                 if (!card.status) card.status = {};
                 if (card.status[type] && card.status[type].duration > 0) {
@@ -6533,6 +6540,14 @@
                     if (typeof template.onEndTurn === 'function') {
                         await template.onEndTurn(c, this);
                     }
+                    // Los EQUIPOS anexados también tienen fin de turno (Guantes sedientos,
+                    // 16-ago-2026). Este bucle solo miraba vanguardia y retaguardia, así que un
+                    // FIN_TURNO declarado en una Ayuda equipada no se disparaba nunca: no está
+                    // en ninguna de las dos filas, vive en `equippedCards` de su portador.
+                    for (const eq of (c.equippedCards || [])) {
+                        const _et = getCardTemplate(eq.id);
+                        if (_et && typeof _et.onEndTurn === 'function') await _et.onEndTurn(eq, this);
+                    }
                 }
 
                 [...p.vanguard, ...p.rearguard].forEach(card => {
@@ -6662,6 +6677,7 @@
                         card.currentAtk = template.atk;
                         card.currentDef = template.def;
                         card.isSilenced = false; // se resetea aquí; las Auras lo reimponen después
+                        card.inmuneAEstados = false; // igual: la reimpone onEquipUpdate si lleva el equipo
                         delete this._statMods[card.instanceId]; // su pizarra empieza limpia con el reseteo
                     });
                 });

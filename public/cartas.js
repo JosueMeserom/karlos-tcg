@@ -2880,6 +2880,37 @@ const CARD_DB = [
         },
     },
     {
+        id: 2001, name: "Hagoromo", type: "Ayuda", subtype: "Vestimenta", tags: ["Equipable"], rarity: "S", cost: 0, series: 1,
+        // Requisito visible: a quién señala la flecha lima al presentarse (§14.bis). Aquí el
+        // aliado no pierde nada -solo tiene que tener Furor-, así que es Requisito, no Coste.
+        requisitoVisible: [ { quien: "ALIADO", filtros: [ { campo: "furor", op: ">=", valor: 1 } ], uno: true } ],
+        text: "Requiere un aliado con 1 o más de Furor. Anéxasela y cúrale 2 de Vida: +1 de Def e inmune a los estados alterados mientras la lleve. Al equiparla, se le eliminan los estados alterados que tuviera.",
+        abilities: [
+            { trigger: "JUGAR", requisitos: [
+                { count: { filtros: [ { campo: "furor", op: ">=", valor: 1 } ] }, op: ">=", valor: 1,
+                  msg: "Necesitas un aliado con al menos 1 de Furor." } ] },
+            { trigger: "AL_EQUIPAR",
+              // `inmuneAEstados` lo reimpone onEquipUpdate en cada pasada de updatePassives, igual
+              // que los stats: así se cae sola al desequipar sin tener que limpiarla a mano.
+              mientrasEquipado: { def: 1, inmuneAEstados: true },
+              efectos: [
+                { op: "ELEGIR", de: "ALIADOS", cantidad: 1, esRequisito: true,
+                  filtros: [ { campo: "furor", op: ">=", valor: 1 } ],
+                  titulo: "¿QUIÉN VISTE EL HAGOROMO?",
+                  efectos: [
+                    // ORDEN: limpiar, equipar y curar AL FINAL. Un CURAR sobre alguien con la
+                    // Vida llena devuelve 'skip' y ABORTA el resto de la cadena, así que puesto
+                    // primero dejaba a un aliado sano sin limpieza y sin Hagoromo — la carta no
+                    // hacía nada. Lo pilló la suite; a ojo en el navegador habría pasado por
+                    // "es que ya estaba curado".
+                    { op: "LIMPIAR_ESTADOS", soloObjetivo: true, todos: true },
+                    { op: "EQUIPAR",
+                      floats: [ { texto: "HAGOROMO", estilo: "ft-ability", offset: -40 }, { texto: "+1 DEF", estilo: "ft-green", offset: -20 } ],
+                      log: "{objetivo} se viste el Hagoromo: nada podrá alterarle." },
+                    { op: "CURAR", valor: 2, floating: "+2 VIDA", floatingStyle: "ft-green" } ] } ] }
+        ],
+    },
+    {
         name: "Shichishito", type: "Ayuda", subtype: "Arma legendaria", tags: ["Equipable", "melé"], rarity: "A", cost: 0, series: 1,
         // Requisito visible: a quién señala la flecha lima al presentarse (§14.bis).
         requisitoVisible: [ { quien: "ALIADO", zona: "vanguardia", filtros: [ { campo: "name", op: "contieneTexto", valor: "Karlos" }, { campo: "type", op: "==", valor: "Personaje" } ], uno: true } ],
@@ -7097,7 +7128,7 @@ const DSL = {
     // tras él, fijar el daño, autoataque del atacante).
     OPS_EFECTO: ['MODIFICAR_STAT', 'CURAR', 'DAÑO', 'APLICAR_ESTADO', 'MODIFICAR_CONTADORES', 'ATACAR', 'MONEDA', 'ROBAR', 'BUSCAR', 'MARCAR', 'VER_MANO', 'LIMPIAR_ESTADOS', 'ELEGIR', 'DESTRUIR_EVENTO', 'MARCAR_TEMPORAL', 'DESCARTAR', 'EQUIPAR', 'MARCAR_JUGADOR', 'FLOTANTE', 'FIJAR_STAT', 'REDIRIGIR', 'CANCELAR_ATAQUE', 'MARCAR_DRENAJE', 'FIJAR_DAÑO', 'ATACANTE_SE_AUTOATACA', 'VOLVER_A_MANO', 'RETRIBUCION', 'SUELO_STAT', 'TECHO_STAT', 'NO_CONSUMIR', 'BONO_ATAQUE', 'MARCAR_PARTIDA', 'ESQUIVAR', 'DESEQUIPAR', 'DAÑO_ATAQUE', 'REDIRIGIR_ATAQUE', 'SECUESTRAR_STAT', 'DEVOLVER_STAT', 'CUENTA_ATRAS'],
     OPS_CMP: ['==', '!=', '<=', '>=', '<', '>', 'includes', 'contieneTexto', 'includesCI', 'truthy', 'falsy'],
-    QUIEN: ['SELF', 'ALIADO', 'ENEMIGO', 'TODOS', 'ATACANTE', 'DEFENSOR'], // ATACANTE/DEFENSOR: solo en GLOBAL_TRAS_ATAQUE y REACCION
+    QUIEN: ['SELF', 'ALIADO', 'ENEMIGO', 'TODOS', 'ATACANTE', 'DEFENSOR', 'PORTADOR'], // ATACANTE/DEFENSOR: solo en GLOBAL_TRAS_ATAQUE y REACCION
 
     _tmpl(id) { return (typeof getCardTemplate === 'function') ? getCardTemplate(id) : CARD_DB.find(c => c.id === id); },
 
@@ -7176,6 +7207,19 @@ const DSL = {
         // el EQUIPO, así que "SELF" no sirve para apuntar a quien lo empuña. El trigger deja al
         // portador en este transitorio de `game` (no viaja en el estado, igual que ESQUIVAR).
         if (spec.quien === 'ATACANTE') return game._dslEquipoAtacante ? [game._dslEquipoAtacante] : [];
+        // PORTADOR (Guantes sedientos, 16-ago-2026): quien lleva ESTE equipo, resuelto desde
+        // `equippedTo`. ATACANTE solo vale dentro de EQUIPO_ANTES_DE_ATACAR, que deja al portador
+        // en un transitorio; esto sirve en cualquier trigger del equipo -su fin de turno, por
+        // ejemplo- y es lo que permite que un contador salga en la carta que se ve en el tablero
+        // y no en la Ayuda, que está anexada y no se ve.
+        if (spec.quien === 'PORTADOR') {
+            const _id = selfCard && selfCard.equippedTo;
+            if (!_id) return [];
+            const _todas = [...game.players.p1.vanguard, ...game.players.p1.rearguard,
+                            ...game.players.p2.vanguard, ...game.players.p2.rearguard];
+            const _h = _todas.find(c => c.instanceId === _id);
+            return _h ? [_h] : [];
+        }
         // selfLista: cartas en mesa cuyo instanceId está en la lista guardada en la
         // propia carta (p. ej. Esfuerzo dividido con chosenAllies). Ignora bandos.
         if (spec.selfLista) {
@@ -9395,6 +9439,10 @@ const DSL = {
                 }
                 if (m.atk) hostCard.currentAtk += m.atk;
                 if (m.def) hostCard.currentDef += m.def;
+                // Inmunidad a estados alterados mientras lo lleve puesto (Hagoromo). Se reimpone
+                // en CADA pasada, como los stats, porque updatePassives la apaga antes de correr
+                // las pasivas: así se cae sola al desequipar, sin tener que acordarse de limpiarla.
+                if (m.inmuneAEstados) hostCard.inmuneAEstados = true;
             };
         }
 
