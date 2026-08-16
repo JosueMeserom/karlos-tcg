@@ -3171,13 +3171,16 @@ const CARD_DB = [
         abilities: [
             { trigger: "JUGAR", requisitos: [
                 { count: { filtros: [ { campo: "furor", op: ">=", valor: 2 } ] }, op: ">=", valor: 1, msg: "No tienes ningún aliado con 2 o más de Furor para pagar el coste." } ] },
-            { trigger: "AL_USAR_AYUDA",
-              requisitosObjetivo: [
-                { campo: "furor", op: ">=", valor: 2, msg: "El objetivo debe tener al menos 2 de Furor." } ],
+            // Mismo camino unico que Espada V y las otras ocho (ver su nota).
+            { trigger: "AL_EQUIPAR",
               efectos: [
-                { op: "MODIFICAR_STAT", stat: "furor", delta: -2, esCoste: true,
-                  log: "¡{objetivo} canaliza maná puro y se equipa con {carta}!" },
-                { op: "EQUIPAR", soloAnexar: true } ] }
+                { op: "ELEGIR", de: "ALIADOS", cantidad: 1,
+                  filtros: [ { campo: "furor", op: ">=", valor: 2 } ],
+                  titulo: "¿QUIÉN CANALIZA EL MANÁ?",
+                  efectos: [
+                    { op: "MODIFICAR_STAT", stat: "furor", delta: -2, esCoste: true,
+                      log: "¡{objetivo} canaliza maná puro y se equipa con {carta}!" },
+                    { op: "EQUIPAR" } ] } ] }
         ],
         onEquipUpdate: function(equipCard, hostCard, game) {
             // Gracias al cambio en index.html, esta bandera hace el trabajo sucio
@@ -3213,22 +3216,23 @@ const CARD_DB = [
             { trigger: "JUGAR", requisitos: [
                 { de: "JUGADOR", campo: "espadaV_Used", op: "falsy", msg: "Ya has empuñado la Espada V en esta partida." },
                 { count: { filtros: [ { o: [ [ { campo: "name", op: "contieneTexto", valor: "Karlos" } ], [ { campo: "name", op: "contieneTexto", valor: "Agah" } ] ] } ] }, op: ">=", valor: 1, msg: "No hay ningún Karlos ni Agah aliado en el campo." } ] },
-            // AL_USAR_AYUDA (no AL_EQUIPAR): la vieja usaba onValidateTarget/onExecuteAyuda
-            // -selección-en-tablero directa sobre la carta, sin ELEGIR-, y ese pipeline
-            // (executeAyuda en index.html) es quien mueve la carta jugada de la mano a
-            // descartes SIEMPRE que onExecuteAyuda devuelva true — el propio EQUIPAR (con
-            // soloAnexar) no toca la mano. Mismo patrón exacto que Infusión de maná (arriba):
-            // el equipo queda a la vez anexado (equippedCards, con su buff) y físicamente en
-            // descartes (location:'discard'). Es una rareza del motor, no un bug de esta
-            // carta en concreto: se replica fielmente en vez de "limpiarla" en la migración.
-            { trigger: "AL_USAR_AYUDA",
+            // UN SOLO CAMINO PARA EQUIPARSE (Toto, 16-ago-2026). Esta carta iba por
+            // AL_USAR_AYUDA + `soloAnexar`, donde el op solo anexa y de la mano y el `location` se
+            // encarga el motor de Ayudas; las otras ocho van por AL_EQUIPAR + ELEGIR, donde el op
+            // lo hace todo. Hacían lo mismo: la división era historica -su version imperativa
+            // usaba targeting en tablero y la migracion la replico fiel en vez de unificarla-, y
+            // tener dos flujos para lo mismo ya costo un bug (el retarget de la presentacion al
+            // portador vivia solo en uno de los dos). Ahora las diez van por el mismo sitio.
+            { trigger: "AL_EQUIPAR",
               mientrasEquipado: { atk: 2 },
-              requisitosObjetivo: [
-                { o: [ [ { campo: "name", op: "contieneTexto", valor: "Karlos" } ], [ { campo: "name", op: "contieneTexto", valor: "Agah" } ] ], msg: "Solo puede equiparse a Karlos o Agah." } ],
               efectos: [
-                { op: "MARCAR_JUGADOR", campo: "espadaV_Used", valor: true },
-                { op: "EQUIPAR", soloAnexar: true,
-                  log: "{objetivo} empuña la mítica Espada V." } ] }
+                { op: "ELEGIR", de: "ALIADOS", cantidad: 1,
+                  filtros: [ { o: [ [ { campo: "name", op: "contieneTexto", valor: "Karlos" } ], [ { campo: "name", op: "contieneTexto", valor: "Agah" } ] ] } ],
+                  titulo: "¿QUIÉN EMPUÑA LA ESPADA V?",
+                  efectos: [
+                    { op: "MARCAR_JUGADOR", campo: "espadaV_Used", valor: true },
+                    { op: "EQUIPAR",
+                      log: "{objetivo} empuña la mítica Espada V." } ] } ] }
         ],
     },
     {

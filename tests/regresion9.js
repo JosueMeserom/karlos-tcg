@@ -22,7 +22,13 @@ const escenarios = [
         p2: { vanguardia: ['Mini-tigre'] },
         pasos: [
             { jugar: 'Infusión de maná' },
-            { seleccionar: 'Oso con armadura' },
+            // UNIFICACIÓN DE EQUIPOS (16-ago-2026): la carta pasó de AL_USAR_AYUDA -clic directo
+            // sobre el objetivo en el tablero- a AL_EQUIPAR + ELEGIR, el camino por el que ya iban
+            // las otras ocho equipables. Para el jugador es el mismo gesto (reborde verde en el
+            // tablero: un ELEGIR con `de: "ALIADOS"` usa pickBoardTargets), pero el arnés lo ve
+            // como otra interacción, de ahí `elegir` en vez de `seleccionar`.
+            { elegir: ['Oso con armadura'], soloEn: 'nueva' },
+            { seleccionar: 'Oso con armadura', soloEn: 'vieja' },
         ],
         logsIntencionados: [
             { de: 'se equipa con Infusión de maná!', a: 'se equipa con Infusión de maná de J1 (Jugador 1)!', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado' },
