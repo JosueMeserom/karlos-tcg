@@ -110,6 +110,36 @@ const contador = (c, k) => (c.counters && c.counters[k] && c.counters[k].count) 
             'status=' + JSON.stringify(tigre.status));
     }
 
+    console.log('\n--- Hagoromo sobre Zoe (calcinante): le corta su propio Daño por tiempo ---');
+    {
+        // Idea de Toto (16-ago-2026). JUSTICIERA ABRASADORA se aplica Daño por tiempo A SÍ MISMA
+        // tras combatir, y su pasiva convierte ese daño en curación y +2 de Def. Con el Hagoromo
+        // puesto, ese autoaplicado pasa por applyStatus como cualquier otro y se bloquea — o sea
+        // que el Hagoromo le QUITA un beneficio en vez de protegerla. Es consecuente con las
+        // reglas, pero es una interacción que conviene tener fijada por escrito y no descubrir
+        // jugando: si algún día se decide que Zoe debe ser la excepción, esta prueba lo dirá.
+        const { g, paso } = await mesa({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'Zoe (calcinante)', furor: 2 }], mano: ['Hagoromo'] },
+            p2: { vanguardia: ['Aniceto'] },
+        });
+        const zoe = buscar(g, 'p1', 'Zoe (calcinante)');
+        const defSinDot = zoe.currentDef;
+        g.applyStatus(zoe, 'dot', 2, zoe);
+        g.updatePassives();
+        check('sin Hagoromo, su propio Daño por tiempo le entra y le da +2 de Def',
+            !!(zoe.status && zoe.status.dot) && zoe.currentDef === defSinDot + 2,
+            'def=' + zoe.currentDef + ' base=' + defSinDot + ' status=' + JSON.stringify(zoe.status));
+
+        zoe.status = {};
+        await paso({ jugar: 'Hagoromo' });
+        await paso({ elegir: ['Zoe (calcinante)'] });
+        g.updatePassives();
+        g.applyStatus(zoe, 'dot', 2, zoe);
+        check('con Hagoromo puesto, ya no se lo puede aplicar ni a sí misma',
+            !(zoe.status && zoe.status.dot), 'status=' + JSON.stringify(zoe.status));
+    }
+
     console.log('\n' + (fallos
         ? `SUITE equipos_serie1: ${comprobaciones - fallos}/${comprobaciones} comprobaciones — ${fallos} FALLOS`
         : `SUITE equipos_serie1: ${comprobaciones}/${comprobaciones} comprobaciones — HAGOROMO CORRECTO`));
