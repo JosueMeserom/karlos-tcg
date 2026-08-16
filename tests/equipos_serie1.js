@@ -55,6 +55,8 @@ const contador = (c, k) => (c.counters && c.counters[k] && c.counters[k].count) 
         await paso({ jugar: 'Hagoromo' });
         await paso({ elegir: ['Mini-tigre'] });
         g.updatePassives();
+        check('el aliado TRIBUTA 1 de Furor (es Coste, no Requisito)', tigre.furor === 1,
+            'furor=' + tigre.furor + ' (partia de 2)');
         check('cura 2 de Vida al equiparse', tigre.currentHp === 3, 'vida=' + tigre.currentHp);
         check('+1 de Def mientras lo lleve', tigre.currentDef === defBase + 1,
             'def=' + tigre.currentDef + ' base=' + defBase);
@@ -108,6 +110,22 @@ const contador = (c, k) => (c.counters && c.counters[k] && c.counters[k].count) 
         check('al equiparlo se le limpian los estados que tuviera',
             !(tigre.status && tigre.status.dot && tigre.status.dot.duration > 0),
             'status=' + JSON.stringify(tigre.status));
+    }
+
+    {
+        // La otra mitad de que sea un COSTE: sin Furor con el que pagar, la carta no se puede
+        // jugar. Un Requisito se comprobaría igual, pero no dejaría a nadie a 0 al usarla.
+        const { g, paso } = await mesa({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'Mini-tigre', furor: 0, vida: 1 }], mano: ['Hagoromo'] },
+            p2: { vanguardia: ['Aniceto'] },
+        });
+        const tigre = buscar(g, 'p1', 'Mini-tigre');
+        await paso({ jugar: 'Hagoromo' });
+        check('sin Furor con el que pagar, no se equipa a nadie', (tigre.equippedCards || []).length === 0,
+            'equipos=' + (tigre.equippedCards || []).length);
+        check('...y el Hagoromo sigue en la mano', g.players.p1.hand.some(c => c.name === 'Hagoromo'),
+            'mano=' + g.players.p1.hand.map(c => c.name).join(','));
     }
 
     console.log('\n--- Hagoromo sobre Zoe (calcinante): le corta su propio Daño por tiempo ---');

@@ -2881,23 +2881,26 @@ const CARD_DB = [
     },
     {
         id: 2001, name: "Hagoromo", type: "Ayuda", subtype: "Vestimenta", tags: ["Equipable"], rarity: "S", cost: 0, series: 1,
-        // Requisito visible: a quién señala la flecha lima al presentarse (§14.bis). Aquí el
-        // aliado no pierde nada -solo tiene que tener Furor-, así que es Requisito, no Coste.
-        requisitoVisible: [ { quien: "ALIADO", filtros: [ { campo: "furor", op: ">=", valor: 1 } ], uno: true } ],
-        text: "Requiere un aliado con 1 o más de Furor. Anéxasela y cúrale 2 de Vida: +1 de Def e inmune a los estados alterados mientras la lleve. Al equiparla, se le eliminan los estados alterados que tuviera.",
+        // COSTE, no Requisito (Toto, 16-ago-2026): el aliado no "tiene" 1 de Furor, lo PAGA.
+        // Lo leí del CSV como una condición y es un pago, que es la diferencia que separa las
+        // dos cajas del detalle. Mismo trato que Té helado, y por eso no lleva requisitoVisible:
+        // la flecha la pone sola el `esCoste` del tributo, en rojo y con su "Tributa 1 FUR".
+        text: "Coste: 1 de Furor. Anéxasela al aliado que tributó y cúrale 2 de Vida: +1 de Def e inmune a los estados alterados mientras la lleve. Al equiparla, se le eliminan los estados alterados que tuviera.",
         abilities: [
             { trigger: "JUGAR", requisitos: [
                 { count: { filtros: [ { campo: "furor", op: ">=", valor: 1 } ] }, op: ">=", valor: 1,
-                  msg: "Necesitas un aliado con al menos 1 de Furor." } ] },
+                  msg: "Necesitas un aliado con al menos 1 de Furor para pagar el Hagoromo." } ] },
             { trigger: "AL_EQUIPAR",
               // `inmuneAEstados` lo reimpone onEquipUpdate en cada pasada de updatePassives, igual
               // que los stats: así se cae sola al desequipar sin tener que limpiarla a mano.
               mientrasEquipado: { def: 1, inmuneAEstados: true },
               efectos: [
-                { op: "ELEGIR", de: "ALIADOS", cantidad: 1, esRequisito: true,
+                { op: "ELEGIR", de: "ALIADOS", cantidad: 1,
                   filtros: [ { campo: "furor", op: ">=", valor: 1 } ],
-                  titulo: "¿QUIÉN VISTE EL HAGOROMO?",
+                  titulo: "¿QUIÉN TRIBUTA Y VISTE EL HAGOROMO?",
                   efectos: [
+                    // Paga y se lo pone EL MISMO aliado, como en Té helado: una sola elección.
+                    { op: "MODIFICAR_STAT", stat: "furor", delta: -1, esCoste: true },
                     // ORDEN: limpiar, equipar y curar AL FINAL. Un CURAR sobre alguien con la
                     // Vida llena devuelve 'skip' y ABORTA el resto de la cadena, así que puesto
                     // primero dejaba a un aliado sano sin limpieza y sin Hagoromo — la carta no
