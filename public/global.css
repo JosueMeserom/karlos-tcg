@@ -22,17 +22,25 @@
     --banner-alto: 84px;
     --stack-offset: 210px;
 
-    /* ===== LOS DOS MANDOS DE LA COLUMNA DERECHA =====================================
+    /* ===== LOS MANDOS DE LA COLUMNA DERECHA =========================================
        Se tocan SOLO aquí: el JS los lee de aquí, no lleva copia propia.
          --ui-top-base : a cuántos px del borde superior arranca la caja de turno+botones.
-                         Súbelo para bajarla. Tope duro: ~150px, donde acaba la mano de J2.
+                         Súbelo para bajarla. Topes: la mano de J2 arriba (~150px) y la de
+                         J1 abajo.
          --cp-centro   : dónde cae el CENTRO del rectángulo de detalle, en % de la altura.
-                         50% = la línea que separa los campos, que es donde va. El banner
-                         de cambio de fase ya no llega hasta aquí (ver #phase-banner).
+                         50% sería la línea que separa los campos. Crece simétrico desde ahí.
        Si un detalle no cabe entre los dos, _acomodarColumnaDerecha() reparte el déficit
        sola: no hace falta tocar nada más. ============================================ */
-    --ui-top-base: 300px;
-    --cp-centro: 50%;
+    /* --col-abajo : QUIÉN de los dos va DEBAJO. `botones` o `detalle`, nada más. Lo lee
+                     _acomodarColumnaDerecha() y con eso invierte la columna entera, topes
+                     incluidos. Al invertir hay que darle la vuelta también a los dos
+                     valores de abajo; los dos juegos que funcionan están anotados. */
+    --col-abajo: botones;
+
+    /* JUEGO ACTUAL - detalle arriba, botones debajo:   botones 700px · centro 36%
+       EL OTRO JUEGO - botones arriba, detalle debajo:  botones 300px · centro 50%   */
+    --ui-top-base: 700px;
+    --cp-centro: 36%;
 }
 
 body {

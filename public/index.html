@@ -5124,9 +5124,9 @@
             }
 
             // Hueco para el detalle SIN mover nada mientras quepa. Si no cabe, el déficit se reparte
-            // entre los dos bloques -bajando el centro del detalle y subiendo la zona de botones-, en
-            // vez de empujar solo a uno (petición de Toto: que la zona de botones se mueva lo mínimo,
-            // que es pequeña pero importantísima). Los topes son la mano de J2 arriba y la de J1 abajo.
+            // entre los dos bloques en vez de empujar solo a uno. CUÁL va arriba y cuál abajo lo dice
+            // `--col-abajo` en :root, junto a los otros dos mandos; esta función sirve a los dos
+            // órdenes. Los topes son la mano de J2 arriba y la de J1 abajo.
             _acomodarColumnaDerecha(altoDetalle) {
                 const panel = document.getElementById('card-preview');
                 const ui = document.getElementById('ui-layer');
@@ -5145,17 +5145,29 @@
                 const _c = _raiz.getPropertyValue('--cp-centro').trim();
                 const CENTRO_PX = _c.endsWith('%') ? VH * parseFloat(_c) / 100 : (parseFloat(_c) || VH * 0.58);
                 const altoUi = ui.getBoundingClientRect().height;
+                // Quién va debajo. La regla de reparto es UNA y sirve para las dos disposiciones:
+                // antes estaba escrita dando por hecho "botones arriba, detalle debajo", y con eso
+                // invertir la columna habría sido reescribirla, no cambiar un valor.
+                const detalleAbajo = _raiz.getPropertyValue('--col-abajo').trim() === 'detalle';
                 let uiTop = UI_BASE, centro = CENTRO_PX;
-                // Lo que le falta al detalle por arriba respecto al fondo de la zona de botones.
-                const deficit = (uiTop + altoUi + AIRE) - (centro - h / 2);
+
+                // Los dos bordes que se tocan: el fondo del de arriba y el techo del de abajo.
+                const finArriba = detalleAbajo ? uiTop + altoUi : centro + h / 2;
+                const iniAbajo = detalleAbajo ? centro - h / 2 : uiTop;
+                const deficit = finArriba + AIRE - iniAbajo;
                 if (deficit > 0) {
-                    // Mitad bajando el detalle (topado por la mano de abajo), el resto subiendo los
-                    // botones (topados por la mano de arriba). Lo que no quepa, no cabe: el panel tiene
-                    // su propio overflow y esos detalles son excepcionales.
-                    const bajaMax = Math.max(0, suelo - (centro + h / 2));
+                    // Se reparte a medias: el de abajo baja y el de arriba sube, cada uno topado por
+                    // su mano (petición de Toto: que la zona de botones se mueva lo mínimo, que es
+                    // pequeña pero importantísima). Lo que no quepa, no cabe: el panel tiene su
+                    // propio overflow y esos detalles son excepcionales.
+                    const bajaMax = detalleAbajo ? Math.max(0, suelo - (centro + h / 2))
+                                                 : Math.max(0, suelo - (uiTop + altoUi));
+                    const subeMax = detalleAbajo ? Math.max(0, uiTop - techo)
+                                                 : Math.max(0, (centro - h / 2) - techo);
                     const baja = Math.min(deficit / 2, bajaMax);
-                    centro += baja;
-                    uiTop = Math.max(techo, uiTop - (deficit - baja));
+                    const sube = Math.min(deficit - baja, subeMax);
+                    if (detalleAbajo) { centro += baja; uiTop -= sube; }
+                    else { uiTop += baja; centro -= sube; }
                 }
                 panel.style.setProperty('--cp-top', centro + 'px');
                 ui.style.setProperty('--ui-top', uiTop + 'px');
