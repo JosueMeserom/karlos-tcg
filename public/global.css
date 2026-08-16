@@ -39,8 +39,8 @@
 
     /* JUEGO ACTUAL - detalle arriba, botones debajo:   botones 700px · centro 36%
        EL OTRO JUEGO - botones arriba, detalle debajo:  botones 300px · centro 50%   */
-    --ui-top-base: 700px;
-    --cp-centro: 36%;
+    --ui-top-base: 780px;
+    --cp-centro: 44%;
 }
 
 body {
