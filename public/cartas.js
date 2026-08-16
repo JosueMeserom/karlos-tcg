@@ -2914,6 +2914,50 @@ const CARD_DB = [
         ],
     },
     {
+        id: 2002, name: "Guantes sedientos", type: "Ayuda", subtype: "Arma", tags: ["Equipable", "melé"], rarity: "B", cost: 0, series: 1,
+        text: "Anéxasela a un aliado: cada vez que haga daño con un ataque normal, se cura esa cantidad de Vida, hasta 1. Al cabo de 3 turnos deja de curarle y pasa a darle +2 de Atq.",
+        abilities: [
+            { trigger: "AL_EQUIPAR",
+              efectos: [
+                { op: "ELEGIR", de: "ALIADOS", cantidad: 1,
+                  titulo: "¿QUIÉN SE CALZA LOS GUANTES SEDIENTOS?",
+                  efectos: [
+                    { op: "EQUIPAR",
+                      floats: [ { texto: "GUANTES SEDIENTOS", estilo: "ft-ability", offset: -40 } ],
+                      log: "{objetivo} se calza los Guantes sedientos: beben de cada golpe." },
+                    // El contador va sobre el PORTADOR, no sobre la Ayuda: la Ayuda queda anexada
+                    // y no se ve en el tablero, así que su badge no lo miraría nadie. Petición de
+                    // Toto (16-ago-2026): que se vea cuánto queda para el cambio.
+                    { op: "MODIFICAR_CONTADORES", target: { quien: "PORTADOR" }, contador: "guantes_sed",
+                      delta: 3, nombreContador: "Turnos de sed", icono: "🩸" } ] } ] },
+            // Mientras queden turnos de sed, bebe de cada golpe. El `si` se evalúa sobre el
+            // ATACANTE (que es quien lleva los guantes), de ahí la ruta con puntos al contador.
+            // `siDanoMinimo: 0.5` y no 1: el mínimo del juego NO es 1 -un Esbirro que golpea a un
+            // Personaje hace 0,5-. Y se cura LO QUE HIZO con tope de 1, en vez de un 1 fijo, para
+            // que ese medio golpe cure medio (Toto, 16-ago-2026).
+            { trigger: "TRAS_ATACAR", soloAtaqueNormal: true, siDanoMinimo: 0.5,
+              si: { campo: "counters.guantes_sed.count", op: ">", valor: 0 },
+              efectos: [
+                { op: "CURAR", valor: { REF: "vars.dano" }, maximo: 1, target: { quien: "SELF" },
+                  floating: "SED", floatingStyle: "ft-green",
+                  log: "Los Guantes sedientos beben del golpe y {objetivo} se refresca." } ] },
+            // El tic. Los equipos no entraban en la fase de efectos finales; ahora sí (index.html).
+            { trigger: "FIN_TURNO",
+              resumenFase: "Les queda un turno menos de sed a los Guantes sedientos",
+              si: { campo: "counters.guantes_sed.count", op: ">", valor: 0, de: "PORTADOR" },
+              efectos: [
+                { op: "MODIFICAR_CONTADORES", target: { quien: "PORTADOR" }, contador: "guantes_sed",
+                  delta: -1, nombreContador: "Turnos de sed", icono: "🩸" } ] }
+        ],
+        // El +2 de Atq no cabe en `mientrasEquipado`, que es un objeto FIJO: solo vale cuando el
+        // contador llega a 0. onEquipUpdate corre en cada pasada de updatePassives -es el mismo
+        // sitio donde vivirían unos stats fijos-, así que la condición se reevalúa sola.
+        onEquipUpdate: function (equipCard, hostCard, game) {
+            const c = hostCard.counters && hostCard.counters.guantes_sed;
+            if (!c || c.count <= 0) hostCard.currentAtk += 2;
+        },
+    },
+    {
         name: "Shichishito", type: "Ayuda", subtype: "Arma legendaria", tags: ["Equipable", "melé"], rarity: "A", cost: 0, series: 1,
         // Requisito visible: a quién señala la flecha lima al presentarse (§14.bis).
         requisitoVisible: [ { quien: "ALIADO", zona: "vanguardia", filtros: [ { campo: "name", op: "contieneTexto", valor: "Karlos" }, { campo: "type", op: "==", valor: "Personaje" } ], uno: true } ],
@@ -7549,6 +7593,20 @@ const DSL = {
     // carta acaba a la vez en la pila y en `equippedCards` del objetivo. Eso es lo que dejaba a
     // Shichishito volando al descarte sin que Karlos la equipara, y a Espada V poblando la pila
     // un instante antes de aparecer bien puesta (Toto, 13-ago-2026).
+    // Una Ayuda que se EQUIPA no viaja a la pila de descartes: su presentación termina EN QUIEN
+    // SE LA PONE. Es de cajón -si algo se equipa, se coloca detrás de su portador- y aun así se
+    // ha colado dos veces, porque el retarget vivía SOLO en executeAyuda (el camino de Espada V,
+    // donde el objetivo se conoce antes de jugar la carta). Las que equipan con AL_EQUIPAR +
+    // ELEGIR -Shichishito, Hagoromo, Guantes sedientos- eligen portador DENTRO de la cadena y no
+    // pasan por ahí, así que volaban al descarte y se anexaban después (Toto, 16-ago-2026).
+    // Ahora la regla vive aquí y la llaman los dos caminos, que es lo que impide que vuelva.
+    _presentaHaciaElPortador(game, sourceCard, portador) {
+        if (!game || !portador || !game._presentacionArmada) return;
+        if (!DSL._esEquipo(DSL._tmpl(sourceCard.id))) return;
+        game._presentacionArmada.destino = `.card[data-id="${portador.instanceId}"]`;
+        game._presentacionArmada.fundirEn = null;   // no se funde con ninguna pila: aterriza encima
+    },
+
     _esEquipo(tmpl) {
         if (!tmpl || !Array.isArray(tmpl.abilities)) return false;
         const hay = (lista) => (lista || []).some(e =>
@@ -7618,7 +7676,11 @@ const DSL = {
     },
 
     async _doEffect(e, sourceCard, target, game, ownerId, habilidad) {
-        const ctx = { self: sourceCard, objetivo: target };
+        // `vars` en el contexto (Toto, 16-ago-2026): sin esto un `{REF:"vars.x"}` dentro de un
+        // efecto normal no resolvía y llegaba undefined -curar {REF:"vars.dano"} dejaba la Vida en
+        // NaN-. FIJAR_STAT ya se lo construía a mano por su cuenta; ahora lo tienen todos igual.
+        const ctx = { self: sourceCard, objetivo: target,
+                      vars: (DSL._vars && DSL._vars[sourceCard.instanceId]) || {} };
         if (e.guardaNombre && target) { DSL._vars = DSL._vars || {}; (DSL._vars[sourceCard.instanceId] = DSL._vars[sourceCard.instanceId] || {})[e.guardaNombre] = DSL._nombre(game, target); }
         if (e.op === 'MODIFICAR_STAT') {
             let d = DSL._deltaStat(e, sourceCard, target, game, ownerId, ctx);
@@ -7715,6 +7777,10 @@ const DSL = {
                 return true;
             }
             let amount = DSL._value(ownerId, game, e.valor, sourceCard, ctx);
+            // `maximo`: tope de la curación. Con `valor: {REF:"vars.dano"}` expresa "cúrate lo que
+            // hiciste, hasta N" — necesario desde que el daño puede ser 0,5 y un `valor: 1` fijo
+            // curaría de más en ese caso.
+            if (typeof e.maximo === 'number' && typeof amount === 'number') amount = Math.min(amount, e.maximo);
             if (e.conBeforeHealed === false) {
                 // Variante simple (grupal): sin passthrough ni tope manual (el motor capa la vida); salta ilesos.
                 if (e.soloSiHerido && target.currentHp >= target.maxHp) return 'skip';
@@ -8570,6 +8636,10 @@ const DSL = {
                 // guardaIdsEnSelf: como el anterior pero con TODOS los elegidos, como
                 // array (Esfuerzo dividido: chosenAllies; lo leen AURA/_pool soloSelfLista).
                 if (e.guardaIdsEnSelf) sourceCard[e.guardaIdsEnSelf] = lista.map(x => x.instanceId);
+                // El portador ya se conoce: si esta carta se equipa, su presentación deja de
+                // apuntar a la pila de descartes. Va ANTES del marcaje de coste porque el primer
+                // efecto no-ELEGIR de la cadena ya dispara la presentación.
+                DSL._presentaHaciaElPortador(game, sourceCard, lista[0]);
                 if (e.esCoste || e.esRequisito) DSL._marcarCoste(game, lista, e.esRequisito ? 'requisito' : 'coste');
                 if (e.esTributo) for (const x of lista) DSL._marcarCoste(game, [x], 'tributo', `Tributa ${Math.abs(e.esTributo)} FUR`);
             };
@@ -9730,6 +9800,13 @@ const DSL = {
                 // anuncia y drena si al enemigo le queda Furor que quitar.
                 if (trasAtacar.siObjetivo && !(defender && DSL._match(defender, trasAtacar.siObjetivo))) return;
                 if (trasAtacar.si && !DSL._cond(attacker, game, trasAtacar.si)) return;
+                // El daño REALMENTE infligido, como var (Toto, 16-ago-2026). Hacía falta porque el
+                // mínimo NO es 1: un Esbirro que golpea a un Personaje hace 0,5 (index.html), y hay
+                // cartas cuyo efecto debe escalarse con lo que de verdad hizo, no con un 1 fijo.
+                if (hpAntes !== undefined && defender) {
+                    DSL._vars = DSL._vars || {};
+                    (DSL._vars[attacker.instanceId] = DSL._vars[attacker.instanceId] || {}).dano = hpAntes - defender.currentHp;
+                }
                 if (trasAtacar.log) game.logMsg(DSL._fill(trasAtacar.log, { carta: attacker.name, objetivo: defender ? DSL._nombre(game, defender) : '' }), trasAtacar.logTipo || 'ability');
                 await DSL._runEffectList(trasAtacar.efectos || [], attacker, game, attacker.owner, [defender], _nombreHab(trasAtacar));
             };

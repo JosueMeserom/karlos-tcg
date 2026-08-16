@@ -7228,9 +7228,10 @@
                 // Una Ayuda que se EQUIPA no se descarta: la coloca EQUIPAR sacándola de la mano
                 // (ver DSL._esEquipo). Y su presentación termina EN EL OBJETIVO, no en la pila.
                 const _equipa = typeof DSL !== 'undefined' && DSL._esEquipo && DSL._esEquipo(template);
-                if (_equipa && this._presentacionArmada && target) {
-                    this._presentacionArmada.destino = `.card[data-id="${target.instanceId}"]`;
-                }
+                // Misma regla que el camino AL_EQUIPAR + ELEGIR, y por eso vive en un solo sitio:
+                // tenerla escrita dos veces es lo que hizo que a las que eligen portador dentro de
+                // la cadena se les olvidara (ver DSL._presentaHaciaElPortador).
+                if (typeof DSL !== 'undefined' && DSL._presentaHaciaElPortador) DSL._presentaHaciaElPortador(this, card, target);
                 if (!_equipa && this._presentacionArmada) {
                     this._presentacionArmada.colocar = () => {
                         const i = p.hand.findIndex(c => c.instanceId === card.instanceId);
@@ -7856,6 +7857,13 @@
                             if (result && result.dmgMod) dmgModifier += result.dmgMod;
                         }
                     }
+                    // Foto de la Vida del defensor ANTES del golpe, para el `siDanoMinimo` de un
+                    // TRAS_ATACAR declarado en un EQUIPO (Guantes sedientos). La pone normalmente
+                    // el onBeforeAttack del propio atacante, pero solo si ES ÉL quien declara el
+                    // trigger; si lo declara el arma que lleva puesta, nadie la tomaba. Es un
+                    // número y solo lo lee quien declara `siDanoMinimo`, así que ponerlo aquí no
+                    // afecta a nadie más.
+                    if (currentDefender) attacker._dslHpEnemigoAntes = currentDefender.currentHp;
                 }
 
                 const template = getCardTemplate(attacker.id);
@@ -7925,6 +7933,14 @@
                 const attTemplate = getCardTemplate(attacker.id);
                 if (typeof attTemplate.onAfterAttack === 'function') {
                     await attTemplate.onAfterAttack(attacker, currentDefender, this);
+                }
+                // Y los EQUIPOS que lleve puestos, con el ATACANTE como carta fuente y no el
+                // arma: así un TRAS_ATACAR declarado en el equipo ve al portador en `SELF`, y su
+                // `si` se evalúa sobre quien de verdad ha atacado. Mismo hueco que tenían con el
+                // fin de turno: un equipo no está en ninguna fila, vive en `equippedCards`.
+                for (const eq of [...(attacker.equippedCards || [])]) {
+                    const _eqT = getCardTemplate(eq.id);
+                    if (_eqT && typeof _eqT.onAfterAttack === 'function') await _eqT.onAfterAttack(attacker, currentDefender, this);
                 }
 
                 attacker.exhausted = true;

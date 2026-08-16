@@ -1,6 +1,5 @@
-// tests/equipos_serie1.js — Hagoromo, la primera Ayuda equipable nueva de la Serie 1
-// (16-ago-2026). Guantes sedientos entra en cuanto tenga su pieza de motor (los equipos no
-// participan todavía en los triggers de ataque), y esta suite crece con ella.
+// tests/equipos_serie1.js — Hagoromo y Guantes sedientos, las dos primeras Ayudas equipables
+// nuevas de la Serie 1 (16-ago-2026).
 //
 // Aserciones directas, no viejo-vs-nuevo: son cartas NUEVAS, no existen en la base congelada, así
 // que no hay con qué comparar. Lo que se fija aquí es su contrato y, sobre todo, las tres piezas
@@ -158,8 +157,92 @@ const contador = (c, k) => (c.counters && c.counters[k] && c.counters[k].count) 
             !(zoe.status && zoe.status.dot), 'status=' + JSON.stringify(zoe.status));
     }
 
+    console.log('\n--- Guantes sedientos: 3 turnos bebiendo, luego +2 de Atq ---');
+    {
+        const { g, paso } = await mesa({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'Karlos', vida: 3 }], mano: ['Guantes sedientos'] },
+            p2: { vanguardia: [{ carta: 'Guardaespaldas', vida: 9 }] },
+        });
+        const karlos = buscar(g, 'p1', 'Karlos');
+        const atkBase = karlos.currentAtk;
+        await paso({ jugar: 'Guantes sedientos' });
+        await paso({ elegir: ['Karlos'] });
+        g.updatePassives();
+        check('el contador entra con 3 y vive en el PORTADOR, no en la Ayuda',
+            contador(karlos, 'guantes_sed') === 3, 'contador=' + contador(karlos, 'guantes_sed'));
+        check('el contador tiene nombre e icono para el badge',
+            !!(karlos.counters.guantes_sed.name && karlos.counters.guantes_sed.icon)
+            || !!(karlos.counters.guantes_sed.nombre && karlos.counters.guantes_sed.icono),
+            JSON.stringify(karlos.counters.guantes_sed));
+        check('todavía NO da el +2 de Atq (aún tiene sed)', karlos.currentAtk === atkBase,
+            'atk=' + karlos.currentAtk + ' base=' + atkBase);
+
+        // El golpe: es la pieza de motor nueva (un TRAS_ATACAR declarado en un EQUIPO).
+        const vidaAntes = karlos.currentHp;
+        await paso({ atacar: 'Karlos', objetivo: 'Guardaespaldas' });
+        check('al golpear con un ataque normal, los guantes le curan 1 de Vida',
+            karlos.currentHp === vidaAntes + 1, 'vida=' + karlos.currentHp + ' antes=' + vidaAntes);
+    }
+    {
+        // El tic de cada turno propio, la otra pieza nueva (los equipos en la fase de efectos
+        // finales), y el cambio de efecto al llegar a 0.
+        const { g, paso } = await mesa({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'Karlos', vida: 3 }], mano: ['Guantes sedientos'] },
+            p2: { vanguardia: [{ carta: 'Guardaespaldas', vida: 9 }] },
+        });
+        const karlos = buscar(g, 'p1', 'Karlos');
+        const atkBase = karlos.currentAtk;
+        await paso({ jugar: 'Guantes sedientos' });
+        await paso({ elegir: ['Karlos'] });
+        await paso({ finTurno: true }); await paso({ finTurno: true });
+        g.updatePassives();
+        check('tras un turno propio el contador baja a 2', contador(karlos, 'guantes_sed') === 2,
+            'contador=' + contador(karlos, 'guantes_sed'));
+        check('...y con sed todavía, sigue sin el +2 de Atq', karlos.currentAtk === atkBase,
+            'atk=' + karlos.currentAtk);
+        await paso({ finTurno: true }); await paso({ finTurno: true });
+        await paso({ finTurno: true }); await paso({ finTurno: true });
+        g.updatePassives();
+        check('a los 3 turnos propios el contador llega a 0', contador(karlos, 'guantes_sed') === 0,
+            'contador=' + contador(karlos, 'guantes_sed'));
+        check('...y entonces sí da el +2 de Atq', karlos.currentAtk === atkBase + 2,
+            'atk=' + karlos.currentAtk + ' base=' + atkBase);
+        // Y ya no bebe: el contador no puede bajar de 0 y la curación está condicionada a él.
+        const vidaAntes = karlos.currentHp;
+        await paso({ atacar: 'Karlos', objetivo: 'Guardaespaldas' });
+        check('saciados, ya no curan al golpear', karlos.currentHp === vidaAntes,
+            'vida=' + karlos.currentHp + ' antes=' + vidaAntes);
+        check('el contador no baja de 0', contador(karlos, 'guantes_sed') === 0,
+            'contador=' + contador(karlos, 'guantes_sed'));
+    }
+
+    {
+        // EL CASO QUE MOTIVÓ TODO (Toto, 16-ago-2026): el mínimo de daño del juego NO es 1. Un
+        // Esbirro que golpea a un Personaje hace 0,5, y entonces los guantes deben curar 0,5, no
+        // 1. La carta se diseñó dando por hecho el mínimo 1, como bastantes otras.
+        const { g, paso } = await mesa({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'Guardaespaldas', vida: 2 }], mano: ['Guantes sedientos'] },
+            // Karlos tiene 6 de Def y el Guardaespaldas 3 de Atq: atq - def <= 0, que es la
+            // condición exacta del mínimo (index.html). Esbirro contra Personaje -> 0,5.
+            p2: { vanguardia: [{ carta: 'Karlos', vida: 9 }] },
+        });
+        const esbirro = buscar(g, 'p1', 'Guardaespaldas');
+        await paso({ jugar: 'Guantes sedientos' });
+        await paso({ elegir: ['Guardaespaldas'] });
+        const vidaAntes = esbirro.currentHp;
+        const rivalAntes = buscar(g, 'p2', 'Karlos').currentHp;
+        await paso({ atacar: 'Guardaespaldas', objetivo: 'Karlos' });
+        const dano = rivalAntes - buscar(g, 'p2', 'Karlos').currentHp;
+        check('un Esbirro contra un Personaje hace 0,5 de daño', dano === 0.5, 'dano=' + dano);
+        check('...y los guantes le curan ESA cantidad, no 1', esbirro.currentHp === vidaAntes + 0.5,
+            'vida=' + esbirro.currentHp + ' antes=' + vidaAntes);
+    }
+
     console.log('\n' + (fallos
         ? `SUITE equipos_serie1: ${comprobaciones - fallos}/${comprobaciones} comprobaciones — ${fallos} FALLOS`
-        : `SUITE equipos_serie1: ${comprobaciones}/${comprobaciones} comprobaciones — HAGOROMO CORRECTO`));
+        : `SUITE equipos_serie1: ${comprobaciones}/${comprobaciones} comprobaciones — LOS DOS EQUIPOS CORRECTOS`));
     if (fallos) process.exit(1);
 })();
