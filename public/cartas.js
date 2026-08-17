@@ -1869,7 +1869,7 @@ const CARD_DB = [
                     // CANCELAR (Toto, 13-ago-2026): elegir CÓMO se paga sigue siendo una ventana
                     // cancelable -no ha cambiado nada todavía, la carta sigue en la mano-, así
                     // que §14 exige poder arrepentirse. `false` aborta la jugada sin coste.
-                    game.openChoiceModal('INVOCAR A WOLFGANG', [
+                    game.openChoiceModal('INVOCAR A WOLFGANG\n\nAtención: la presencia de Aniceto no te cuesta nada; descartar Manzanahoria te cuesta esa carta.', [
                         { label: 'USAR PRESENCIA DE ANICETO', action: () => { DSL._marcarCoste(game, _aniceto, 'requisito'); resolve(true); } },
                         { label: 'DESCARTAR MANZANAHORIA', action: () => { _pagarConManzanahoria(); resolve(true); } },
                         { label: 'CANCELAR', action: () => resolve(false) }
@@ -4786,7 +4786,7 @@ const CARD_DB = [
             if (mecasInHand.length > 0) {
                 // Preguntamos al jugador si quiere usar el de la mano o buscar en mazo
                 const choice = await new Promise(resolve => {
-                    game.openChoiceModal('¿DE DÓNDE LLAMAS AL MECA EBA?', [
+                    game.openChoiceModal('¿DE DÓNDE LLAMAS AL MECA EBA?\n\nAtención: tienes un Meca EBA en la mano. Si buscas en el mazo y no queda ninguno, te quedarás sin llamarlo.', [
                         { label: 'DESDE LA MANO', action: () => resolve('hand') },
                         { label: 'BUSCAR EN EL MAZO', action: () => resolve('deck') },
                         { label: 'CANCELAR', action: () => resolve('cancel') }
@@ -4953,7 +4953,7 @@ const CARD_DB = [
             let zona = enCampo.length ? 'CAMPO' : 'MANO';
             if (enCampo.length && enMano.length) {
                 zona = await new Promise(resolve => {
-                    game.openChoiceModal('¿DE DÓNDE SALE EL PILOTO?', [
+                    game.openChoiceModal('¿DE DÓNDE SALE EL PILOTO?\n\nDel campo gastas un aliado ya colocado; de la mano, una carta que aún no has jugado.', [
                         { label: 'DEL CAMPO', action: () => resolve('CAMPO') },
                         { label: 'DE LA MANO', action: () => resolve('MANO') },
                         { label: 'CANCELAR', action: () => resolve(null) },
@@ -6383,7 +6383,7 @@ const CARD_DB = [
                 // nada ha cambiado todavía—, así que §14 exige poder arrepentirse. Y con la
                 // opción puesta, clicar el velo del modal la dispara sola.
                 const choice = await new Promise(resolve => {
-                    game.openChoiceModal(`¿CÓMO COLOCAR A LIMO CRECIDO?`, [
+                    game.openChoiceModal('¿CÓMO COLOCAR A LIMO CRECIDO?\n\nEvolucionar destruye el Limo artificial, pero Limo crecido conserva sus bonos.', [
                         { label: 'EVOLUCIONAR LIMO ARTIFICIAL', action: () => resolve('evo') },
                         { label: 'COLOCAR COMO ESBIRRO NUEVO', action: () => resolve('nuevo') },
                         { label: 'CANCELAR', action: () => resolve('cancelar') }
