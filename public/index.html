@@ -536,6 +536,10 @@
                         onclick="game.openDiscardViewer('p1', event)">
                         DESCARTES <span class="count-badge" id="p1-discard-count">0</span>
                     </div>
+                    <!-- TEMPORAL: comparador A/B de la animacion de la pila. Se quita cuando
+                         Toto decida cual se queda (16-ago-2026). -->
+                    <div id="descarte-modo" style="left:20px; top:132px;"
+                         onclick="event.stopPropagation(); game.alternarModoDescarte()">MODO B</div>
                 </div>
             </div>
 
@@ -2201,6 +2205,8 @@
                 this.activePlayerId = 'p1';
                 this.startingPlayerId = 'p1';
                 this.phase = 'INICIO';
+                try { this._modoDescarte = localStorage.getItem('karlos_modo_descarte') || 'B'; }
+                catch (e) { this._modoDescarte = 'B'; }   // TEMPORAL: ver alternarModoDescarte
                 if (this.dslPick) { const r = this.dslPick.resolve; this.dslPick = null; r(null); }
                 this.selectedCard = null;
                 this.inputState = 'IDLE';
@@ -6466,6 +6472,18 @@
                 return out;
             }
 
+            // TEMPORAL (16-ago-2026): comparador de las dos versiones de la animacion de la pila
+            // de descartes. A = siempre un pulso. B = fundido cuando la pila NACE (de 0 a 1) y
+            // pulso el resto de las veces. Se recuerda entre recargas para poder ir probando.
+            alternarModoDescarte() {
+                this._modoDescarte = this._modoDescarte === 'A' ? 'B' : 'A';
+                try { localStorage.setItem('karlos_modo_descarte', this._modoDescarte); } catch (e) {}
+                const b = document.getElementById('descarte-modo');
+                if (b) b.innerText = 'MODO ' + this._modoDescarte;
+                this.logMsg(`[DEBUG] Animacion de la pila de descartes: modo ${this._modoDescarte}` +
+                    (this._modoDescarte === 'B' ? ' (fundido al nacer + pulso)' : ' (siempre pulso)'), 'debug');
+            }
+
             pintarReposoFase(text) {
                 const f = document.getElementById('cpr-fase'), b = document.getElementById('cpr-base');
                 if (!f || !b) return;
@@ -9901,6 +9919,26 @@
                 const discardCount = p.discard ? p.discard.length : 0;
                 document.getElementById(`${pid}-discard-count`).innerText = discardCount;
                 const discardEl = document.getElementById(`${pid}-discard-stack`);
+                // LA PILA ACUSA EL GOLPE. Una carta que se destruye, un Evento que expira o la
+                // que se queda atrás al evolucionar NO viajan al descarte: se desvanecen donde
+                // estaban y aparecen en la pila de la nada. Devolverles el viaje seria
+                // contradecir su propia animacion de destruccion, asi que reacciona la PILA.
+                // Se engancha aqui, donde ya se sabe el recuento, y no en cada carta que muere:
+                // asi cubre todos los caminos -destruccion, expiracion, evolucion- sin tocarlos.
+                this._descarteAnterior = this._descarteAnterior || {};
+                const _antes = this._descarteAnterior[pid];
+                this._descarteAnterior[pid] = discardCount;
+                if (_antes !== undefined && discardCount > _antes && !this.isSkippingAnim) {
+                    // Modo B (por defecto): si la pila NACE -de 0 a 1- se materializa entera con
+                    // un fundido, como la ranura de Evento al colocarse; si ya tenia cartas, solo
+                    // pega el pulso. Modo A: siempre el pulso. El toggle esta debajo de la pila.
+                    const _naceLaPila = _antes === 0 && this._modoDescarte !== 'A';
+                    const _clase = _naceLaPila ? 'descarte-nace' : 'descarte-pulso';
+                    discardEl.classList.remove('descarte-nace', 'descarte-pulso');
+                    void discardEl.offsetWidth;   // reinicia la animacion si caen dos seguidas
+                    discardEl.classList.add(_clase);
+                    setTimeout(() => discardEl.classList.remove(_clase), _naceLaPila ? 460 : 340);
+                }
 
                 const oldPrev = discardEl.querySelector('.card-preview-mini');
                 if (oldPrev) oldPrev.remove();
