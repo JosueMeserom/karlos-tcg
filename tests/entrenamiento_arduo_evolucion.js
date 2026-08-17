@@ -20,9 +20,9 @@ const RAIZ = path.join(__dirname, '..');
 const H = fs.readFileSync(path.join(RAIZ, 'tests/harness.js'), 'utf8');
 const mod = { exports: {} };
 new Function('module', 'exports', 'require', '__dirname',
-    H + '\n;module.exports.__i={crearContexto,crearJuego,construirEstado,asentar};'
+    H + '\n;module.exports.__i={crearContexto,crearJuego,construirEstado,asentar,ejecutarPaso};'
 )(mod, mod.exports, require, path.join(RAIZ, 'tests'));
-const { crearContexto, crearJuego, construirEstado, asentar } = mod.exports.__i;
+const { crearContexto, crearJuego, construirEstado, asentar, ejecutarPaso } = mod.exports.__i;
 
 let comprobaciones = 0, fallos = 0;
 function check(titulo, ok, detalle) {
@@ -70,9 +70,19 @@ function check(titulo, ok, detalle) {
     // solo avanzan cuando asentar() bombea la cola de timers del sandbox -exactamente el patrón
     // `lanzar()` del propio harness (ver ejecutarPaso, paso `finTurno`)-. Con await directo la
     // promesa se queda colgada para siempre (nadie drena sus timers mientras tanto).
+    // Y hay que CONTESTAR el modal que abre la evolución. Con una Zoe (calcinante) en la mano
+    // -que es lo que monta este escenario- la carta pregunta si usar esa o buscar en el mazo. Ese
+    // modal se añadió DESPUÉS de escribir esta suite, así que la cadena se quedaba esperando una
+    // respuesta que no llegaba nunca: el Evento se quedaba clavado en duración 0 y Zoe no
+    // evolucionaba. La suite llevaba meses en rojo por eso -no era un bug del juego, que Toto
+    // verificó a mano en el navegador (16-ago-2026)-.
     for (let i = 0; i < 6 && g.players.p1.activeEvent; i++) {
         g.confirmEndTurn().catch(e => ctx.errores.push(e));
         await asentar(ctx);
+        while ((ctx.pendientes || []).length && ctx.pendientes[0].tipo === 'opcion') {
+            await ejecutarPaso(ctx, g, { opcion: 'USAR LA DE TU MANO' });
+            await asentar(ctx);
+        }
     }
 
     const calc = g.players.p1.vanguard.find(c => c.name === 'Zoe (calcinante)');
