@@ -75,7 +75,13 @@
     </div>
 
     <div id="choice-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:8500; flex-direction:column; align-items:center; justify-content:center;">
-        <div style="margin-bottom: 30px; font-size: 2rem; font-weight: bold; color:white;" id="choice-title">ELIGE UNA OPCIÓN</div>
+        <!-- Título y cuerpo SEPARADOS. Antes era un solo div y openChoiceModal le metía
+             "TÍTULO\n\ncuerpo" entero, así que el aviso salía también a 2rem y en negrita, y
+             las líneas largas no se centraban. Lo usan cuatro cartas (Zoe, Xanadu,
+             Guardaespaldas y Uniojo), o sea que el arreglo va aquí y no en ninguna. -->
+        <div style="font-size: 2rem; font-weight: bold; color:white; text-align:center; max-width:min(90vw,720px);" id="choice-title">ELIGE UNA OPCIÓN</div>
+        <div style="display:none; margin-top:12px; font-size:0.95rem; font-weight:normal; line-height:1.45; color:#cbd5e1; text-align:center; max-width:min(90vw,620px);" id="choice-body"></div>
+        <div style="height:30px;"></div>
         <div class="type-btn-container" id="choice-buttons"></div>
     </div>
 
@@ -8221,7 +8227,17 @@
                         this.pendingInteraction = { tipo: 'choice', chooserId: intendedPlayer, titulo: title, opciones: choices.map(c => c.label) };
                     }
                 }
-                document.getElementById('choice-title').innerText = title;
+                // Convenio de cuatro cartas: "TÍTULO\n\ncuerpo". El título manda y el cuerpo es
+                // el aviso, así que van en dos elementos con su propio tamaño en vez de en uno
+                // solo a 2rem. Un título sin cuerpo se comporta igual que siempre.
+                const _p = String(title == null ? '' : title).split('\n\n');
+                document.getElementById('choice-title').innerText = _p[0];
+                const _cuerpo = document.getElementById('choice-body');
+                if (_cuerpo) {
+                    const _resto = _p.slice(1).join('\n\n').trim();
+                    _cuerpo.innerText = _resto;
+                    _cuerpo.style.display = _resto ? 'block' : 'none';
+                }
 
                 // Fila de cartas de reacción (si las hay). El modal baja a z-index 4500
                 // (bajo #card-preview, 5000) para que el panel de detalle se vea por
