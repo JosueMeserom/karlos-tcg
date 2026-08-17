@@ -11653,7 +11653,7 @@
                 const CADENCIA = 60; // ms entre sondeos; con dedup, solo emite/renderiza si el estado cambió
                 // Volcado DIRIGIDO cuando sé a quién se lo debo (el que acaba de reconectar): así
                 // no se le pisa el estado a un cliente que está perfectamente bien.
-                const _emitirEstado = (snap) => {
+                const _emitirEstado = (snap, _debia) => {
                     if (this.gameMode !== 'online' || this.myPlayerId === 'spectator') return;
                     // SIN DESTINATARIO NO SE MANDA (Toto, 13-ago-2026). Este volcado existe para
                     // el que RECONECTÓ: su corrutina murió y le debo el resultado. Sin `_reSyncTarget`
@@ -11664,7 +11664,7 @@
                     // no solo tras una reconexión-. El síntoma era un frame con el estado viejo
                     // (la carta de vuelta en la mano) antes de corregirse solo.
                     // En modo espejo sí se difunde: ahí el rival reconectado no tiene otra fuente.
-                    if (!this._reSyncTarget && !this._espejandoReaccion) return;
+                    if (!this._reSyncTarget && !this._espejandoReaccion && !_debia) return;
                     const msg = { roomCode: this.roomCode, action: 'HARD_SYNC', admin: true, state: snap || this.exportGameState() };
                     if (this._reSyncTarget) msg.targetId = this._reSyncTarget;
                     this.socket.emit('gameAction', msg);
@@ -11702,12 +11702,16 @@
                     const asentado = !esperandoOtraInteraccion && !this._corrutinasVivas &&
                         this.inputState === 'IDLE' && !this.isActionLocked && !this.isFlipping;
                     if (asentado) {
+                        // Se apuntan ANTES de apagarlas: _emitirEstado las consultaba para decidir
+                        // si mandar, y aquí ya estaban a false. Aunque hubiera destinatario, el
+                        // volcado no salía nunca por este camino.
+                        const _debia = this._espejandoReaccion || this._reSyncTrasEleccion || this._debeVolcarTrasCadena;
                         this._esperandoSettleEspejo = false;
                         this._espejandoReaccion = false;
                         this._reSyncTrasEleccion = false;
                         this._debeVolcarTrasCadena = false;
                         this._dbgRx('poller ASENTADO -> vuelco estado final');
-                        _emitirEstado();
+                        _emitirEstado(null, _debia);
                         this._reSyncTarget = null;
                     } else {
                         // Snapshot INTERMEDIO: la corrutina sigue trabajando pero el rival NO tiene
@@ -11792,6 +11796,13 @@
                     // sus clics dirigirán MI corrutina viva, que hace el trabajo y, al terminar
                     // (con lo que encadene), le vuelca el estado final.
                     this._espejandoReaccion = true;
+                    // A QUIÉN le debo el volcado final. Faltaba: `_reSyncTarget` solo se ponía
+                    // en el caso de abajo -cuando el que elige soy YO-, pero en el modo espejo
+                    // elige el RECONECTADO y yo solo presto mi corrutina viva. Al asentar, este
+                    // cliente le debía el estado final y no sabía a quién, así que _emitirEstado
+                    // se cortaba y el reconectado se quedaba sin el resultado de su propia
+                    // elección: el equipo se anexaba aquí y allí no (Toto, 18-ago-2026).
+                    this._reSyncTarget = target;
                     this._dbgRx('-> MODO ESPEJO activado, envío estado a', target);
                     this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'HARD_SYNC', state: this.exportGameState(), targetId: target });
                 } else if (esperandoRival) {
