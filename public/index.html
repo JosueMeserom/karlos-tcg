@@ -10992,6 +10992,17 @@
                     }
                     if (hasCounters) marginRight = Math.max(marginRight, getCssOffset('.counter-badge', 'right') + 4); 
 
+                    // LOS EQUIPOS TAMBIEN OCUPAN SITIO A LA DERECHA (Toto, 18-ago-2026). No
+                    // entraban en esta cuenta: el primero parecia reservar algo solo porque la
+                    // carta se envuelve en .card-wrapper -que trae `margin: 0 4px`- justo cuando
+                    // tiene equipos, pero del segundo en adelante no se reservaba NADA y una carta
+                    // con varios se solapaba con la de al lado.
+                    // El escalonado los desplaza 15px + 10 por cada uno (ver el forEach de
+                    // equippedCards), asi que el ultimo sobresale 15 + (N-1)*10 por la derecha.
+                    // Va con Math.max como todo lo demas: si una badge sobresale mas, manda ella.
+                    const _nEquipos = (!inHand && !isVisualOnly && card.equippedCards) ? card.equippedCards.length : 0;
+                    if (_nEquipos > 0) marginRight = Math.max(marginRight, 15 + (_nEquipos - 1) * 10 + 4);
+
                     el.style.marginLeft = `${marginLeft > 0 ? marginLeft : 0}px`;
                     el.style.marginRight = `${marginRight > 0 ? marginRight : 0}px`;
                 }
