@@ -2097,7 +2097,16 @@
             // superior de la pila de descartes. Si la pila ya tenía cartas la miniatura no cambia
             // -y ahí Toto dice que desvanecerse está bien-, así que solo se cruza cuando el
             // destino ESTRENA contenido (`fundirSoloSiVacio`).
-            const _real = _fundir && _fundir.querySelector('.active-event-card, .card-preview-mini');
+            // `aterrizarEn`: el destino no existe TODAVIA cuando el clon sale, porque lo crea el
+            // repintado de quien lo coloca. Es el caso del equipo que se anexa: su hueco no esta
+            // en ninguna fila y su visual nace con el render del EQUIPAR. Se le pasa una funcion
+            // que se llama AQUI, ya en el aterrizaje: coloca, repinta y devuelve el elemento con
+            // el que cruzarse. A partir de ahi es el mismo cruce suave del Evento con su ranura,
+            // no un camino nuevo (Toto, 18-ago-2026).
+            let _real = _fundir && _fundir.querySelector('.active-event-card, .card-preview-mini');
+            if (!_real && opts && typeof opts.aterrizarEn === 'function') {
+                try { _real = await opts.aterrizarEn(); } catch (err) { console.error(err); }
+            }
             if (_real) { _real.style.transition = 'none'; _real.style.opacity = '0'; }
             else if (!idEntrante) {                         // sin nada que enseñar: se funde en la pila
                 cont.style.opacity = '0';

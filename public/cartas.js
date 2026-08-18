@@ -7666,6 +7666,14 @@ const DSL = {
         // de equippedCards): 15px + 10px por cada equipo previo, arriba y a la derecha.
         const _idx = ((portador.equippedCards || []).length);
         game._presentacionArmada.ajusteDestino = { dx: 15 + _idx * 10, dy: -(15 + _idx * 10) };
+        // Y al llegar se CRUZA con su visual en vez de desvanecerse. Ese visual no existe todavia
+        // -lo crea el render del EQUIPAR-, asi que se le da al escaparate una funcion que se llama
+        // ya en el aterrizaje: para entonces la carta esta anexada y el elemento existe. Si por lo
+        // que sea no lo encuentra, devuelve null y el escaparate se comporta como antes.
+        game._presentacionArmada.aterrizarEn = () => {
+            if (typeof game.render === 'function') game.render();
+            return document.querySelector(`[data-eq="${sourceCard.instanceId}"]`);
+        };
     },
 
     // Los nombres CONCRETOS que busca un BUSCAR, si busca por nombre. Sirve para que el visor
