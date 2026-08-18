@@ -6612,6 +6612,12 @@
                         const tmpl = getCardTemplate(c.id);
                         for (const ab of ((tmpl && tmpl.abilities) || [])) {
                             if (!ab.resumenFase || this.FASE_DE[ab.trigger] !== fase) continue;
+                        // Y no se anuncia lo que esta carta se va a SALTAR. Un efecto con
+                        // `salvoSi` cumplido no ocurre -el Meca con piloto emplazado ya no pierde
+                        // Furor-, asi que listarlo seria mentir (Toto, 18-ago-2026).
+                        const _salta = (ab.efectos || []).some(e => e.salvoSi
+                            && typeof DSL !== 'undefined' && DSL._cond && DSL._cond(c, this, e.salvoSi));
+                        if (_salta) continue;
                             if (this.SOLO_TURNO_PROPIO.has(ab.trigger) && c.owner !== this.activePlayerId) continue;
                             // Un AL_CADUCAR no ocurre "en la fase de Evento": ocurre el turno en que a ESE
                             // Evento se le acaba el tiempo. Anunciarlo antes sería mentir tres turnos.

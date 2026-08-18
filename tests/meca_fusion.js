@@ -60,6 +60,13 @@ const check = (t, ok, extra) => {
     check('...y no queda en ninguna fila', !van.includes('Yuriy') && !ret.includes('Yuriy'));
     check('la Pasiva del Meca queda anulada', !!(meca && meca.pilotoEmplazado),
         'pilotoEmplazado=' + (meca && meca.pilotoEmplazado));
+    // ENTERA, no a medias: el tope de 2 de Furor es parte de la misma Pasiva y seguia aplicandose.
+    check('...incluido su tope de 2 de Furor, que vuelve al normal', meca && meca.maxFuror === 4,
+        'maxFuror=' + (meca && meca.maxFuror));
+    // Y la fase de efectos finales deja de anunciar un efecto que ya no va a ocurrir.
+    const _ent = g.entradasFase('EFECTOS FINALES').join(' | ');
+    check('...y la fase de efectos finales ya no lo anuncia', !/Consumo|Furor/i.test(_ent),
+        'entradas=' + (_ent || '(ninguna)'));
 
     console.log('\n' + (fallos
         ? `SUITE meca_fusion: ${comprobaciones - fallos}/${comprobaciones} comprobaciones — ${fallos} FALLOS`

@@ -5058,6 +5058,12 @@ const CARD_DB = [
             }
 
             card.pilotoEmplazado = true;
+            // La Pasiva se desactiva ENTERA, no solo a medias (Toto, 18-ago-2026). El "-1 de Furor
+            // al final del turno" y el "no gana Furor" ya se saltaban con `salvoSi` y
+            // onBeforeGainFuror, pero el tope de 2 es `maxFuror` de la PLANTILLA, que vive en la
+            // instancia desde que se creo y no lo miraba nadie: el Meca con piloto seguia capado a
+            // 2. Se le devuelve el maximo normal del juego.
+            card.maxFuror = 4;
             game.logMsg(`${game.getCardNameWithOwner(card)} ahora tiene piloto. CONSUMO DESMESURADO desactivado.`, 'system');
 
             card.exhausted = true;
