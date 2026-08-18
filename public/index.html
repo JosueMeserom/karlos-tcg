@@ -7323,7 +7323,15 @@
                     // `enElEscaparate`). El hueco de vanguardia no puede faltar en ese caso: la
                     // carta lo ha vaciado ella misma, así que la rama de "elige un Esbirro" no
                     // se da y no hace falta un camino de suspenso dentro de la animación.
-                    if (!_pausaCoste && _decidirZona()) return;
+                    // VANGUARDIA LLENA: la eleccion del Esbirro se hace con la carta YA PRESENTADA
+                    // y parada en el escaparate, no antes (Toto, 18-ago-2026). Se detecta aqui sin
+                    // mutar nada, para que _decidirZona no se lleve la jugada por el camino viejo
+                    // -que suspendia todo ANTES de presentar y descartaba los costes de golpe-.
+                    // No es de Wolfgang: le pasa a CUALQUIER Personaje, por eso va aqui.
+                    const _pideHueco = card.type === 'Personaje' && p.vanguard.length >= 4
+                        && p.vanguard.filter(c => c.type === 'Personaje').length < 2;
+                    if (_pideHueco) card.location = 'vanguard';   // aterriza en el hueco que se abra
+                    if (!_pausaCoste && !_pideHueco && _decidirZona()) return;
 
                     // La carta NO se mete en la fila aquí: eso es el ATERRIZAJE, y ocurre DENTRO
                     // de la presentación (§14). Antes se empujaba a la fila primero, así que el
@@ -7341,13 +7349,28 @@
                         this.gameMode === 'online' && this.myPlayerId !== card.owner,
                         {
                             origenId: card.instanceId,
-                            enElEscaparate: _pausaCoste ? async () => {
-                                if (typeof template.onBeforePlayAsync === 'function') await this._seguirCorrutina(template.onBeforePlayAsync(card, this, p));
-                                _decidirZona();   // ya con el coste pagado: la vanguardia puede haberse vaciado
+                            enElEscaparate: (_pausaCoste || _pideHueco) ? async () => {
+                                if (_pausaCoste) {
+                                    if (typeof template.onBeforePlayAsync === 'function') await this._seguirCorrutina(template.onBeforePlayAsync(card, this, p));
+                                    _decidirZona();   // ya con el coste pagado: la vanguardia puede haberse vaciado
+                                }
+                                // Y si sigue haciendo falta hueco, se pide AQUI: la carta esta
+                                // enseñada en el centro y el rival ve el aviso de espera de siempre.
+                                if (card.type === 'Personaje' && p.vanguard.length >= 4
+                                    && p.vanguard.filter(c => c.type === 'Personaje').length < 2) {
+                                    card.location = 'vanguard';
+                                    await this._pedirHuecoEnVanguardia(card);
+                                }
                             } : null,
                             zonaSel: _filaDe,
                             colocar: () => {
-                                (card.location === 'rearguard' ? p.rearguard : p.vanguard).push(card);
+                                // Si se retiro un Esbirro para hacerle sitio, la carta ocupa SU
+                                // hueco exacto, no el final de la fila.
+                                const _arr = card.location === 'rearguard' ? p.rearguard : p.vanguard;
+                                if (this._indiceHueco !== null && this._indiceHueco !== undefined && _arr === p.vanguard) {
+                                    _arr.splice(Math.min(this._indiceHueco, _arr.length), 0, card);
+                                    this._indiceHueco = null;
+                                } else _arr.push(card);
                                 card.justPlayed = true;
                                 card._presentada = true;   // su entrada la hace la presentación
                                 setTimeout(() => { delete card._presentada; }, 800);
@@ -7356,7 +7379,7 @@
                                 return card.instanceId;
                             },
                         });
-                    if (_pausaCoste && typeof this.sinRecolocarHasta === 'function') await this.sinRecolocarHasta(_presentar);
+                    if ((_pausaCoste || _pideHueco) && typeof this.sinRecolocarHasta === 'function') await this.sinRecolocarHasta(_presentar);
                     else await _presentar();
 
                     this.placedUnitThisTurn = true;
@@ -7579,24 +7602,37 @@
                         }
                         p.rearguard.push(esbirro);
                         
-                        const newCard = this.pendingPlayCard;
-                        const handIdx = p.hand.findIndex(c => c.instanceId === newCard.instanceId);
-                        if (handIdx !== -1) p.hand.splice(handIdx, 1);
-                        
-                        newCard.location = 'vanguard';
-                        // Ocupa el HUECO del aliado retirado, no el final de la fila
-                        p.vanguard.splice(Math.min(vIdx, p.vanguard.length), 0, newCard);
-                        
-                        this.logMsg(`${esbirro.name} se mueve a retaguardia. ${newCard.name} ocupa su lugar en vanguardia.`, 'system');
-                        
-                        this.placedUnitThisTurn = true;
-                        newCard.justPlayed = true;
-                        setTimeout(() => { newCard.justPlayed = false; }, 1000);
-                        
+                        // A partir de aqui NO se coloca la carta: eso lo hace la PRESENTACION, que
+                        // esta esperando parada en el escaparate (Toto, 18-ago-2026). Antes este
+                        // bloque la sacaba de la mano y la metia en la fila el mismo, de ahi que
+                        // ninguna carta se presentara al jugarse con la vanguardia llena. Aqui solo
+                        // se apunta EN QUE HUECO ha de aterrizar y se suelta la animacion.
+                        this._indiceHueco = vIdx;
+                        this.logMsg(`${this.getCardNameWithOwner(esbirro)} se retira a la retaguardia para hacer hueco.`, 'system');
                         this.inputState = 'IDLE';
-                        this.pendingPlayCard = null;
+                        this.pendingInteraction = null;
                         this.updatePassives();
                         this.render();
+                        if (this._resolverHueco) {
+                            this.pendingPlayCard = null;   // la coloca la presentacion, ya no hay nada pendiente
+                            this._resolverHueco();
+                        }
+                        else {
+                            // Respaldo: si nadie esta esperando -una partida vieja, un camino que no
+                            // paso por el escaparate- se coloca como se hacia antes, para no dejar la
+                            // carta en el limbo.
+                            const _n = this.pendingPlayCard;
+                            if (_n) {
+                                const hi = p.hand.findIndex(c => c.instanceId === _n.instanceId);
+                                if (hi !== -1) p.hand.splice(hi, 1);
+                                _n.location = 'vanguard';
+                                p.vanguard.splice(Math.min(vIdx, p.vanguard.length), 0, _n);
+                                this.placedUnitThisTurn = true;
+                                this.pendingPlayCard = null;
+                                this._indiceHueco = null;
+                                this.updatePassives(); this.render();
+                            }
+                        }
                     } else {
                         if (!isRemote) this.logError("Debes elegir un Esbirro aliado de tu vanguardia.");
                     }
@@ -8692,6 +8728,26 @@
             // Suelta la carta retenida en el escaparate y espera a que termine su viaje. Inocuo
             // si nadie estaba reteniendo (una carta sin efectos previos, o una jugada cancelada
             // antes de presentarse).
+            // Pide un Esbirro de la vanguardia para hacer hueco, CON la carta parada en el
+            // escaparate. Devuelve una promesa que resuelve cuando el jugador elige; quien la
+            // llama es `enElEscaparate`, asi que la animacion se queda quieta mientras tanto y el
+            // rival ve el aviso de espera por el mismo cauce que cualquier otra interaccion.
+            _pedirHuecoEnVanguardia(card) {
+                return new Promise(resolve => {
+                    this.pendingPlayCard = card;
+                    this._resolverHueco = () => { this._resolverHueco = null; resolve(); };
+                    this.inputState = 'SELECT_ESBIRRO_TO_SWAP';
+                    // Descriptor para el reanudar-perfecto: si el que elige recarga, su UI se
+                    // rehace y el rival le espera, como con el resto de interacciones.
+                    if (this.gameMode === 'online') {
+                        this.pendingInteraction = { tipo: 'huecoVanguardia', chooserId: this.activePlayerId,
+                            titulo: 'Elige un Esbirro de tu vanguardia para retirarlo' };
+                    }
+                    this.logMsg('Vanguardia llena. Selecciona un Esbirro de la vanguardia para retirarlo sin coste y hacer hueco.', 'system');
+                    this.render();
+                });
+            }
+
             async _soltarYEsperarEscaparate() {
                 this._retenerEscaparate = false;
                 if (this._soltarEscaparate) this._soltarEscaparate();
