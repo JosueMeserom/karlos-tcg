@@ -2179,7 +2179,24 @@
                 _subidos.forEach(({ el, z, pos }) => { el.style.zIndex = z; el.style.position = pos; });
                 _subidos.length = 0;
             };
-            if (_hayAterrizaje && destinoSel) _subirColumna(document.querySelector(destinoSel));
+            if (_hayAterrizaje && destinoSel) {
+                const _pEl = document.querySelector(destinoSel);
+                _subirColumna(_pEl);
+                // Y la fila se REACOMODA YA, al arrancar el viaje, no al terminar el fundido
+                // (Toto, 18-ago-2026). El hueco que el equipo va a necesitar a la derecha lo
+                // calcula render(), y el render que incluye al nuevo equipo no llega hasta
+                // `aterrizarEn`, o sea al final: los vecinos daban el respingo cuando la
+                // animacion ya habia acabado. Se adelanta aqui con la misma cuenta que usa
+                // render -15 + 10 por cada equipo previo- contando el que viene, y como .card
+                // transiciona `margin`, el deslizamiento sale solo. El render posterior calcula
+                // exactamente lo mismo, asi que no hay salto.
+                if (_pEl) {
+                    const _w = _pEl.closest ? _pEl.closest('.card-wrapper') : null;
+                    const _n = (_w ? _w.querySelectorAll('.equipped-card-visual').length : 0) + 1;
+                    const _necesario = 15 + (_n - 1) * 10 + 4;
+                    if ((parseFloat(_pEl.style.marginRight) || 0) < _necesario) _pEl.style.marginRight = _necesario + 'px';
+                }
+            }
             await g.sleep(PRESENTA_VIAJE);
             if (!_real && _hayAterrizaje) {
                 try { _real = await opts.aterrizarEn(); } catch (err) { console.error(err); }
