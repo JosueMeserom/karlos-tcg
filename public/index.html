@@ -2151,30 +2151,38 @@
             // acerca, no solo en los ultimos 180ms. Ese fue el primer intento y no se noto nada.
             // El portador sale del propio selector de destino, que ya apunta a el; `_real` todavia
             // no existe en este caso -lo crea `aterrizarEn` al final del viaje-.
-            let _portadorEl = null, _zPrev = '', _posPrev = '';
-            if (_hayAterrizaje && destinoSel) {
-                _portadorEl = document.querySelector(destinoSel);
-                if (_portadorEl) {
-                    _zPrev = _portadorEl.style.zIndex; _posPrev = _portadorEl.style.position;
-                    if (!_posPrev) _portadorEl.style.position = 'relative';   // para que el z-index cuente
-                    _portadorEl.style.zIndex = '3901';
-                }
-            }
+            // Se sube TODA LA COLUMNA por encima del clon, no solo la carta: los equipos que ya
+            // lleva puestos viven en la capa del tablero, asi que el clon -a 3900- los sobrevolaba
+            // y el equipo entrante se veia por delante de los anteriores, cuando va detras de
+            // todos (Toto, 18-ago-2026). Se respeta el orden entre ellos: la carta arriba del todo,
+            // luego los equipos por antiguedad, y el clon por debajo de todos.
+            const _subidos = [];
+            const _subirColumna = (cardEl, excluir) => {
+                if (!cardEl) return;
+                const _w = cardEl.closest ? cardEl.closest('.card-wrapper') : null;
+                const _lista = [cardEl].concat(_w
+                    ? Array.from(_w.querySelectorAll('.equipped-card-visual'))
+                          .filter(x => !excluir || x !== excluir)
+                    : []);
+                _lista.forEach((el, k) => {
+                    _subidos.push({ el, z: el.style.zIndex, pos: el.style.position });
+                    if (!el.style.position) el.style.position = 'relative';
+                    el.style.zIndex = String(3910 - k);   // 3910 la carta, luego los equipos
+                });
+            };
+            const _bajarColumna = () => {
+                _subidos.forEach(({ el, z, pos }) => { el.style.zIndex = z; el.style.position = pos; });
+                _subidos.length = 0;
+            };
+            if (_hayAterrizaje && destinoSel) _subirColumna(document.querySelector(destinoSel));
             await g.sleep(PRESENTA_VIAJE);
             if (!_real && _hayAterrizaje) {
                 try { _real = await opts.aterrizarEn(); } catch (err) { console.error(err); }
-                // `aterrizarEn` REPINTA, asi que el nodo que subimos antes del viaje ya no esta en
-                // el documento y el nuevo nace sin z-index: el clon volvia a verse por encima
-                // durante los ultimos fotogramas. Se vuelve a subir el elemento actual.
-                if (destinoSel) {
-                    const _nuevo = document.querySelector(destinoSel);
-                    if (_nuevo && _nuevo !== _portadorEl) {
-                        _portadorEl = _nuevo;
-                        _zPrev = _nuevo.style.zIndex; _posPrev = _nuevo.style.position;
-                        if (!_posPrev) _nuevo.style.position = 'relative';
-                        _nuevo.style.zIndex = '3901';
-                    }
-                }
+                // `aterrizarEn` REPINTA: los nodos que subimos antes del viaje ya no estan en el
+                // documento y los nuevos nacen sin z-index. Se rehace sobre los actuales,
+                // excluyendo el visual del equipo que esta ENTRANDO -ese va debajo de todos-.
+                _bajarColumna();
+                if (destinoSel) _subirColumna(document.querySelector(destinoSel), _real);
                 if (_real) { _real.style.transition = 'none'; _real.style.opacity = '0'; void _real.offsetWidth; }
             }
             if (_real) {
@@ -2196,7 +2204,7 @@
                 await g.sleep(MORPH);
                 _real.style.transition = '';
                 _real.style.opacity = '';
-                if (_portadorEl) { _portadorEl.style.zIndex = _zPrev; _portadorEl.style.position = _posPrev; }
+                _bajarColumna();
                 if (_badge) { _badge.style.transition = ''; _badge.style.opacity = ''; }
             }
             g._descarteFundiendo = null;   // se desarma pase lo que pase, tambien si no hubo cruce
