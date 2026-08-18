@@ -2060,6 +2060,14 @@
             // Entonces se vuelve a voltear en el último tramo y acaba de dorso, como la pinta esa
             // mano. Si la mano SÍ es visible (la tuya, o una expuesta por SEGUIMIENTO) no se
             // voltea: sería tapar algo que se está viendo (Toto, 13-ago-2026).
+            // Y se TUERCE por el camino hasta la inclinacion exacta que tendra ya puesto: los
+            // equipos se pintan con `rotate(5deg)` (.equipped-card-visual), asi que llegar recto
+            // obligaba a un salto de angulo justo al fundirse (Toto, 18-ago-2026). Se gira el
+            // contenedor, no el volteador, que ya tiene ocupado su transform con el flip 3D.
+            if (opts && typeof opts.aterrizarEn === 'function') {
+                cont.style.transition += `, transform ${PRESENTA_VIAJE}ms cubic-bezier(.2,.8,.2,1)`;
+                cont.style.transform = 'rotate(5deg)';
+            }
             flip.style.transform = (opts && opts.ocultarAlLlegar)
                 ? `rotateY(180deg) scale(${(1 / PRESENTA_ZOOM).toFixed(4)})`
                 : `rotateY(0deg) scale(${(1 / PRESENTA_ZOOM).toFixed(4)})`;
@@ -2155,6 +2163,18 @@
             await g.sleep(PRESENTA_VIAJE);
             if (!_real && _hayAterrizaje) {
                 try { _real = await opts.aterrizarEn(); } catch (err) { console.error(err); }
+                // `aterrizarEn` REPINTA, asi que el nodo que subimos antes del viaje ya no esta en
+                // el documento y el nuevo nace sin z-index: el clon volvia a verse por encima
+                // durante los ultimos fotogramas. Se vuelve a subir el elemento actual.
+                if (destinoSel) {
+                    const _nuevo = document.querySelector(destinoSel);
+                    if (_nuevo && _nuevo !== _portadorEl) {
+                        _portadorEl = _nuevo;
+                        _zPrev = _nuevo.style.zIndex; _posPrev = _nuevo.style.position;
+                        if (!_posPrev) _nuevo.style.position = 'relative';
+                        _nuevo.style.zIndex = '3901';
+                    }
+                }
                 if (_real) { _real.style.transition = 'none'; _real.style.opacity = '0'; void _real.offsetWidth; }
             }
             if (_real) {
