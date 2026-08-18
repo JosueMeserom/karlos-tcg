@@ -7613,6 +7613,8 @@
                         this.pendingInteraction = null;
                         this.updatePassives();
                         this.render();
+                        const _bAvi = document.getElementById('action-banner');
+                        if (_bAvi) _bAvi.style.display = 'none';   // fuera el cartel de espera
                         if (this._resolverHueco) {
                             this.pendingPlayCard = null;   // la coloca la presentacion, ya no hay nada pendiente
                             this._resolverHueco();
@@ -8734,16 +8736,31 @@
             // rival ve el aviso de espera por el mismo cauce que cualquier otra interaccion.
             _pedirHuecoEnVanguardia(card) {
                 return new Promise(resolve => {
+                    const chooserId = this.activePlayerId;
                     this.pendingPlayCard = card;
+                    this._interaccionChooser = chooserId;   // para el reanudar-perfecto
                     this._resolverHueco = () => { this._resolverHueco = null; resolve(); };
                     this.inputState = 'SELECT_ESBIRRO_TO_SWAP';
                     // Descriptor para el reanudar-perfecto: si el que elige recarga, su UI se
                     // rehace y el rival le espera, como con el resto de interacciones.
                     if (this.gameMode === 'online') {
-                        this.pendingInteraction = { tipo: 'huecoVanguardia', chooserId: this.activePlayerId,
+                        this.pendingInteraction = { tipo: 'huecoVanguardia', chooserId,
                             titulo: 'Elige un Esbirro de tu vanguardia para retirarlo' };
                     }
-                    this.logMsg('Vanguardia llena. Selecciona un Esbirro de la vanguardia para retirarlo sin coste y hacer hueco.', 'system');
+                    // EL AVISO AL QUE NO ELIGE (Toto, 18-ago-2026). El rival corre este mismo
+                    // playCard, asi que su presentacion tambien se para aqui -eso es correcto y
+                    // se resuelve solo con el replay-, pero sin cartel parecia un cuelgue. Se le
+                    // enseña el mismo 'Esperando a que X elija...' que el resto de interacciones.
+                    // No se usa _carteleraEspera porque su guarda mira si la cadena esta en
+                    // marcha, y aqui YA sabemos que estamos esperando: no hay nada que deducir.
+                    const _noElijoYo = this.gameMode === 'online' && this.myPlayerId !== 'spectator'
+                        && this.myPlayerId !== chooserId;
+                    if (_noElijoYo) {
+                        const _b = document.getElementById('action-banner');
+                        if (_b) { _b.innerText = `Esperando a que ${this.getDisplayName(chooserId)} elija...`; _b.style.display = 'block'; }
+                    } else {
+                        this.logMsg('Vanguardia llena. Selecciona un Esbirro de la vanguardia para retirarlo sin coste y hacer hueco.', 'system');
+                    }
                     this.render();
                 });
             }

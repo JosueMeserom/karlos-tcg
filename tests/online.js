@@ -202,6 +202,40 @@ async function reposar(clientes, vueltas = 60) {
             'HARD_SYNC aplicados: p1=' + (cl.p1.g.__sincronizado || 0) + ' p2=' + (cl.p2.g.__sincronizado || 0));
     }
 
+    console.log('\n--- Vanguardia LLENA: el rival no se queda colgado esperando la eleccion ---');
+    {
+        // Toto lo vio jugando (18-ago-2026): con el nuevo flujo la carta se presenta y se para en
+        // el escaparate a esperar que elijas el Esbirro. En el cliente del RIVAL corre el mismo
+        // playCard, asi que tambien se para... y ahi se quedaba colgado, sin aviso de espera y sin
+        // que nada lo soltara. Esto reproduce los dos clientes de verdad.
+        const esc = {
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: ['Mini-tigre', 'Guardaespaldas', 'Robot de seguridad SP', 'Hechicero'],
+                  mano: ['Karlos'] },
+            p2: { vanguardia: ['Aniceto'] },
+        };
+        const cl = await mesaOnline(esc);
+        const A = cl.p1.g, B = cl.p2.g;
+        const karlos = A.players.p1.hand.find(c => c.name === 'Karlos');
+        A.playCard(karlos.instanceId).catch(() => {});
+        await reposar(cl);
+
+        check('el que juega pide elegir el Esbirro', A.inputState === 'SELECT_ESBIRRO_TO_SWAP',
+            'A.inputState=' + A.inputState);
+        check('y el RIVAL sabe que esta esperando una eleccion',
+            !!(B.pendingInteraction && B.pendingInteraction.chooserId === 'p1'),
+            'B.pendingInteraction=' + JSON.stringify(B.pendingInteraction));
+
+        const robot = A.players.p1.vanguard.find(c => c.name === 'Robot de seguridad SP');
+        A.selectCard(robot.instanceId);
+        await reposar(cl);
+
+        check('el rival NO se queda colgado: vuelve a IDLE', B.inputState === 'IDLE',
+            'B.inputState=' + B.inputState);
+        check('y los dos tableros coinciden', foto(A) === foto(B),
+            'A=' + foto(A) + '  B=' + foto(B));
+    }
+
     console.log('');
     if (fallos) { console.log(`SUITE online: ${fallos} FALLOS de ${comprobaciones} comprobaciones`); process.exit(1); }
     console.log(`SUITE online: ${comprobaciones}/${comprobaciones} comprobaciones — LOS DOS CLIENTES COINCIDEN`);
