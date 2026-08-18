@@ -3208,14 +3208,12 @@ const CARD_DB = [
         ],
     },
     {
-        name: "Espada V", type: "Ayuda", subtype: "Arma", tags: ["melé"], cost: 1, rarity: "B", series: 1,
-        // SIN "Equipable" A PROPÓSITO, y no por descuido (18-ago-2026). Las otras nueve
-        // equipables lo llevan y esta debería, pero la BASE CONGELADA no tiene `tags` en Espada V
-        // -literalmente `undefined`-, y regresion56 fuerza los tags de la instancia con un
-        // `campos` para que el ARMAMENTO MELÉ de Honsow, que filtra por la etiqueta "melé", pueda
-        // encontrarla en la base vieja. Añadirlo aquí saca una divergencia con esa base que NO es
-        // un bug del juego: es que las dos plantillas dicen cosas distintas. Arreglarlo de verdad
-        // pide decidir qué hacer con la base congelada, y eso es decisión de Toto.
+        name: "Espada V", type: "Ayuda", subtype: "Arma", tags: ["Equipable", "melé"], cost: 1, rarity: "B", series: 1,
+        // Lleva "Equipable" como las otras nueve (Toto, 18-ago-2026, opción B). La BASE
+        // CONGELADA no tiene `tags` en esta carta, así que el tag sale como diferencia en
+        // regresion56: está DECLARADA allí como intencionada, con su motivo. Es una diferencia
+        // de DATOS, no de comportamiento -el tag no cambia lo que la carta hace, solo cómo la
+        // encuentran los filtros por etiqueta-.
         // Requisito visible: a quién señala la flecha lima al presentarse (§14.bis).
         requisitoVisible: [ { quien: "ALIADO", filtros: [ { campo: "type", op: "==", valor: "Personaje" } ], algunFiltro: [ { campo: "name", op: "contieneTexto", valor: "Karlos" }, { campo: "name", op: "==", valor: "Agah" } ], uno: true } ],
         text: "Requisito: un Personaje aliado 'Karlos' o 'Agah'. Anéxasela a ese aliado: +2 de Atq mientras la lleve. Sólo puedes usar esta carta una vez por partida.",
