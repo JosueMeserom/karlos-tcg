@@ -5652,12 +5652,9 @@
                 // elegible, lo redacta el propio visor, con los nombres si se los han dicho. Así no
                 // depende de que cada carta se acuerde: es imposible olvidarlo.
                 if (!aviso && (!elegibles || !elegibles.length)) {
-                    const _n = (Array.isArray(buscado) ? buscado : (buscado ? [buscado] : []))
-                        .filter(Boolean).filter((x, i, a) => a.indexOf(x) === i);
-                    const _pila = zona === 'discard' ? 'los descartes' : 'el mazo';
-                    if (_n.length === 1) aviso = `No queda ning\u00fan ${_n[0]} en ${_pila}.`;
-                    else if (_n.length > 1) aviso = `No queda ning\u00fan ${_n.slice(0, -1).join(', ')} ni ${_n[_n.length - 1]} en ${_pila}.`;
-                    else aviso = `No hay cartas elegibles en ${_pila}.`;
+                    aviso = (typeof DSL !== 'undefined' && DSL._avisoVacio)
+                        ? DSL._avisoVacio(buscado, zona)
+                        : 'No hay cartas elegibles aquí.';
                 }
                 const multi = maxCount > 1;
                 const _esDescartes = zona === 'discard';

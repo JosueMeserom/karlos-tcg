@@ -159,7 +159,12 @@ const enCampo = (g, pid) => [...g.players[pid].vanguard, ...g.players[pid].rearg
         const visor = ctx.pendientes[0] || {};
         check('mirar el mazo vacío abre el visor igualmente', visor.tipo === 'visorMazo', 'tipo=' + visor.tipo);
         check('...sin ninguna carta elegible', (visor.elegibles || []).length === 0);
-        check('...y CON el aviso que lo explica', /No hay cartas elegibles/.test(visor.aviso || ''),
+        // El aviso NOMBRA lo que se buscaba desde el 18-ago-2026 (peticion de Toto: "sustituyendo
+        // el nombre de la carta por el que sea, y si son varias, que salgan todas"). Berry busca
+        // tres cartas concretas, asi que las lista. El generico se reserva para cuando el filtro
+        // no es un nombre -una etiqueta, un tipo-, donde nombrar algo seria inventarselo.
+        check('...y CON el aviso, nombrando las tres que buscaba',
+            /No queda ning[uú]n Rebobinar, Cambio de canal ni Publicidad mental en el mazo/.test(visor.aviso || ''),
             'aviso=' + JSON.stringify(visor.aviso));
         await paso({ cancelar: true });
     }

@@ -7634,6 +7634,37 @@ const DSL = {
         game._presentacionArmada.fundirEn = null;   // no se funde con ninguna pila: aterriza encima
     },
 
+    // Los nombres CONCRETOS que busca un BUSCAR, si busca por nombre. Sirve para que el visor
+    // pueda decir "No queda ningún Escudo mágico en el mazo" en vez del genérico "no hay cartas
+    // elegibles" (Toto, 18-ago-2026: "sustituyendo el nombre de la carta por el que sea, y si son
+    // varias, que salgan todas"). Solo un filtro `name ==` da un nombre presentable; un filtro por
+    // etiqueta o por tipo ("Ser vivo", "Otaku") no es el nombre de ninguna carta, así que ahí se
+    // devuelve vacío y el visor cae al texto genérico, que para ese caso es el correcto.
+    _nombresBuscados(e) {
+        const out = [];
+        const mirar = (f) => {
+            if (!f) return;
+            if (Array.isArray(f)) return f.forEach(mirar);
+            if (f.o) return f.o.forEach(mirar);
+            if (f.campo === 'name' && f.op === '==' && typeof f.valor === 'string') out.push(f.valor);
+        };
+        mirar(e.filtros); mirar(e.algunFiltro);
+        return out.filter((x, i, a) => a.indexOf(x) === i);
+    },
+
+    // EL texto de "aquí no hay nada". Una sola redacción, la usan el op BUSCAR (que la pasa) y
+    // openDeckSearchViewer (que la pone de oficio si el llamante no pasó ninguna). Tenerla en dos
+    // sitios era pedir que se separaran.
+    _avisoVacio(nombres, zona, barajaDespues) {
+        const n = (Array.isArray(nombres) ? nombres : (nombres ? [nombres] : [])).filter(Boolean);
+        const pila = zona === 'discard' ? 'los descartes' : 'el mazo';
+        let t;
+        if (n.length === 1) t = `No queda ningún ${n[0]} en ${pila}.`;
+        else if (n.length > 1) t = `No queda ningún ${n.slice(0, -1).join(', ')} ni ${n[n.length - 1]} en ${pila}.`;
+        else t = `No hay cartas elegibles en ${pila}.`;
+        return barajaDespues ? t + ' Se barajará al cerrar el visor.' : t;
+    },
+
     _esEquipo(tmpl) {
         if (!tmpl || !Array.isArray(tmpl.abilities)) return false;
         const hay = (lista) => (lista || []).some(e =>
@@ -8174,10 +8205,12 @@ const DSL = {
                         // aviso puesto (Toto, 7-ago-2026): aquí se pasaba `null` siempre, así que
                         // el jugador veía su mazo sin nada en verde y sin una sola palabra que se
                         // lo explicara. Mismo texto que `visorVacio` usa en el camino de una zona.
-                        const _aviso = poolZona.length ? null
-                            : (e.barajarDespues ? 'No hay cartas elegibles en este mazo. Se barajará al cerrar el visor.'
-                                                : 'No hay cartas elegibles en este mazo.');
-                        const r = await game.openDeckSearchViewer(pid, poolZona, F(e.titulo || 'ELIGE UNA CARTA'), _aviso, e.cantidad || 1, 'deck');
+                        // El aviso lo redacta el VISOR (garantía única, ver openDeckSearchViewer):
+                        // aquí solo se le dice QUÉ se buscaba para que pueda nombrarlo. La coletilla
+                        // del barajado sí es de este camino, así que se añade si toca.
+                        const _nom = DSL._nombresBuscados(e);
+                        const _aviso = poolZona.length ? null : DSL._avisoVacio(_nom, 'deck', !!e.barajarDespues);
+                        const r = await game.openDeckSearchViewer(pid, poolZona, F(e.titulo || 'ELIGE UNA CARTA'), _aviso, e.cantidad || 1, 'deck', _nom);
                         const elegidas = Array.isArray(r) ? r : (r ? [r] : []);
                         if (elegidas.length > 0) { for (const t of elegidas) await aMano(t); algunExito = true; }
                         else if (e.logSinEleccion) game.logMsg(F(e.logSinEleccion), 'system');
