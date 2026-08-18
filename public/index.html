@@ -1622,7 +1622,13 @@
         function _fotoFila(sel) {
             const foto = new Map();
             _cartasDeFila(sel).forEach(el => {
-                foto.set(el.getAttribute('data-id'), el.getBoundingClientRect());
+                // Se guarda el rect (para el desplazamiento) Y el tamaño de LAYOUT, que ignora los
+                // `transform`. Hacen falta los dos: el rect dice donde estaba, y el layout dice si
+                // la carta cambio de tamaño DE VERDAD -el zoom- o solo esta escalada por CSS
+                // -.card.selected, la que esta usando su Activa- (Toto, 18-ago-2026).
+                const r = el.getBoundingClientRect();
+                r.__ow = el.offsetWidth; r.__oh = el.offsetHeight;
+                foto.set(el.getAttribute('data-id'), r);
             });
             return foto;
         }
@@ -1641,8 +1647,23 @@
                 // esquinas, así que con tamaños distintos el translate sale desviado -la carta
                 // aparecía arriba-izquierda y saltaba a su sitio en unos frames- y además taparía
                 // la transición suave que ya tiene el propio zoom (Toto, 13-ago-2026).
-                if (Math.abs(antes.width - ahora.width) > 0.5 || Math.abs(antes.height - ahora.height) > 0.5) return;
-                const dx = antes.left - ahora.left, dy = antes.top - ahora.top;
+                // Un ESCALADO uniforme no descalifica a la carta (Toto, 18-ago-2026). Este guarda
+                // existe para el zoom, donde la carta cambia de tamaño de verdad; pero .card.selected
+                // aplica `scale(1.2)`, asi que la carta que esta usando su Activa medía distinto
+                // antes y despues del repintado y se quedaba FUERA del deslizamiento: se clavaba en
+                // su destino mientras las demas se movian. Se compara la PROPORCION: si ancho y alto
+                // cambiaron en el mismo factor, es un escalado y sigue valiendo.
+                // El tamaño que cuenta es el de LAYOUT: un `scale` del CSS no descalifica a la
+                // carta, un cambio real de tamaño -el zoom- si. Sin foto de layout (una carta que
+                // acaba de nacer) se cae al criterio de antes, el del rect.
+                const _owAntes = antes.__ow, _ohAntes = antes.__oh;
+                const _dw = (_owAntes !== undefined) ? Math.abs(_owAntes - el.offsetWidth) : Math.abs(antes.width - ahora.width);
+                const _dh = (_ohAntes !== undefined) ? Math.abs(_ohAntes - el.offsetHeight) : Math.abs(antes.height - ahora.height);
+                if (_dw > 0.5 || _dh > 0.5) return;
+                // Y el desplazamiento se mide entre CENTROS, no entre esquinas: con la carta
+                // escalada, su esquina se mueve aunque su centro siga en el mismo sitio.
+                const dx = (antes.left + antes.width / 2) - (ahora.left + ahora.width / 2);
+                const dy = (antes.top + antes.height / 2) - (ahora.top + ahora.height / 2);
                 if (!dx && !dy) return;
                 // SE DESLIZA EL WRAPPER, NO LA CARTA SUELTA (Toto, 18-ago-2026). Los equipos
                 // anexados son hermanos de la carta dentro de .card-wrapper, asi que moviendo
@@ -1654,10 +1675,14 @@
                     ? el.parentElement : el;
                 if (_mov !== el && _mov.style.transform) return;   // el wrapper ya esta animandose
                 _mov.style.transition = 'none';
-                _mov.style.transform = `translate(${dx}px, ${dy}px)`;
+                // Se COMPONE con el transform que ya traiga del CSS (el scale de .selected): un
+                // translate a secas lo borraria y la carta pegaria un bajon de tamaño al deslizarse.
+                const _cs = (typeof getComputedStyle === 'function') ? getComputedStyle(_mov).transform : 'none';
+                const _base = (_cs && _cs !== 'none') ? ` ${_cs}` : '';
+                _mov.style.transform = `translate(${dx}px, ${dy}px)${_base}`;
                 void _mov.offsetWidth;                     // fuerza el reflow antes de soltar
                 _mov.style.transition = `transform ${DESLIZA_MS}ms cubic-bezier(.2,.8,.2,1)`;
-                _mov.style.transform = '';
+                _mov.style.transform = _base ? _cs : '';
                 setTimeout(() => { _mov.style.transition = ''; }, DESLIZA_MS + 50);
             });
         }
