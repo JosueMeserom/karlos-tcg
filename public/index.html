@@ -536,10 +536,6 @@
                         onclick="game.openDiscardViewer('p1', event)">
                         DESCARTES <span class="count-badge" id="p1-discard-count">0</span>
                     </div>
-                    <!-- TEMPORAL: comparador A/B de la animacion de la pila. Se quita cuando
-                         Toto decida cual se queda (16-ago-2026). -->
-                    <div id="descarte-modo" style="left:20px; top:132px;"
-                         onclick="event.stopPropagation(); game.alternarModoDescarte()">MODO B</div>
                 </div>
             </div>
 
@@ -2205,8 +2201,6 @@
                 this.activePlayerId = 'p1';
                 this.startingPlayerId = 'p1';
                 this.phase = 'INICIO';
-                try { this._modoDescarte = localStorage.getItem('karlos_modo_descarte') || 'B'; }
-                catch (e) { this._modoDescarte = 'B'; }   // TEMPORAL: ver alternarModoDescarte
                 if (this.dslPick) { const r = this.dslPick.resolve; this.dslPick = null; r(null); }
                 this.selectedCard = null;
                 this.inputState = 'IDLE';
@@ -4231,6 +4225,13 @@
                 for (const pid of ['p1', 'p2']) {
                     const p = this.players[pid];
                     p.hand = []; p.vanguard = []; p.rearguard = []; p.deck = []; p.discard = []; p.retribution = []; p.activeEvent = null;
+                    // Banderas de UNA VEZ POR PARTIDA. Sin esto, cargar un escenario o una
+                    // partida guardada heredaba el "ya la has usado" de la partida anterior y la
+                    // carta quedaba muerta sin explicacion (Toto, 18-ago-2026). Se limpian con el
+                    // resto del jugador, que es donde se limpia todo lo demas: si manana hay una
+                    // bandera nueva, este es el sitio evidente donde ponerla.
+                    p.hasUsedShichishito = false;
+                    p.espadaV_Used = false;
                     p.cardCounts = {};
                     const cfg = spec[pid] || {};
                     if (cfg.hp !== undefined) p.hp = cfg.hp;
@@ -5642,7 +5643,22 @@
             // generaliza (Toto, 7-ago-2026) porque la norma es la misma para las dos: buscar
             // en una pila SIEMPRE enseña la pila entera con las elegibles en verde, nunca el
             // modal genérico de selección -que solo lista las válidas y no deja ver el resto-.
-            openDeckSearchViewer(playerId, elegibles, titulo = null, aviso = null, maxCount = 1, zona = 'deck') {
+            // `buscado`: qué se estaba buscando (nombre o lista de nombres). Sirve para el AVISO
+            // AUTOMÁTICO de abajo. Nace de que abrir el visor con la pila sin nada elegible y sin
+            // una palabra que lo explique se coló en Igniz y en Meca EBA, mientras Zoe (calcinante)
+            // y el op BUSCAR sí avisaban -cada una con su texto escrito a mano- (Toto, 18-ago-2026).
+            openDeckSearchViewer(playerId, elegibles, titulo = null, aviso = null, maxCount = 1, zona = 'deck', buscado = null) {
+                // GARANTÍA: nunca se abre un visor vacío mudo. Si nadie pasó aviso y no hay nada
+                // elegible, lo redacta el propio visor, con los nombres si se los han dicho. Así no
+                // depende de que cada carta se acuerde: es imposible olvidarlo.
+                if (!aviso && (!elegibles || !elegibles.length)) {
+                    const _n = (Array.isArray(buscado) ? buscado : (buscado ? [buscado] : []))
+                        .filter(Boolean).filter((x, i, a) => a.indexOf(x) === i);
+                    const _pila = zona === 'discard' ? 'los descartes' : 'el mazo';
+                    if (_n.length === 1) aviso = `No queda ning\u00fan ${_n[0]} en ${_pila}.`;
+                    else if (_n.length > 1) aviso = `No queda ning\u00fan ${_n.slice(0, -1).join(', ')} ni ${_n[_n.length - 1]} en ${_pila}.`;
+                    else aviso = `No hay cartas elegibles en ${_pila}.`;
+                }
                 const multi = maxCount > 1;
                 const _esDescartes = zona === 'discard';
                 return new Promise(resolveRaw => {
@@ -6470,18 +6486,6 @@
                     }
                 }
                 return out;
-            }
-
-            // TEMPORAL (16-ago-2026): comparador de las dos versiones de la animacion de la pila
-            // de descartes. A = siempre un pulso. B = fundido cuando la pila NACE (de 0 a 1) y
-            // pulso el resto de las veces. Se recuerda entre recargas para poder ir probando.
-            alternarModoDescarte() {
-                this._modoDescarte = this._modoDescarte === 'A' ? 'B' : 'A';
-                try { localStorage.setItem('karlos_modo_descarte', this._modoDescarte); } catch (e) {}
-                const b = document.getElementById('descarte-modo');
-                if (b) b.innerText = 'MODO ' + this._modoDescarte;
-                this.logMsg(`[DEBUG] Animacion de la pila de descartes: modo ${this._modoDescarte}` +
-                    (this._modoDescarte === 'B' ? ' (fundido al nacer + pulso)' : ' (siempre pulso)'), 'debug');
             }
 
             pintarReposoFase(text) {
@@ -9929,10 +9933,9 @@
                 const _antes = this._descarteAnterior[pid];
                 this._descarteAnterior[pid] = discardCount;
                 if (_antes !== undefined && discardCount > _antes && !this.isSkippingAnim) {
-                    // Modo B (por defecto): si la pila NACE -de 0 a 1- se materializa entera con
-                    // un fundido, como la ranura de Evento al colocarse; si ya tenia cartas, solo
-                    // pega el pulso. Modo A: siempre el pulso. El toggle esta debajo de la pila.
-                    const _naceLaPila = _antes === 0 && this._modoDescarte !== 'A';
+                    // Si la pila NACE -de 0 a 1- se materializa entera con un fundido, como la
+                    // ranura de Evento al colocarse; si ya tenia cartas, solo pega el pulso.
+                    const _naceLaPila = _antes === 0;   // modo B, el que eligio Toto
                     const _clase = _naceLaPila ? 'descarte-nace' : 'descarte-pulso';
                     discardEl.classList.remove('descarte-nace', 'descarte-pulso');
                     void discardEl.offsetWidth;   // reinicia la animacion si caen dos seguidas
@@ -11103,6 +11106,7 @@
 
                 const exportPlayer = (p) => ({
                     id: p.id, hp: p.hp, hasUsedShichishito: p.hasUsedShichishito || false,
+                    espadaV_Used: p.espadaV_Used || false,   // faltaba: no viajaba en el estado
                     hand: p.hand.map(cloneCard),
                     vanguard: p.vanguard.map(cloneCard),
                     rearguard: p.rearguard.map(cloneCard),
@@ -11232,6 +11236,7 @@
                     const p = this.players[pid];
                     p.hp = pData.hp;
                     p.hasUsedShichishito = pData.hasUsedShichishito || false;
+                    p.espadaV_Used = pData.espadaV_Used || false;
                     p.hand = pData.hand.map(restoreCard);
                     p.vanguard = pData.vanguard.map(restoreCard);
                     p.rearguard = pData.rearguard.map(restoreCard);

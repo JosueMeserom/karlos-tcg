@@ -2964,7 +2964,7 @@ const CARD_DB = [
         text: "Requisito: un Personaje 'Karlos' en tu vanguardia. Anéxasela: +2 de Atq y +2 de Def mientras la lleve. Sólo puedes usar esta carta una vez por partida.",
         abilities: [
             { trigger: "JUGAR", requisitos: [
-                { de: "JUGADOR", campo: "hasUsedShichishito", op: "falsy", msg: "Ya has usado Shichishito en esta partida." },
+                { de: "JUGADOR", campo: "hasUsedShichishito", op: "falsy", msg: "Ya has empuñado la Shichishito en esta partida." },
                 { count: { zona: "VANGUARDIA", filtros: [ { campo: "type", op: "==", valor: "Personaje" }, { campo: "name", op: "contieneTexto", valor: "Karlos" } ] }, op: ">=", valor: 1, msg: "Necesitas a Karlos en la vanguardia." } ] },
             { trigger: "AL_EQUIPAR",
               mientrasEquipado: { atk: 2, def: 2 },
@@ -4773,8 +4773,26 @@ const CARD_DB = [
         
         // --- ACTIVA CORREGIDA (Lógica de mano vs mazo) ---
         onExecuteAbility: async function(card, game) {
-            game.modifyStat(card, 'furor', -2);
-            showFloatingText(card.instanceId, card.activeName, "ft-ability", -30);
+            // EL COSTE NO SE COBRA AQUÍ (§14, Toto 18-ago-2026). Se cobraba lo primero, antes
+            // del modal, y luego se DEVOLVÍA al cancelar: es exactamente lo que la norma prohíbe
+            // -nada irreversible mientras se pueda cancelar-. Ahora se cobra en el punto de
+            // compromiso, que depende del camino, y no queda nada que devolver.
+            const _cobrar = () => {
+                if (card.__ignizCobrado) return;
+                card.__ignizCobrado = true;
+                game.modifyStat(card, 'furor', -2);
+                showFloatingText(card.instanceId, card.activeName, "ft-ability", -30);
+            };
+            // Salida limpia de una cancelación: sin esto Igniz se quedaba resaltada esperando algo
+            // que ya no iba a pasar, con la X en gris y el velo diciendo "no puedes cancelar".
+            const _abortar = () => {
+                delete card.__ignizCobrado;
+                game.cancelAction();
+                game.inputState = 'IDLE';
+                game.isActionLocked = false;
+                game.selectedCard = null;
+                game.render();
+            };
             
             const p = game.players[card.owner];
             
@@ -4794,11 +4812,10 @@ const CARD_DB = [
                 });
 
                 if (choice === 'cancel') {
-                    game.modifyStat(card, 'furor', 2); // Devolvemos coste
-                    game.cancelAction();
-                    game.render();
+                    _abortar();   // nada que devolver: no se ha cobrado
                     return;
                 } else if (choice === 'hand') {
+                    _cobrar();   // punto de compromiso: la sacas de tu mano, ya es irreversible
                     mecaToPlay = mecasInHand[0]; // Coge el primero sin preguntar
                     const hIdx = p.hand.findIndex(c => c.instanceId === mecaToPlay.instanceId);
                     p.hand.splice(hIdx, 1);
@@ -4813,7 +4830,11 @@ const CARD_DB = [
             // 2. Si ha decidido (o no le queda otra) que buscar en mazo:
             if (searchedDeck) {
                 const validDeck = p.deck.filter(c => c.name === "Meca EBA");
-                const _elegida = await game.openDeckSearchViewer(card.owner, validDeck, 'BUSCAR MECA EBA EN MAZO');
+                // §12.bis: el MAZO compromete al ABRIR el visor -mirarlo sería leerlo gratis-,
+                // así que el coste se cobra justo antes. Si no queda ninguno se pierde, que es lo
+                // que avisa el propio modal ("te quedarás sin llamarlo").
+                _cobrar();
+                const _elegida = await game.openDeckSearchViewer(card.owner, validDeck, 'BUSCAR MECA EBA EN MAZO', null, 1, 'deck', 'Meca EBA');
                 const chosen = _elegida ? [_elegida] : [];
                 
                 // Barajamos SIEMPRE tras abrir el modal del mazo
@@ -4821,12 +4842,7 @@ const CARD_DB = [
                 if (typeof animateShuffle === 'function') await animateShuffle(p.id);
                 game.shuffle(p.deck);
 
-                if (!chosen || chosen.length === 0) {
-                    game.modifyStat(card, 'furor', 2); // Devolver coste
-                    game.cancelAction(); 
-                    game.render();
-                    return;
-                }
+                if (!chosen || chosen.length === 0) { _abortar(); return; }   // ya se cobró: §12.bis
                 
                 mecaToPlay = chosen[0];
                 const dIdx = p.deck.findIndex(c => c.instanceId === mecaToPlay.instanceId);
@@ -4834,6 +4850,8 @@ const CARD_DB = [
             }
 
             // 3. Colocación y Activación
+            _cobrar();                     // red por si un camino nuevo llegara aquí sin cobrar
+            delete card.__ignizCobrado;    // marca de ESTA activación: no viaja con la carta
             game.logMsg(`¡Igniz llama a su ${game.getCardNameWithOwner(mecaToPlay)}!`, 'ability');
 
             const placeChoice = p.vanguard.length < 4 ? 'vanguard' : 'rearguard';
@@ -4849,7 +4867,12 @@ const CARD_DB = [
                 return mecaToPlay.instanceId;
             };
             if (typeof animarPresentacionCarta === 'function') {
-                await animarPresentacionCarta(mecaToPlay.id, `#${p.id}-deck-stack`, _filaMeca, true,
+                // El ORIGEN es de donde sale de verdad. Estaba cableado al mazo, así que un Meca
+                // cogido de la MANO se veía salir volando de la pila de la izquierda (Toto,
+                // 18-ago-2026). El dorso igual: del mazo viene tapada; de la mano ya la veías.
+                const _desdeMano = !searchedDeck;
+                await animarPresentacionCarta(mecaToPlay.id,
+                    _desdeMano ? `#${p.id}-hand` : `#${p.id}-deck-stack`, _filaMeca, !_desdeMano,
                     { zonaSel: _filaMeca, colocar: _colocarMeca });
             } else { _colocarMeca(); }
 
