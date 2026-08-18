@@ -27,6 +27,9 @@
 'use strict';
 const { correrSuite } = require('./harness');
 
+// El `campos` fuerza los tags en la INSTANCIA. Lo necesita la base VIEJA, cuyo ARMAMENTO MELÉ
+// filtra por el tag 'melé' leyéndolo de la carta en mano. Se mantiene tal cual: desde que la
+// Espada V nueva lleva 'Equipable' en su plantilla (18-ago-2026), las dos coinciden.
 const ESPADA_MELE = { carta: 'Espada V', campos: { tags: ['Equipable', 'melé'] } };
 
 const AVISO_RAW_VIEJA = {

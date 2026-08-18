@@ -164,7 +164,7 @@ const enCampo = (g, pid) => [...g.players[pid].vanguard, ...g.players[pid].rearg
         // tres cartas concretas, asi que las lista. El generico se reserva para cuando el filtro
         // no es un nombre -una etiqueta, un tipo-, donde nombrar algo seria inventarselo.
         check('...y CON el aviso, nombrando las tres que buscaba',
-            /No queda ning[uú]n Rebobinar, Cambio de canal ni Publicidad mental en el mazo/.test(visor.aviso || ''),
+            /No queda ninguna carta de Rebobinar, Cambio de canal ni de Publicidad mental en este mazo/.test(visor.aviso || ''),
             'aviso=' + JSON.stringify(visor.aviso));
         await paso({ cancelar: true });
     }

@@ -5647,13 +5647,13 @@
             // AUTOMÁTICO de abajo. Nace de que abrir el visor con la pila sin nada elegible y sin
             // una palabra que lo explique se coló en Igniz y en Meca EBA, mientras Zoe (calcinante)
             // y el op BUSCAR sí avisaban -cada una con su texto escrito a mano- (Toto, 18-ago-2026).
-            openDeckSearchViewer(playerId, elegibles, titulo = null, aviso = null, maxCount = 1, zona = 'deck', buscado = null) {
+            openDeckSearchViewer(playerId, elegibles, titulo = null, aviso = null, maxCount = 1, zona = 'deck', buscado = null, barajaDespues = false) {
                 // GARANTÍA: nunca se abre un visor vacío mudo. Si nadie pasó aviso y no hay nada
                 // elegible, lo redacta el propio visor, con los nombres si se los han dicho. Así no
                 // depende de que cada carta se acuerde: es imposible olvidarlo.
                 if (!aviso && (!elegibles || !elegibles.length)) {
                     aviso = (typeof DSL !== 'undefined' && DSL._avisoVacio)
-                        ? DSL._avisoVacio(buscado, zona)
+                        ? DSL._avisoVacio(buscado, zona, !!barajaDespues)
                         : 'No hay cartas elegibles aquí.';
                 }
                 const multi = maxCount > 1;

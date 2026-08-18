@@ -59,6 +59,43 @@ const EXENTAS = [
 // de la retribución). Se declaran para que no ensucien la lista de pendientes.
 const RESPALDOS = [/_yaColocada/, /_yaEnMano/];
 
+// ---- SALIDAS DE LA MANO -------------------------------------------------------------------
+// El gemelo del problema de arriba, y el que más veces se ha colado: una presentación que ARRANCA
+// en una mano tiene que llevar SIEMPRE las dos piezas que sacan la carta de ella —
+//   · `origenId`         : arranca el clon del hueco EXACTO y desliza el resto de la mano.
+//   · `alSalirDeLaMano`  : la saca del ESTADO en ese mismo instante.
+// Sin cualquiera de las dos se ve una COPIA fantasma en la mano mientras el original vuela. Le
+// pasó a Igniz el 18-ago-2026 y Toto avisó de que no era la primera vez, así que deja de
+// depender de acordarse: si el origen es `-hand`, esto lo exige.
+const salidas = [];
+{
+    const src = fs.readFileSync(path.join(RAIZ, 'public/cartas.js'), 'utf8');
+    const lineas = src.split('\n');
+    lineas.forEach((l, i) => {
+        if (!/animarPresentacionCarta\(/.test(l) || /^\s*\/\//.test(l)) return;
+        // La llamada y sus opciones caben de sobra en esta ventana.
+        const ventana = lineas.slice(i, i + 16).join('\n');
+        // Solo el ORIGEN (2º argumento). Mirar la ventana entera pillaba también las que
+        // ATERRIZAN en la mano viniendo de una pila, que no tienen nada que sacar de ella.
+        const _args = ventana.slice(ventana.indexOf('animarPresentacionCarta('));
+        const _origen = (_args.match(/animarPresentacionCarta\(\s*[^,]+,\s*([^,]+),/) || [])[1] || '';
+        if (!/-hand`/.test(_origen)) return;
+        // Neo se saca de la mano dentro de `sustituirEnCampo`, que la quita ANTES de medir para
+        // que el relevo con el cebo sea simultáneo. Ahí `alSalirDeLaMano` sobraría y además
+        // llegaría tarde. Es la excepción, y por eso está escrita.
+        if (/Neo/.test(ventana) || /neo\./.test(ventana)) return;
+        const falta = [];
+        if (!/origenId\s*:/.test(ventana)) falta.push('origenId');
+        if (!/alSalirDeLaMano\s*:/.test(ventana)) falta.push('alSalirDeLaMano');
+        let dueno = '(?)';
+        for (let j = i; j >= 0; j--) {
+            const m = lineas[j].match(/^\s*(?:id:\s*\d+,\s*)?name:\s*"([^"]+)"/);
+            if (m) { dueno = m[1]; break; }
+        }
+        salidas.push({ carta: dueno, linea: i + 1, falta });
+    });
+}
+
 const hallazgos = [];
 for (const rel of ['public/cartas.js', 'public/index.html']) {
     const lineas = fs.readFileSync(path.join(RAIZ, rel), 'utf8').split('\n');
@@ -104,5 +141,18 @@ pinta('Exentas', hallazgos.filter(h => h.estado === 'exenta'),
 pinta('POR REVISAR', hallazgos.filter(h => h.estado === 'revisar'),
     'meten una carta en la mano sin pasar por ningún camino conocido. Mirar una a una.');
 
+const malas = salidas.filter(s => s.falta.length);
+pinta('Salidas de la mano correctas', salidas.filter(s => !s.falta.length).map(s => ({
+    fichero: 'cartas.js', linea: s.linea, dueno: s.carta, motivo: null, contexto: '' })),
+    'presentan ARRANCANDO del hueco real y sacan la carta del estado a la vez.');
+if (malas.length) {
+    console.log(`## SALIDAS INCOMPLETAS (${malas.length}) — se verá una copia fantasma en la mano`);
+    malas.forEach(m => console.log(`   · ${m.carta} (cartas.js:${m.linea}) — le falta: ${m.falta.join(' y ')}`));
+    console.log();
+}
+
 const n = (e) => hallazgos.filter(h => h.estado === e).length;
 console.log(`TOTAL: ${hallazgos.length} llegadas · ${n('ok')} correctas · ${n('exenta')} exentas · ${n('revisar')} por revisar`);
+console.log(`       ${salidas.length} salidas de la mano · ${salidas.length - malas.length} correctas · ${malas.length} INCOMPLETAS`);
+// Esta mitad SÍ falla: que una carta se vea duplicada en la mano no es una decisión de diseño.
+if (malas.length) { console.log('\nHAY SALIDAS DE LA MANO INCOMPLETAS.'); process.exit(1); }

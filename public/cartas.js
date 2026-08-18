@@ -2961,7 +2961,7 @@ const CARD_DB = [
         name: "Shichishito", type: "Ayuda", subtype: "Arma legendaria", tags: ["Equipable", "melé"], rarity: "A", cost: 0, series: 1,
         // Requisito visible: a quién señala la flecha lima al presentarse (§14.bis).
         requisitoVisible: [ { quien: "ALIADO", zona: "vanguardia", filtros: [ { campo: "name", op: "contieneTexto", valor: "Karlos" }, { campo: "type", op: "==", valor: "Personaje" } ], uno: true } ],
-        text: "Requisito: un Personaje 'Karlos' en tu vanguardia. Anéxasela: +2 de Atq y +2 de Def mientras la lleve. Sólo puedes usar esta carta una vez por partida.",
+        text: "Requisito: un Personaje aliado 'Karlos' en tu vanguardia. Anéxasela a ese aliado: +2 de Atq y +2 de Def mientras la lleve. Sólo puedes usar esta carta una vez por partida.",
         abilities: [
             { trigger: "JUGAR", requisitos: [
                 { de: "JUGADOR", campo: "hasUsedShichishito", op: "falsy", msg: "Ya has empuñado la Shichishito en esta partida." },
@@ -3166,8 +3166,8 @@ const CARD_DB = [
         ],
     },
     {
-        name: "Infusión de maná", type: "Ayuda", subtype: "Técnica", cost: 1, rarity: "B", series: 1,
-        text: "Coste: 2 de Furor del aliado que la equipa. Equipable. Mientras la tenga equipada, todos sus ataques normales son tratados como ataques especiales.",
+        name: "Infusión de maná", type: "Ayuda", subtype: "Técnica", tags: ["Equipable"], cost: 1, rarity: "B", series: 1,
+        text: "Coste: 2 de Furor. Anéxasela al aliado que tributó: todos sus ataques normales cuentan como especiales mientras la lleve.",
         abilities: [
             { trigger: "JUGAR", requisitos: [
                 { count: { filtros: [ { campo: "furor", op: ">=", valor: 2 } ] }, op: ">=", valor: 1, msg: "No tienes ningún aliado con 2 o más de Furor para pagar el coste." } ] },
@@ -3208,10 +3208,10 @@ const CARD_DB = [
         ],
     },
     {
-        name: "Espada V", type: "Ayuda", subtype: "Arma", tags: ["melé"], cost: 1, rarity: "B", series: 1,
+        name: "Espada V", type: "Ayuda", subtype: "Arma", tags: ["melé"]  /* PENDIENTE: falta "Equipable" por consistencia; anadirlo destapa una divergencia con la base congelada (los tags no llegan a la instancia equipada en la nueva). Ver informe del 18-ago-2026. */, cost: 1, rarity: "B", series: 1,
         // Requisito visible: a quién señala la flecha lima al presentarse (§14.bis).
         requisitoVisible: [ { quien: "ALIADO", filtros: [ { campo: "type", op: "==", valor: "Personaje" } ], algunFiltro: [ { campo: "name", op: "contieneTexto", valor: "Karlos" }, { campo: "name", op: "==", valor: "Agah" } ], uno: true } ],
-        text: "Requisito: un Personaje aliado 'Karlos' o 'Agah'. Anéxasela: +2 de Atq mientras la lleve. Sólo puedes usar esta carta una vez por partida.",
+        text: "Requisito: un Personaje aliado 'Karlos' o 'Agah'. Anéxasela a ese aliado: +2 de Atq mientras la lleve. Sólo puedes usar esta carta una vez por partida.",
         abilities: [
             { trigger: "JUGAR", requisitos: [
                 { de: "JUGADOR", campo: "espadaV_Used", op: "falsy", msg: "Ya has empuñado la Espada V en esta partida." },
@@ -4817,8 +4817,10 @@ const CARD_DB = [
                 } else if (choice === 'hand') {
                     _cobrar();   // punto de compromiso: la sacas de tu mano, ya es irreversible
                     mecaToPlay = mecasInHand[0]; // Coge el primero sin preguntar
-                    const hIdx = p.hand.findIndex(c => c.instanceId === mecaToPlay.instanceId);
-                    p.hand.splice(hIdx, 1);
+                    // NO se saca de la mano aquí: lo hace la presentación, a la vez que arranca su
+                    // clon del hueco exacto y el resto de la mano se desliza. Sacarla antes dejaba
+                    // el estado y el DOM descompasados y se veía una COPIA en la mano mientras el
+                    // original volaba (Toto, 18-ago-2026; van varias veces con este mismo fallo).
                 } else if (choice === 'deck') {
                     searchedDeck = true;
                 }
@@ -4873,7 +4875,17 @@ const CARD_DB = [
                 const _desdeMano = !searchedDeck;
                 await animarPresentacionCarta(mecaToPlay.id,
                     _desdeMano ? `#${p.id}-hand` : `#${p.id}-deck-stack`, _filaMeca, !_desdeMano,
-                    { zonaSel: _filaMeca, colocar: _colocarMeca });
+                    { zonaSel: _filaMeca, colocar: _colocarMeca,
+                      // Las DOS piezas que hacen que una carta salga de la mano de verdad:
+                      // `origenId` arranca su clon del hueco exacto y desliza el resto, y
+                      // `alSalirDeLaMano` la saca del ESTADO en ese mismo instante. Faltando
+                      // cualquiera de las dos se ve la copia fantasma. Lo comprueba
+                      // tests/auditar_llegadas.js.
+                      origenId: _desdeMano ? mecaToPlay.instanceId : null,
+                      alSalirDeLaMano: _desdeMano ? () => {
+                          const hi = p.hand.findIndex(c => c.instanceId === mecaToPlay.instanceId);
+                          if (hi !== -1) p.hand.splice(hi, 1);
+                      } : null });
             } else { _colocarMeca(); }
 
             const mecaTemplate = getCardTemplate(mecaToPlay.id);
@@ -7317,6 +7329,18 @@ const DSL = {
         }
         if (spec.algunEstado) pool = pool.filter(c => c.status && spec.algunEstado.some(k => c.status[k])); // mismo criterio que canPlayCard (JUGAR)
         (spec.filtros || []).forEach(f => { pool = pool.filter(c => DSL._match(c, f)); });
+        // Filtro IMPLÍCITO de los equipables: si la carta que se está jugando es un equipo, quedan
+        // fuera los aliados que ya lleven uno de su tipo. Va aquí y no en los `requisitos` de cada
+        // carta a propósito -son diez, y la undécima se olvidaría-, y como filtro de elección hace
+        // que el aliado inelegible ni siquiera salga con reborde verde, que es la norma de UX.
+        // Solo cuando la carta jugada es la AYUDA que se anexa. Karlitos también pasa por
+        // _esEquipo -su ARMAMENTO MELÉ usa `EQUIPAR invertido`, donde él se calza un arma-, y ahí
+        // el pool son ARMAS, no portadores: aplicarles esta regla no tiene sentido y rompía su
+        // Activa entera.
+        const _tEq = selfCard ? DSL._tmpl(selfCard.id) : null;
+        if (_tEq && _tEq.type === 'Ayuda' && DSL._esEquipo(_tEq)) {
+            pool = pool.filter(c => DSL._puedeEquiparse(c, _tEq));
+        }
         // algunFiltro (Karlitos, 31-jul-2026): OR de filtros, como ya aceptaban ELEGIR y BUSCAR.
         // Faltaba aquí, así que un `count` con `algunFiltro` NO filtraba nada y contaba de más
         // (el requisito "tienes un Arma en la mano" daba por bueno cualquier carta).
@@ -7657,12 +7681,31 @@ const DSL = {
     // sitios era pedir que se separaran.
     _avisoVacio(nombres, zona, barajaDespues) {
         const n = (Array.isArray(nombres) ? nombres : (nombres ? [nombres] : [])).filter(Boolean);
-        const pila = zona === 'discard' ? 'los descartes' : 'el mazo';
+        const pila = zona === 'discard' ? 'esta pila de descartes' : 'este mazo';
+        // "No queda ninguna CARTA DE X" y no "ningún X": los nombres de carta no concuerdan en
+        // género -"ningún Súper Evolución" chirría- y anteponer "carta de" lo resuelve para todos
+        // de una vez, sin tener que saber el género de cada una (Toto, 18-ago-2026).
         let t;
-        if (n.length === 1) t = `No queda ningún ${n[0]} en ${pila}.`;
-        else if (n.length > 1) t = `No queda ningún ${n.slice(0, -1).join(', ')} ni ${n[n.length - 1]} en ${pila}.`;
+        if (n.length === 1) t = `No queda ninguna carta de ${n[0]} en ${pila}.`;
+        else if (n.length > 1) t = `No queda ninguna carta de ${n.slice(0, -1).join(', ')} ni de ${n[n.length - 1]} en ${pila}.`;
         else t = `No hay cartas elegibles en ${pila}.`;
         return barajaDespues ? t + ' Se barajará al cerrar el visor.' : t;
+    },
+
+    // UN EQUIPO POR TIPO (Toto, 18-ago-2026). Puedes llevar varios equipos a la vez mientras no
+    // sean del mismo tipo. "Arma" y "Arma legendaria" cuentan como EL MISMO tipo a estos efectos y
+    // solo a estos: no puedes empuñar dos armas por muy legendaria que sea una.
+    _tipoEquipo(tmpl) {
+        const st = String((tmpl && tmpl.subtype) || '');
+        return /^Arma/.test(st) ? 'Arma' : st;
+    },
+    // ¿Puede ESTE portador ponerse ESTE equipo? Se consulta desde los filtros de elección, así que
+    // un aliado que ya lleve algo de ese tipo simplemente no sale con reborde verde.
+    _puedeEquiparse(portador, tmplEquipo) {
+        const tipo = DSL._tipoEquipo(tmplEquipo);
+        if (!tipo) return true;
+        return !((portador && portador.equippedCards) || []).some(eq =>
+            DSL._tipoEquipo(typeof getCardTemplate === 'function' ? getCardTemplate(eq.id) : null) === tipo);
     },
 
     _esEquipo(tmpl) {
@@ -8210,7 +8253,7 @@ const DSL = {
                         // del barajado sí es de este camino, así que se añade si toca.
                         const _nom = DSL._nombresBuscados(e);
                         const _aviso = poolZona.length ? null : DSL._avisoVacio(_nom, 'deck', !!e.barajarDespues);
-                        const r = await game.openDeckSearchViewer(pid, poolZona, F(e.titulo || 'ELIGE UNA CARTA'), _aviso, e.cantidad || 1, 'deck', _nom);
+                        const r = await game.openDeckSearchViewer(pid, poolZona, F(e.titulo || 'ELIGE UNA CARTA'), _aviso, e.cantidad || 1, 'deck', _nom, !!e.barajarDespues);
                         const elegidas = Array.isArray(r) ? r : (r ? [r] : []);
                         if (elegidas.length > 0) { for (const t of elegidas) await aMano(t); algunExito = true; }
                         else if (e.logSinEleccion) game.logMsg(F(e.logSinEleccion), 'system');
