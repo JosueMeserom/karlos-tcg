@@ -3208,7 +3208,14 @@ const CARD_DB = [
         ],
     },
     {
-        name: "Espada V", type: "Ayuda", subtype: "Arma", tags: ["melé"]  /* PENDIENTE: falta "Equipable" por consistencia; anadirlo destapa una divergencia con la base congelada (los tags no llegan a la instancia equipada en la nueva). Ver informe del 18-ago-2026. */, cost: 1, rarity: "B", series: 1,
+        name: "Espada V", type: "Ayuda", subtype: "Arma", tags: ["melé"], cost: 1, rarity: "B", series: 1,
+        // SIN "Equipable" A PROPÓSITO, y no por descuido (18-ago-2026). Las otras nueve
+        // equipables lo llevan y esta debería, pero la BASE CONGELADA no tiene `tags` en Espada V
+        // -literalmente `undefined`-, y regresion56 fuerza los tags de la instancia con un
+        // `campos` para que el ARMAMENTO MELÉ de Honsow, que filtra por la etiqueta "melé", pueda
+        // encontrarla en la base vieja. Añadirlo aquí saca una divergencia con esa base que NO es
+        // un bug del juego: es que las dos plantillas dicen cosas distintas. Arreglarlo de verdad
+        // pide decidir qué hacer con la base congelada, y eso es decisión de Toto.
         // Requisito visible: a quién señala la flecha lima al presentarse (§14.bis).
         requisitoVisible: [ { quien: "ALIADO", filtros: [ { campo: "type", op: "==", valor: "Personaje" } ], algunFiltro: [ { campo: "name", op: "contieneTexto", valor: "Karlos" }, { campo: "name", op: "==", valor: "Agah" } ], uno: true } ],
         text: "Requisito: un Personaje aliado 'Karlos' o 'Agah'. Anéxasela a ese aliado: +2 de Atq mientras la lleve. Sólo puedes usar esta carta una vez por partida.",

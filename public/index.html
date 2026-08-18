@@ -10986,6 +10986,12 @@
                         eqEl.className = 'card equipped-card-visual';
                         eqEl.style.top = `-${15 + (idx * 10)}px`;
                         eqEl.style.left = `${15 + (idx * 10)}px`;
+                        // El SEGUNDO equipo va DEBAJO del primero, no encima (Toto, 18-ago-2026).
+                        // Todos comparten z-index 0 en el CSS, así que mandaba el orden del DOM y el
+                        // último pintaba arriba: se veía la carta nueva tapando a la que ya estaba
+                        // puesta, al revés de como se apilan las cosas de verdad. Descendente por
+                        // índice, y siempre por debajo de la carta que los lleva.
+                        eqEl.style.zIndex = String(Math.max(1, 8 - idx));
                         
                         eqEl.style.pointerEvents = 'auto'; 
                         eqEl.style.cursor = 'help'; 
@@ -10994,14 +11000,14 @@
                         eqEl.onmouseenter = (e) => {
                             e.stopPropagation(); 
                             this.startPreview(eq);
-                            eqEl.style.zIndex = "100"; 
+                            eqEl.style.zIndex = "100";   // al inspeccionarlo sí sube del todo 
                             eqEl.style.filter = "brightness(1) sepia(0)"; 
                         };
                         
                         eqEl.onmouseleave = (e) => {
                             e.stopPropagation();
                             this.stopPreview();
-                            eqEl.style.zIndex = "0"; 
+                            eqEl.style.zIndex = String(Math.max(1, 8 - idx));   // vuelve a SU sitio en la pila, no a 0
                             eqEl.style.filter = "brightness(0.6) sepia(0.3)";
                         };
 
