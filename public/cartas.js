@@ -8748,7 +8748,10 @@ const DSL = {
             // decline tenían hasta ahora forma de disparar un efecto de verdad.
             if (!pool.length && _sinPortador) {
                 game.logError(`No hay ningún aliado al que anexar ${DSL._nombre(game, sourceCard)}: ya llevan un equipo de ese tipo.`);
-                return { ok: false };   // la carta NO se juega: sigue en la mano
+                // `false` y NO `{ ok: false }`: _runEffectList aborta con `if (r === false)`, asi
+                // que un objeto -que es truthy- pasaba de largo y la jugada seguia. Es el mismo
+                // return que usa `abortaSiVacio`.
+                return false;   // la carta NO se juega: sigue en la mano
             }
             if (!pool.length) {
                 if (e.logSiVacio) game.logMsg(DSL._fill(e.logSiVacio, Object.assign({}, (DSL._vars && DSL._vars[sourceCard.instanceId]) || {}, { carta: DSL._nombre(game, sourceCard) })), e.logSiVacioTipo || 'ability');
