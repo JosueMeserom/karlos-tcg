@@ -2166,7 +2166,12 @@
                     : []);
                 _lista.forEach((el, k) => {
                     _subidos.push({ el, z: el.style.zIndex, pos: el.style.position });
-                    if (!el.style.position) el.style.position = 'relative';
+                    // `position` solo si es STATIC. Los equipos ya son `absolute` por CSS, y
+                    // ponerles `relative` los metia en el flujo: la fila de vanguardia se estiraba
+                    // y los equipos saltaban de sitio durante el viaje (Toto, 18-ago-2026). Un
+                    // elemento ya posicionado no necesita nada para que su z-index cuente.
+                    const _cs = (typeof getComputedStyle === 'function') ? getComputedStyle(el) : null;
+                    if (!_cs || _cs.position === 'static') el.style.position = 'relative';
                     el.style.zIndex = String(3910 - k);   // 3910 la carta, luego los equipos
                 });
             };
