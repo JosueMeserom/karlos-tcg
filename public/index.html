@@ -1644,12 +1644,21 @@
                 if (Math.abs(antes.width - ahora.width) > 0.5 || Math.abs(antes.height - ahora.height) > 0.5) return;
                 const dx = antes.left - ahora.left, dy = antes.top - ahora.top;
                 if (!dx && !dy) return;
-                el.style.transition = 'none';
-                el.style.transform = `translate(${dx}px, ${dy}px)`;
-                void el.offsetWidth;                       // fuerza el reflow antes de soltar
-                el.style.transition = `transform ${DESLIZA_MS}ms cubic-bezier(.2,.8,.2,1)`;
-                el.style.transform = '';
-                setTimeout(() => { el.style.transition = ''; }, DESLIZA_MS + 50);
+                // SE DESLIZA EL WRAPPER, NO LA CARTA SUELTA (Toto, 18-ago-2026). Los equipos
+                // anexados son hermanos de la carta dentro de .card-wrapper, asi que moviendo
+                // solo la carta se quedaban clavados en su sitio nuevo desde el primer frame
+                // -se teletransportaban mientras su portador andaba-. Moviendo el wrapper viajan
+                // pegados, igual que ya hacen cuando la carta embiste al atacar. Sin wrapper
+                // -lo normal, una carta sin equipos- se mueve ella misma, como siempre.
+                const _mov = (el.parentElement && el.parentElement.classList.contains('card-wrapper'))
+                    ? el.parentElement : el;
+                if (_mov !== el && _mov.style.transform) return;   // el wrapper ya esta animandose
+                _mov.style.transition = 'none';
+                _mov.style.transform = `translate(${dx}px, ${dy}px)`;
+                void _mov.offsetWidth;                     // fuerza el reflow antes de soltar
+                _mov.style.transition = `transform ${DESLIZA_MS}ms cubic-bezier(.2,.8,.2,1)`;
+                _mov.style.transform = '';
+                setTimeout(() => { _mov.style.transition = ''; }, DESLIZA_MS + 50);
             });
         }
 
