@@ -2005,6 +2005,10 @@
             // `zonaSel` admite una FUNCIÓN, y se resuelve AQUÍ: si la carta ha pagado su coste en
             // el escaparate, su zona puede depender de lo que ese coste haya cambiado (Némesis
             // vacía su propia vanguardia, así que deja de estar llena y ya no va a retaguardia).
+            // Aviso al render: esta pila la estrena el CRUCE de esta presentacion, no su propio
+            // repintado. Se arma antes de `colocar`, que es quien dispara ese repintado.
+            const _mFund = (opts && opts.fundirEn || '').match(/#(p\d)-discard-stack/);
+            if (_mFund) g._descarteFundiendo = _mFund[1];
             const _zonaSel = opts && (typeof opts.zonaSel === 'function' ? opts.zonaSel() : opts.zonaSel);
             if (opts && typeof opts.colocar === 'function' && !_zonaSel) {
                 opts.colocar();
@@ -2140,6 +2144,10 @@
                 cont.style.opacity = '0';
                 if (_pilaEstrena) {
                     _fundir.classList.remove('empty-slot'); _fundir.classList.add('filled');
+                    _fundir.classList.remove('descarte-nace');
+                    void _fundir.offsetWidth;
+                    _fundir.classList.add('descarte-nace');   // el estreno, AQUI, no al arrancar
+                    setTimeout(() => _fundir.classList.remove('descarte-nace'), 460);
                     if (_badge) { _badge.style.transition = `opacity ${MORPH}ms ease`; _badge.style.opacity = '1'; }
                 }
                 await g.sleep(MORPH);
@@ -2147,6 +2155,7 @@
                 _real.style.opacity = '';
                 if (_badge) { _badge.style.transition = ''; _badge.style.opacity = ''; }
             }
+            g._descarteFundiendo = null;   // se desarma pase lo que pase, tambien si no hubo cruce
             cont.remove();
             if (idEntrante) {
                 const real = document.querySelector(`[data-id="${idEntrante}"]`);
@@ -9979,7 +9988,12 @@
                 this._descarteAnterior = this._descarteAnterior || {};
                 const _antes = this._descarteAnterior[pid];
                 this._descarteAnterior[pid] = discardCount;
-                if (_antes !== undefined && discardCount > _antes && !this.isSkippingAnim) {
+                // Si una presentacion se va a FUNDIR con esta pila, el estreno lo hace ese cruce
+                // y aqui no se anima nada: `colocar` corre al arrancar el viaje, asi que el
+                // "nace" saltaba con la carta todavia en el escaparate y se veia como un bote
+                // semitransparente al empezar a moverse (Toto, 18-ago-2026).
+                if (_antes !== undefined && discardCount > _antes && !this.isSkippingAnim
+                    && this._descarteFundiendo !== pid) {
                     // Si la pila NACE -de 0 a 1- se materializa entera con un fundido, como la
                     // ranura de Evento al colocarse; si ya tenia cartas, solo pega el pulso.
                     const _naceLaPila = _antes === 0;   // modo B, el que eligio Toto
