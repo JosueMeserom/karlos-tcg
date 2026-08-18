@@ -263,6 +263,15 @@ const contador = (c, k) => (c.counters && c.counters[k] && c.counters[k].count) 
             !_pool.includes('Karlos'), 'pool=' + JSON.stringify(_pool));
 
         // Y la otra mitad: un tipo DISTINTO sí entra. Hagoromo es Vestimenta.
+        // Y sin portador válido la jugada se ABORTA: la carta sigue en la mano. Un ELEGIR con el
+        // pool vacío devuelve 'skip' y la cadena seguía corriendo -la Ayuda se presentaba, se iba
+        // al descarte y volvía a la mano-.
+        check('...y la Espada V se queda en la mano, sin presentarse',
+            g.players.p1.hand.some(c => c.name === 'Espada V'),
+            'mano=' + g.players.p1.hand.map(c => c.name).join(','));
+        check('...y no ha acabado en los descartes', !g.players.p1.discard.some(c => c.name === 'Espada V'),
+            'descartes=' + g.players.p1.discard.map(c => c.name).join(','));
+
         await paso({ jugar: 'Hagoromo' });
         const _pool2 = ((ctx.pendientes[0] || {}).pool || []).map(c => c.name);
         check('...pero el Hagoromo sí, porque es Vestimenta', _pool2.includes('Karlos'),

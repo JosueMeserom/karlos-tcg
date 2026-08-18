@@ -7662,7 +7662,24 @@ const DSL = {
         // -lo crea el render del EQUIPAR-, asi que se le da al escaparate una funcion que se llama
         // ya en el aterrizaje: para entonces la carta esta anexada y el elemento existe. Si por lo
         // que sea no lo encuentra, devuelve null y el escaparate se comporta como antes.
+        // El aterrizaje ANEXA la carta y devuelve su visual para cruzarse con el. Se llama al
+        // principio del viaje, igual que el Evento resuelve su ranura: el visual real nace ya pero
+        // oculto (el escaparate le pone opacity 0), el clon viaja entero y visible hasta el hueco,
+        // y al llegar se cruzan. Antes esto solo hacia render() y devolvia null -la carta aun no
+        // estaba anexada-, asi que caia al fade y no se veia nada (Toto, 18-ago-2026).
+        // El EQUIPAR posterior es idempotente, asi que no la anexa dos veces.
         game._presentacionArmada.aterrizarEn = () => {
+            const _p = game.players[sourceCard.owner];
+            if (!portador.equippedCards) portador.equippedCards = [];
+            if (!portador.equippedCards.some(x => x.instanceId === sourceCard.instanceId)) {
+                const hi = _p.hand.findIndex(x => x.instanceId === sourceCard.instanceId);
+                if (hi !== -1) _p.hand.splice(hi, 1);
+                portador.equippedCards.push(sourceCard);
+                sourceCard.location = 'equipped';
+                sourceCard.equippedTo = portador.instanceId;
+                // El copyId NO se asigna aqui: lo hace EQUIPAR, que es donde se hacia siempre
+                // ("el [n] nace al salir de la mano"). Adelantarlo cambiaba los logs.
+            }
             if (typeof game.render === 'function') game.render();
             return document.querySelector(`[data-eq="${sourceCard.instanceId}"]`);
         };
@@ -8597,8 +8614,14 @@ const DSL = {
                 return true;
             }
             if (!target.equippedCards) target.equippedCards = [];
-            target.equippedCards.push(sourceCard);
-            if (!e.soloAnexar) {
+            // IDEMPOTENTE (18-ago-2026): el aterrizaje de la presentacion puede haber anexado ya la
+            // carta -lo hace para poder CRUZARSE con su visual en vez de desvanecerse, igual que el
+            // Evento con su ranura-. Si ya esta, no se anexa dos veces; el resto (logs, flotantes,
+            // updatePassives) sigue corriendo igual.
+            const _yaAnexada = target.equippedCards.some(x => x.instanceId === sourceCard.instanceId);
+            if (!_yaAnexada) target.equippedCards.push(sourceCard);
+            if (!e.soloAnexar && _yaAnexada && typeof game.assignCopyId === 'function') game.assignCopyId(sourceCard);
+            if (!e.soloAnexar && !_yaAnexada) {
                 const hi = p.hand.findIndex(x => x.instanceId === sourceCard.instanceId);
                 if (hi !== -1) p.hand.splice(hi, 1);
                 sourceCard.location = 'equipped';
@@ -8698,8 +8721,16 @@ const DSL = {
             // construye su pool a mano, aqui mismo, y nunca pasa por _pool (Toto lo vio jugando:
             // la Espada V seguia elegible sobre un Karlos que ya llevaba la Shichishito).
             const _tmplEq = DSL._tmpl(sourceCard.id);
+            let _sinPortador = false;
             if (_tmplEq && _tmplEq.type === 'Ayuda' && DSL._esEquipo(_tmplEq)) {
+                const _antes = pool.length;
                 pool = pool.filter(x => DSL._puedeEquiparse(x, _tmplEq));
+                // Si el filtro se lleva por delante a TODOS los candidatos, la jugada no es legal y
+                // hay que ABORTARLA, no seguir. Un ELEGIR con el pool vacío devuelve 'skip', que
+                // deja la cadena correr: la Ayuda se presentaba, se iba al descarte y volvía a la
+                // mano, un circo (Toto, 18-ago-2026). Los `requisitos` del JUGAR no lo pillan
+                // porque ellos solo miran que EXISTA el aliado, no si ya lleva algo de ese tipo.
+                _sinPortador = _antes > 0 && pool.length === 0;
             }
             // excluirSelf: la propia carta fuente ya está en el campo cuando ELEGIR corre en
             // AL_JUGAR (Kazuo/Gladiador eligiendo a quién anexar), así que el pool de ALIADOS
@@ -8715,6 +8746,10 @@ const DSL = {
             // carta en silencio con opcional:true, o abortarla del todo sin opcional). Hacía
             // falta para "tributa 2 Furor de un aliado O Gárgola se destruye": ni pool vacío ni
             // decline tenían hasta ahora forma de disparar un efecto de verdad.
+            if (!pool.length && _sinPortador) {
+                game.logError(`No hay ningún aliado al que anexar ${DSL._nombre(game, sourceCard)}: ya llevan un equipo de ese tipo.`);
+                return { ok: false };   // la carta NO se juega: sigue en la mano
+            }
             if (!pool.length) {
                 if (e.logSiVacio) game.logMsg(DSL._fill(e.logSiVacio, Object.assign({}, (DSL._vars && DSL._vars[sourceCard.instanceId]) || {}, { carta: DSL._nombre(game, sourceCard) })), e.logSiVacioTipo || 'ability');
                 if (e.siNoElegido) { const r = await DSL._runEffectList(e.siNoElegido, sourceCard, game, ownerId, null, habilidad); return !(r && r.ok === false); }
@@ -9557,7 +9592,13 @@ const DSL = {
         const equipar = abs.find(a => a.trigger === 'AL_EQUIPAR');
         if (equipar && typeof tmpl.onPlay !== 'function') {
             tmpl.onPlay = async function (card, game) {
+                // Marca "esta Ayuda se esta jugando AHORA", la misma que usa AL_CONSUMIR: la lee
+                // _fuenteFlotante para no nombrarla en sus propios flotantes. Hacia falta aqui
+                // desde que el aterrizaje la anexa durante la presentacion: la heuristica de "sigue
+                // en la mano" deja de valer, pero la marca sigue siendo cierta.
+                game._ayudaEnCurso = card.instanceId;
                 const res = await DSL._runEffectList(equipar.efectos || [], card, game, card.owner, null);
+                game._ayudaEnCurso = null;
                 if (res && res.ok === false) { game.cancelAction(); return; } // cancelado: la carta sigue en mano
                 // Mismo punto de compromiso que en las otras dos cadenas. Hoy ninguna carta de
                 // AL_EQUIPAR lo necesita -todas acaban en un op EQUIPAR, que ya dispara-, pero

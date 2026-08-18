@@ -2097,22 +2097,26 @@
             // superior de la pila de descartes. Si la pila ya tenía cartas la miniatura no cambia
             // -y ahí Toto dice que desvanecerse está bien-, así que solo se cruza cuando el
             // destino ESTRENA contenido (`fundirSoloSiVacio`).
-            // `aterrizarEn`: el destino no existe TODAVIA cuando el clon sale, porque lo crea el
-            // repintado de quien lo coloca. Es el caso del equipo que se anexa: su hueco no esta
-            // en ninguna fila y su visual nace con el render del EQUIPAR. Se le pasa una funcion
-            // que se llama AQUI, ya en el aterrizaje: coloca, repinta y devuelve el elemento con
-            // el que cruzarse. A partir de ahi es el mismo cruce suave del Evento con su ranura,
-            // no un camino nuevo (Toto, 18-ago-2026).
+            // `aterrizarEn`: el destino no existe todavía cuando el clon sale -lo crea quien lo
+            // coloca-. Es el caso del equipo que se anexa: su hueco no está en ninguna fila y su
+            // visual nace al anexarlo. Se le pasa una función que se llama AL FINAL DEL VIAJE:
+            // coloca, repinta y devuelve el elemento con el que cruzarse.
+            // AL FINAL y no al principio (Toto, 18-ago-2026): anexar antes saca la Ayuda de la
+            // mano demasiado pronto y rompe la heurística del flotante -que se apoya en que una
+            // Ayuda recién jugada SIGUE en la mano para no firmarse a sí misma-, y adelanta el
+            // assignCopyId. Salían diferencias en regresion6 y regresion9.
             let _real = _fundir && _fundir.querySelector('.active-event-card, .card-preview-mini');
-            if (!_real && opts && typeof opts.aterrizarEn === 'function') {
-                try { _real = await opts.aterrizarEn(); } catch (err) { console.error(err); }
-            }
+            const _hayAterrizaje = !!(opts && typeof opts.aterrizarEn === 'function');
             if (_real) { _real.style.transition = 'none'; _real.style.opacity = '0'; }
-            else if (!idEntrante) {                         // sin nada que enseñar: se funde en la pila
+            else if (!idEntrante && !_hayAterrizaje) {      // sin nada que enseñar: se funde en la pila
                 cont.style.opacity = '0';
                 cont.style.transition += `, opacity ${PRESENTA_VIAJE}ms ease`;
             }
             await g.sleep(PRESENTA_VIAJE);
+            if (!_real && _hayAterrizaje) {
+                try { _real = await opts.aterrizarEn(); } catch (err) { console.error(err); }
+                if (_real) { _real.style.transition = 'none'; _real.style.opacity = '0'; void _real.offsetWidth; }
+            }
             if (_real) {
                 // Cruce en el sitio: ni parpadeo ni salto de un frame.
                 const MORPH = 180;
