@@ -2133,6 +2133,25 @@
                 cont.style.opacity = '0';
                 cont.style.transition += `, opacity ${PRESENTA_VIAJE}ms ease`;
             }
+            // UN EQUIPO PASA POR DEBAJO DE SU PORTADOR, Y DURANTE TODO EL VIAJE (Toto, 18-ago-2026).
+            // El clon vive en una capa fija a z-index 3900 -tiene que estar arriba mientras cruza
+            // el tablero-, asi que se veia por ENCIMA de la carta a la que se anexa, justo al reves
+            // de como queda un segundo despues. En vez de bajar el clon -que obligaria a
+            // reparentarlo y a recalcular coordenadas en px de pantalla y con `zoom` de por medio-,
+            // se SUBE la carta por encima de esa capa y se deja como estaba al acabar.
+            // Va AQUI, antes del viaje, y no en el cruce final: el clon la tapa desde que se le
+            // acerca, no solo en los ultimos 180ms. Ese fue el primer intento y no se noto nada.
+            // El portador sale del propio selector de destino, que ya apunta a el; `_real` todavia
+            // no existe en este caso -lo crea `aterrizarEn` al final del viaje-.
+            let _portadorEl = null, _zPrev = '', _posPrev = '';
+            if (_hayAterrizaje && destinoSel) {
+                _portadorEl = document.querySelector(destinoSel);
+                if (_portadorEl) {
+                    _zPrev = _portadorEl.style.zIndex; _posPrev = _portadorEl.style.position;
+                    if (!_posPrev) _portadorEl.style.position = 'relative';   // para que el z-index cuente
+                    _portadorEl.style.zIndex = '3901';
+                }
+            }
             await g.sleep(PRESENTA_VIAJE);
             if (!_real && _hayAterrizaje) {
                 try { _real = await opts.aterrizarEn(); } catch (err) { console.error(err); }
@@ -2141,26 +2160,6 @@
             if (_real) {
                 // Cruce en el sitio: ni parpadeo ni salto de un frame.
                 const MORPH = 180;
-                // UN EQUIPO PASA POR DEBAJO DE SU PORTADOR (Toto, 18-ago-2026). El clon vive en
-                // una capa fija a z-index 3900 -tiene que estar arriba durante el viaje, o pasaria
-                // por detras de medio tablero-, asi que al llegar se veia por ENCIMA de la carta a
-                // la que se anexa, que es justo al reves de como queda despues.
-                // En vez de bajar el clon -que obligaria a reparentarlo y a recalcular sus
-                // coordenadas, que van en px de pantalla y con zoom-, se SUBE la carta por encima
-                // de esa capa durante el cruce y se deja como estaba al acabar. El visual real del
-                // equipo ya esta detras de ella, asi que los dos quedan por debajo: el cambiazo no
-                // se ve. Solo en el caso del equipo (`aterrizarEn`); las filas, la ranura de Evento
-                // y la pila de descartes no tienen nada que tapar.
-                let _portadorEl = null, _zPrev = '', _posPrev = '';
-                if (_hayAterrizaje) {
-                    const _w = _real.closest ? _real.closest('.card-wrapper') : null;
-                    _portadorEl = _w ? _w.querySelector('.card[data-id]') : null;
-                    if (_portadorEl) {
-                        _zPrev = _portadorEl.style.zIndex; _posPrev = _portadorEl.style.position;
-                        if (!_posPrev) _portadorEl.style.position = 'relative';   // para que el z-index cuente
-                        _portadorEl.style.zIndex = '3901';
-                    }
-                }
                 _real.style.transition = `opacity ${MORPH}ms ease`;
                 cont.style.transition = `opacity ${MORPH}ms ease`;
                 void _real.offsetWidth;
