@@ -8516,7 +8516,16 @@
                 // animación (al aterrizar), no antes ni después. Es lo que hace que la pila se
                 // pueble justo cuando la carta llega y que, mientras aún se pueda cancelar, siga
                 // viéndose en la mano.
-                const _o = { origenId: p.origenId || null, fundirEn: p.fundirEn || null, alSalirDeLaMano: p.alSalirDeLaMano || null };
+                // LISTA BLANCA, y por eso hay que acordarse de ampliarla: lo que se arme en
+                // `_presentacionArmada` y NO este aqui se tira por el camino sin decir nada. Ya
+                // costo dos intentos fallidos del aterrizaje del equipo -`ajusteDestino` y
+                // `aterrizarEn` se ponian bien y nunca llegaban- (Toto, 18-ago-2026).
+                const _o = { origenId: p.origenId || null, fundirEn: p.fundirEn || null,
+                             alSalirDeLaMano: p.alSalirDeLaMano || null,
+                             ajusteDestino: p.ajusteDestino || null,
+                             aterrizarEn: p.aterrizarEn || null,
+                             zonaSel: p.zonaSel || null, ocultarAlLlegar: p.ocultarAlLlegar || null,
+                             disolverHacia: p.disolverHacia || null, enElEscaparate: p.enElEscaparate || null };
                 if (p.colocar) _o.colocar = () => { p.colocar(); return null; };
                 const _anim = animarPresentacionCarta(p.cardId, p.origen, p.destino, p.deDorso, _o);
                 // Con retención, esto resuelve al LLEGAR al centro, no al final: la cadena que

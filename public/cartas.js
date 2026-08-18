@@ -7338,14 +7338,6 @@ const DSL = {
         // fuera los aliados que ya lleven uno de su tipo. Va aquí y no en los `requisitos` de cada
         // carta a propósito -son diez, y la undécima se olvidaría-, y como filtro de elección hace
         // que el aliado inelegible ni siquiera salga con reborde verde, que es la norma de UX.
-        // Solo cuando la carta jugada es la AYUDA que se anexa. Karlitos también pasa por
-        // _esEquipo -su ARMAMENTO MELÉ usa `EQUIPAR invertido`, donde él se calza un arma-, y ahí
-        // el pool son ARMAS, no portadores: aplicarles esta regla no tiene sentido y rompía su
-        // Activa entera.
-        const _tEq = selfCard ? DSL._tmpl(selfCard.id) : null;
-        if (_tEq && _tEq.type === 'Ayuda' && DSL._esEquipo(_tEq)) {
-            pool = pool.filter(c => DSL._puedeEquiparse(c, _tEq));
-        }
         // algunFiltro (Karlitos, 31-jul-2026): OR de filtros, como ya aceptaban ELEGIR y BUSCAR.
         // Faltaba aquí, así que un `count` con `algunFiltro` NO filtraba nada y contaba de más
         // (el requisito "tienes un Arma en la mano" daba por bueno cualquier carta).
@@ -8702,6 +8694,13 @@ const DSL = {
             pool = pool.filter(x => (e.filtros || []).every(f => DSL._match(x, f)) &&
                                     (!e.algunFiltro || e.algunFiltro.some(f => DSL._match(x, f))));
             pool = pool.filter(x => !((getCardTemplate(x.id) || {}).isAvatar)); // Kami: intocable
+            // UN EQUIPO POR TIPO. Estaba puesto en DSL._pool y NO SERVIA DE NADA: el ELEGIR se
+            // construye su pool a mano, aqui mismo, y nunca pasa por _pool (Toto lo vio jugando:
+            // la Espada V seguia elegible sobre un Karlos que ya llevaba la Shichishito).
+            const _tmplEq = DSL._tmpl(sourceCard.id);
+            if (_tmplEq && _tmplEq.type === 'Ayuda' && DSL._esEquipo(_tmplEq)) {
+                pool = pool.filter(x => DSL._puedeEquiparse(x, _tmplEq));
+            }
             // excluirSelf: la propia carta fuente ya está en el campo cuando ELEGIR corre en
             // AL_JUGAR (Kazuo/Gladiador eligiendo a quién anexar), así que el pool de ALIADOS
             // la incluiría por defecto si no se filtra explícitamente (Toto, 27-jul-2026).

@@ -241,6 +241,34 @@ const contador = (c, k) => (c.counters && c.counters[k] && c.counters[k].count) 
             'vida=' + esbirro.currentHp + ' antes=' + vidaAntes);
     }
 
+    console.log('\n--- Un equipo por tipo ---');
+    {
+        // Toto lo vio jugando: la Espada V seguia elegible sobre un Karlos que ya llevaba la
+        // Shichishito. El filtro estaba puesto en DSL._pool y NO SERVIA DE NADA, porque el ELEGIR
+        // se construye su pool a mano y nunca pasa por ahi. "Arma" y "Arma legendaria" cuentan
+        // como el MISMO tipo a estos efectos, que es justo el caso de estas dos.
+        const { ctx, g, paso } = await mesa({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'Karlos', furor: 3 }], mano: ['Shichishito', 'Espada V', 'Hagoromo'] },
+            p2: { vanguardia: ['Aniceto'] },
+        });
+        const karlos = buscar(g, 'p1', 'Karlos');
+        await paso({ jugar: 'Shichishito' });
+        await paso({ elegir: ['Karlos'] });
+        check('Karlos empuña la Shichishito', ((karlos.equippedCards || [])[0] || {}).name === 'Shichishito',
+            'equipos=' + (karlos.equippedCards || []).map(e => e.name).join(','));
+        await paso({ jugar: 'Espada V' });
+        const _pool = ((ctx.pendientes[0] || {}).pool || []).map(c => c.name);
+        check('la Espada V ya NO puede elegir a Karlos: las dos son Arma',
+            !_pool.includes('Karlos'), 'pool=' + JSON.stringify(_pool));
+
+        // Y la otra mitad: un tipo DISTINTO sí entra. Hagoromo es Vestimenta.
+        await paso({ jugar: 'Hagoromo' });
+        const _pool2 = ((ctx.pendientes[0] || {}).pool || []).map(c => c.name);
+        check('...pero el Hagoromo sí, porque es Vestimenta', _pool2.includes('Karlos'),
+            'pool=' + JSON.stringify(_pool2));
+    }
+
     console.log('\n' + (fallos
         ? `SUITE equipos_serie1: ${comprobaciones - fallos}/${comprobaciones} comprobaciones — ${fallos} FALLOS`
         : `SUITE equipos_serie1: ${comprobaciones}/${comprobaciones} comprobaciones — LOS DOS EQUIPOS CORRECTOS`));
