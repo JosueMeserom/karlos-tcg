@@ -11000,12 +11000,6 @@
                         eqEl.dataset.eq = eq.instanceId;
                         eqEl.style.top = `-${15 + (idx * 10)}px`;
                         eqEl.style.left = `${15 + (idx * 10)}px`;
-                        // El SEGUNDO equipo va DEBAJO del primero, no encima (Toto, 18-ago-2026).
-                        // Todos comparten z-index 0 en el CSS, así que mandaba el orden del DOM y el
-                        // último pintaba arriba: se veía la carta nueva tapando a la que ya estaba
-                        // puesta, al revés de como se apilan las cosas de verdad. Descendente por
-                        // índice, y siempre por debajo de la carta que los lleva.
-                        eqEl.style.zIndex = String(Math.max(1, 8 - idx));
                         
                         eqEl.style.pointerEvents = 'auto'; 
                         eqEl.style.cursor = 'help'; 
@@ -11014,14 +11008,14 @@
                         eqEl.onmouseenter = (e) => {
                             e.stopPropagation(); 
                             this.startPreview(eq);
-                            eqEl.style.zIndex = "100";   // al inspeccionarlo sí sube del todo 
+                            eqEl.style.zIndex = "100"; 
                             eqEl.style.filter = "brightness(1) sepia(0)"; 
                         };
                         
                         eqEl.onmouseleave = (e) => {
                             e.stopPropagation();
                             this.stopPreview();
-                            eqEl.style.zIndex = String(Math.max(1, 8 - idx));   // vuelve a SU sitio en la pila, no a 0
+                            eqEl.style.zIndex = "0"; 
                             eqEl.style.filter = "brightness(0.6) sepia(0.3)";
                         };
 
@@ -11049,7 +11043,14 @@
                             eqEl.innerHTML = `<div class="card-header" style="background: linear-gradient(135deg, #fbcfe8 0%, #be185d 100%) !important; border-bottom: 1px solid #f9a8d4 !important; color: white !important; font-size: 0.55rem; text-align: center; padding: 2px; height: auto; min-height: 18px; line-height: 1.2;">EQUIPADO:<br>${eq.name}</div>`;
                         }
                         
-                        wrapper.appendChild(eqEl);
+                        // EL PRIMER EQUIPO ARRIBA, el segundo detrás (Toto, 18-ago-2026). Todos
+                        // comparten z-index 0 -que es lo que los mantiene DETRÁS de la carta que
+                        // los lleva, y eso no se toca-, así que entre ellos manda el orden del DOM:
+                        // el último pintaba encima. Se insertan al REVÉS, delante del anterior, y
+                        // con eso el de índice 0 queda arriba sin levantar nada.
+                        const _primerEq = wrapper.querySelector('.equipped-card-visual');
+                        if (_primerEq) wrapper.insertBefore(eqEl, _primerEq);
+                        else wrapper.appendChild(eqEl);
                     });
 
                     el.style.zIndex = "2";
