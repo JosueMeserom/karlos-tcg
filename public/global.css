@@ -1047,9 +1047,11 @@ button.game-btn:disabled { background: #64748b; cursor: not-allowed; opacity: 0.
                         fundido, el mismo gesto que la ranura de Evento al colocarse.
      · descarte-pulso : ya tenía cartas. Un latido corto y un destello en el borde.
    Se eligieron los dos juntos tras compararlos con un toggle temporal (Toto, 18-ago). */
+/* El brillo era de cuando esto saltaba con la carta aun lejos y habia que NOTARLO; ahora corre
+   pegado al cruce, con la carta ya puesta, y a 2.2 daba un fogonazo (Toto, 18-ago-2026). */
 @keyframes descarteNace {
-    0%   { opacity: 0; transform: scale(0.82); filter: brightness(2.2); }
-    55%  { opacity: 1; transform: scale(1.06); filter: brightness(1.5); }
+    0%   { opacity: 0; transform: scale(0.86); filter: brightness(1.3); }
+    55%  { opacity: 1; transform: scale(1.04); filter: brightness(1.1); }
     100% { opacity: 1; transform: scale(1);    filter: brightness(1); }
 }
 @keyframes descartePulso {

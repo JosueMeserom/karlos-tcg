@@ -2125,7 +2125,11 @@
                 _fundir.classList.remove('filled'); _fundir.classList.add('empty-slot');
                 if (_badge) { _badge.style.transition = 'none'; _badge.style.opacity = '0'; }
             }
-            else if (!idEntrante && !_hayAterrizaje) {      // sin nada que enseñar: se funde en la pila
+            // `if` SUELTO, no `else if`. Colgaba del `if (_real)` de arriba, y al meter en medio
+            // el bloque de la pila paso a colgar de ESE: para un Evento -que no es una pila-
+            // daba false y entraba aqui, asi que el Evento dejo de fundirse y se desvanecia.
+            // La condicion de verdad siempre fue "no hay con quien cruzarse" (Toto, 18-ago-2026).
+            if (!_real && !idEntrante && !_hayAterrizaje) {   // sin nada que enseñar: se funde en la pila
                 cont.style.opacity = '0';
                 cont.style.transition += `, opacity ${PRESENTA_VIAJE}ms ease`;
             }
