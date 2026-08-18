@@ -9193,6 +9193,41 @@
                 this.forceSync();
             }
 
+            // FUSION PILOTO -> MECA (Toto, 18-ago-2026). Antes esto era un animateSwap seguido de
+            // la muerte del piloto: los dos se cambiaban de sitio y, nada mas terminar, el piloto
+            // se partia por la mitad. Quedaba raro porque son dos gestos que se contradicen.
+            // Ahora el Meca es LLAMADO a la posicion del piloto mientras este SALTA DENTRO: se
+            // encoge, sube un poco y se desvanece hacia el centro del Meca. Al acabar, quien
+            // ocupa la casilla es el Meca, y la fila se reacomoda sola con el FLIP de siempre.
+            // Devuelve una promesa: quien llama muta el estado DESPUES.
+            async animateFusionPiloto(mecaId, pilotoId) {
+                const meca = document.querySelector(`.card[data-id="${mecaId}"]`);
+                const pil = document.querySelector(`.card[data-id="${pilotoId}"]`);
+                if (!meca || !pil) return;
+                const MS = 620;
+                const rM = meca.getBoundingClientRect(), rP = pil.getBoundingClientRect();
+                // Se mueve el WRAPPER si lo hay, para que sus equipos viajen pegados (misma razon
+                // que el deslizamiento de filas).
+                const movM = (meca.parentElement && meca.parentElement.classList.contains('card-wrapper')) ? meca.parentElement : meca;
+                const dx = rP.left - rM.left, dy = rP.top - rM.top;
+                movM.style.zIndex = '1000';
+                pil.style.zIndex = '1001';   // el piloto por ENCIMA: se mete dentro, no debajo
+                movM.style.transition = `transform ${MS}ms cubic-bezier(.2,.8,.2,1)`;
+                pil.style.transition = `transform ${MS}ms cubic-bezier(.5,0,.9,.4), opacity ${MS}ms ease-in`;
+                void movM.offsetWidth;
+                movM.style.transform = `translate(${dx}px, ${dy}px)`;
+                // El piloto cae hacia el centro del Meca -que ya viene hacia el- encogiendose.
+                pil.style.transformOrigin = 'center center';
+                pil.style.transform = 'translateY(-14px) scale(0.12)';
+                pil.style.opacity = '0';
+                await this.sleep(MS);
+                // Se deja todo como estaba: el estado y el repintado los hace quien llamo, y si
+                // estos transforms sobrevivieran, el FLIP de la fila los daria por animacion viva
+                // y no deslizaria la carta.
+                [movM, pil].forEach(el => { el.style.transition = ''; el.style.transform = ''; el.style.zIndex = ''; el.style.opacity = ''; });
+                pil.style.transformOrigin = '';
+            }
+
             async animateSwap(id1, id2) {
                 const el1 = document.querySelector(`.card[data-id="${id1}"]`);
                 const el2 = document.querySelector(`.card[data-id="${id2}"]`);

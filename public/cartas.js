@@ -5030,27 +5030,31 @@ const CARD_DB = [
             } else {
                 game.logMsg(`¡${game.getCardNameWithOwner(pilot)} corre a abordar el ${game.getCardNameWithOwner(card)} en el campo!`, 'ability');
                 
-                if (typeof game.animateSwap === 'function') {
-                    await game.animateSwap(card.instanceId, pilot.instanceId);
+                // FUSION en vez de INTERCAMBIO + MUERTE (Toto, 18-ago-2026). Antes se cambiaban
+                // de sitio y, nada mas terminar, el piloto se partia por la mitad: dos gestos que se
+                // contradicen. Ahora el Meca es llamado a la casilla del piloto mientras este salta
+                // dentro, y el hueco que deja el Meca lo cierra el deslizamiento de la fila.
+                if (typeof game.animateFusionPiloto === 'function') {
+                    await game.animateFusionPiloto(card.instanceId, pilot.instanceId);
                 }
-                
+
+                // El Meca OCUPA la casilla del piloto; su casilla anterior se queda vacia y la fila
+                // se reacomoda sola en el siguiente render.
                 const cardArray = p[card.location];
                 const pilotArray = p[pilot.location];
-
                 const cIdx = cardArray.findIndex(c => c.instanceId === card.instanceId);
                 const pIdx = pilotArray.findIndex(c => c.instanceId === pilot.instanceId);
-                
-                // Intercambio de matrices y ubicaciones
-                cardArray[cIdx] = pilot;
-                pilotArray[pIdx] = card;
-
-                const tempLoc = card.location;
+                if (cIdx !== -1) cardArray.splice(cIdx, 1);
+                const _destino = p[pilot.location];
+                const _pIdx2 = _destino.findIndex(c => c.instanceId === pilot.instanceId);
+                if (_pIdx2 !== -1) _destino[_pIdx2] = card;
                 card.location = pilot.location;
-                pilot.location = tempLoc;
 
-                // El piloto se destruye tras el intercambio
+                // El piloto ya no esta en el campo: se va al descarte SIN animacion de muerte -su
+                // desaparicion ya la ha contado la fusion-.
+                pilot.location = 'discard';
                 pilot.currentHp = 0;
-                await game.checkDeath(pilot, false);
+                await game.checkDeath(pilot, false, true);
             }
 
             card.pilotoEmplazado = true;
