@@ -2270,6 +2270,12 @@
                 // Persistencia del debug (como el override de admin): último slot de
                 // save-state activo y último escenario cargado con éxito.
                 this._ssSlot = parseInt(localStorage.getItem('karlos_dbg_ss_slot'), 10) || 1;
+                // Y se PINTA, que es lo que faltaba (Toto, 18-ago-2026). El valor si se recordaba
+                // entre recargas, pero el rotulo del panel esta escrito a mano como "(slot 1)" en
+                // el HTML y solo lo actualiza _ssRefresh, que hasta ahora unicamente corria al
+                // CAMBIAR de slot. Tras un Ctrl+F5 el panel decia 1 mientras se guardaba y cargaba
+                // del 3 de verdad: el rotulo mentia, no el estado.
+                this._ssRefresh();
                 try {
                     const _sc = localStorage.getItem('karlos_dbg_scenario');
                     const _scEl = document.getElementById('dbg-scenario-input');
