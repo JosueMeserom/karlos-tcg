@@ -2021,6 +2021,16 @@
             } else {
                 destino = _rect(destinoSel);
             }
+            // `ajusteDestino` mueve el punto de llegada sin cambiar el selector. Lo pide el
+            // equipo que se anexa: su destino es SU portador, pero no aterriza sobre él sino en
+            // el hueco escalonado que le toca segun cuantos equipos lleve ya. Sin esto, el
+            // segundo equipo volaba al sitio del primero y saltaba al suyo al soltarlo.
+            const _aj = opts && opts.ajusteDestino;
+            if (destino && _aj) {
+                destino = { left: destino.left + (_aj.dx || 0), top: destino.top + (_aj.dy || 0),
+                            width: destino.width, height: destino.height,
+                            right: destino.right + (_aj.dx || 0), bottom: destino.bottom + (_aj.dy || 0) };
+            }
             if (destino && idEntrante) {
                 // Hueco REAL de una carta: se encaja en él tal cual. El hueco puede medir otra
                 // cosa que 90x126 (wrapper de equipo, escalas), así que centrar un tamaño fijo
@@ -10984,6 +10994,10 @@
                     card.equippedCards.forEach((eq, idx) => {
                         const eqEl = document.createElement('div');
                         eqEl.className = 'card equipped-card-visual';
+                        // Identificable desde fuera. Hoy solo lo usa la depuración, pero es lo que
+                        // le falta a la presentación para poder FUNDIRSE con él al aterrizar -como
+                        // hace el Evento con su ranura- en vez de desvanecerse encima.
+                        eqEl.dataset.eq = eq.instanceId;
                         eqEl.style.top = `-${15 + (idx * 10)}px`;
                         eqEl.style.left = `${15 + (idx * 10)}px`;
                         // El SEGUNDO equipo va DEBAJO del primero, no encima (Toto, 18-ago-2026).

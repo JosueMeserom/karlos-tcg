@@ -7663,6 +7663,11 @@ const DSL = {
         if (!DSL._esEquipo(DSL._tmpl(sourceCard.id))) return;
         game._presentacionArmada.destino = `.card[data-id="${portador.instanceId}"]`;
         game._presentacionArmada.fundirEn = null;   // no se funde con ninguna pila: aterriza encima
+        // Y aterriza en SU hueco, no encima del portador ni sobre el equipo que ya lleve puesto.
+        // Los números son los mismos que usa el render para escalonarlos (index.html, el forEach
+        // de equippedCards): 15px + 10px por cada equipo previo, arriba y a la derecha.
+        const _idx = ((portador.equippedCards || []).length);
+        game._presentacionArmada.ajusteDestino = { dx: 15 + _idx * 10, dy: -(15 + _idx * 10) };
     },
 
     // Los nombres CONCRETOS que busca un BUSCAR, si busca por nombre. Sirve para que el visor
