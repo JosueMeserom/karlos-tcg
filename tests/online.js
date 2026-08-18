@@ -48,6 +48,15 @@ const CONVERTIDAS = new Set(['END_TURN', 'PLAY_CARD', 'ACTIVATE_ABILITY', 'DIREC
 // Subconjunto de la tubería del servidor que importa para una jugada. Se copia el `else if` de
 // processActionQueue y las tres respuestas inmediatas (que en el cliente real bypasean la cola
 // justo para no bloquearla: la cola espera la Promise y la Promise esperaría a la cola).
+// LÍMITE CONOCIDO DE ESTE ARNÉS (18-ago-2026): aquí cada acción se despacha DIRECTAMENTE, y el
+// cliente real las mete en una cola FIFO BLOQUEANTE (processActionQueue). Por eso esta suite NO
+// puede ver los deadlocks de cola: el caso en que un cliente está suspendido dentro de su
+// PLAY_CARD esperando una respuesta que viaja por esa misma cola, que no avanzará hasta que el
+// PLAY_CARD termine. Ya paso con Deuda con la mafia (21-jul) y volvio a pasar con la eleccion del
+// hueco de vanguardia (18-ago): las dos veces la suite decia verde y el juego real se colgaba.
+// La solucion en el codigo es siempre la misma -un canal FUERA de cola, como
+// VISUAL_SEARCH_CONFIRM o HUECO_SELECTED-, asi que al añadir una interaccion nueva que suspenda
+// una cadena, comprobar que su respuesta no viaja por la cola. Esto no lo dira esta suite.
 async function entregar(g, data) {
     // Mi propio eco: solo me interesan las convertidas (el resto ya las ejecuté al emitirlas).
     if (data._from && data._from === g.myPlayerId && !CONVERTIDAS.has(data.action)) return;
@@ -55,6 +64,7 @@ async function entregar(g, data) {
         switch (data.action) {
             case 'CHOICE_SELECTED':        g.executeChoice(data.index, true); break;
             case 'VISUAL_SEARCH_CONFIRM':  g.resolveVisualSearch(data.ids, true); break;
+            case 'HUECO_SELECTED':         g.resolverHuecoRemoto(data.cardId); break;
             case 'PLAY_CARD':              await g.playCard(data.cardId, true); break;
             case 'SELECT_CARD':            await g.selectCard(data.cardId, true); break;
             case 'CANCEL_ACTION':          g.cancelAction(true); break;

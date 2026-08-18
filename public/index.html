@@ -2727,7 +2727,14 @@
                     //    Meterlas en la cola causaría un deadlock: la cola espera la Promise,
                     //    y la Promise espera que la cola las procese.
                     if (data.action === 'CHOICE_SELECTED') { this.executeChoice(data.index, true); return; }
-                    if (data.action === 'VISUAL_SEARCH_CONFIRM') { this._dbgRx('recibido VISUAL_SEARCH_CONFIRM', { ids: (data.ids||[]).length, espejando: !!this._espejandoReaccion }); this.resolveVisualSearch(data.ids, true); return; }
+                    // FUERA DE LA COLA, por la misma razon que VISUAL_SEARCH_CONFIRM (ver la nota
+                    // de pickBoardTargets): el rival esta suspendido DENTRO de su PLAY_CARD
+                    // esperando esta eleccion, y la cola es FIFO y bloqueante -no procesaria esto
+                    // hasta que termine el PLAY_CARD que espera justo esto-. Deadlock estructural,
+                    // el mismo que Toto encontro el 21-jul-2026 con Deuda con la mafia y que yo
+                    // reintroduje al hacer que la eleccion del hueco ocurra en el escaparate.
+                    if (data.action === 'HUECO_SELECTED') { this.resolverHuecoRemoto(data.cardId); return; }
+                                        if (data.action === 'VISUAL_SEARCH_CONFIRM') { this._dbgRx('recibido VISUAL_SEARCH_CONFIRM', { ids: (data.ids||[]).length, espejando: !!this._espejandoReaccion }); this.resolveVisualSearch(data.ids, true); return; }
                     // Reanudar perfecto (cadena de reacciones): el rival estable me empuja el
                     // SIGUIENTE prompt de reacción para que lo re-muestre tras haber reconectado.
                     if (data.action === 'PENDING_REACTION') {
@@ -7615,6 +7622,11 @@
                         this.render();
                         const _bAvi = document.getElementById('action-banner');
                         if (_bAvi) _bAvi.style.display = 'none';   // fuera el cartel de espera
+                        // Se avisa por el canal fuera de cola: el rival esta bloqueado dentro de su
+                        // PLAY_CARD y su cola no llegara a procesar el SELECT_CARD que emitimos.
+                        if (this.gameMode === 'online' && !isRemote && this.socket) {
+                            this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'HUECO_SELECTED', cardId: card.instanceId });
+                        }
                         if (this._resolverHueco) {
                             this.pendingPlayCard = null;   // la coloca la presentacion, ya no hay nada pendiente
                             this._resolverHueco();
@@ -8734,6 +8746,15 @@
             // escaparate. Devuelve una promesa que resuelve cuando el jugador elige; quien la
             // llama es `enElEscaparate`, asi que la animacion se queda quieta mientras tanto y el
             // rival ve el aviso de espera por el mismo cauce que cualquier otra interaccion.
+            // El otro cliente ya sabe QUE Esbirro se ha retirado. Hace el mismo trabajo que el
+            // clic local -retirarlo, apuntar el hueco y soltar la presentacion- sin volver a
+            // emitir nada. Llega FUERA DE COLA, que es lo unico que rompe el deadlock.
+            resolverHuecoRemoto(cardId) {
+                if (this.inputState !== 'SELECT_ESBIRRO_TO_SWAP') return;
+                const el = this.findCard(cardId);
+                if (el) this.selectCard(cardId, true);
+            }
+
             _pedirHuecoEnVanguardia(card) {
                 return new Promise(resolve => {
                     const chooserId = this.activePlayerId;
