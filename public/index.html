@@ -2108,6 +2108,19 @@
             let _real = _fundir && _fundir.querySelector('.active-event-card, .card-preview-mini');
             const _hayAterrizaje = !!(opts && typeof opts.aterrizarEn === 'function');
             if (_real) { _real.style.transition = 'none'; _real.style.opacity = '0'; }
+            // LA PILA TAMPOCO SE LLENA ANTES DE TIEMPO (Toto, 18-ago-2026). `colocar` corre al
+            // principio -tiene que hacerlo: de ahí sale el rect de destino-, así que el hueco de
+            // descartes pasaba a su aspecto de LLENO (fondo claro y contador a 1) nada más
+            // arrancar el viaje, y solo la miniatura se cruzaba al final. La ranura de Evento no
+            // lo sufría porque su aspecto no cambia, solo aparece la tira dentro. Se le devuelve
+            // el aspecto vacío durante el viaje y se cruza entero al llegar, como el Evento.
+            const _pilaEstrena = !!(_real && _real.classList && _real.classList.contains('card-preview-mini')
+                                    && _fundir && _fundir.classList.contains('filled'));
+            const _badge = _pilaEstrena ? _fundir.querySelector('.count-badge') : null;
+            if (_pilaEstrena) {
+                _fundir.classList.remove('filled'); _fundir.classList.add('empty-slot');
+                if (_badge) { _badge.style.transition = 'none'; _badge.style.opacity = '0'; }
+            }
             else if (!idEntrante && !_hayAterrizaje) {      // sin nada que enseñar: se funde en la pila
                 cont.style.opacity = '0';
                 cont.style.transition += `, opacity ${PRESENTA_VIAJE}ms ease`;
@@ -2125,9 +2138,14 @@
                 void _real.offsetWidth;
                 _real.style.opacity = '1';
                 cont.style.opacity = '0';
+                if (_pilaEstrena) {
+                    _fundir.classList.remove('empty-slot'); _fundir.classList.add('filled');
+                    if (_badge) { _badge.style.transition = `opacity ${MORPH}ms ease`; _badge.style.opacity = '1'; }
+                }
                 await g.sleep(MORPH);
                 _real.style.transition = '';
                 _real.style.opacity = '';
+                if (_badge) { _badge.style.transition = ''; _badge.style.opacity = ''; }
             }
             cont.remove();
             if (idEntrante) {
