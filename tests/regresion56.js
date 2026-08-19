@@ -54,7 +54,7 @@ const FUR_AL_FINAL = {
 const escenarios = [
     {
         nombre: 'ARMAMENTO MELÉ: coge el arma de la MANO, se equipa y ataca (sin barajar)',
-        diferenciasEsperadas: [ { contiene: 'equippedCards.0.tags', motivo: "OPCIÓN B DE TOTO (18-ago-2026): la Espada V nueva lleva el tag 'Equipable' como las otras nueve equipables; la plantilla de la BASE CONGELADA no tiene `tags` en esa carta. Es una diferencia de DATOS, no de comportamiento: el tag no cambia lo que la carta hace, solo cómo la encuentran los filtros por etiqueta, y el ataque, el equipado y los stats coinciden. OJO, queda un cabo suelto honesto: el diff sale INVERTIDO respecto a las plantillas (dice que la vieja tiene los tags y la nueva no), y no llegué a averiguar por qué. Se declara lo que se OBSERVA, no una explicación inventada" } ],
+        diferenciasEsperadas: [ { contiene: 'equippedCards.0.tags', motivo: "OPCIÓN B DE TOTO (18-ago-2026): la Espada V nueva lleva el tag 'Equipable' como las otras nueve; la plantilla de la BASE CONGELADA no lo tiene. Diferencia de DATOS, no de comportamiento. Y POR QUÉ EL DIFF SALE 'INVERTIDO' (resuelto el 19-ago-2026): `cloneCard`, dentro de exportGameState, OMITE todo campo cuyo valor sea identico al de la plantilla -para no mandar datos estaticos por la red-. En la NUEVA los tags de la instancia coinciden con los de su plantilla, asi que no se exportan y salen undefined; en la VIEJA la plantilla no tiene tags, los de la instancia (que pone el `campos` de esta suite) NO coinciden, y por eso si viajan. Las dos instancias son IGUALES en memoria, comprobado con sonda: lo que difiere es que una los hereda" } ],
         turno: 2, turnoDe: 'p1', empieza: 'p2',
         p1: { vanguardia: [{ carta: 'Honsow', furor: 1 }], mano: [ESPADA_MELE] },
         p2: { vanguardia: [{ carta: 'Mini-tigre', vida: 20 }] },
@@ -76,7 +76,7 @@ const escenarios = [
     },
     {
         nombre: 'ARMAMENTO MELÉ: coge el arma del MAZO, se equipa, baraja y ataca',
-        diferenciasEsperadas: [ { contiene: 'equippedCards.0.tags', motivo: "OPCIÓN B DE TOTO (18-ago-2026): la Espada V nueva lleva el tag 'Equipable' como las otras nueve equipables; la plantilla de la BASE CONGELADA no tiene `tags` en esa carta. Es una diferencia de DATOS, no de comportamiento: el tag no cambia lo que la carta hace, solo cómo la encuentran los filtros por etiqueta, y el ataque, el equipado y los stats coinciden. OJO, queda un cabo suelto honesto: el diff sale INVERTIDO respecto a las plantillas (dice que la vieja tiene los tags y la nueva no), y no llegué a averiguar por qué. Se declara lo que se OBSERVA, no una explicación inventada" } ],
+        diferenciasEsperadas: [ { contiene: 'equippedCards.0.tags', motivo: "OPCIÓN B DE TOTO (18-ago-2026): la Espada V nueva lleva el tag 'Equipable' como las otras nueve; la plantilla de la BASE CONGELADA no lo tiene. Diferencia de DATOS, no de comportamiento. Y POR QUÉ EL DIFF SALE 'INVERTIDO' (resuelto el 19-ago-2026): `cloneCard`, dentro de exportGameState, OMITE todo campo cuyo valor sea identico al de la plantilla -para no mandar datos estaticos por la red-. En la NUEVA los tags de la instancia coinciden con los de su plantilla, asi que no se exportan y salen undefined; en la VIEJA la plantilla no tiene tags, los de la instancia (que pone el `campos` de esta suite) NO coinciden, y por eso si viajan. Las dos instancias son IGUALES en memoria, comprobado con sonda: lo que difiere es que una los hereda" } ],
         turno: 2, turnoDe: 'p1', empieza: 'p2',
         p1: { vanguardia: [{ carta: 'Honsow', furor: 1 }], mazo: [ESPADA_MELE, 'Longaniza'] },
         p2: { vanguardia: [{ carta: 'Mini-tigre', vida: 20 }] },
@@ -123,7 +123,7 @@ const escenarios = [
     },
     {
         nombre: 'ARMAMENTO MELÉ rechazada: no hay enemigos a los que atacar',
-        diferenciasEsperadas: [ { contiene: 'hand.0.tags', motivo: "OPCIÓN B DE TOTO (18-ago-2026): la Espada V nueva lleva el tag 'Equipable' como las otras nueve; la plantilla de la BASE CONGELADA no tiene `tags` en esa carta. Diferencia de DATOS, no de comportamiento. Aquí la carta se queda en la MANO porque no hay a quién atacar" } ],
+        diferenciasEsperadas: [ { contiene: 'hand.0.tags', motivo: "OPCIÓN B DE TOTO (18-ago-2026): la Espada V nueva lleva el tag 'Equipable' como las otras nueve; la plantilla de la BASE CONGELADA no lo tiene. Diferencia de DATOS, no de comportamiento. Y POR QUÉ EL DIFF SALE 'INVERTIDO' (resuelto el 19-ago-2026): `cloneCard`, dentro de exportGameState, OMITE todo campo cuyo valor sea identico al de la plantilla -para no mandar datos estaticos por la red-. En la NUEVA los tags de la instancia coinciden con los de su plantilla, asi que no se exportan y salen undefined; en la VIEJA la plantilla no tiene tags, los de la instancia (que pone el `campos` de esta suite) NO coinciden, y por eso si viajan. Las dos instancias son IGUALES en memoria, comprobado con sonda: lo que difiere es que una los hereda" } ],
         turno: 2, turnoDe: 'p1', empieza: 'p2',
         p1: { vanguardia: [{ carta: 'Honsow', furor: 1 }], mano: [ESPADA_MELE] },
         p2: {},

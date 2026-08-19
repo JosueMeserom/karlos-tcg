@@ -3211,9 +3211,9 @@ const CARD_DB = [
         name: "Espada V", type: "Ayuda", subtype: "Arma", tags: ["Equipable", "melé"], cost: 1, rarity: "B", series: 1,
         // Lleva "Equipable" como las otras nueve (Toto, 18-ago-2026, opción B). La BASE
         // CONGELADA no tiene `tags` en esta carta, así que el tag sale como diferencia en
-        // regresion56: está DECLARADA allí como intencionada, con su motivo. Es una diferencia
-        // de DATOS, no de comportamiento -el tag no cambia lo que la carta hace, solo cómo la
-        // encuentran los filtros por etiqueta-.
+        // regresion56: está DECLARADA allí como intencionada, con su motivo, y el porqué del
+        // "diff invertido" que despistaba quedó resuelto el 19-ago (es `cloneCard` omitiendo los
+        // campos iguales a la plantilla; está explicado entero en el motivo de esa suite).
         // Requisito visible: a quién señala la flecha lima al presentarse (§14.bis).
         requisitoVisible: [ { quien: "ALIADO", filtros: [ { campo: "type", op: "==", valor: "Personaje" } ], algunFiltro: [ { campo: "name", op: "contieneTexto", valor: "Karlos" }, { campo: "name", op: "==", valor: "Agah" } ], uno: true } ],
         text: "Requisito: un Personaje aliado 'Karlos' o 'Agah'. Anéxasela a ese aliado: +2 de Atq mientras la lleve. Sólo puedes usar esta carta una vez por partida.",
@@ -8650,10 +8650,21 @@ const DSL = {
             sourceCard.equippedTo = target.instanceId;
             if (typeof showFloatingText === 'function') (e.floats || []).forEach(f => showFloatingText(target.instanceId, f.texto, f.estilo || 'ft-green', f.offset !== undefined ? f.offset : -20));
             if (e.log) game.logMsg(DSL._fill(e.log, Object.assign({}, (DSL._vars && DSL._vars[sourceCard.instanceId]) || {}, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target) })), e.logTipo || 'ability');
+            // ORDEN INVERTIDO (Toto, 18-ago-2026). Esto corría tras `updatePassives` "para que la
+            // carta ya se pinte con sus stats nuevos", y con la animación de antes tenía sentido:
+            // giraba y al acabar ya estaba todo puesto. Pero desde que la evolución cambia la CARA
+            // a mitad del giro, pintarla nueva ANTES significa que empieza a girar ya evolucionada
+            // y no hay transformación que ver. Ahora gira con los stats viejos, el cambiazo ocurre
+            // de canto -al 60%, invisible- y los stats de verdad se aplican al terminar.
+            if (e.animacion === 'evolucion' && typeof animateEvolution === 'function') {
+                // La cara del 60% son los superStats de la propia carta: no se convierte en OTRA
+                // carta -eso es la evolución de Zoe-, se convierte en ella misma potenciada.
+                const _t = (typeof getCardTemplate === 'function') ? getCardTemplate(target.id) : null;
+                const _sup = _t && _t.superStats;
+                const _cara = _sup ? Object.assign({}, _t, { hp: _sup.hp, def: _sup.def, atk: _sup.atk }) : null;
+                try { await animateEvolution(target.instanceId, _cara); } catch (err) {}
+            }
             if (!e.soloAnexar && typeof game.updatePassives === 'function') game.updatePassives();
-            // animacion: la de evolución la lanzaba a mano la Súper Evolución imperativa. Va tras
-            // updatePassives para que la carta ya se pinte con sus stats nuevos.
-            if (e.animacion === 'evolucion' && typeof animateEvolution === 'function') { try { await animateEvolution(target.instanceId); } catch (err) {} }
             return true;
         }
         if (e.op === 'DESEQUIPAR') {
