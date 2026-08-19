@@ -2880,6 +2880,101 @@ const CARD_DB = [
         },
     },
     {
+        id: 2003, name: "Bastón astral", type: "Ayuda", subtype: "Arma legendaria", tags: ["Equipable", "melé"], rarity: "A", cost: 0, series: 1,
+        text: "Requisito: un aliado sin la etiqueta 'Animal salvaje' ni 'Cosa'. Anéxasela a ese aliado: +1 de Atq, +2 en sus ataques especiales, y 1 de Furor más al inicio de cada turno mientras lo lleve.",
+        abilities: [
+            { trigger: "JUGAR", requisitos: [
+                { count: { filtros: [ { no: true, campo: "tags", op: "includes", valor: "Animal salvaje" },
+                                      { no: true, campo: "tags", op: "includes", valor: "Cosa" } ] }, op: ">=", valor: 1,
+                  msg: "No tienes ningún aliado que pueda empuñar el Bastón astral." } ] },
+            { trigger: "AL_EQUIPAR",
+              mientrasEquipado: { atk: 1 },
+              furorPorTurno: 1,
+              efectos: [
+                { op: "ELEGIR", de: "ALIADOS", cantidad: 1,
+                  filtros: [ { no: true, campo: "tags", op: "includes", valor: "Animal salvaje" },
+                             { no: true, campo: "tags", op: "includes", valor: "Cosa" } ],
+                  titulo: "¿QUIÉN EMPUÑA EL BASTÓN ASTRAL?",
+                  efectos: [
+                    { op: "EQUIPAR",
+                      floats: [ { texto: "BASTÓN ASTRAL", estilo: "ft-ability", offset: -40 }, { texto: "+1 ATQ", estilo: "ft-green", offset: -20 } ],
+                      log: "{objetivo} empuña el Bastón astral y se llena de energía." } ] } ] },
+            // El +1 de `mientrasEquipado` ya está puesto siempre; esto añade el segundo punto SOLO
+            // en los especiales, que es lo que pide el texto ("en 2 mientras esté realizando
+            // ataques especiales").
+            { trigger: "EQUIPO_ANTES_DE_ATACAR", soloAtaqueEspecial: true, bonoAtq: 1 }
+        ],
+    },
+    {
+        id: 2004, name: "Permiso especial", type: "Ayuda", subtype: "Técnica", tags: ["Equipable"], rarity: "B", cost: 0, series: 1,
+        text: "Requisito: un aliado con etiqueta 'Policía' o con etiqueta 'Guardia Real'. Anéxasela a ese aliado: 1 de Furor más al inicio de cada turno mientras lo lleve. Si tiene etiqueta 'Policía', además +1 de Atq y +1 de Def; si tiene etiqueta 'Guardia Real', al equiparla busca en tu mazo una Ayuda con etiqueta 'Tecnología', añádela a tu mano y baraja.",
+        abilities: [
+            { trigger: "JUGAR", requisitos: [
+                { count: { algunFiltro: [ { campo: "tags", op: "includes", valor: "Policía" },
+                                          { campo: "tags", op: "includes", valor: "Guardia Real" } ] }, op: ">=", valor: 1,
+                  msg: "No tienes ningún aliado 'Policía' ni 'Guardia Real'." } ] },
+            { trigger: "AL_EQUIPAR",
+              // `segun`: gana la PRIMERA rama que cumpla. Un Policía se lleva los stats; un Guardia
+              // Real no, y lo suyo es la búsqueda de abajo. El Furor extra lo tienen los dos.
+              mientrasEquipado: { segun: [
+                { filtros: [ { campo: "tags", op: "includes", valor: "Policía" } ], stats: { atk: 1, def: 1 } },
+                { stats: {} } ] },
+              furorPorTurno: 1,
+              efectos: [
+                { op: "ELEGIR", de: "ALIADOS", cantidad: 1,
+                  algunFiltro: [ { campo: "tags", op: "includes", valor: "Policía" },
+                                 { campo: "tags", op: "includes", valor: "Guardia Real" } ],
+                  titulo: "¿A QUIÉN LE DAS EL PERMISO ESPECIAL?",
+                  guardaIdEnSelf: "permisoObjetivo",
+                  efectos: [
+                    { op: "EQUIPAR",
+                      floats: [ { texto: "PERMISO ESPECIAL", estilo: "ft-ability", offset: -40 } ],
+                      log: "{objetivo} recibe el Permiso especial." },
+                    // Solo el Guardia Real trae equipo de Tecnología consigo.
+                    { op: "BUSCAR", en: "MAZO", destino: "MANO", cantidad: 1,
+                      // Sobre el ELEGIDO, no sobre la Ayuda: solo el Guardia Real trae Tecnología.
+                      siObjetivo: { campo: "tags", op: "includes", valor: "Guardia Real" },
+                      filtros: [ { campo: "type", op: "==", valor: "Ayuda" },
+                                 { campo: "tags", op: "includes", valor: "Tecnología" } ],
+                      titulo: "PERMISO ESPECIAL: BUSCA TECNOLOGÍA",
+                      log: "{jugador} requisa {objetivo} del mazo.",
+                      barajarDespues: { log: "Barajando el mazo de {jugador}...", inclusoSinValidas: true } } ] } ] }
+        ],
+    },
+    {
+        id: 2005, name: "Alabanza", type: "Ayuda", subtype: "Técnica", tags: ["Equipable"], rarity: "B", cost: 0, series: 1,
+        text: "Coste: 2 de Furor de cada aliado de tu vanguardia que pueda pagarlo. Requiere un aliado con la etiqueta 'Dios/a' o 'Genio'. Anéxasela a ese aliado: gana +1 de Vida, Def y Atq por cada aliado que tributó, mientras la lleve.",
+        abilities: [
+            { trigger: "JUGAR", requisitos: [
+                { count: { algunFiltro: [ { campo: "tags", op: "includes", valor: "Dios" },
+                                          { campo: "tags", op: "includes", valor: "Diosa" },
+                                          { campo: "tags", op: "includes", valor: "Genio" } ] }, op: ">=", valor: 1,
+                  msg: "No tienes ningún aliado 'Dios/a' ni 'Genio' al que alabar." },
+                { count: { zona: "VANGUARDIA", filtros: [ { campo: "furor", op: ">=", valor: 2 } ] }, op: ">=", valor: 1,
+                  msg: "Nadie en tu vanguardia tiene 2 de Furor con los que alabar." } ] },
+            { trigger: "AL_EQUIPAR",
+              // `porCampo`: el bono se multiplica por cuántos tributaron, que se cuenta abajo y se
+              // guarda en la propia carta. No es un número fijo, así que no cabía en el objeto.
+              mientrasEquipado: { porCampo: "alabanzaTributos", stats: { hp: 1, def: 1, atk: 1 } },
+              efectos: [
+                // El tributo va PRIMERO y se lo cobra a quien PUEDA pagarlo: el texto dice
+                // literalmente "si alguna carta no tiene al menos 2 de Furor, no tributa".
+                { op: "MODIFICAR_STAT", stat: "furor", delta: -2, esCoste: true,
+                  target: { quien: "ALIADO", zona: "vanguardia", modo: "TODOS",
+                            filtros: [ { campo: "furor", op: ">=", valor: 2 } ] },
+                  guardaCuantosEnSelf: "alabanzaTributos" },
+                { op: "ELEGIR", de: "ALIADOS", cantidad: 1,
+                  algunFiltro: [ { campo: "tags", op: "includes", valor: "Dios" },
+                                 { campo: "tags", op: "includes", valor: "Diosa" },
+                                 { campo: "tags", op: "includes", valor: "Genio" } ],
+                  titulo: "¿A QUIÉN ALABAS?",
+                  efectos: [
+                    { op: "EQUIPAR",
+                      floats: [ { texto: "ALABANZA", estilo: "ft-ability", offset: -40 } ],
+                      log: "Los cánticos elevan a {objetivo}." } ] } ] }
+        ],
+    },
+    {
         id: 2001, name: "Hagoromo", type: "Ayuda", subtype: "Vestimenta", tags: ["Equipable"], rarity: "S", cost: 0, series: 1,
         // COSTE, no Requisito (Toto, 16-ago-2026): el aliado no "tiene" 1 de Furor, lo PAGA.
         // Lo leí del CSV como una condición y es un pago, que es la diferencia que separa las
@@ -9045,6 +9140,15 @@ const DSL = {
         let anyApplied = false;
         for (const e of (efectos || [])) {
             if (e.if && !DSL._cond(sourceCard, game, e.if)) continue; // condición evaluada sobre la carta fuente
+            // `siObjetivo`: condición sobre el OBJETIVO, no sobre la fuente (Toto, 19-ago-2026).
+            // Dentro de un ELEGIR los efectos corren con el elegido como objetivo, así que esto es
+            // lo que permite "y si el elegido es X, ademas haz Y" — Permiso especial busca en el
+            // mazo solo si a quien se lo pusiste es un 'Guardia Real'. Con `if` no se puede: ese
+            // mira la carta fuente, que aqui es siempre la propia Ayuda.
+            if (e.siObjetivo) {
+                const _obj = Array.isArray(fallbackTargets) ? fallbackTargets[0] : fallbackTargets;
+                if (!_obj || !DSL._match(_obj, e.siObjetivo)) continue;
+            }
             if (e.op === 'ROBAR' || e.op === 'RETRIBUCION') { // afectan al jugador, no a cartas: una sola ejecución
                 const r = await DSL._doEffect(e, sourceCard, null, game, ownerId, habilidad);
                 if (r === true) anyApplied = true;
@@ -9065,6 +9169,12 @@ const DSL = {
             // fallback -null en Eventos-, machacando el campo con basura (rompía Esfuerzo
             // dividido: chosenAllies). El filter(Boolean) protege ese mismo caso en general.
             if (e.guardaIdsEnSelf && e.op !== 'ELEGIR') sourceCard[e.guardaIdsEnSelf] = targets.filter(Boolean).map(t => t.instanceId);
+            // `guardaCuantosEnSelf`: A CUÁNTOS ha alcanzado de verdad este efecto, guardado en la
+            // propia carta (Alabanza, 19-ago-2026: su bono es "+1 por cada aliado que tributó", y
+            // ese número no se sabe hasta cobrarlo, porque solo pagan los que pueden). Hermano de
+            // guardaIdsEnSelf, que guarda quiénes; este guarda cuántos, que es lo que hace falta
+            // cuando el número alimenta un `mientrasEquipado` con `porCampo`.
+            if (e.guardaCuantosEnSelf && e.op !== 'ELEGIR') sourceCard[e.guardaCuantosEnSelf] = targets.filter(Boolean).length;
             // Coste/Requisito: se anota QUIÉN lo paga o lo cumple para que la presentación
             // pueda dibujarlo. `_marcarCoste` es idempotente por id, así que un mismo aliado
             // marcado por dos vías no sale dos veces.
@@ -9644,6 +9754,20 @@ const DSL = {
         // currentAtk/currentDef a la plantilla en cada updatePassives y llama a este hook para
         // reaplicar el delta; de ahí que sea pura suma, no un efecto de una vez.
         const _fuenteBuff = (equipar && equipar.mientrasEquipado) ? equipar : (usar && usar.mientrasEquipado) ? usar : null;
+        // `furorPorTurno`: el equipo hace que su portador gane N de Furor de mas en la fase de
+        // Furor. La cadena de ganancia no consultaba a los equipos -solo a la propia carta, a los
+        // Eventos y a la vanguardia-; ahora si (index.html), y esto es su lado declarativo.
+        const _fuenteFuror = (equipar && equipar.furorPorTurno) ? equipar
+                           : (usar && usar.furorPorTurno) ? usar : null;
+        if (_fuenteFuror && typeof tmpl.onEquipBeforeGainFuror !== 'function') {
+            tmpl.onEquipBeforeGainFuror = function (equipCard, hostCard, amount, game, source) {
+                // Solo la ganancia PASIVA del turno. Un +1 aqui no debe colarse en curaciones de
+                // Furor, costes devueltos ni nada que no sea la fase.
+                if (source !== 'fase_furor' || !amount) return amount;
+                return amount + _fuenteFuror.furorPorTurno;
+            };
+        }
+
         if (_fuenteBuff && typeof tmpl.onEquipUpdate !== 'function') {
             tmpl.onEquipUpdate = function (equipCard, hostCard, game) {
                 const m = _fuenteBuff.mientrasEquipado;
@@ -9695,8 +9819,39 @@ const DSL = {
                     _anotaVida();
                     return;
                 }
-                if (m.atk) hostCard.currentAtk += m.atk;
-                if (m.def) hostCard.currentDef += m.def;
+                // `mientrasEquipado` CALCULADO (Toto, 19-ago-2026). Era un objeto FIJO, y hay dos
+                // formas de bono que no caben ahí y que piden varias cartas del Excel:
+                //   · `segun`: ramas por FILTROS sobre el portador; gana la PRIMERA que cumpla.
+                //     Permiso especial da una cosa a un 'Policía' y otra a un 'Guardia Real'.
+                //   · `porCampo`: el bono se MULTIPLICA por un número guardado en el propio equipo.
+                //     Alabanza sube todas las stats tantos puntos como cartas le tributaron.
+                // Las dos se resuelven aquí, en cada pasada de updatePassives, así que siguen al
+                // día solas si el portador cambia de etiquetas o el número se recalcula.
+                let _m = m;
+                if (Array.isArray(m.segun)) {
+                    const _rama = m.segun.find(r => !r.filtros || r.filtros.every(f => DSL._match(hostCard, f)));
+                    _m = (_rama && _rama.stats) || {};
+                }
+                let _factor = 1;
+                if (m.porCampo) {
+                    _factor = Number(equipCard[m.porCampo]) || 0;
+                    _m = m.stats || {};
+                }
+                if (_m.atk) hostCard.currentAtk += _m.atk * _factor;
+                if (_m.def) hostCard.currentDef += _m.def * _factor;
+                if (_m.hp) {
+                    // La Vida sube el MÁXIMO y la actual a la vez, para que el bono no llegue ya
+                    // "gastado". Al desequipar, updatePassives reconstruye desde la plantilla.
+                    const _t = getCardTemplate(hostCard.id) || {};
+                    const _nuevo = (_t.hp || 0) + _m.hp * _factor;
+                    if (hostCard.maxHp !== _nuevo) {
+                        const _sube = _nuevo - hostCard.maxHp;
+                        hostCard.maxHp = _nuevo;
+                        if (_sube > 0) hostCard.currentHp += _sube;
+                        if (hostCard.currentHp > hostCard.maxHp) hostCard.currentHp = hostCard.maxHp;
+                    }
+                    _anotaVida();
+                }
                 // Inmunidad a estados alterados mientras lo lleve puesto (Hagoromo). Se reimpone
                 // en CADA pasada, como los stats, porque updatePassives la apaga antes de correr
                 // las pasivas: así se cae sola al desequipar, sin tener que acordarse de limpiarla.
@@ -10127,6 +10282,8 @@ const DSL = {
             tmpl.onEquipBeforeAttack = async function (equipCard, attacker, defender, game) {
                 // soloAtaqueNormal: misma heurística que el resto de interceptores del proyecto.
                 if (eqAtacar.soloAtaqueNormal && game.abilityContext && !game.abilityContext.isNormalAttack) return null;
+                // Y su gemelo, que faltaba: bonos que solo valen en los ESPECIALES (Bastón astral).
+                if (eqAtacar.soloAtaqueEspecial && !(game.abilityContext && game.abilityContext.isNormalAttack === false)) return null;
                 if (eqAtacar.si && !DSL._cond(equipCard, game, eqAtacar.si)) return null;
                 game._dslEquipoAtaque = {};
                 game._dslEquipoAtacante = attacker; // para `enAtacante` en los flotantes

@@ -3422,6 +3422,16 @@
                         if (typeof template.onBeforeGainFuror === 'function') {
                             amount = template.onBeforeGainFuror(card, amount, source, this);
                         }
+                        // Y LOS EQUIPOS QUE LLEVE PUESTOS (Toto, 19-ago-2026). Faltaban: en esta
+                        // cadena entraban la propia carta, los Eventos y las cartas de vanguardia,
+                        // pero no lo que uno lleva anexado. Es lo que necesitan los equipos que dan
+                        // Furor extra por turno (Baston astral, Permiso especial).
+                        (card.equippedCards || []).forEach(eq => {
+                            const _et = getCardTemplate(eq.id);
+                            if (_et && typeof _et.onEquipBeforeGainFuror === 'function') {
+                                amount = _et.onEquipBeforeGainFuror(eq, card, amount, this, source);
+                            }
+                        });
                         // Eventos y Auras de Vanguardia
                         for (let pid of ['p1', 'p2']) {
                             let ev = this.players[pid].activeEvent;
@@ -10421,24 +10431,6 @@
                 const rearEl = document.getElementById(`${pid}-rearguard`);
                 rearEl.innerHTML = '<div class="zone-label">Retaguardia</div>';
                 p.rearguard.forEach(card => rearEl.appendChild(this.createCardEl(card)));
-
-                // HUECO POR ARRIBA PARA LOS EQUIPOS (Toto, 18-ago-2026: el gemelo del de la
-                // derecha, que quedo apuntado). Los equipos suben 15px + 10 por cada uno, y por
-                // ese eje no reservaba nadie: con dos o mas se metian en la fila de encima.
-                // Va en la FILA y no en la carta a proposito: un margen en la carta la
-                // desplazaria hacia abajo respecto a sus vecinas -la fila centra verticalmente-,
-                // y quedarian desalineadas. Ensanchando la fila se mantienen todas a la misma
-                // altura y el hueco sale por arriba, que es donde hace falta.
-                const _saliente = (cartas) => cartas.reduce((m, c) => {
-                    const n = (c.equippedCards || []).length;
-                    return n ? Math.max(m, 15 + (n - 1) * 10 + 4) : m;
-                }, 0);
-                [[vanEl, p.vanguard], [rearEl, p.rearguard]].forEach(([el, cartas]) => {
-                    if (!el) return;
-                    const _extra = _saliente(cartas);
-                    // 5px es el padding de .zone-row; se le SUMA lo que sobresalga, no se pisa.
-                    el.style.paddingTop = _extra ? (5 + _extra) + 'px' : '';
-                });
             }
 
             adjustCardHeaders() {
