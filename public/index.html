@@ -1178,43 +1178,14 @@
             await new Promise(r => setTimeout(r, 50)); 
         }
 
-        async function animateSpinToHand(cardId, ownerId) {
-            const cardEl = document.querySelector(`.card[data-id="${cardId}"]`);
-            if (!cardEl) return;
-
-            cardEl.style.pointerEvents = 'none';
-            cardEl.style.zIndex = 2000; 
-
-            const handEl = document.getElementById(`${ownerId}-hand`); // la mano correcta de CADA jugador (la de J2 está arriba)
-            let targetX = window.innerWidth / 2, targetY = ownerId === 'p2' ? 0 : window.innerHeight;
-
-            if (handEl) {
-                const rect = handEl.getBoundingClientRect();
-                const enMano = handEl.querySelectorAll('.card');
-                if (enMano.length > 0) {
-                    // El hueco que va a ocupar: justo a la derecha de la última carta de la mano
-                    const ult = enMano[enMano.length - 1].getBoundingClientRect();
-                    targetX = Math.min(ult.right + ult.width * 0.6, rect.right - ult.width / 2);
-                    targetY = ult.top + ult.height / 2;
-                } else {
-                    targetX = rect.left + rect.width / 2;
-                    targetY = rect.top + rect.height / 2;
-                }
-            }
-
-            const cardRect = cardEl.getBoundingClientRect();
-            const dx = targetX - (cardRect.left + cardRect.width / 2);
-            const dy = targetY - (cardRect.top + cardRect.height / 2);
-
-            const duration = 600;
-            cardEl.style.transition = `transform ${duration}ms cubic-bezier(0.6, -0.28, 0.735, 0.045), opacity ${duration}ms, filter ${duration}ms`;
-            
-            cardEl.style.filter = "blur(2px) brightness(1.2)";
-
-            cardEl.style.transform = `translate(${dx}px, ${dy}px) rotate(1440deg) scale(0.1)`;
-            cardEl.style.opacity = "0";
-
-            await new Promise(r => setTimeout(r, duration));
+        // DELEGA en volarALaMano (Toto, 19-ago-2026). Hacia su propio viaje: movia la carta
+        // real encogiendola a 0.1 y desvaneciendola, asi que no aterrizaba en la mano ni el resto
+        // se acomodaba -era el unico retorno a la mano que no seguia el camino comun-. Lo unico
+        // suyo que merecia la pena, el giro, es ahora una opcion de ese camino.
+        async function animateSpinToHand(cardId, ownerId, carta, colocar) {
+            const sel = `.card[data-id="${cardId}"]`;
+            if (!document.querySelector(sel)) { if (typeof colocar === 'function') colocar(); return; }
+            return volarALaMano(sel, ownerId, carta || null, colocar || null, 600, false, true);
         }
 
         async function animateDirectAttack(attackerId, targetPlayerId) {
@@ -1440,7 +1411,11 @@
         // `resaltada`: la carta salía RESALTADA (era el atacante). Su clon nace con el reborde y
         // lo pierde en la PRIMERA MITAD del vuelo, mientras la que la releva lo gana en la
         // segunda: se lee como un traspaso y no como un parpadeo (Toto, 14-ago-2026).
-        async function volarALaMano(origenSel, playerId, carta, colocar, ms = 600, resaltada = false) {
+        // `girando`: da 4 vueltas por el camino. Es lo unico que distinguia a la vieja
+        // animateSpinToHand, que ademas de girar se ENCOGIA y se desvanecia en vez de aterrizar
+        // en la mano, asi que Incluso En El KG volvia por un camino distinto al de todas las
+        // demas (Toto, 19-ago-2026). Ahora el giro es un adorno de ESTE viaje y no otro viaje.
+        async function volarALaMano(origenSel, playerId, carta, colocar, ms = 600, resaltada = false, girando = false) {
             const sourceEl = document.querySelector(origenSel);
             const handSel = `#${playerId}-hand`;
             const handEl = document.querySelector(handSel);
@@ -1501,6 +1476,12 @@
             const destino = nuevoEl ? nuevoEl.getBoundingClientRect() : handEl.getBoundingClientRect();
             cont.style.transition = `left ${ms}ms cubic-bezier(.2,.8,.2,1), top ${ms}ms cubic-bezier(.2,.8,.2,1),`
                 + ` width ${ms}ms ease, height ${ms}ms ease`;
+            if (girando) {
+                // Va en el CONTENEDOR: el volteador de dentro tiene ocupado su transform con el
+                // flip de cara/dorso, que es lo que decide si la carta se enseña o no.
+                cont.style.transition += `, transform ${ms}ms cubic-bezier(.2,.8,.2,1)`;
+                cont.style.transform = 'rotate(1440deg)';
+            }
             if (nuevoEl) {
                 cont.style.left = destino.left + 'px';
                 cont.style.top = destino.top + 'px';

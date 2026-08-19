@@ -2450,13 +2450,20 @@ const CARD_DB = [
 
             if (game.abilityContext.targets.length === 1) {
                 game.logMsg(`¡ESTORNUDO DEVASTADOR! El vendaval lanza a ${game.getCardNameWithOwner(target)} de vuelta a la mano rival.`, 'ability');
-                try { await animateSpinToHand(target.instanceId, enemyId); } catch(e){}
-                enemyP.vanguard = enemyP.vanguard.filter(c => c.instanceId !== target.instanceId);
-                game.unequipAll(target); // Desequipa lo que tenga el objetivo
-                target.location = 'hand';
-                target.currentHp = getCardTemplate(target.id).hp;
-                target.status = {};
-                enemyP.hand.push(target);
+                // El movimiento va DENTRO de la animación (§14.quater): la carta entra en la mano
+                // a mitad del vuelo, así que aterriza en su hueco y el resto se acomoda.
+                const _aLaManoRival = () => {
+                    enemyP.vanguard = enemyP.vanguard.filter(c => c.instanceId !== target.instanceId);
+                    game.unequipAll(target); // Desequipa lo que tenga el objetivo
+                    target.location = 'hand';
+                    target.currentHp = getCardTemplate(target.id).hp;
+                    target.status = {};
+                    enemyP.hand.push(target);
+                    if (typeof game.render === 'function') game.render();
+                    return target.instanceId;
+                };
+                try { await animateSpinToHand(target.instanceId, enemyId, target, _aLaManoRival); }
+                catch(e){ _aLaManoRival(); }
             } else {
                 const swapTarget = game.abilityContext.targets[1];
                 game.logMsg(`¡ESTORNUDO DEVASTADOR atrapa a ${game.getCardNameWithOwner(target)} y ${game.getCardNameWithOwner(swapTarget)} en un tornado y los intercambia!`, 'ability');
@@ -4585,13 +4592,20 @@ const CARD_DB = [
                     showFloatingText(attacker.instanceId, "ESCAPA", "ft-purple", -30);
                     
                     const p = game.players[attacker.owner];
-                    p.vanguard = p.vanguard.filter(c => c.instanceId !== attacker.instanceId);
-                    p.rearguard = p.rearguard.filter(c => c.instanceId !== attacker.instanceId);
-                    
-                    if(typeof game.resetCard === 'function') game.resetCard(attacker);
-                    attacker.location = 'hand';
-                    p.hand.push(attacker);
-                    try { await window.animateSpinToHand(attacker.instanceId, attacker.owner); } catch(e){}
+                    // El movimiento va DENTRO de la animación (§14.quater). Estaba al revés: se
+                    // sacaba del campo y se metía en la mano ANTES, así que el vuelo arrancaba de
+                    // una carta que ya no estaba en el tablero (Toto, 19-ago-2026).
+                    const _aLaMano = () => {
+                        p.vanguard = p.vanguard.filter(c => c.instanceId !== attacker.instanceId);
+                        p.rearguard = p.rearguard.filter(c => c.instanceId !== attacker.instanceId);
+                        if (typeof game.resetCard === 'function') game.resetCard(attacker);
+                        attacker.location = 'hand';
+                        p.hand.push(attacker);
+                        if (typeof game.render === 'function') game.render();
+                        return attacker.instanceId;
+                    };
+                    try { await window.animateSpinToHand(attacker.instanceId, attacker.owner, attacker, _aLaMano); }
+                    catch(e){ _aLaMano(); }
                 }
             }
         },
@@ -8694,21 +8708,27 @@ const DSL = {
             // EXACTAMENTE la vieja: solo resetea currentHp; furor/estado no se tocan.
             const owner = target.owner;
             const pl = game.players[owner];
-            if (typeof animateSpinToHand === 'function') { try { await animateSpinToHand(target.instanceId, owner); } catch (err) {} }
-            pl.vanguard = pl.vanguard.filter(c => c.instanceId !== target.instanceId);
-            pl.rearguard = pl.rearguard.filter(c => c.instanceId !== target.instanceId);
-            target.location = 'hand';
-            // reset (Poder Legado, 31-jul-2026): lavado completo con resetCard en vez de solo
-            // restaurar la Vida. Importa aquí porque el portador vuelve a la mano CON un equipo
-            // encima y con los stats bloqueados a 9: resetCard deshace ambas cosas (llama a
-            // unequipAll, que manda el equipo a la basura). Sin él volvería a la mano evolucionado.
-            if (e.reset && typeof game.resetCard === 'function') game.resetCard(target);
-            else target.currentHp = getCardTemplate(target.id).hp;
-            pl.hand.push(target);
-            // La mano se acomoda con la carta ya dentro, igual que cualquier otra llegada
-            // (§14.quater). Sin esto, la carta que vuelve del campo aparecía de golpe y las
-            // demás daban un salto de un frame (Toto, 13-ago-2026).
-            if (typeof game.render === 'function') game.render();
+            // El movimiento de estado va DENTRO de la animación, como `colocar` (§14.quater): la
+            // carta entra en la mano a mitad del vuelo, así que aterriza en su hueco real y las
+            // demás se apartan deslizándose. Puesto después, la mano daba un salto al final
+            // (Toto, 19-ago-2026).
+            const _aLaMano = () => {
+                pl.vanguard = pl.vanguard.filter(c => c.instanceId !== target.instanceId);
+                pl.rearguard = pl.rearguard.filter(c => c.instanceId !== target.instanceId);
+                target.location = 'hand';
+                if (e.reset && typeof game.resetCard === 'function') game.resetCard(target);
+                else target.currentHp = getCardTemplate(target.id).hp;
+                pl.hand.push(target);
+                if (typeof game.render === 'function') game.render();
+                return target.instanceId;
+            };
+            if (typeof animateSpinToHand === 'function') {
+                try { await animateSpinToHand(target.instanceId, owner, target, _aLaMano); }
+                catch (err) { _aLaMano(); }
+            } else _aLaMano();
+            // (el `reset` de Poder Legado -lavado completo con resetCard, que además desequipa-
+            // y el resto del movimiento viven ya en `_aLaMano`, arriba, para que ocurran DENTRO
+            // de la animación.)
             if (e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
             return true;
         }

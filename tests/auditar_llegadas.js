@@ -39,6 +39,10 @@ const detalle = process.argv.includes('--detalle');
 // Marcas de que ese `hand.push` va por un camino que cumple las reglas.
 const BUENAS = [/volarALaMano/, /animateStackToHand/, /animateRetributionToHand/,
                 /animarPresentacionCarta/, /animateSpinToHand/, /_volverAMano/, /_deslizarFila/,
+                // El `colocar` de una vuelta a la mano: el push va DENTRO de un helper que la
+                // animación llama a mitad del vuelo, así que el nombre de la animación queda por
+                // encima de la ventana. La marca es el propio helper (Toto, 19-ago-2026).
+                /_aLaMano\b/, /_aLaManoRival/,
                 // El `colocar` de una presentación: la marca que lo identifica es `zonaSel` /
                 // `ocultarAlLlegar`, porque la llamada a animarPresentacionCarta queda lejos.
                 /ocultarAlLlegar/, /zonaSel:/];
