@@ -2116,7 +2116,7 @@
                 // promesa y se esperan las DOS antes del intercambio. Sin esto la base se
                 // sustituía a mitad de su propia animación y esta se veía cortada (Toto, 13-ago).
                 const _evo = (typeof animateEvolution === 'function' && base)
-                    ? animateEvolution(opts.disolverHacia) : null;
+                    ? animateEvolution(opts.disolverHacia, getCardTemplate(cardId)) : null;
                 cont.style.transition = `left ${PRESENTA_DISUELVE}ms ease-in, top ${PRESENTA_DISUELVE}ms ease-in,`
                     + ` opacity ${PRESENTA_DISUELVE}ms ease-in, filter ${PRESENTA_DISUELVE}ms ease-in`;
                 if (rb) {
@@ -2327,18 +2327,40 @@
             });
         }
 
-        async function animateEvolution(instanceId) {
+        // `plantillaNueva`: la carta en la que se convierte. Si se pasa, la CARA se cambia a
+        // mitad del giro -no al final- para que, cuando la carta vuelva a dar la cara, esa cara
+        // YA sea la de la evolución (Toto, 18-ago-2026). Antes terminaba de girar siendo la
+        // original y la sustitución llegaba después: se veía un corte seco en el frontal.
+        // El momento exacto es el 60% de la animación, que es donde `evolve-anim` la tiene a
+        // rotateY(270deg): de canto, o sea invisible. Ahí el cambiazo no se puede ver.
+        async function animateEvolution(instanceId, plantillaNueva) {
             const el = document.querySelector(`.card[data-id="${instanceId}"]`);
             if (!el) return;
-            
+            const DURA = 1200, CAMBIO = DURA * 0.6;
             el.classList.add('evolving');
-            
-            if (window.game) {
-                await window.game.sleep(1200);
-            } else {
-                await new Promise(resolve => setTimeout(resolve, 1200));
+            let _swap = null;
+            if (plantillaNueva && window.game && typeof window.game.createCardEl === 'function') {
+                _swap = setTimeout(() => {
+                    try {
+                        // Misma receta que el clon del escaparate: se copia la plantilla ENTERA y
+                        // solo se sobrescribe lo que una instancia necesita, para no dejarse un
+                        // campo (el `text` ya se olvidó una vez y salía "undefined").
+                        const nueva = window.game.createCardEl(Object.assign({}, plantillaNueva, {
+                            instanceId: '__evo__', owner: 'p1', location: 'preview',
+                            currentHp: plantillaNueva.hp, currentDef: plantillaNueva.def,
+                            currentAtk: plantillaNueva.atk,
+                        }), false, true);
+                        el.innerHTML = nueva.innerHTML;   // solo la cara: el elemento sigue girando
+                    } catch (e) { console.error(e); }
+                }, CAMBIO);
             }
             
+            if (window.game) {
+                await window.game.sleep(DURA);
+            } else {
+                await new Promise(resolve => setTimeout(resolve, DURA));
+            }
+            if (_swap) clearTimeout(_swap);
             el.classList.remove('evolving');
         }
 
