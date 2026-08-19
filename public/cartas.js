@@ -2881,6 +2881,11 @@ const CARD_DB = [
     },
     {
         id: 2003, name: "Bastón astral", type: "Ayuda", subtype: "Arma legendaria", tags: ["Equipable", "melé"], rarity: "A", cost: 0, series: 1,
+        // Requisito visible: a quién señala la flecha lima al presentarse (§14.bis). Aquí no se
+        // pierde nada -solo hace falta que exista alguien que pueda empuñarlo-, así que Requisito.
+        requisitoVisible: [ { quien: "ALIADO", uno: true,
+            filtros: [ { no: true, campo: "tags", op: "includes", valor: "Animal salvaje" },
+                       { no: true, campo: "tags", op: "includes", valor: "Cosa" } ] } ],
         text: "Requisito: un aliado sin la etiqueta 'Animal salvaje' ni 'Cosa'. Anéxasela a ese aliado: +1 de Atq, +2 en sus ataques especiales, y 1 de Furor más al inicio de cada turno mientras lo lleve.",
         abilities: [
             { trigger: "JUGAR", requisitos: [
@@ -2907,6 +2912,10 @@ const CARD_DB = [
     },
     {
         id: 2004, name: "Permiso especial", type: "Ayuda", subtype: "Técnica", tags: ["Equipable"], rarity: "B", cost: 0, series: 1,
+        // Requisito visible: a quién señala la flecha lima al presentarse (§14.bis).
+        requisitoVisible: [ { quien: "ALIADO", uno: true,
+            algunFiltro: [ { campo: "tags", op: "includes", valor: "Policía" },
+                           { campo: "tags", op: "includes", valor: "Guardia Real" } ] } ],
         text: "Requisito: un aliado con etiqueta 'Policía' o con etiqueta 'Guardia Real'. Anéxasela a ese aliado: 1 de Furor más al inicio de cada turno mientras lo lleve. Si tiene etiqueta 'Policía', además +1 de Atq y +1 de Def; si tiene etiqueta 'Guardia Real', al equiparla busca en tu mazo una Ayuda con etiqueta 'Tecnología', añádela a tu mano y baraja.",
         abilities: [
             { trigger: "JUGAR", requisitos: [
