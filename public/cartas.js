@@ -1774,6 +1774,14 @@ const CARD_DB = [
                   msg: "No hay enemigos válidos (sin Ocultarse) en la vanguardia para aplicar el ataque." } ],
               efectos: [
                 { op: "ELEGIR", de: "ENEMIGOS", cantidad: 4,
+                  // `hastaCantidad` (Toto, 19-ago-2026): el cupo se ajusta a los enemigos que HAY.
+                  // Sin esto la elección pedía 4 fijos y con menos enemigos en el campo no dejaba
+                  // elegir a ninguno: la Activa se quedaba muerta salvo con la vanguardia rival
+                  // llena, que no es lo que dice la carta ("ataca a un MÁXIMO de 3 y 1"). Y de
+                  // paso arregla lo otro: al elegir al último enemigo que queda se alcanza el
+                  // cupo y los ataques arrancan solos, sin tener que pulsar un OK que ya no
+                  // ofrece ninguna alternativa.
+                  hastaCantidad: true,
                   permitirParar: true, maxPorZona: { vanguardia: 3, retaguardia: 1 },
                   filtros: [ { campo: "stealth", op: "falsy" } ],
                   titulo: "AL-FÉNIX: elige hasta 3 en vanguardia y 1 en retaguardia (pulsa OK al terminar)",
