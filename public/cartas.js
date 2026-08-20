@@ -1137,7 +1137,11 @@ const CARD_DB = [
                 { count: { quien: "ENEMIGO", zona: "vanguardia", filtros: [ { campo: "stealth", op: "falsy" } ] }, op: ">=", valor: 2,
                   msg: "No hay suficientes enemigos válidos en vanguardia para ANDANADA METEÓRICA." } ],
               efectos: [
-                { op: "ELEGIR", de: "ENEMIGOS", zona: "VANGUARDIA", filtros: [ { campo: "stealth", op: "falsy" } ], cantidad: 2, cancelable: false,
+                // Sin `cancelable: false` (Toto, 20-ago-2026): ese flag apagaba la norma del
+                // coste y la Activa cobraba al confirmarla, antes de elegir a nadie. Lo llevaba
+                // por fidelidad a la base congelada, donde no se podía cancelar una vez
+                // confirmada; Toto ha decidido que manda la norma. Su suite lo declara.
+                { op: "ELEGIR", de: "ENEMIGOS", zona: "VANGUARDIA", filtros: [ { campo: "stealth", op: "falsy" } ], cantidad: 2,
                   titulo: "ANDANADA METEÓRICA: elige 2 enemigos distintos",
                   efectos: [ { op: "ATACAR", especial: true } ] } ] }
         ],
@@ -4742,7 +4746,11 @@ const CARD_DB = [
                 { count: { quien: "ENEMIGO", zona: "vanguardia", filtros: [ { campo: "isTaunt", op: "truthy", dePlantilla: true } ] }, op: "==", valor: 0, msg: "Hay un enemigo Provocando, no puedes atacar a objetivos múltiples." },
                 { count: { quien: "ENEMIGO", zona: "vanguardia", filtros: [ { campo: "stealth", op: "falsy" } ] }, op: ">=", valor: 2, msg: "No hay suficientes enemigos válidos en vanguardia para SEÍSMO." } ],
               efectos: [
-                { op: "ELEGIR", de: "ENEMIGOS", zona: "VANGUARDIA", cantidad: 2, filtros: [ { campo: "stealth", op: "falsy" } ], cancelable: false,
+                // Sin `cancelable: false` (Toto, 20-ago-2026): ese flag apagaba la norma del
+                // coste y la Activa cobraba al confirmarla, antes de elegir a nadie. Lo llevaba
+                // por fidelidad a la base congelada, donde no se podía cancelar una vez
+                // confirmada; Toto ha decidido que manda la norma. Su suite lo declara.
+                { op: "ELEGIR", de: "ENEMIGOS", zona: "VANGUARDIA", cantidad: 2, filtros: [ { campo: "stealth", op: "falsy" } ],
                   titulo: "SEÍSMO: elige 2 enemigos distintos de la vanguardia",
                   efectos: [ { op: "ATACAR" } ] } ] }
         ]
@@ -5731,7 +5739,11 @@ const CARD_DB = [
                 { count: { quien: "ALIADO", filtros: [ { campo: "type", op: "==", valor: "Personaje" } ] }, op: ">=", valor: 1,
                   msg: "No hay Personajes aliados a los que proteger." } ],
               efectos: [
-                { op: "ELEGIR", de: "ALIADOS", filtros: [ { campo: "type", op: "==", valor: "Personaje" } ], cantidad: 1, cancelable: false,
+                // Sin `cancelable: false` (Toto, 20-ago-2026): ese flag apagaba la norma del
+                // coste y la Activa cobraba al confirmarla, antes de elegir a nadie. Lo llevaba
+                // por fidelidad a la base congelada, donde no se podía cancelar una vez
+                // confirmada; Toto ha decidido que manda la norma. Su suite lo declara.
+                { op: "ELEGIR", de: "ALIADOS", filtros: [ { campo: "type", op: "==", valor: "Personaje" } ], cantidad: 1,
                   guardaEn: "objetivo", logDespues: "¡{carta} se vuelve el fan número 1 de {objetivo} y lo protegerá con su vida!",
                   efectos: [ { op: "ANEXAR", reverse: true } ] } ] },
             { trigger: "INTERCEPTOR_ATAQUE", nombre: "FIJACIÓN",
@@ -6439,7 +6451,11 @@ const CARD_DB = [
                 { count: { quien: "ENEMIGO", zona: "vanguardia" }, op: ">=", valor: 2, msg: "Necesitas al menos 2 enemigos en vanguardia para golpear a objetivos distintos." } ],
               log: "¡Raiju desata una tormenta eléctrica cegadora!",
               efectos: [
-                { op: "ELEGIR", de: "ENEMIGOS", zona: "VANGUARDIA", cantidad: 2, cancelable: false,
+                // Sin `cancelable: false` (Toto, 20-ago-2026): ese flag apagaba la norma del
+                // coste y la Activa cobraba al confirmarla, antes de elegir a nadie. Lo llevaba
+                // por fidelidad a la base congelada, donde no se podía cancelar una vez
+                // confirmada; Toto ha decidido que manda la norma. Su suite lo declara.
+                { op: "ELEGIR", de: "ENEMIGOS", zona: "VANGUARDIA", cantidad: 2,
                   titulo: "FOSFORESCENCIA: elige 2 enemigos distintos",
                   efectos: [
                     { op: "ATACAR", especial: true,

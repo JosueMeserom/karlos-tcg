@@ -69,19 +69,42 @@ const escenarios = [
         logsSoloVieja: LOGS_SISTEMA_VIEJA,
     },
     {
-        nombre: 'SEÍSMO: intentar cancelar tras confirmar (Furor ya comprometido) se ignora',
+        // CAMBIO DE COMPORTAMIENTO DELIBERADO (Toto, 20-ago-2026). Antes SEÍSMO llevaba
+        // `cancelable: false`, que apagaba la norma del coste: cobraba el Furor al confirmar la
+        // Habilidad y a partir de ahí ya no se podía uno arrepentir — este escenario fijaba justo
+        // eso, que el intento de cancelar se ignoraba. Toto ha decidido que manda la norma:
+        // "siempre que tengas que hacer otra cosa antes de que el tablero ya cambie, entonces es
+        // cancelable". Ahora cancelar FUNCIONA y no pasa nada: ni Furor, ni agotarse, ni daño.
+        // La vieja no puede hacer esto (su SEÍSMO no pasa por ELEGIR), así que la divergencia es
+        // total y se declara entera.
+        nombre: 'SEÍSMO: cancelar tras confirmar ya NO cuesta nada (la vieja lo ignoraba)',
         p1: { vanguardia: [{ carta: 'Gólem de tierra', furor: 1 }] },
         p2: { vanguardia: ['Mini-tigre', 'Robot de seguridad SP'] },
         pasos: [
             { habilidad: 'Gólem de tierra' },
             { confirmar: true },
-            { soloEn: 'nueva', cancelar: true }, // intento de cancelar tras pagar el Furor: ignorado
-            { elegir: ['Mini-tigre', 'Robot de seguridad SP'] },
+            { soloEn: 'nueva', cancelar: true },
+            { soloEn: 'vieja', elegir: ['Mini-tigre', 'Robot de seguridad SP'] },
         ],
-        logsSoloVieja: LOGS_SISTEMA_VIEJA,
-        logsSoloNueva: [
-            { linea: 'Ya te has comprometido: no puedes cancelar esta elección.',
-              motivo: 'aviso genérico que el motor emite al rechazar cancelAction() sobre un ELEGIR cancelable:false; la vieja no pasa por ELEGIR para SEÍSMO y no tiene este aviso' },
+        // La vieja hace la Habilidad ENTERA (cobra, anuncia y golpea) porque para ella cancelar
+        // no existe; la nueva no hace nada de eso. Se declara todo lo que la vieja emite de más.
+        logsSoloVieja: LOGS_SISTEMA_VIEJA.concat([
+            { linea: 'Mini-tigre [1] de J2 (Jugador 2) recibe 1 daño (3 Vida -> 2).',
+              motivo: 'la vieja no puede cancelar y golpea igualmente; la nueva cancela y no ataca a nadie' },
+            { linea: 'Robot de seguridad SP [1] de J2 (Jugador 2) recibe 1 daño (4 Vida -> 3).',
+              motivo: 'ídem con el segundo objetivo' },
+        ]),
+        flotantesSoloVieja: [
+            { linea: '-1 FUR', motivo: 'la nueva cancela ANTES de cobrar: ese es justo el arreglo' },
+            { linea: 'SEÍSMO', motivo: 'el anuncio de la Activa viaja pegado al cobro, así que tampoco sale' },
+            { linea: '-1 VIDA', motivo: 'cancelado: nadie recibe el golpe (dos flotantes, uno por objetivo)' },
+        ],
+        diferenciasEsperadas: [
+            { contiene: 'p1.vanguard.0.furor', motivo: 'la nueva cancela y NO cobra el Furor; la vieja lo había cobrado al confirmar' },
+            { contiene: 'p1.vanguard.0.exhausted', motivo: 'cancelar no gasta la acción; la vieja ya la había gastado' },
+            { contiene: 'p1.vanguard.0.hasAttackedThisTurn', motivo: 'ídem: en la nueva no llega a atacar nadie' },
+            { contiene: 'p2.vanguard.0.currentHp', motivo: 'cancelado: el enemigo no recibe el golpe' },
+            { contiene: 'p2.vanguard.1.currentHp', motivo: 'cancelado: el segundo enemigo tampoco' },
         ],
     },
 ];

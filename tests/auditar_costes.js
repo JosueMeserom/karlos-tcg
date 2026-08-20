@@ -63,12 +63,11 @@ if (!/_hayVentanaCancelable\s*=\s*!!_p0 && \(_p0\.op === 'ELEGIR' \|\| _p0\.op =
 // anteriores a la norma y vienen de la base congelada, donde la Activa no se podía cancelar una
 // vez confirmada; quitarles el flag les CAMBIA el comportamiento y hace divergir su suite
 // viejo-vs-nuevo, así que es decisión de Toto y no un arreglo que se cuele en una tanda.
-const DECLARADAS = {
-    'Garret|ANDANADA METEÓRICA': 'heredado de la base congelada: la vieja no dejaba cancelar tras confirmar. Pendiente de decisión de Toto (20-ago-2026).',
-    'Gólem de tierra|SEÍSMO': 'heredado de la base congelada: ídem. Pendiente de decisión de Toto (20-ago-2026).',
-    'Frikazo|FIJACIÓN': 'heredado de la base congelada: ídem. Pendiente de decisión de Toto (20-ago-2026).',
-    'Raiju|FOSFORESCENCIA': 'heredado de la base congelada: ídem. Es la carta de la que se copió Erazor Djinn y así se propagó el fallo. Pendiente de decisión de Toto (20-ago-2026).',
-};
+// Las cuatro que había (Garret, Gólem de tierra, Frikazo y Raiju) se arreglaron el mismo día:
+// Toto decidió que manda la norma y no la fidelidad a la base congelada. "Siempre que tengas que
+// hacer otra cosa antes de que el tablero ya cambie, entonces es cancelable". Sus suites declaran
+// la diferencia de comportamiento.
+const DECLARADAS = {};
 
 const malas = [], declaradas = [], bien = [];
 
