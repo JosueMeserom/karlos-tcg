@@ -284,10 +284,39 @@ async function reposar(clientes, vueltas = 60) {
         check('al cerrar una búsqueda, el rival conserva IGUALMENTE su pila abierta',
             !!B._visorSoloLectura, 'B._visorSoloLectura=' + JSON.stringify(B._visorSoloLectura));
 
-        // Y la regla de cuándo SÍ se cierra sola: cuando a ese cliente le piden algo.
+        // Y la regla de cuándo SÍ se cierra sola: cuando a ese cliente le piden algo. Los TRES
+        // sitios por los que el juego pide algo, uno por uno, porque wirear dos de tres y dejarse
+        // el otro es exactamente el fallo que no se vería hasta jugando.
         B.pickBoardTargets(B.players.p2.vanguard, 1, 'prueba', null, 'p2');
-        check('...pero se cierra sola cuando a ESE cliente le toca elegir', !B._visorSoloLectura,
+        check('...pero se cierra sola cuando a ESE cliente le toca elegir en el tablero',
+            !B._visorSoloLectura, 'B._visorSoloLectura=' + JSON.stringify(B._visorSoloLectura));
+
+        // OJO: los modales están SUSTITUIDOS a nivel de instancia por el harness (los convierte
+        // en `ctx.pendientes` para poder guionizarlos). Llamándolos por el objeto se probaría el
+        // sustituto, no el cliente — la primera versión de esta prueba hacía justo eso y daba
+        // rojo por el motivo equivocado. Se invoca el método de la CLASE, que es el que corre en
+        // el navegador.
+        const real = (g, nombre, ...args) => Object.getPrototypeOf(g)[nombre].apply(g, args);
+
+        B.openDiscardViewer('p2', null);
+        real(B, 'openChoiceModal', '¿prueba?', [{ label: 'Sí' }, { label: 'No' }], 'p2');
+        check('...y cuando le sale un modal de opciones', !B._visorSoloLectura,
             'B._visorSoloLectura=' + JSON.stringify(B._visorSoloLectura));
+
+        B.openDiscardViewer('p2', null);
+        real(B, 'openVisualSearchModal', 'prueba', B.players.p2.discard, 1, false, 'p2');
+        check('...y cuando le sale el modal de búsqueda visual', !B._visorSoloLectura,
+            'B._visorSoloLectura=' + JSON.stringify(B._visorSoloLectura));
+
+        // Y el fin de turno, que es el otro momento en que se cierra sola. SIN `await`: la
+        // secuencia de fin de turno se queda esperando carteles y temporizadores que solo mueve
+        // `reposar`, así que esperarla aquí cuelga la suite sin imprimir ni el resumen (pasó).
+        A.openDiscardViewer('p1', null);
+        A.activePlayerId = 'p1';
+        A.confirmEndTurn(true);
+        await reposar(cl);
+        check('...y al terminarse el turno', !A._visorSoloLectura,
+            'A._visorSoloLectura=' + JSON.stringify(A._visorSoloLectura));
     }
 
     console.log('');

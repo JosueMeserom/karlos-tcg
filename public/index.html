@@ -8682,6 +8682,10 @@
                     return; // Abortamos para que no dibuje el modal HTML
                 }
                 this.currentChoices = choices;
+                // Como en pickBoardTargets y openVisualSearchModal: si el modal es para MÍ, se
+                // cierra la pila que estuviera mirando. "Cualquier modal entra aquí" (Toto,
+                // 20-ago-2026), y este es el tercer y último sitio donde el juego pide algo.
+                if (intendedPlayer === this.myPlayerId || this.gameMode !== 'online') this._cerrarVisorPropio();
                 this._interaccionChooser = intendedPlayer; // quién debe responder (para la recuperación por reconexión)
 
                 // Descriptor SERIALIZABLE del prompt de reacción, para poder RE-MOSTRARLO si el
