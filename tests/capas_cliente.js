@@ -659,5 +659,44 @@ console.log('\n--- ajuste del nombre en toda carta creada ---');
     check('...y después vuelve a poder pedirse', rafCola.length === 2, 'rAF encolados: ' + rafCola.length);
 }
 
+// ESCALONADO DE FLOTANTES DE UN MISMO LOTE (Toto, 20-ago-2026). La cola de flotantes es por
+// carta, así que dos cartas golpeadas a la vez pintaban su texto en el mismo instante y los
+// anchos ("DAÑO VERDADERO") se pisaban. Ahora lo que cae junto y en cartas distintas se reparte
+// en el tiempo. Se comprueba el REPARTO, que es lo comprobable desde aquí; que se lea mejor lo
+// dice el navegador.
+console.log('\n--- escalonado de flotantes de un mismo lote ---');
+{
+    const sft = vm.runInContext('showFloatingText', sandbox);
+    const programados = [];
+    const _st = sandbox.setTimeout;
+    sandbox.setTimeout = (fn, ms) => { programados.push(ms); return 0; };
+
+    // Se filtran los 400 y 1500: son las esperas de la PROPIA cola de flotantes (el hueco entre
+    // dos de la misma carta y el borrado del nodo), no el escalonado que se está midiendo.
+    const escalones = () => programados.filter(m => m > 0 && m < 400);
+
+    sft('cartaA', 'DAÑO VERDADERO', 'ft-purple', -30);
+    check('el primero del lote sale EN EL ACTO, sin retraso', escalones().length === 0,
+          'programados=' + JSON.stringify(programados));
+    sft('cartaB', 'DAÑO VERDADERO', 'ft-purple', -30);
+    sft('cartaC', 'DAÑO VERDADERO', 'ft-purple', -30);
+    const esc = escalones();
+    check('los siguientes se reparten en el tiempo', esc.length === 2, 'escalones=' + JSON.stringify(esc));
+    check('...y cada uno un escalón más tarde que el anterior',
+          esc.length === 2 && esc[0] > 0 && esc[1] === esc[0] * 2, 'escalones=' + JSON.stringify(esc));
+
+    // Dos seguidos sobre la MISMA carta no se escalonan: ya los separa su propia cola de 400 ms,
+    // y meterles retraso encima los duplicaría.
+    // Dos seguidos sobre la MISMA carta: el primero cuenta como uno más del lote (viene de otra
+    // carta), pero el SEGUNDO no añade escalón — su cola de 400 ms ya los separa, y meterle
+    // retraso encima los duplicaría. Se mide que el segundo no programa nada nuevo.
+    sft('cartaD', 'x', 'ft-green', 0);
+    const antes = escalones().length;
+    sft('cartaD', 'y', 'ft-green', 0);
+    check('el segundo flotante de la MISMA carta no añade retraso', escalones().length === antes,
+          'antes=' + antes + ' despues=' + escalones().length);
+    sandbox.setTimeout = _st;
+}
+
 console.log(fallos === 0 ? '\nSUITE capas_cliente: ' + comprobaciones + '/' + comprobaciones + ' comprobaciones — CAPAS CORRECTAS' : '\nSUITE capas_cliente: ' + fallos + ' FALLOS de ' + comprobaciones + ' comprobaciones');
 process.exit(fallos ? 1 : 0);

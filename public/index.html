@@ -763,12 +763,41 @@
             queue.processing = false;
         }
 
+        // ESCALONADO DE LOTE (Toto, 20-ago-2026). La cola de flotantes es POR CARTA: dos cartas
+        // distintas disparan a la vez y cada texto se centra en la suya, así que uno ancho -"DAÑO
+        // VERDADERO" es el más largo del juego- se sale por los lados e invade al vecino. Lo vio
+        // con la Granada de maná, que golpea a dos enemigos contiguos en el mismo instante.
+        //
+        // Esto NO los aparta: los reparte en el tiempo, igual que la animación de daño verdadero
+        // ya reparte sus impactos 70 ms. Un lote que cae escalonado se lee como un barrido y no
+        // como un fogonazo, y de paso el primero ya ha subido bastante cuando nace el segundo, así
+        // que se pisan mucho menos. No es LA solución al solape -esa sería medirlos y apartarlos,
+        // como se hizo con las etiquetas de las flechas-, pero es barata y compone con ella.
+        //
+        // Solo se escalona lo que cae junto y en cartas DISTINTAS: dos flotantes seguidos sobre la
+        // misma carta ya los separa su propia cola (400 ms), y meterles retraso los duplicaría.
+        const FT_ESCALON = 110;   // ms entre flotantes del mismo lote
+        const FT_VENTANA = 50;    // ms dentro de los cuales dos flotantes se consideran del mismo lote
+        let _ftLote = { t: -1e9, n: 0, id: null };
+
         function showFloatingText(elementId, text, colorClass, offsetY = 0) {
-            if (!window.ftQueues[elementId]) {
-                window.ftQueues[elementId] = { items: [], processing: false };
-            }
-            window.ftQueues[elementId].items.push({text, colorClass, offsetY});
-            processFtQueue(elementId);
+            const _ahora = Date.now();
+            if (_ahora - _ftLote.t <= FT_VENTANA && elementId !== _ftLote.id) _ftLote.n++;
+            else _ftLote.n = 0;
+            _ftLote.t = _ahora;
+            _ftLote.id = elementId;
+
+            const _poner = () => {
+                if (!window.ftQueues[elementId]) {
+                    window.ftQueues[elementId] = { items: [], processing: false };
+                }
+                window.ftQueues[elementId].items.push({text, colorClass, offsetY});
+                processFtQueue(elementId);
+            };
+            // Sin retraso se hace EN EL ACTO, no en un setTimeout(0): así un flotante suelto se
+            // comporta exactamente igual que antes de este cambio.
+            if (_ftLote.n === 0) _poner();
+            else setTimeout(_poner, _ftLote.n * FT_ESCALON);
         }
 
         /* GLOBAL BANNER RESOLVER TO SKIP */
