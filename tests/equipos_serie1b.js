@@ -127,6 +127,13 @@ const pool = (ctx) => ((ctx.pendientes[0] || {}).pool || []).map(c => c.name);
         const nem = buscar(g, 'p1', 'Némesis'), ani = buscar(g, 'p1', 'Aniceto'), mt = buscar(g, 'p1', 'Mini-tigre');
         const atk0 = nem.currentAtk, def0 = nem.currentDef, hp0 = nem.maxHp;
         await paso({ jugar: 'Alabanza' });
+        // EL ORDEN, que es lo que se rompió (Toto, 20-ago-2026): con el tributo declarado antes
+        // del ELEGIR, la Alabanza se iba al descarte y cobraba el Furor ANTES de preguntar a quién
+        // alabar. Mientras se elige no puede haber pasado NADA: §14.
+        check('mientras se elige, nadie ha pagado todavía',
+            nem.furor === 3 && ani.furor === 2, 'nemesis=' + nem.furor + ' aniceto=' + ani.furor);
+        check('...y la Alabanza sigue en la mano', g.players.p1.hand.some(c => c.name === 'Alabanza'),
+            'mano=' + g.players.p1.hand.map(c => c.name).join(','));
         await paso({ elegir: ['Némesis'] });
         g.updatePassives();
         check('tributan los que PUEDEN pagar (Némesis y Aniceto)', nem.furor === 1 && ani.furor === 0,

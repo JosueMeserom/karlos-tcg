@@ -2981,18 +2981,25 @@ const CARD_DB = [
               // guarda en la propia carta. No es un número fijo, así que no cabía en el objeto.
               mientrasEquipado: { porCampo: "alabanzaTributos", stats: { hp: 1, def: 1, atk: 1 } },
               efectos: [
-                // El tributo va PRIMERO y se lo cobra a quien PUEDA pagarlo: el texto dice
-                // literalmente "si alguna carta no tiene al menos 2 de Furor, no tributa".
-                { op: "MODIFICAR_STAT", stat: "furor", delta: -2, esCoste: true,
-                  target: { quien: "ALIADO", zona: "vanguardia", modo: "TODOS",
-                            filtros: [ { campo: "furor", op: ">=", valor: 2 } ] },
-                  guardaCuantosEnSelf: "alabanzaTributos" },
+                // LA ELECCIÓN VA PRIMERO (§14, Toto 20-ago-2026). Con el tributo delante, elegir
+                // era lo ÚLTIMO que pasaba: la carta se presentaba, el Furor se cobraba y solo
+                // entonces se preguntaba a quién alabar — o sea, pagado y sin vuelta atrás antes
+                // del punto de compromiso. Mismo arreglo que Rezo en grupo. Mientras se elige, la
+                // carta sigue en la mano; al elegir, el `esCoste` de abajo la presenta y cobra.
                 { op: "ELEGIR", de: "ALIADOS", cantidad: 1,
                   algunFiltro: [ { campo: "tags", op: "includes", valor: "Dios" },
                                  { campo: "tags", op: "includes", valor: "Diosa" },
                                  { campo: "tags", op: "includes", valor: "Genio" } ],
                   titulo: "¿A QUIÉN ALABAS?",
                   efectos: [
+                    // Se lo cobra a quien PUEDA pagarlo: el texto dice literalmente "si alguna
+                    // carta no tiene al menos 2 de Furor, no tributa". Lleva `target` propio, así
+                    // que no le toca al elegido sino a la vanguardia entera (_runEffectList solo
+                    // usa el elegido cuando el efecto NO trae target).
+                    { op: "MODIFICAR_STAT", stat: "furor", delta: -2, esCoste: true,
+                      target: { quien: "ALIADO", zona: "vanguardia", modo: "TODOS",
+                                filtros: [ { campo: "furor", op: ">=", valor: 2 } ] },
+                      guardaCuantosEnSelf: "alabanzaTributos" },
                     { op: "EQUIPAR",
                       floats: [ { texto: "ALABANZA", estilo: "ft-ability", offset: -40 } ],
                       log: "Los cánticos elevan a {objetivo}." } ] } ] }
