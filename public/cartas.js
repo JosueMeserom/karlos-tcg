@@ -2800,7 +2800,7 @@ const CARD_DB = [
         ],
     },
     {
-        name: "PEM", type: "Ayuda", subtype: "Técnica", tags: ["Consumible"], rarity: "C", cost: 0, series: 1,
+        name: "PEM", type: "Ayuda", subtype: "Tecnología", tags: ["Consumible"], rarity: "C", cost: 0, series: 1,
         tempEffectText: "{genero?Paralizado|Paralizada} por PEM: se saltará su próximo turno (sin atacar, sin Habilidades y sin retirarse)",
         text: "Coste: 1 de Furor. Elige un enemigo 'Máquina'. No podrá atacar, usar Habilidades ni retirarse en su próximo turno.",
         abilities: [
@@ -2958,8 +2958,14 @@ const CARD_DB = [
                     { op: "BUSCAR", en: "MAZO", destino: "MANO", cantidad: 1,
                       // Sobre el ELEGIDO, no sobre la Ayuda: solo el Guardia Real trae Tecnología.
                       siObjetivo: { campo: "tags", op: "includes", valor: "Guardia Real" },
+                      // Tecnología es un SUBTIPO, no una etiqueta (Lupa, Cápsula de
+                      // bio-regeneración, Overclock, PEM). Buscándola entre las etiquetas la
+                      // búsqueda no encontraba nada nunca y el visor se abría vacío, que es lo
+                      // que se veía jugando (20-ago-2026). El `type: Ayuda` sobra de hecho -solo
+                      // las Ayudas tienen ese subtipo- pero se deja explícito: si algún día un
+                      // Esbirro Máquina se llamara así, esta búsqueda no debe cogerlo.
                       filtros: [ { campo: "type", op: "==", valor: "Ayuda" },
-                                 { campo: "tags", op: "includes", valor: "Tecnología" } ],
+                                 { campo: "subtype", op: "==", valor: "Tecnología" } ],
                       titulo: "PERMISO ESPECIAL: BUSCA TECNOLOGÍA",
                       log: "{jugador} requisa {objetivo} del mazo.",
                       barajarDespues: { log: "Barajando el mazo de {jugador}...", inclusoSinValidas: true } } ] } ] }

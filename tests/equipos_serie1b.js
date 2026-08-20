@@ -92,21 +92,29 @@ const pool = (ctx) => ((ctx.pendientes[0] || {}).pool || []).map(c => c.name);
     {
         const { ctx, g, paso } = await mesa({
             turno: 2, turnoDe: 'p1', empieza: 'p2',
+            // En el mazo, una Ayuda de Tecnología (Overclock) y dos que no lo son: la búsqueda
+            // tiene que ver la pila entera pero solo poder coger la de Tecnología.
             p1: { vanguardia: [{ carta: 'Capitán Guardia Real', furor: 0 }], mano: ['Permiso especial'],
-                  mazo: ['Mini-tigre', 'Longaniza'] },
+                  mazo: ['Mini-tigre', 'Overclock', 'Longaniza'] },
             p2: { vanguardia: ['Karolina'] },
         });
         const cap = buscar(g, 'p1', 'Capitán Guardia Real');
         const atk0 = cap.currentAtk, def0 = cap.currentDef, fur0 = cap.furor;
         await paso({ jugar: 'Permiso especial' });
         await paso({ elegir: ['Capitán Guardia Real'] });
-        // Y ABRE EL VISOR DEL MAZO, que es lo suyo del Guardia Real. Hoy no hay ninguna carta con
-        // la etiqueta 'Tecnología' implementada, así que el visor se abre vacío y con su aviso —
-        // que es el comportamiento correcto (§12.bis: el mazo se enseña igual) y de paso deja
-        // fijado que la búsqueda se dispara SOLO en esta rama.
+        // Y ABRE EL VISOR DEL MAZO, que es lo suyo del Guardia Real.
         check('el "Guardia Real" dispara la búsqueda de Tecnología',
             (ctx.pendientes[0] || {}).tipo === 'visorMazo', 'pendiente=' + JSON.stringify((ctx.pendientes[0] || {}).tipo));
-        await paso({ elegir: [] });
+        // LO QUE OFRECE. 'Tecnología' es un SUBTIPO, no una etiqueta: buscándolo entre las
+        // etiquetas -como estaba- el visor se abría siempre vacío y la mitad de la carta no hacía
+        // nada (20-ago-2026). Se comprueba el pool, no solo que el visor se abra.
+        const _pool = ((ctx.pendientes[0] || {}).elegibles || []).map(c => c.name);
+        check('...y ofrece la Ayuda de Tecnología del mazo, solo esa',
+            _pool.length === 1 && _pool[0] === 'Overclock', 'pool=[' + _pool.join(', ') + ']');
+        await paso({ elegir: ['Overclock'] });
+        check('la carta encontrada acaba en la mano',
+            g.players.p1.hand.some(c => c.name === 'Overclock'),
+            'mano=' + g.players.p1.hand.map(c => c.name).join(','));
         g.updatePassives();
         check('un "Guardia Real" NO se lleva los stats del "Policía"',
             cap.currentAtk === atk0 && cap.currentDef === def0,
