@@ -68,9 +68,17 @@ if (!ARMAN.length) { console.log('NO ENCUENTRO la lista `_hayVentana` en index.h
 
 // Qué cadenas comprometen al final: el compilador de cada trigger que llama a _comprometer.
 const COMPROMETEN = new Set();
+// La búsqueda arranca DENTRO de `compile` (20-ago-2026). Antes empezaba en el byte 0 y cogía la
+// PRIMERA aparición de `a.trigger === 'X'` en todo el fichero, que no tiene por qué ser la del
+// compilador: en cuanto se escribió un helper que también inspecciona las abilities
+// (_expandirCosteColocacion) la auditoría se puso a leer ESE bloque, no encontró el
+// _comprometer y dio una alarma falsa de las gordas. El compilador vive en `compile`, así que
+// se busca desde ahí.
+const _iniCompile = SRC_MOTOR.indexOf('compile(tmpl) {');
+if (_iniCompile === -1) { console.log('NO ENCUENTRO `compile(tmpl)` en cartas.js.'); process.exit(1); }
 for (const t of ARMAN) {
     // El bloque del compilador de ese trigger, hasta el siguiente `abs.find`.
-    const i = SRC_MOTOR.indexOf(`a.trigger === '${t}'`);
+    const i = SRC_MOTOR.indexOf(`a.trigger === '${t}'`, _iniCompile);
     if (i === -1) continue;
     const j = SRC_MOTOR.indexOf('abs.find(', i + 10);
     if (/await DSL\._comprometer\(/.test(SRC_MOTOR.slice(i, j === -1 ? undefined : j))) COMPROMETEN.add(t);

@@ -3716,11 +3716,6 @@ const CARD_DB = [
         text: "Coste: 4 de Furor. P: BELLEZA INCOMPARABLE: Oculta permanentemente. Si es tu único aliado al inicio de tu turno, lanza moneda: Cruz = pierde Oculto este turno. A: TORMENTA PERFECTA (4F): Quita 2 de Vida (daño verdadero) a TODOS los enemigos.",
         passiveName: "BELLEZA INCOMPARABLE", activeName: "TORMENTA PERFECTA", activeCost: 4,
         
-        onBeforePlayAsync: async function(card, game, p) {
-            return await DSL.tributoFuror(card, game, p, 4, {
-                msgSinPagador: "Necesitas un aliado con 4 de Furor para invocar a Edrielle.",
-                titulo: 'TRIBUTO PARA EDRIELLE (-4 FUROR)' });
-        },
         
         onStartTurn: async function(card, game) {
             // Comprueba si es el turno de su dueño
@@ -3774,6 +3769,9 @@ const CARD_DB = [
         // resuelto, así que no hace falta ningún flag de "aplícalo a todos". Excluye Avatares
         // por defecto (Kami: intocable), igual que el `!isAvatar` a mano de la vieja.
         abilities: [
+            { trigger: "COSTE_COLOCACION", furor: 4,
+              msgSinPagador: "Necesitas un aliado con 4 de Furor para invocar a Edrielle.",
+              titulo: "TRIBUTO PARA EDRIELLE (-4 FUROR)" },
             { trigger: "ACTIVA", nombre: "TORMENTA PERFECTA", coste: { furor: 4 }, sinObjetivo: true,
               requisitos: [ { count: { quien: "ENEMIGO" }, op: ">=", valor: 1, msg: "No hay enemigos en el campo." } ],
               log: "¡{carta} desata una TORMENTA PERFECTA sobre todo el campo enemigo!",
@@ -6186,9 +6184,6 @@ const CARD_DB = [
         name: "Imp mayor", hp: 6, def: 2, atk: 4, type: "Esbirro", subtype: "Ser mágico", tags: ["Monstruo"], rarity: "B", cost: 1, series: 2,
         text: "Coste: 2 de Furor. P: DEMONIO VIL: Cada vez que sea atacado, el atacante pierde 1 de Furor.",
         passiveName: "DEMONIO VIL",
-        onBeforePlayAsync: async function(card, game, p) {
-            return await DSL.tributoFuror(card, game, p, 2, { msgSinPagador: `Necesitas un aliado con al menos 2 de Furor para invocar al ${card.name}.`, titulo: `${card.name}: ELIGE TRIBUTO (-2 FUROR)` });
-        },
         // DEMONIO VIL migrada (31-jul-2026) con el trigger NUEVO TRAS_DEFENDER (onAfterDefend):
         // "pierde Furor" es una CONSECUENCIA de ser atacado, no una condición previa, así que
         // corre DESPUÉS del golpe -incluida la animación completa-, no antes (betasteo de
@@ -6198,6 +6193,8 @@ const CARD_DB = [
         // igual que la vieja cuando el atacante no tiene Furor -`ifObjetivo` hace `continue`
         // antes de llegar a _doEffect, así que ni el log ni el MODIFICAR_STAT llegan a correr-.
         abilities: [
+            { trigger: "COSTE_COLOCACION", furor: 2,
+              msgSinPagador: "Necesitas un aliado con al menos 2 de Furor para invocar al Imp mayor." },
             { trigger: "TRAS_DEFENDER", nombre: "DEMONIO VIL",
               efectos: [
                 { op: "MODIFICAR_STAT", stat: "furor", delta: -1,
@@ -6216,10 +6213,9 @@ const CARD_DB = [
         // `soloSiDaño` hace por su cuenta la contabilidad de la Vida enemiga antes/después que
         // la vieja llevaba a mano con _enemyHpBefore, y `siObjetivo` cubre el "solo si le queda
         // Furor que quitar". SANGRE MALDITA ya estaba migrada.
-        onBeforePlayAsync: async function(card, game, p) {
-            return await DSL.tributoFuror(card, game, p, 2, { msgSinPagador: `Necesitas un aliado con 2 Furor para el tributo.` });
-        },
         abilities: [
+            { trigger: "COSTE_COLOCACION", furor: 2,
+              msgSinPagador: "Necesitas un aliado con 2 Furor para el tributo." },
             { trigger: "TRAS_ATACAR", nombre: "DEMONIO BELICOSO", soloSiDaño: true,
               siObjetivo: { campo: "furor", op: ">=", valor: 1 },
               log: "¡DEMONIO BELICOSO! El Gul desgarra la energía de {objetivo}.",
@@ -6238,9 +6234,6 @@ const CARD_DB = [
         name: "Oni ancho", hp: 4, def: 4, atk: 6, type: "Esbirro", subtype: "Ser mágico", tags: ["Monstruo"], rarity: "B", cost: 1, series: 2,
         text: "Coste: 2 de Furor. P: YŌKAI VIOLENTO: Al realizar un ataque normal, echa una moneda. Cara: +1 Atq. Cruz: -1 Atq durante ese ataque.",
         passiveName: "YŌKAI VIOLENTO",
-        onBeforePlayAsync: async function(card, game, p) {
-            return await DSL.tributoFuror(card, game, p, 2, { titulo: `${card.name}: ELIGE TRIBUTO (-2 FUROR)` });
-        },
         // YŌKAI VIOLENTO migrada (31-jul-2026) con el trigger NUEVO `ANTES_DE_ATACAR` y el op
         // `BONO_ATAQUE`. `soloAtaqueNormal` replica el `!game.abilityContext ||
         // isNormalAttack` que la vieja hacía a mano. El bono lo deshace el propio compilador
@@ -6249,6 +6242,7 @@ const CARD_DB = [
         // doble resta. Aquí NO lo había: en Oni ancho el += y el -= viven DENTRO de
         // performAttack, antes de su updatePassives final, así que se compensaban.
         abilities: [
+            { trigger: "COSTE_COLOCACION", furor: 2 },
             { trigger: "ANTES_DE_ATACAR", nombre: "YŌKAI VIOLENTO", soloAtaqueNormal: true,
               log: "¡YŌKAI VIOLENTO! La brutalidad del Oni lo vuelve impredecible...",
               efectos: [
@@ -6265,9 +6259,6 @@ const CARD_DB = [
         // YŌKAI SOBERBIO era solo el tributo de colocación, ya visible en la caja COSTE.
         text: "Coste: 2 de Furor. A: DOMINANCIA ILUSORIA (1F): Echa 2 monedas. Por cada cara, realiza 2 ataques normales a un enemigo (pudiendo elegir objetivos distintos para cada ráfaga).",
         activeName: "DOMINANCIA ILUSORIA", activeCost: 1,
-        onBeforePlayAsync: async function(card, game, p) {
-            return await DSL.tributoFuror(card, game, p, 2, { titulo: `${card.name}: ELIGE TRIBUTO (-2 FUROR)` });
-        },
         canActivateAbility: function(card, game) {
             if (card.furor < (card.activeCost || 1)) { game.logError(`Falta Furor.`); return false; }
             const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
@@ -6342,7 +6333,11 @@ const CARD_DB = [
             game.isActionLocked = false;
             game.cancelAction();
             game.render();
-        }
+        },
+        // El tributo de colocación, que era su otro hook a mano, ya es declarativo.
+        abilities: [
+            { trigger: "COSTE_COLOCACION", furor: 2 }
+        ]
     },
     {
         // Sin passiveName ni "P: ..." en el text (Toto, 27-jul-2026): su supuesta pasiva
@@ -6353,9 +6348,6 @@ const CARD_DB = [
         name: "Súcubo", hp: 2, def: 3, atk: 4, type: "Esbirro", subtype: "Ser mágico", tags: ["Monstruo"], gender: 'F', rarity: "B", cost: 1, series: 2,
         text: "Coste: 2 de Furor. A: SEDUCCIÓN (1F): Permanece Oculta permanentemente mientras siga en el campo.",
         activeName: "SEDUCCIÓN", activeCost: 1,
-        onBeforePlayAsync: async function(card, game, p) {
-            return await DSL.tributoFuror(card, game, p, 2, { titulo: `${card.name}: ELIGE TRIBUTO (-2 FUROR)` });
-        },
         canActivateAbility: function(card, game) {
             if (card.furor < 1) { game.logError("Falta Furor (1)."); return false; }
             if (card.permanentStealth) { game.logError("Súcubo ya está en estado de Seducción."); return false; }
@@ -6379,6 +6371,7 @@ const CARD_DB = [
         // SEDUCCIÓN (imperativa); esta pasiva continua solo lo SOSTIENE mientras siga en el
         // campo, así que se atribuye a SEDUCCIÓN en el detalle.
         abilities: [
+            { trigger: "COSTE_COLOCACION", furor: 2 },
             { trigger: "PASIVA_CONTINUA", nombre: "SEDUCCIÓN", silencioso: true,
               if: { campo: "permanentStealth", op: "truthy" },
               then: [ { op: "MARCAR", campo: "stealth", valor: true, badge: "oculto" } ] }
@@ -6408,9 +6401,6 @@ const CARD_DB = [
         // detalle. El parser la listaba como "Pasiva:" con la descripción partida.
         text: "Coste: 1 de Furor. A: FOSFORESCENCIA (1F): Realiza 2 ataques especiales a enemigos distintos y les ciega (2 turnos).",
         activeName: "FOSFORESCENCIA", activeCost: 1,
-        onBeforePlayAsync: async function(card, game, p) {
-            return await DSL.tributoFuror(card, game, p, 1, { titulo: `${card.name}: ELIGE TRIBUTO (-1 FUROR)` });
-        },
         // Migrada (30-jul-2026): mismo esqueleto que Gólem de tierra (ELEGIR de cantidad EXACTA
         // 2 + ATACAR anidado), pero con especial:true en vez de especial ausente, y con
         // APLICAR_ESTADO en siExito para la Ceguera. A diferencia de Gólem de tierra, la vieja
@@ -6418,6 +6408,7 @@ const CARD_DB = [
         // replica fiel, sin el filtro de stealth que sí lleva SEÍSMO. El tributo de colocación
         // se queda imperativo (DSL.tributoFuror, sin op DSL para "elegir pagador genérico").
         abilities: [
+            { trigger: "COSTE_COLOCACION", furor: 1 },
             { trigger: "ACTIVA", nombre: "FOSFORESCENCIA", coste: { furor: 1 }, sinObjetivo: true,
               // count/ELEGIR excluyen Avatares por defecto (Kami: intocable), igual que el
               // `!getCardTemplate(c.id).isAvatar` a mano de la vieja — sin filtro adicional.
@@ -6584,9 +6575,12 @@ const CARD_DB = [
         name: "Experimento fallido", hp: 4, def: 3, atk: 5, type: "Esbirro", subtype: "No-muerto", tags: ["Monstruo", "Creación artificial"], rarity: "B", cost: 1, series: 2,
         text: "Coste: 1 de Furor. P: ABOMINACIÓN AFABLE: Su coste se tributa al colocar esta carta en el campo.",
         passiveName: "ABOMINACIÓN AFABLE",
-        onBeforePlayAsync: async function(card, game, p) {
-            return await DSL.tributoFuror(card, game, p, 1, { msgSinPagador: "Necesitas un aliado con al menos 1 de Furor para el tributo.", titulo: `${card.name}: ELIGE TRIBUTO (-1 FUROR)` });
-        }
+        // Primera del lote (20-ago-2026): era ENTERA un `DSL.tributoFuror` escrito a mano. Con
+        // COSTE_COLOCACION la carta se queda sin una sola línea de código.
+        abilities: [
+            { trigger: "COSTE_COLOCACION", furor: 1,
+              msgSinPagador: "Necesitas un aliado con al menos 1 de Furor para el tributo." }
+        ]
     },
     {
         name: "Hiposaurio", hp: 6, def: 4, atk: 2, type: "Esbirro", subtype: "Ser vivo", tags: ["Bestia salvaje"], rarity: "B", cost: 1, series: 2,
@@ -6966,10 +6960,10 @@ const CARD_DB = [
         // enemigos válidos antes de activar, con lo que la selección pasa a ser "exactamente
         // 2, sin parada anticipada" — el camino RAW de `target:{cantidad:2}` ya soportado por
         // el compilador de ACTIVA (ver DEVASTACIÓN AGAH / COMA), sin canStopEarly.
-        onBeforePlayAsync: async function(card, game, p) {
-            return await DSL.tributoFuror(card, game, p, 2, { msgSinPagador: "Necesitas un aliado con 2 Furor para el tributo.", titulo: `TRIBUTO PARA ÁNGEL (-2 FUROR)` });
-        },
         abilities: [
+            { trigger: "COSTE_COLOCACION", furor: 2,
+              msgSinPagador: "Necesitas un aliado con 2 Furor para el tributo.",
+              titulo: "TRIBUTO PARA ÁNGEL (-2 FUROR)" },
             { trigger: "AL_JUGAR",
               efectos: [ { op: "CURAR", valor: 1, conBeforeHealed: false, soloSiHerido: true,
                            offsetY: -20, fuente: "healing",
@@ -7463,7 +7457,7 @@ const KARLOS_RULES = {
 //  Valores: número | {COUNT:{...}} | {REF:"objetivo.furorMax"} (campos computados)
 // ===================================================================
 const DSL = {
-    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE', 'AURA', 'ANTES_DE_JUGAR', 'PUEDE_ATACAR', 'SOBRECURACION', 'REACCION', 'AL_MORIR', 'AL_MORIR_ALIADO', 'AL_DESTRUIR', 'ESPEJO', 'ANTES_DE_ATACAR', 'TRAS_ATACAR', 'TRAS_DEFENDER', 'ANTES_DE_DEFENDER', 'INTERCEPTOR_ATAQUE', 'EQUIPO_ANTES_DE_DEFENDER', 'EQUIPO_ANTES_DE_ATACAR', 'GLOBAL_ANTES_DE_CAMBIO_STAT'],
+    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE', 'AURA', 'ANTES_DE_JUGAR', 'PUEDE_ATACAR', 'SOBRECURACION', 'REACCION', 'AL_MORIR', 'AL_MORIR_ALIADO', 'AL_DESTRUIR', 'ESPEJO', 'ANTES_DE_ATACAR', 'TRAS_ATACAR', 'TRAS_DEFENDER', 'ANTES_DE_DEFENDER', 'INTERCEPTOR_ATAQUE', 'EQUIPO_ANTES_DE_DEFENDER', 'EQUIPO_ANTES_DE_ATACAR', 'GLOBAL_ANTES_DE_CAMBIO_STAT', 'COSTE_COLOCACION'],
     // Los 5 últimos ops solo tienen sentido dentro de una REACCION (los interpreta
     // DSL._runReaccion, no _doEffect): controlan el resultado que la reacción
     // devuelve al motor de combate (redirigir el ataque, cancelarlo, drenar Furor
@@ -9581,8 +9575,63 @@ const DSL = {
         return true;
     },
 
+    // COSTE_COLOCACION -> azúcar sobre lo que el DSL ya sabía hacer (20-ago-2026).
+    //
+    // "Coste: N de Furor de un aliado" lo pedían DIEZ cartas, y las diez lo resolvían llamando a
+    // mano a `DSL.tributoFuror` desde un `onBeforePlayAsync` escrito carta por carta. Pero el
+    // patrón declarativo ya existía y estaba probado en Garret: un requisito que comprueba que
+    // haya pagador, y un ANTES_DE_JUGAR con `ELEGIR` + `MODIFICAR_STAT ... esCoste`. Esto no
+    // inventa un mecanismo nuevo: ESCRIBE ESE MISMO, para que la carta lo declare en una línea.
+    //
+    //   { trigger: "COSTE_COLOCACION", furor: 2 }
+    //
+    // Opciones, todas con un valor por defecto sensato: `titulo` (el prompt), `msgSinPagador`
+    // (el aviso cuando nadie puede pagar), `log` (lo que se escribe al cobrar), `filtros` (para
+    // exigir un pagador concreto, como Garret) y `excluirSelf`.
+    //
+    // Lo que se gana además de la línea, y es lo importante: pasan a cobrar en el PUNTO DE
+    // COMPROMISO. `esCoste` aparca el cobro hasta el escaparate, así que el "-2 FUR" sale a la
+    // vez que la carta se enseña, en vez de antes de que el rival haya visto nada.
+    _expandirCosteColocacion(tmpl) {
+        const abs = tmpl.abilities || [];
+        const cc = abs.find(a => a.trigger === 'COSTE_COLOCACION');
+        if (!cc) return;
+        const n = cc.furor || 0;
+        const filtros = [{ campo: 'furor', op: '>=', valor: n }].concat(cc.filtros || []);
+
+        // 1. El requisito: sin nadie que pueda pagar, la carta ni se juega. Se AÑADE al JUGAR que
+        //    la carta ya tenga (varias tienen otros requisitos suyos) en vez de crear un segundo,
+        //    que el compilador no miraría: busca el primero.
+        const req = { count: { quien: 'ALIADO', filtros, excludeSelf: !!cc.excluirSelf },
+                      op: '>=', valor: 1,
+                      msg: cc.msgSinPagador || `Necesitas un aliado con al menos ${n} de Furor para el tributo de ${tmpl.name}.` };
+        const jugar = abs.find(a => a.trigger === 'JUGAR');
+        if (jugar) (jugar.requisitos = jugar.requisitos || []).push(req);
+        else abs.push({ trigger: 'JUGAR', requisitos: [req] });
+
+        // 2. El cobro: elegir pagador (cancelable — mientras eliges no ha pasado nada) y cobrarle.
+        //    Va DELANTE de lo que la carta ya hiciera antes de colocarse: primero se paga.
+        const tributo = {
+            op: 'ELEGIR', de: 'ALIADOS', cantidad: 1, filtros, excludeSelf: !!cc.excluirSelf,
+            titulo: cc.titulo || `${tmpl.name}: ELIGE TRIBUTO (-${n} FUROR)`,
+            // `fuente: null` -> el flotante sale "-2 FUR" y no "-2 FUR (Ángel)". La flecha del
+            // tributo, que sale sola con el `esCoste`, ya está diciendo quién paga y para qué
+            // carta; repetirlo en el flotante es la misma redundancia que retiramos en Nethuns.
+            // Además es lo que hacía el helper viejo, así que la migración no cambia nada
+            // visible (lo cazó la suite de Ángel).
+            efectos: [ Object.assign({ op: 'MODIFICAR_STAT', stat: 'furor', delta: -n, esCoste: true, fuente: null },
+                                     cc.log ? { log: cc.log } : {}) ],
+        };
+        const antes = abs.find(a => a.trigger === 'ANTES_DE_JUGAR');
+        if (antes) (antes.efectos = antes.efectos || []).unshift(tributo);
+        else abs.push({ trigger: 'ANTES_DE_JUGAR', efectos: [tributo] });
+
+        tmpl.abilities = abs.filter(a => a.trigger !== 'COSTE_COLOCACION');
+    },
+
     compile(tmpl) {
         if (!DSL.validate(tmpl)) return false;
+        DSL._expandirCosteColocacion(tmpl);
         const abs = tmpl.abilities || [];
 
         // Atribución por defecto de una habilidad de UNIDAD (Toto, 5-ago-2026). El "por
