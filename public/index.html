@@ -1758,6 +1758,39 @@
             };
             return { capa, svg, punta, etiqueta };
         }
+        // Dos flechas que salen de cartas contiguas dejan su etiqueta casi en el mismo sitio y
+        // las letras se juntan (Toto, 20-ago-2026: Alabanza cobrando a Némesis y a Eris a la vez,
+        // los dos "Tributa 2 FUR" montados). Esto las APARTA lo justo: se miden ya puestas y, por
+        // cada par que se toque, se separan por el eje que menos haya que mover, repartiendo el
+        // empujón entre las dos para que ninguna se aleje sola de su flecha. Se repite unas
+        // pocas pasadas porque apartar dos puede meter a una en la tercera; con dos o tres
+        // etiquetas converge a la primera.
+        // No se mueve nada si no hay solape: una etiqueta sola se queda exactamente donde estaba.
+        function _separarEtiquetas(els, gap = 8) {
+            const cajas = (els || []).filter(Boolean).map(el => {
+                const r = el.getBoundingClientRect();
+                return { el, x: parseFloat(el.style.left) || 0, y: parseFloat(el.style.top) || 0,
+                         w: r.width, h: r.height };
+            }).filter(c => c.w && c.h);
+            if (cajas.length < 2) return;
+            for (let pasada = 0; pasada < 8; pasada++) {
+                let movida = false;
+                for (let i = 0; i < cajas.length; i++) for (let j = i + 1; j < cajas.length; j++) {
+                    const a = cajas[i], b = cajas[j];
+                    // Cuánto habría que separarlas en cada eje para que dejen de tocarse. Si
+                    // alguno sale <= 0 es que por ese eje ya no se solapan, y entonces no hay
+                    // solape en absoluto: son rectángulos.
+                    const sx = (a.w + b.w) / 2 + gap - Math.abs(a.x - b.x);
+                    const sy = (a.h + b.h) / 2 + gap - Math.abs(a.y - b.y);
+                    if (sx <= 0 || sy <= 0) continue;
+                    movida = true;
+                    if (sx <= sy) { const d = (a.x <= b.x ? 1 : -1) * sx / 2; a.x -= d; b.x += d; }
+                    else          { const d = (a.y <= b.y ? 1 : -1) * sy / 2; a.y -= d; b.y += d; }
+                }
+                if (!movida) break;
+            }
+            cajas.forEach(c => { c.el.style.left = c.x + 'px'; c.el.style.top = c.y + 'px'; });
+        }
         async function _presentarCarta(cardId, origenSel, destinoSel, deDorso, opts) {
             const g = window.game;
             // La carta se va al escaparate, así que el ratón deja de estar encima sin que llegue
@@ -1943,7 +1976,11 @@
                 // La etiqueta va sobre la MITAD de la longitud de la flecha, un pelo por encima.
                 const et = flechas.etiqueta((ox + tx) / 2, (oy + ty) / 2 - 12, c.etiqueta || PRESENTA_ETIQ[c.tipo] || PRESENTA_ETIQ.coste, color);
                 _lineas.push({ ln, et, color });
-            }); } catch (err) { console.error(err); }
+            });
+            // Ya colocadas todas: se apartan las que se pisen entre sí. Va aquí y no dentro del
+            // bucle porque hace falta tenerlas TODAS medidas para saber quién estorba a quién.
+            _separarEtiquetas(_lineas.map(l => l.et));
+            } catch (err) { console.error(err); }
 
             await g.sleep(PRESENTA_VIAJE);
 

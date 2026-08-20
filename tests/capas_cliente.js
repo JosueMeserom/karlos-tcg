@@ -546,5 +546,56 @@ vm.runInContext('_deslizarFila', sandbox)('#p2-hand', _fotoAntes, null);
 check('a la carta que se recoloca se le arma el deslizamiento', /transform \d+ms/.test(nA.style.transition || ''),
       'transition: ' + nA.style.transition);
 
+// ── ETIQUETAS DE LAS FLECHAS DE PRESENTACIÓN QUE SE SOLAPAN ──────────────────────────────
+// Alabanza cobra a varios aliados a la vez, así que salen dos "Tributa 2 FUR" desde cartas
+// contiguas y sus etiquetas se montaban una encima de otra (Toto, 20-ago-2026). Aquí se fija que
+// _separarEtiquetas las aparta lo justo y que NO toca las que ya se leían bien.
+console.log('\n--- etiquetas de flechas que se solapan ---');
+const _separarEtiquetas = vm.runInContext('_separarEtiquetas', sandbox);
+// Etiqueta de mentira: solo necesita medirse y dejarse mover. El ancho es el de un "Tributa 2
+// FUR" real a 0.9rem; el alto, el de su línea.
+const _etiq = (x, y, w = 100, h = 18) => ({
+    style: { left: x + 'px', top: y + 'px' },
+    getBoundingClientRect: () => ({ width: w, height: h, left: x - w / 2, top: y - h / 2 }),
+});
+const _x = e => parseFloat(e.style.left), _y = e => parseFloat(e.style.top);
+const _sesolapan = (a, b, w = 100, h = 18) => Math.abs(_x(a) - _x(b)) < w && Math.abs(_y(a) - _y(b)) < h;
+{
+    // El caso de la captura: mismo alto, centros a 90px, anchos de 100 -> se pisan 10px.
+    const a = _etiq(300, 400), b = _etiq(390, 400);
+    _separarEtiquetas([a, b]);
+    check('dos etiquetas montadas dejan de solaparse', !_sesolapan(a, b),
+          'x=' + _x(a) + ' y ' + _x(b));
+    check('...y se apartan lo JUSTO (menos de 15px cada una)',
+          Math.abs(_x(a) - 300) < 15 && Math.abs(_x(b) - 390) < 15,
+          'movidas ' + (300 - _x(a)) + ' y ' + (_x(b) - 390));
+    check('...repartiendo el empujón entre las dos', Math.abs((300 - _x(a)) - (_x(b) - 390)) < 0.01,
+          _x(a) + ' / ' + _x(b));
+    check('...y sin tocar la altura', _y(a) === 400 && _y(b) === 400, _y(a) + ' / ' + _y(b));
+}
+{
+    // Exactamente encima: el desempate tiene que existir, o se quedan pegadas para siempre.
+    const a = _etiq(500, 300), b = _etiq(500, 300);
+    _separarEtiquetas([a, b]);
+    check('dos etiquetas EXACTAMENTE encima también se separan', !_sesolapan(a, b),
+          'x=' + _x(a) + ' y ' + _x(b));
+}
+{
+    // Lo que NO debe pasar: mover las que ya se leían bien.
+    const a = _etiq(200, 300), b = _etiq(600, 300), c = _etiq(200, 500);
+    _separarEtiquetas([a, b, c]);
+    check('las que no se tocan se quedan donde estaban',
+          _x(a) === 200 && _y(a) === 300 && _x(b) === 600 && _x(c) === 200 && _y(c) === 500,
+          [_x(a), _y(a), _x(b), _x(c), _y(c)].join(','));
+}
+{
+    // Tres en cadena: apartar dos puede meter a una en la tercera, por eso hay varias pasadas.
+    const a = _etiq(300, 400), b = _etiq(360, 400), c = _etiq(420, 400);
+    _separarEtiquetas([a, b, c]);
+    check('tres en cadena acaban las tres separadas',
+          !_sesolapan(a, b) && !_sesolapan(b, c) && !_sesolapan(a, c),
+          [_x(a), _x(b), _x(c)].join(' / '));
+}
+
 console.log(fallos === 0 ? '\nSUITE capas_cliente: ' + comprobaciones + '/' + comprobaciones + ' comprobaciones — CAPAS CORRECTAS' : '\nSUITE capas_cliente: ' + fallos + ' FALLOS de ' + comprobaciones + ' comprobaciones');
 process.exit(fallos ? 1 : 0);
