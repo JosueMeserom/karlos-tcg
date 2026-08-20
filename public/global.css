@@ -1063,3 +1063,16 @@ button.game-btn:disabled { background: #64748b; cursor: not-allowed; opacity: 0.
 .discard-stack.descarte-pulso { animation: descartePulso 330ms ease-out; }
 
 
+
+/* Vuelta a la mano DANDO VUELTAS (Incluso En El KG, Xidachane, Xanadu). Los primeros fotogramas
+   son los de la vieja animateSpinToHand -anticipación, 4 vueltas, encogida y desenfoque-, que es
+   lo que Toto quería conservar; la LLEGADA es la nueva: recupera tamaño y nitidez para aterrizar
+   en el hueco de la mano en vez de desvanecerse por el camino (20-ago-2026).
+   El interruptor para volver al giro liso es SPIN_CLASICO, en index.html. */
+@keyframes giroALaMano {
+    0%   { transform: rotate(0deg) scale(1);      filter: none;
+           animation-timing-function: cubic-bezier(.6, -.28, .735, .045); }
+    62%  { transform: rotate(1050deg) scale(.28); filter: blur(2px) brightness(1.2);
+           animation-timing-function: cubic-bezier(.2, .8, .2, 1); }
+    100% { transform: rotate(1440deg) scale(1);   filter: none; }
+}

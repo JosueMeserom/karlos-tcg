@@ -1182,6 +1182,13 @@
         // real encogiendola a 0.1 y desvaneciendola, asi que no aterrizaba en la mano ni el resto
         // se acomodaba -era el unico retorno a la mano que no seguia el camino comun-. Lo unico
         // suyo que merecia la pena, el giro, es ahora una opcion de ese camino.
+        // SPIN_CLASICO (Toto, 20-ago-2026): true = el vuelo empieza como la vieja
+        // animateSpinToHand -anticipacion, 4 vueltas, encogida y desenfoque- y solo cambia la
+        // LLEGADA, que aterriza en el hueco de la mano. false = el giro liso del 19-ago, que era
+        // el viaje comun con las vueltas puestas encima. Se deja el interruptor porque Toto
+        // quiere poder volver al liso si el clasico no le convence.
+        const SPIN_CLASICO = true;
+
         async function animateSpinToHand(cardId, ownerId, carta, colocar) {
             const sel = `.card[data-id="${cardId}"]`;
             if (!document.querySelector(sel)) { if (typeof colocar === 'function') colocar(); return; }
@@ -1474,9 +1481,19 @@
             _deslizarFila(handSel, foto, idEntrante);
 
             const destino = nuevoEl ? nuevoEl.getBoundingClientRect() : handEl.getBoundingClientRect();
-            cont.style.transition = `left ${ms}ms cubic-bezier(.2,.8,.2,1), top ${ms}ms cubic-bezier(.2,.8,.2,1),`
+            // El giro CLÁSICO arranca con la curva de la vieja animateSpinToHand -tira hacia
+            // atrás y acelera- y solo el tramo final se suaviza, que es lo único que hacía falta
+            // cambiar para poder aterrizar en el hueco en vez de estrellarse contra él.
+            const curva = (girando && SPIN_CLASICO) ? 'cubic-bezier(.6,-.28,.5,1)' : 'cubic-bezier(.2,.8,.2,1)';
+            cont.style.transition = `left ${ms}ms ${curva}, top ${ms}ms ${curva},`
                 + ` width ${ms}ms ease, height ${ms}ms ease`;
-            if (girando) {
+            if (girando && SPIN_CLASICO) {
+                // Las 4 vueltas, la encogida y el desenfoque de la vieja animación van en
+                // keyframes (global.css) y no en una transición: el tamaño BAJA y vuelve a
+                // SUBIR, y una transición sola no puede ir y volver. Va en el CONTENEDOR, como
+                // abajo: el volteador de dentro tiene ocupado su transform con el flip.
+                cont.style.animation = `giroALaMano ${ms}ms both`;
+            } else if (girando) {
                 // Va en el CONTENEDOR: el volteador de dentro tiene ocupado su transform con el
                 // flip de cara/dorso, que es lo que decide si la carta se enseña o no.
                 cont.style.transition += `, transform ${ms}ms cubic-bezier(.2,.8,.2,1)`;
