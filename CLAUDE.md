@@ -39,6 +39,7 @@ La batería histórica (r1–r23 + humo) se perdió con los transcripts de chat 
 **Migración al DSL, en curso por tandas** (ver la memoria `estado-migracion-dsl` para el detalle vivo): cada tanda = migrar cartas en `public/cartas.js` + suite viejo-vs-nuevo nueva + pasada estricta + commit + push. Tandas hechas: interceptores (Plan de equipo, Feria del cómic, Deuda con la mafia), tanda 1 (simples), tanda 2 (REACCION). Candidatas siguientes: `AL_MORIR` (onDeath/onAllyDeath), clones/tokens (más arquitectura), y las irreducibles de §6 que se quedan como código. El recuento de hooks de una carta NO es buen proxy de complejidad.
 
 ## Metodología (INNEGOCIABLE)
+0. **Copiar una carta hermana NO exime de repasar sus normas.** El origen de casi todos los fallos repetidos de esta fase es replicar un patrón y heredar de paso un flag que apaga una norma. Al reusar una carta como plantilla, leer QUÉ hace cada campo que se copia; las auditorías (`auditar_costes`, `auditar_presenta`, `auditar_llegadas`…) están para cazar justo eso, así que pasarlas TODAS es lo que cierra el agujero, no la buena memoria.
 1. Tras CUALQUIER cambio en `cartas.js` o el intérprete: pasada estricta de TODAS las suites (`for f in tests/regresion*.js tests/humo.js; do node "$f"; done`, más las de aserción: `nuevas*`, `modales_pilas`, `badge_furor_forzado`, `picker_mano`, `capas_cliente`, `costes_presenta` y **`online`**), exigiendo el mensaje de éxito explícito de cada una. No vale "parece que pasa".
 2. `node --check` tras editar cualquier `.js`.
 3. `index.html` es CRLF: conservar los finales de línea al editar.
@@ -83,6 +84,8 @@ El Excel de Toto (`docs/Cartas KG.csv`, **ignorado por git a propósito: son sus
 3. Un Evento **no anuncia su propia destrucción al expirar**. Y "descartar" es solo desde la MANO; desde el campo es "destruir" (§11).
 4. `node tests/auditar_textos.js` tiene que salir en 0 problemas. Comprueba en máquina todo lo anterior — si añades una regla nueva, mira que de verdad falle al romperla antes de fiarte.
 5. Si la carta busca en una pila o elige algo del campo, repasar las dos normas de UX de arriba: son las que más se saltan al replicar patrones.
+6. **NO COPIAR `cancelable: false` de una carta hermana.** Es el interruptor que apaga la norma del coste: el compilador de `ACTIVA` deduce si hay ventana para arrepentirse mirando si el primer efecto es una elección cancelable, y ese flag le dice que no la hay, así que **cobra el Furor al confirmar la Habilidad, antes de elegir objetivo**. Ha pasado tres veces (Igniz, Alabanza, Erazor Djinn copiada de Raiju). `node tests/auditar_costes.js` tiene que salir en 0 sin declarar.
+7. **Id EXPLÍCITO siempre** (siguiente libre de la serie 2000). Los ids se autogeneran recorriendo `CARD_DB` en orden desde 1000: una carta sin id metida en medio del array le corre el id a todas las de detrás y pone en rojo media batería de golpe, porque la base congelada no la tiene.
 
 ## Preferencias de Toto
 - Español siempre. Honestidad ante todo: si algo no se puede verificar, decirlo en vez de improvisar.

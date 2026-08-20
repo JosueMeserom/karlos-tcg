@@ -62,6 +62,30 @@ const dur = (c, k) => (c.status && c.status[k] && c.status[k].duration) || 0;
             'aniceto=' + dur(ani, 'dot') + ' karolina=' + dur(kar, 'dot'));
     }
     {
+        // EL COSTE NO SE COBRA HASTA ELEGIR (Toto, 20-ago-2026, muy enfadado y con razón). Copié
+        // de Raiju un `cancelable: false` que es justo el interruptor que apaga la norma: el
+        // compilador de ACTIVA deduce la ventana de arrepentimiento mirando si el primer efecto
+        // es una elección cancelable, y con el flag puesto cobraba al confirmar la Habilidad.
+        // Se comprueba lo de siempre: mientras se elige, NADA ha pasado.
+        const { ctx, g, paso } = await mesa({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'Erazor Djinn', furor: 2 }] },
+            p2: { vanguardia: [{ carta: 'Aniceto', vida: 9 }, { carta: 'Karolina', vida: 9 }] },
+        });
+        const dj = buscar(g, 'p1', 'Erazor Djinn');
+        await paso({ habilidad: 'Erazor Djinn' });
+        await paso({ confirmar: true });
+        check('al confirmar la Activa NO se ha cobrado el Furor todavía', dj.furor === 2, 'furor=' + dj.furor);
+        check('...y la elección sigue abierta y es cancelable',
+            (ctx.pendientes[0] || {}).tipo === 'elegirTablero' && (ctx.pendientes[0] || {}).cancelable !== false,
+            'pendiente=' + JSON.stringify((ctx.pendientes[0] || {}).tipo));
+        await paso({ cancelar: true });
+        check('al cancelar no pasa NADA: ni Furor gastado ni carta agotada',
+            dj.furor === 2 && !dj.exhausted, 'furor=' + dj.furor + ' agotada=' + dj.exhausted);
+        check('...y ningún enemigo ha sido tocado',
+            buscar(g, 'p2', 'Aniceto').currentHp === 9 && buscar(g, 'p2', 'Karolina').currentHp === 9);
+    }
+    {
         // Con un solo enemigo no hay dos objetivos distintos que golpear: la Activa no arranca.
         const { g, paso } = await mesa({
             turno: 2, turnoDe: 'p1', empieza: 'p2',

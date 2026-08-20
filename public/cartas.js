@@ -6471,7 +6471,13 @@ const CARD_DB = [
                   msg: "Necesitas al menos 2 enemigos en vanguardia para golpear a objetivos distintos." } ],
               log: "¡Erazor Djinn prende la vanguardia enemiga!",
               efectos: [
-                { op: "ELEGIR", de: "ENEMIGOS", zona: "VANGUARDIA", cantidad: 2, cancelable: false,
+                // SIN `cancelable: false`, aunque Raiju lo lleve (Toto, 20-ago-2026). Ese flag es
+                // justo el interruptor que apaga la norma del coste: el compilador de ACTIVA
+                // deduce que hay ventana para arrepentirse mirando si el primer efecto es una
+                // elección cancelable, y con el flag puesto cobraba los 2 de Furor al confirmar
+                // la Habilidad, antes de elegir a nadie. Mientras se elige no ha cambiado nada
+                // en el tablero, así que debe poder cancelarse sin que pase absolutamente nada.
+                { op: "ELEGIR", de: "ENEMIGOS", zona: "VANGUARDIA", cantidad: 2,
                   titulo: "INCINERAR: elige 2 enemigos distintos",
                   efectos: [
                     { op: "ATACAR", especial: true,
@@ -6543,7 +6549,8 @@ const CARD_DB = [
                   msg: "Necesitas 3 enemigos en la vanguardia del rival para derrengarlos." } ],
               log: "¡Nethuns arrastra a la vanguardia enemiga bajo la marea!",
               efectos: [
-                { op: "ELEGIR", de: "ENEMIGOS", zona: "VANGUARDIA", cantidad: 3, cancelable: false,
+                // Sin `cancelable: false`: ver el comentario de INCINERAR.
+                { op: "ELEGIR", de: "ENEMIGOS", zona: "VANGUARDIA", cantidad: 3,
                   titulo: "DERRENGAR: elige 3 enemigos",
                   efectos: [
                     { op: "MODIFICAR_STAT", stat: "furor", delta: -2 },
