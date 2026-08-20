@@ -335,6 +335,39 @@ async function reposar(clientes, vueltas = 60) {
             'turno=' + A.activePlayerId + ' visor=' + JSON.stringify(A._visorSoloLectura));
     }
 
+    console.log('\n--- Al ESPECTADOR no le cierra la pila lo que decidan los jugadores ---');
+    {
+        // Toto, 20-ago-2026: un espectador que está mirando una pila no debería ser molestado por
+        // las decisiones de los jugadores; las pilas se refrescan solas, así que puede quedarse
+        // ahí todo el turno. Y no hay que hacer nada especial para conseguirlo: el modal solo
+        // cierra la pila de QUIEN TIENE QUE RESPONDERLO, y un espectador nunca es ese -de hecho
+        // el modal ni se le pinta: se le oculta y en su lugar recibe el cartel de espera-.
+        // Se fija aquí para que siga siendo verdad si alguien toca esa condición.
+        const cl = await mesaOnline({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: ['Mini-tigre'], descartes: ['Longaniza'] },
+            p2: { vanguardia: ['Aniceto'], descartes: ['Manzanahoria'] },
+        });
+        const A = cl.p1.g, E = cl.p2.g;
+        const real = (g, nombre, ...args) => Object.getPrototypeOf(g)[nombre].apply(g, args);
+        E.myPlayerId = 'spectator';
+        E.isOmniscient = true;
+
+        E.openDiscardViewer('p1', null);
+        real(E, 'openChoiceModal', '¿prueba?', [{ label: 'Sí' }, { label: 'No' }], 'p1');
+        check('un modal para un JUGADOR no le cierra la pila al espectador',
+            !!E._visorSoloLectura, 'E._visorSoloLectura=' + JSON.stringify(E._visorSoloLectura));
+        real(E, 'pickBoardTargets', A.players.p1.vanguard, 1, 'prueba', null, 'p1');
+        check('...ni un picker de tablero', !!E._visorSoloLectura,
+            'E._visorSoloLectura=' + JSON.stringify(E._visorSoloLectura));
+
+        E.activePlayerId = 'p1';
+        E.confirmEndTurn(true);
+        await reposar(cl);
+        check('...pero el cambio de turno sí se la cierra', !E._visorSoloLectura,
+            'E._visorSoloLectura=' + JSON.stringify(E._visorSoloLectura));
+    }
+
     console.log('');
     if (fallos) { console.log(`SUITE online: ${fallos} FALLOS de ${comprobaciones} comprobaciones`); process.exit(1); }
     console.log(`SUITE online: ${comprobaciones}/${comprobaciones} comprobaciones — LOS DOS CLIENTES COINCIDEN`);
