@@ -1751,28 +1751,37 @@
             // confunden con lo de debajo: se lee, pero cuesta. Esto las despega sin tocar el
             // color del texto.
             //
-            // LOS DOS ÚNICOS NÚMEROS QUE HAY QUE TOCAR están justo aquí abajo. El `blur` del
-            // backdrop-filter NO es uno de ellos: ese desenfoca lo que hay detrás, y sobre un
-            // fondo casi liso -el tablero, una carta- no se nota lo pongas a 3 o a 30 (Toto,
-            // 20-ago-2026: "lo pongo en 30 y no hace nada"). Se queda porque cuando la etiqueta
-            // cae encima de algo con detalle sí ayuda, pero no es el mando del tamaño.
+            // El halo es una CAPA PROPIA detrás del texto, no el fondo del texto. Las dos formas
+            // anteriores no valían y por el mismo motivo, la FORMA:
+            //   · Fondo plano con border-radius: borde duro, se ve la caja pegada encima.
+            //   · radial-gradient: dibuja una ELIPSE, y una etiqueta es un rectángulo largo. El
+            //     centro quedaba oscuro y las puntas casi sin halo (Toto, 20-ago-2026: "sale un
+            //     círculo bastante pronunciado"). Un degradado no puede tener forma de rectángulo
+            //     redondeado, así que no había número que arreglara eso.
+            // Con una capa aparte sí: es un rectángulo redondeado del tamaño del texto y se
+            // DESENFOCA ella sola (`filter`), lo que le da un borde suave y uniforme de punta a
+            // punta. El texto va encima y no se desenfoca, porque el filtro es de la capa.
             //
-            // El halo de verdad es el degradado: opaco en el centro y desvanecido hacia los
-            // bordes, así que no tiene borde duro y no parece una caja pegada encima. Cuánto
-            // sobresale por fuera de las letras lo manda el PADDING, y solo el padding.
-            const ETIQ_HALO_PAD  = '2px 9px';   // cuánto sobresale el halo por fuera de las letras
-            const ETIQ_HALO_ALFA = 0.62;        // cuánto oscurece en el centro (0 = halo apagado)
+            // El backdrop-filter se ha ido: desenfocaba lo de detrás y sobre un fondo casi liso
+            // no se notaba ni a 30px, así que era una pieza que solo estorbaba al calibrar.
+            //
+            // LOS TRES NÚMEROS, y no hay más:
+            const ETIQ_HALO_MARGEN = 4;      // px que el halo sobresale por fuera de las letras
+            const ETIQ_HALO_BLUR   = 5;      // px de difuminado de su borde (0 = borde duro)
+            const ETIQ_HALO_ALFA   = 0.62;   // cuánto oscurece (0 = halo apagado)
             const etiqueta = (x, y, texto, color) => {
                 const d = document.createElement('div');
                 d.style.cssText = 'position:absolute; transform:translate(-50%,-50%); white-space:nowrap;'
                     + `color:${color}; font-weight:bold; font-size:0.9rem; opacity:0;`
-                    + `padding:${ETIQ_HALO_PAD};`
-                    + `background:radial-gradient(closest-side, rgba(8,10,18,${ETIQ_HALO_ALFA}) 45%,`
-                    + ` rgba(8,10,18,${ETIQ_HALO_ALFA * 0.75}) 72%, rgba(8,10,18,0) 100%);`
-                    + 'backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px);'
                     + `text-shadow:0 1px 3px #000, 0 0 6px #000; transition:opacity ${PRESENTA_FLECHA_MS}ms ease;`
                     + `left:${x}px; top:${y}px;`;
-                d.textContent = texto;
+                const halo = document.createElement('div');
+                halo.style.cssText = `position:absolute; inset:${-ETIQ_HALO_MARGEN}px; border-radius:8px;`
+                    + ` background:rgba(8,10,18,${ETIQ_HALO_ALFA}); filter:blur(${ETIQ_HALO_BLUR}px);`;
+                const txt = document.createElement('span');
+                txt.style.position = 'relative';   // por encima del halo, sin z-index ni capas
+                txt.textContent = texto;
+                d.appendChild(halo); d.appendChild(txt);
                 capa.appendChild(d);
                 return d;
             };
