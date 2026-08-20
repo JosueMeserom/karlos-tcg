@@ -137,6 +137,10 @@ const escenarios = [
     },
     {
         nombre: 'Frasco maldito: reacciona al daño normal, baja 2 el ATQ del atacante y el golpe',
+        diferenciasEsperadas: [
+            { contiene: 'tempEffects.0.stats', motivo: 'la marca ahora LLEVA ESCRITO lo que antes hacía un hook a mano de la carta (20-ago-2026): el motor ya tenía handlers genéricos para `stats`, así que la carta solo tiene que declararlo. Mismo comportamiento; lo que cambia es dónde está dicho' },
+            { contiene: 'tempEffects.0.hastaInicioTurnoLanzador', motivo: 'la marca ahora LLEVA ESCRITO lo que antes hacía un hook a mano de la carta (20-ago-2026): el motor ya tenía handlers genéricos para `hastaInicioTurnoLanzador`, así que la carta solo tiene que declararlo. Mismo comportamiento; lo que cambia es dónde está dicho' },
+        ],
         p1: { vanguardia: ['Droide antidisturbios'] }, // atk 5
         p2: { vanguardia: ['Robot de seguridad SP'], mano: ['Frasco maldito'] }, // def 1, hp 4
         pasos: [

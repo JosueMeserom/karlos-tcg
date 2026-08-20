@@ -60,6 +60,10 @@ const escenarios = [
     },
     {
         nombre: 'Overclock: +2/+2 temporal a una Máquina elegida entre dos',
+        diferenciasEsperadas: [
+            { contiene: 'tempEffects.0.stats', motivo: 'la marca ahora LLEVA ESCRITO lo que antes hacía un hook a mano de la carta (20-ago-2026): el motor ya tenía handlers genéricos para `stats`, así que la carta solo tiene que declararlo. Mismo comportamiento; lo que cambia es dónde está dicho' },
+            { contiene: 'tempEffects.0.hastaInicioTurnoLanzador', motivo: 'la marca ahora LLEVA ESCRITO lo que antes hacía un hook a mano de la carta (20-ago-2026): el motor ya tenía handlers genéricos para `hastaInicioTurnoLanzador`, así que la carta solo tiene que declararlo. Mismo comportamiento; lo que cambia es dónde está dicho' },
+        ],
         p1: {
             vanguardia: [{ carta: 'Robot de seguridad SP', furor: 1 }, 'Droide antidisturbios', 'Oso con armadura'],
             mano: ['Overclock'],

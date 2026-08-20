@@ -2778,6 +2778,7 @@ const CARD_DB = [
         ],
     },
     {
+        tempEffectExpiraLog: "¡{objetivo} sufre los efectos del PEM y no puede actuar este turno!",
         name: "PEM", type: "Ayuda", subtype: "Tecnología", tags: ["Consumible"], rarity: "C", cost: 0, series: 1,
         tempEffectText: "{genero?Paralizado|Paralizada} por PEM: se saltará su próximo turno (sin atacar, sin Habilidades y sin retirarse)",
         text: "Coste: 1 de Furor. Elige un enemigo 'Máquina'. No podrá atacar, usar Habilidades ni retirarse en su próximo turno.",
@@ -2793,17 +2794,9 @@ const CARD_DB = [
                 { op: "ELEGIR", de: "ENEMIGOS", filtros: [ { campo: "subtype", op: "==", valor: "Máquina" } ], cantidad: 1, cancelable: false,
                   titulo: "Elige al enemigo 'Máquina' para paralizarlo",
                   efectos: [
-                    { op: "MARCAR_TEMPORAL", floating: "PARALIZADO", floatingStyle: "ft-ability", offsetFloating: -30,
+                    { op: "MARCAR_TEMPORAL", pierdeSuTurno: true, floating: "PARALIZADO", floatingStyle: "ft-ability", offsetFloating: -30,
                       log: "¡El PEM fríe los circuitos de {objetivo}! Se saltará su próximo turno." } ] } ] }
         ],
-        onStartTurnTempEffect: function(target, effect, game, currentTurnPlayerId) {
-            if (currentTurnPlayerId === target.owner) {
-                target.exhausted = true; // ¡Lo agotamos automáticamente!
-                game.logMsg(`¡${game.getCardNameWithOwner(target)} sufre los efectos del PEM y no podrá actuar este turno!`, 'system');
-                return false; 
-            }
-            return true; 
-        }
     },
     {
         name: "Rebobinar", type: "Ayuda", subtype: "Técnica", tags: ["Consumible"], rarity: "C", cost: 0, series: 1,
@@ -2845,6 +2838,7 @@ const CARD_DB = [
         ],
     },
     {
+        tempEffectExpiraLog: "El Overclock de {objetivo} se ha apagado.",
         name: "Overclock", type: "Ayuda", subtype: "Tecnología", tags: ["Consumible"], rarity: "C", cost: 0, series: 1,
         text: "Elige un aliado 'Máquina'. Aumenta su Def y Atq en 2 hasta el inicio de tu próximo turno.",
         abilities: [
@@ -2856,21 +2850,14 @@ const CARD_DB = [
                   titulo: "¿A QUIÉN APLICAS OVERCLOCK?",
                   efectos: [
                     { op: "MARCAR_TEMPORAL", conOwner: true, actualizaPasivas: true,
+                      // El +2/+2 y la caducidad, declarados (20-ago-2026): eran dos hooks a mano
+                      // que hacían justo lo que `stats` y `hastaInicioTurnoLanzador` ya hacen
+                      // para cualquier carta desde el 28-jul.
+                      stats: { atk: 2, def: 2 }, hastaInicioTurnoLanzador: true,
                       floating: { texto: "OVERCLOCK", estilo: "ft-ability", offset: -40 },
                       log: "¡{objetivo} recibe Overclock! (+2 Atq, +2 Def)." },
                     { op: "FLOTANTE", texto: "+2 ATQ / +2 DEF", estilo: "ft-green", offset: -20 } ] } ] }
         ],
-        onUpdateTempEffect: function(target, effect, game) {
-            target.currentAtk += 2;
-            target.currentDef += 2;
-        },
-        onStartTurnTempEffect: function(target, effect, game, currentTurnPlayerId) {
-            if (currentTurnPlayerId === effect.ownerId) {
-                game.logMsg(`El Overclock de ${game.getCardNameWithOwner(target)} se ha apagado.`, 'system');
-                return false; 
-            }
-            return true;
-        },
     },
     {
         id: 2003, name: "Bastón astral", type: "Ayuda", subtype: "Arma legendaria", tags: ["Equipable", "melé"], rarity: "A", cost: 0, series: 1,
@@ -3932,6 +3919,7 @@ const CARD_DB = [
         }
     },
     {
+        tempEffectExpiraLog: "El efecto del Frasco maldito sobre {objetivo} desaparece.",
         name: "Frasco maldito", type: "Ayuda", subtype: "Mágico", tags: ["Consumible"], rarity: "C", cost: 1, series: 1,
         text: "Reacción. Puedes usarla antes de recibir un ataque normal. Baja en 2 el Atq del atacante hasta el inicio de tu próximo turno.",
         // Migrada a DSL (trigger REACCION sobre DAÑO, 22-jul-2026). La reacción es
@@ -3947,21 +3935,11 @@ const CARD_DB = [
             log: { msg: '¡{reactor} lanza un Frasco maldito a {atacante}!', tipo: 'ability' },
             efectos: [
                 { op: 'MARCAR_TEMPORAL', quien: 'ATACANTE', conOwner: true,
+                  stats: { atk: -2 }, hastaInicioTurnoLanzador: true,
                   floating: { texto: '-2 ATQ (Frasco)', estilo: 'ft-red-stat', offset: -20 } },
                 { op: 'FIJAR_DAÑO', reducir: 2 },
             ],
         }],
-        onUpdateTempEffect: function(target, effect, game) {
-            target.currentAtk -= 2;
-        },
-        onStartTurnTempEffect: function(target, effect, game, currentTurnPlayerId) {
-            // Expira al INICIO del próximo turno del dueño del frasco
-            if (currentTurnPlayerId === effect.ownerId) {
-                game.logMsg(`El efecto del Frasco maldito sobre ${game.getCardNameWithOwner(target)} desaparece.`, 'system');
-                return false; 
-            }
-            return true;
-        }
     },
     {
         name: "Poción revitalizante", type: "Ayuda", subtype: "Mágico", tags: ["Consumible"], rarity: "C", cost: 1, series: 1,
@@ -4103,6 +4081,7 @@ const CARD_DB = [
         ],
     },
     {
+        tempEffectExpiraLog: "¡{objetivo} no puede actuar este turno debido a la Canceladora!",
         name: "Canceladora", tempEffectText: "{genero?Cancelado|Cancelada}: perderá su próximo turno", type: "Ayuda", subtype: "Arma", tags: ["Consumible", "a distancia"], rarity: "B", cost: 1, series: 1,
         text: "Elige un enemigo con la etiqueta 'Usuario de VP'. Ese enemigo no podrá actuar (atacar, usar Habilidad o retirarse) en su próximo turno.",
         abilities: [
@@ -4110,16 +4089,8 @@ const CARD_DB = [
             { trigger: "AL_CONSUMIR",
               efectos: [
                 { op: "ELEGIR", de: "ENEMIGOS", algunFiltro: [ { campo: "tags", op: "includes", valor: "Usuaria de VP" }, { campo: "tags", op: "includes", valor: "Usuario de VP" } ], cantidad: 1, titulo: "CANCELADORA: ELIGE OBJETIVO",
-                  efectos: [ { op: "MARCAR_TEMPORAL", conOwner: true, floating: { texto: "CANCELADO", estilo: "ft-ability", offset: -40 }, log: "¡La Canceladora golpea a {objetivo}! Perderá su próximo turno." } ] } ] }
+                  efectos: [ { op: "MARCAR_TEMPORAL", conOwner: true, pierdeSuTurno: true, floating: { texto: "CANCELADO", estilo: "ft-ability", offset: -40 }, log: "¡La Canceladora golpea a {objetivo}! Perderá su próximo turno." } ] } ] }
         ],
-        onStartTurnTempEffect: function(target, effect, game, currentTurnPlayerId) {
-            if (currentTurnPlayerId === target.owner) {
-                target.exhausted = true; // No puede actuar
-                game.logMsg(`¡${game.getCardNameWithOwner(target)} no puede actuar este turno debido a la Canceladora!`, 'system');
-                return false; // El efecto se elimina tras hacerle perder el turno
-            }
-            return true;
-        }
     },
     {
         name: "Karlitos", hp: 3, def: 2, atk: 3, type: "Personaje", subtype: "Ser vivo", tags: ["Usuario de Súper Evolución"], gender: "M", rarity: "A", cost: 4, series: 1,
@@ -5589,6 +5560,7 @@ const CARD_DB = [
         abilities: [{ trigger: "ESPEJO", de: "parentId", copiar: ["currentAtk", "currentDef"], furorCero: true, muerteSiSinPadre: true }]
     },
     {
+        tempEffectExpiraLog: "El Liderazgo sobre {objetivo} expira.",
         name: "Capitán Guardia Real", hp: 3, def: 4, atk: 5, type: "Esbirro", subtype: "Ser vivo", tags: ["Guardia Real", "Traje protector"], rarity: "A", cost: 1, series: 2,
         text: "A: LIDERAZGO (1F): Elige un aliado de tu vanguardia que no haya atacado. +2 Atq hasta el final del turno. Puedes usarla desde retaguardia.",
         activeName: "LIDERAZGO", activeCost: 1,
@@ -5618,13 +5590,6 @@ const CARD_DB = [
                   log: "{carta} motiva profundamente a {objetivo}. (+2 ATQ temporal)" }
               ] }
         ],
-        onEndTurnTempEffect: function(target, effect, game, currentTurnPlayerId) {
-            if (effect.hastaFinDeTurnoPropio && target.owner === currentTurnPlayerId) {
-                game.logMsg(`El Liderazgo sobre ${DSL._nombre(game, target)} expira.`, 'system');
-                return false;
-            }
-            return true;
-        }
     },
     {
         name: "Llamada del deber", type: "Evento", rarity: "B", cost: 1, duration: 2, series: 2,
@@ -6474,6 +6439,7 @@ const CARD_DB = [
         text: "A: CRIOGENIZAR (1F): Realiza un ataque especial y echa una moneda. Si sale cara, el enemigo atacado no podrá actuar (atacar, usar Habilidad o retirarse) en su próximo turno.",
         activeName: "CRIOGENIZAR", activeCost: 1,
         tempEffectText: "{genero?Congelado|Congelada} por CRIOGENIZAR: perderá su próximo turno",
+        tempEffectExpiraLog: "¡{objetivo} sigue congelado y no puede actuar este turno!",
         abilities: [
             { trigger: "ACTIVA", nombre: "CRIOGENIZAR", coste: { furor: 1 },
               requisitos: [
@@ -6495,21 +6461,13 @@ const CARD_DB = [
                   logCara: { msg: "Moneda: CARA - ¡El hielo lo atrapa!", tipo: "ability" },
                   logCruz: { msg: "Moneda: CRUZ - el hielo no llega a cuajar.", tipo: "ability" },
                   cara: [
-                    { op: "MARCAR_TEMPORAL", conOwner: true,
+                    { op: "MARCAR_TEMPORAL", conOwner: true, pierdeSuTurno: true,
                       siObjetivo: { campo: "location", op: "==", valor: "vanguard" },
                       floating: { texto: "CONGELADO", estilo: "ft-ability", offset: -40 },
                       log: "¡{objetivo} queda congelado! Perderá su próximo turno." } ] } ] }
         ],
         // Copiado de la Canceladora, que hace justo esto: al llegar el turno de su dueño, se
         // agota solo y el efecto se consume. Devolver false es lo que lo borra.
-        onStartTurnTempEffect: function(target, effect, game, currentTurnPlayerId) {
-            if (currentTurnPlayerId === target.owner) {
-                target.exhausted = true;
-                game.logMsg(`¡${game.getCardNameWithOwner(target)} sigue congelado y no puede actuar este turno!`, 'system');
-                return false;
-            }
-            return true;
-        }
     },
     {
         id: 2008, name: "Nethuns", hp: 5, def: 3, atk: 4, type: "Personaje", subtype: "Ser mágico",
@@ -6573,8 +6531,12 @@ const CARD_DB = [
     },
     {
         name: "Experimento fallido", hp: 4, def: 3, atk: 5, type: "Esbirro", subtype: "No-muerto", tags: ["Monstruo", "Creación artificial"], rarity: "B", cost: 1, series: 2,
-        text: "Coste: 1 de Furor. P: ABOMINACIÓN AFABLE: Su coste se tributa al colocar esta carta en el campo.",
-        passiveName: "ABOMINACIÓN AFABLE",
+        // Sin passiveName ni "P: ..." (Toto, 20-ago-2026), mismo criterio que Raiju y Súcubo:
+        // ABOMINACIÓN AFABLE no describía nada, era SOLO el tributo de colocación, y ese ya sale
+        // en la caja COSTE del detalle. En el Excel de Toto los costes viven dentro del campo de
+        // la pasiva -de ahí el nombre-, pero aquí se parsean fuera, así que una "pasiva" que solo
+        // habla del coste no es una pasiva: es la caja de coste con un nombre encima.
+        text: "Coste: 1 de Furor.",
         // Primera del lote (20-ago-2026): era ENTERA un `DSL.tributoFuror` escrito a mano. Con
         // COSTE_COLOCACION la carta se queda sin una sola línea de código.
         abilities: [
@@ -9207,6 +9169,8 @@ const DSL = {
             // turno del rival. Distinto de `hastaFinDeTurnoPropio`, que mira al dueño de la
             // carta MARCADA y caduca al final de su turno.
             if (e.hastaInicioTurnoLanzador) marca.hastaInicioTurnoLanzador = true;
+            if (e.oculto) marca.oculto = true;                 // Oculta al portador mientras dure
+            if (e.pierdeSuTurno) marca.pierdeSuTurno = true;   // se agota solo al llegar SU turno
             // provocaAtaque (Achmay, 31-jul-2026): ver el onStartTurnTempEffect genérico más
             // abajo (guard "MARCAR_TEMPORAL" en JSON.stringify(abs)).
             if (e.provocaAtaque) marca.provocaAtaque = true;
@@ -10934,7 +10898,13 @@ const DSL = {
             if (typeof tmpl.onEndTurnTempEffect !== 'function') {
                 // Las marcas con hastaFinDeTurnoPropio caducan al terminar el turno del dueño de la carta marcada
                 tmpl.onEndTurnTempEffect = function (card, eff, game, activePid) {
-                    return !(eff.hastaFinDeTurnoPropio && card.owner === activePid);
+                    if (!(eff.hastaFinDeTurnoPropio && card.owner === activePid)) return true;
+                    // Y lo ANUNCIA, con el mismo campo de plantilla que usa la caducidad por
+                    // inicio de turno. Sin esto, la marca se iba en silencio y las cartas que
+                    // querían decirlo (LIDERAZGO del Capitán) tenían que escribir el hook entero
+                    // a mano solo por el log (20-ago-2026).
+                    if (tmpl.tempEffectExpiraLog) game.logMsg(DSL._fill(tmpl.tempEffectExpiraLog, { objetivo: DSL._nombre(game, card), genero: card.gender }), 'system');
+                    return false;
                 };
             }
             // stats (Capitán Guardia Real, LIDERAZGO, 28-jul-2026): reaplica el bono de
@@ -10942,6 +10912,10 @@ const DSL = {
             // que la carta necesite su propio onUpdateTempEffect a mano.
             if (typeof tmpl.onUpdateTempEffect !== 'function') {
                 tmpl.onUpdateTempEffect = function (card, eff, game) {
+                    // `oculto` (Simon, 20-ago-2026): hermano de `stats`, mismo sitio y mismo
+                    // porqué. Su ÚLTIMA RESISTENCIA esconde al resto de la vanguardia, y eso era
+                    // un onUpdateTempEffect de una línea escrito a mano.
+                    if (eff.oculto) card.stealth = true;
                     if (!eff.stats) return;
                     if (eff.stats.atk) card.currentAtk += eff.stats.atk;
                     if (eff.stats.def) card.currentDef += eff.stats.def;
@@ -11031,6 +11005,16 @@ const DSL = {
                         if (_cuentaAtras.contador && card.counters) delete card.counters[_cuentaAtras.contador.id];
                         if (_src) await DSL._runEffectList(_cuentaAtras.alCaducar || [], _src, game, _src.owner, [card]);
                         return false; // el motor retira la marca
+                    }
+                    // `pierdeSuTurno` (PEM, Canceladora, Elsa; 20-ago-2026): al llegar el turno
+                    // del PORTADOR -no el del lanzador-, se agota solo y la marca se consume. Es
+                    // "no podrá actuar en su próximo turno", que tres cartas resolvían con el
+                    // mismo hook copiado. OJO a de quién es el turno: es la diferencia con
+                    // `hastaInicioTurnoLanzador`, que mira el del que la puso.
+                    if (eff.pierdeSuTurno && card.owner === activePid) {
+                        card.exhausted = true;
+                        if (tmpl.tempEffectExpiraLog) game.logMsg(DSL._fill(tmpl.tempEffectExpiraLog, { objetivo: DSL._nombre(game, card), genero: card.gender }), 'system');
+                        return false;
                     }
                     if (!(eff.hastaInicioTurnoLanzador && eff.ownerId === activePid)) return true;
                     if (tmpl.tempEffectExpiraLog) game.logMsg(DSL._fill(tmpl.tempEffectExpiraLog, { objetivo: DSL._nombre(game, card), genero: card.gender }), 'system');

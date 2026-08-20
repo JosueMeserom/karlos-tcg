@@ -83,6 +83,9 @@ const escenarios = [
     },
     {
         nombre: 'PEM: paga 1 Furor y paraliza a la única Máquina enemiga',
+        diferenciasEsperadas: [
+            { contiene: 'tempEffects.0.pierdeSuTurno', motivo: 'la marca ahora LLEVA ESCRITO lo que antes hacía un hook a mano de la carta (20-ago-2026): el motor ya tenía handlers genéricos para `pierdeSuTurno`, así que la carta solo tiene que declararlo. Mismo comportamiento; lo que cambia es dónde está dicho' },
+        ],
         p1: { vanguardia: [{ carta: 'Oso con armadura', furor: 1 }], mano: ['PEM'] },
         p2: { vanguardia: ['Robot de seguridad SP', 'Mini-tigre'] },
         pasos: [
