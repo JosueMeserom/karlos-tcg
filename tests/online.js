@@ -65,6 +65,11 @@ async function entregar(g, data) {
             case 'CHOICE_SELECTED':        g.executeChoice(data.index, true); break;
             case 'VISUAL_SEARCH_CONFIRM':  g.resolveVisualSearch(data.ids, true); break;
             case 'HUECO_SELECTED':         g.resolverHuecoRemoto(data.cardId); break;
+            // El servidor la reparte como cualquier otra (está en su lista blanca). Faltaba en
+            // este cable, así que el escenario de las pilas de descartes pasaba SIN reproducir el
+            // bug -y una prueba que pasa por no ejercitar nada es peor que no tenerla-. Se
+            // comprobó a posteriori: con el código viejo puesto, ahora sí falla (20-ago-2026).
+            case 'CLOSE_VIEWER':           g._quitarAvisoDeEspera ? g._quitarAvisoDeEspera() : g.closeDiscardViewer(true); break;
             case 'PLAY_CARD':              await g.playCard(data.cardId, true); break;
             case 'SELECT_CARD':            await g.selectCard(data.cardId, true); break;
             case 'CANCEL_ACTION':          g.cancelAction(true); break;
@@ -244,6 +249,45 @@ async function reposar(clientes, vueltas = 60) {
             'B.inputState=' + B.inputState);
         check('y los dos tableros coinciden', foto(A) === foto(B),
             'A=' + foto(A) + '  B=' + foto(B));
+    }
+
+    console.log('\n--- La pila de descartes es de cada uno: cerrarla no se la cierra al otro ---');
+    {
+        // Toto, 20-ago-2026: los dos mirando su pila de descartes, uno cierra y se le cerraba
+        // TAMBIÉN al otro. La causa: closeDiscardViewer emitía CLOSE_VIEWER siempre, y el que lo
+        // recibía cerraba el suyo. Pero la pila de descartes es pública y se consulta cuando a
+        // cada uno le da la gana; lo único que el rival tiene puesto por mi culpa es el cartel de
+        // "espera, estoy buscando", y eso solo existe mientras haya una BÚSQUEDA.
+        const cl = await mesaOnline({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: ['Mini-tigre'], descartes: ['Longaniza'] },
+            p2: { vanguardia: ['Aniceto'], descartes: ['Manzanahoria'] },
+        });
+        const A = cl.p1.g, B = cl.p2.g;
+        A.openDiscardViewer('p1', null);
+        B.openDiscardViewer('p2', null);
+        check('los dos están mirando una pila', !!A._visorSoloLectura && !!B._visorSoloLectura);
+
+        A.closeDiscardViewer();
+        await reposar(cl);
+        check('el que cierra, cierra la suya', !A._visorSoloLectura);
+        check('...y el otro SIGUE mirando la suya', !!B._visorSoloLectura,
+            'B._visorSoloLectura=' + JSON.stringify(B._visorSoloLectura));
+
+        // La otra mitad: cerrar una BÚSQUEDA sí tiene que avisar al rival, porque tiene puesto
+        // el cartel de espera. Pero tampoco entonces se le cierra la pila que esté mirando.
+        A._deckSearchActivo = true;
+        A._deckSearchZona = 'discard';
+        A.currentVisualResolve = () => {};
+        A.closeDiscardViewer();
+        await reposar(cl);
+        check('al cerrar una búsqueda, el rival conserva IGUALMENTE su pila abierta',
+            !!B._visorSoloLectura, 'B._visorSoloLectura=' + JSON.stringify(B._visorSoloLectura));
+
+        // Y la regla de cuándo SÍ se cierra sola: cuando a ese cliente le piden algo.
+        B.pickBoardTargets(B.players.p2.vanguard, 1, 'prueba', null, 'p2');
+        check('...pero se cierra sola cuando a ESE cliente le toca elegir', !B._visorSoloLectura,
+            'B._visorSoloLectura=' + JSON.stringify(B._visorSoloLectura));
     }
 
     console.log('');

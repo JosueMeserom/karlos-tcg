@@ -360,84 +360,51 @@ const CARD_DB = [
         text: "P: ENTEREZA DEL INGENUO: Mientras tenga 4 o más de Vida, su Def y su Atq aumentan en 2. A: REPARACIÓN MOLECULAR (1F): Cura 2 de Vida a un aliado.", 
         passiveName: "ENTEREZA DEL INGENUO", activeName: "REPARACIÓN MOLECULAR", activeCost: 1, series: 1,
 
+        // ACTIVA migrada al DSL (20-ago-2026). Era de las últimas imperativas de una sola pieza:
+        // canActivateAbility + onExecuteAbility + onValidateTarget + onTargetsReady, todo para
+        // "elige un aliado y cúrale 2". El compilador de ACTIVA hace las cuatro cosas, y de paso
+        // la carta se lleva lo que el DSL trae de serie: el cobro que espera a que elijas, la
+        // animación de aura y los logs con el formato de la rúbrica.
+        //
+        // Lo que la migración CAMBIA a propósito (Toto, 20-ago-2026):
+        //   · Ya no pinta "REPARACIÓN MOLECULAR" sobre el aliado curado. Con la animación de
+        //     aura -que sale de Kyle y cae sobre el objetivo- ese cartel sobra, y el "+2 VIDA"
+        //     automático de modifyStat ya dice lo que ha pasado. El nombre de la Activa sigue
+        //     saliendo sobre Kyle, igual que "DERRENGAR" sale sobre Nethuns.
+        //   · El log nombra a Kyle con getCardNameWithOwner ("Kyle de J1 (Nick)") en vez de con
+        //     `card.name` a secas: es la norma del proyecto para todo log visible por los dos.
+        //
+        // Lo que NO cambia: solo son objetivo válido los aliados a los que de verdad puede curar
+        // (Toto, 27-jul-2026). Sin eso se podía gastar el Furor y la acción sobre uno con la Vida
+        // llena para que el efecto no hiciera nada. Las dos excepciones siguen en pie: los
+        // Zombificados rechazan la reparación, y quien puede REBASAR su Vida máxima
+        // (onBeforeHealed, p. ej. Limo primario) es objetivo válido aunque esté al máximo.
         abilities: [
             // retrasoSiRecienJugada: conserva el "temporizador inteligente" que tenía a mano
             // (espera a que acabe la animación de colocación antes de anunciarse).
             { trigger: "PASIVA_CONTINUA", nombre: "ENTEREZA DEL INGENUO", retrasoSiRecienJugada: 450,
               if: { campo: "self.hp", op: ">=", valor: 4 },
-              then: [ { op: "MODIFICAR_STAT", stat: "def", delta: 2 }, { op: "MODIFICAR_STAT", stat: "atk", delta: 2 } ] }
+              then: [ { op: "MODIFICAR_STAT", stat: "def", delta: 2 }, { op: "MODIFICAR_STAT", stat: "atk", delta: 2 } ] },
+
+            { trigger: "ACTIVA", nombre: "REPARACIÓN MOLECULAR", coste: { furor: 1 },
+              // El requisito repite el criterio de validarObjetivo: sin NADIE a quien curar, la
+              // Activa no debe ni empezar. `esZombi` fuera y, dentro, o le falta Vida o puede
+              // rebasar su máximo.
+              requisitos: [
+                { count: { quien: "ALIADO", filtros: [ { campo: "esZombi", op: "falsy" },
+                    { o: [ [ { campo: "currentHp", op: "<", valorCampo: "maxHp" } ],
+                           [ { dePlantilla: true, campo: "onBeforeHealed", op: "truthy" } ] ] } ] },
+                  op: ">=", valor: 1, msg: "No tienes ningún aliado al que reparar." } ],
+              target: { quien: "ALIADO", cantidad: 1 },
+              validarObjetivo: [
+                { campo: "esZombi", op: "falsy", msg: "{objetivo} está Zombificado y rechaza la reparación." },
+                { o: [ [ { campo: "currentHp", op: "<", valorCampo: "maxHp" } ],
+                       [ { dePlantilla: true, campo: "onBeforeHealed", op: "truthy" } ] ],
+                  msg: "{objetivo} ya tiene la Vida completa." } ],
+              efectos: [
+                { op: "CURAR", valor: 2, animacion: "HABILIDAD_BUENA",
+                  log: "{carta} repara la Vida de {objetivo} ({antes} -> {despues})." } ] }
         ],
-
-        canActivateAbility: function(card, game) {
-            if (card.furor < 1) { game.logError("Falta Furor (1)."); return false; }
-            return true;
-        },
-
-        onExecuteAbility: function(card, game) {
-            game.selectedCard = card;
-            game.inputState = 'SELECT_ABILITY_TARGETS';
-            game.abilityContext = { targets: [], maxTargets: 1, name: 'REPARACIÓN MOLECULAR', targetType: 'ally' };
-            game.logMsg("Selecciona un aliado para Reparación Molecular.", 'system');
-            game.render();
-        },
-
-        // Solo son objetivo válido los aliados a los que REALMENTE puede curar (Toto,
-        // 27-jul-2026): antes valía cualquier aliado, así que se podía gastar el Furor y
-        // la acción sobre uno con la Vida llena para que el efecto no hiciera nada.
-        // Excepciones respetadas: los Zombificados rechazan la reparación, y quien puede
-        // REBASAR su Vida máxima (onBeforeHealed, p. ej. Limo primario) sí es válido
-        // aunque esté al máximo — mismo criterio que usa el DSL para CURAR.
-        onValidateTarget: function(card, target, game, isSilent) {
-            if (target.owner !== card.owner) return false;
-            if (target.esZombi) {
-                if (!isSilent) game.logError(`${game.getCardNameWithOwner(target)} está Zombificado y rechaza la reparación.`);
-                return false;
-            }
-            const tpl = getCardTemplate(target.id) || {};
-            const puedeSobrecurar = typeof tpl.onBeforeHealed === 'function';
-            if (target.currentHp >= target.maxHp && !puedeSobrecurar) {
-                if (!isSilent) game.logError(`${game.getCardNameWithOwner(target)} ya tiene la Vida completa.`);
-                return false;
-            }
-            return true;
-        },
-
-        onTargetsReady: async function(card, game) {
-            const target = game.abilityContext.targets[0];
-            game.modifyStat(card, 'furor', -1);
-            showFloatingText(card.instanceId, card.activeName, "ft-ability", -30); // Animación en Kyle de que usa la habilidad
-            // AURA DE HABILIDAD, versión buena (Toto, 20-ago-2026): Kyle canaliza en su sitio y
-            // le cae un halo verde ascendente al aliado, y SOLO DESPUÉS se aplica la curación.
-            // Kyle sigue siendo imperativa, así que la llamada va a mano; en una carta del DSL
-            // basta con `animacion: "HABILIDAD_BUENA"` en el efecto.
-            if (typeof animateAbilityAura === 'function') {
-                try { await animateAbilityAura(card.instanceId, [target.instanceId], true); } catch (err) {}
-            }
-
-            if (target.attachedTo) {
-                game.logMsg(`${game.getCardNameWithOwner(target)} está Zombificado y rechaza la reparación.`, 'system');
-            } else {
-                let amount = 2;
-                const template = getCardTemplate(target.id);
-                if (typeof template.onBeforeHealed === 'function') amount = template.onBeforeHealed(target, amount, card, game);
-                
-                const missing = target.maxHp - target.currentHp;
-                if (missing > 0) {
-                    const heal = Math.min(amount, missing);
-                    showFloatingText(target.instanceId, "REPARACIÓN MOLECULAR", "ft-ability", -40); // El nombre aparece sobre el aliado
-                    game.modifyStat(target, 'currentHp', heal);
-                    game.logMsg(`${card.name} repara ${heal} de Vida a ${game.getCardNameWithOwner(target)}.`, 'ability');
-                } else {
-                    game.logMsg(`${game.getCardNameWithOwner(target)} ya tiene la Vida completa.`, 'system');
-                }
-            }
-
-            card.exhausted = true;
-            game.isActionLocked = false;
-            game.cancelAction();
-            game.updatePassives();
-            game.render();
-        },
     },
     { 
         id: 4, name: "Eris", hp: 4, def: 3, atk: 5, type: "Personaje", subtype: "Ser vivo", tags: ['Policía', 'Usuaria de magia'], gender: 'F', rarity: "A", 
@@ -8219,7 +8186,13 @@ const DSL = {
                 return false;
             }
             const heal = Math.min(amount, missing);
-            if (typeof showFloatingText === 'function') showFloatingText(target.instanceId, e.floating || sourceCard.name.toUpperCase(), 'ft-ability', -40);
+            // Flotante-etiqueta OPT-IN, igual que en la variante simple desde el 7-ago-2026: el
+            // "+N VIDA" lo pinta ya modifyStat, así que este solo tiene sentido si aporta algo
+            // distinto. Antes caía a `sourceCard.name.toUpperCase()` cuando la carta no declaraba
+            // ninguno, y con Kyle eso ponía un "KYLE" encima del curado además del "+2 VIDA"
+            // (Toto, 20-ago-2026: con la animación de Habilidad ese cartel sobra). Las cinco
+            // cartas que usan esta rama declaran el suyo, así que el fallback no lo usaba nadie.
+            if (e.floating && typeof showFloatingText === 'function') showFloatingText(target.instanceId, e.floating, e.floatingStyle || 'ft-ability', e.offsetFloating !== undefined ? e.offsetFloating : -40);
             game.modifyStat(target, 'currentHp', heal);
             if (e.log) game.logMsg(DSL._fill(e.log, Object.assign({}, (DSL._vars && DSL._vars[sourceCard.instanceId]) || {}, ctx, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target), antes, despues: target.currentHp })), 'ability');
             return true;
@@ -10262,10 +10235,15 @@ const DSL = {
                 game.render();
             };
             if (Array.isArray(activa.validarObjetivo) && typeof tmpl.onValidateTarget !== 'function') {
+                // _match y no _cmp a pelo (20-ago-2026): así `validarObjetivo` acepta los mismos
+                // filtros que ELEGIR y `count` -grupos `o`, `valorCampo` para comparar con OTRO
+                // campo, `dePlantilla`, `no`- en vez de solo "campo op valor". Kyle lo necesita
+                // para "no está a Vida llena, O puede rebasarla". El caso simple se comporta
+                // igual: es literalmente la rama `else` de _match.
                 tmpl.onValidateTarget = function (card, target, game, isSilent) {
                     for (const v of activa.validarObjetivo) {
-                        if (!DSL._cmp(DSL._field(target, v.campo), v.op, v.valor)) {
-                            if (!isSilent && v.msg) game.logError(v.msg);
+                        if (!DSL._match(target, v)) {
+                            if (!isSilent && v.msg) game.logError(DSL._fill(v.msg, { carta: DSL._nombre(game, card), objetivo: DSL._nombre(game, target) }));
                             return false;
                         }
                     }

@@ -3064,7 +3064,11 @@
                         const card = this.findCard(data.cardId); 
                         if (card) this.handleOpponentDiscard(card, true); 
                     }
-                    else if (data.action === 'CLOSE_VIEWER') this.closeDiscardViewer(true);
+                    // Ya no cierra el visor del rival (Toto, 20-ago-2026): lo único que el otro
+                    // cliente tiene puesto por culpa de mi búsqueda es el cartel de espera, y es
+                    // lo único que debe quitarse. Si además estaba mirando su pila de descartes,
+                    // que siga mirándola.
+                    else if (data.action === 'CLOSE_VIEWER') this._quitarAvisoDeEspera();
                     else if (data.action === 'DEBUG_RETRIBUTION') await this.debugTakeRetribution(data.playerId, true);
                     else if (data.action === 'DEBUG_COIN_MODE') this.debugCoinMode = data.mode;
                     
@@ -5697,6 +5701,9 @@
                 // cerrarla antes de llenar el cupo (AL-FÉNIX: "hasta 3 en Van. y 1 en Ret.");
                 // `maxPorZona` limita cuántos caben de cada fila.
                 const opts = (arguments.length > 6 && arguments[6]) || {};
+                // Me toca elegir en el tablero: fuera la pila que estuviera curioseando (solo la
+                // MÍA, y solo si soy yo quien elige — al otro no le cierra nada).
+                if (chooserId === this.myPlayerId || this.gameMode !== 'online') this._cerrarVisorPropio();
                 return new Promise(resolve => {
                     this.currentVisualResolve = (sel) => { resolve(sel && sel.length ? sel : null); };
                     this._interaccionChooser = chooserId; // quién debe elegir (para la recuperación por reconexión)
@@ -5965,6 +5972,31 @@
                 this.adjustCardHeaders(); 
             }
 
+            // Quita SOLO el cartel de "espera a que el rival termine". No toca ningún visor: es
+            // lo que corre en el cliente que NO está buscando (ver CLOSE_VIEWER).
+            _quitarAvisoDeEspera() {
+                if (this.myPlayerId === 'spectator') return;
+                const b = document.getElementById('action-banner');
+                if (b) b.style.display = 'none';
+                const aviso = document.getElementById('deck-search-notice');
+                if (aviso) aviso.style.display = 'none';
+            }
+
+            // Cierra MI visor de solo-lectura (la pila que estuviera curioseando) porque el juego
+            // me pide algo: un picker, un modal, una búsqueda, o se acaba el turno. La regla de
+            // Toto (20-ago-2026): la pila se cierra sola cuando ME toca hacer algo, no cuando el
+            // otro cierra la suya. No toca el visor de BÚSQUEDA -ese tiene su propio cierre, con
+            // su promesa que resolver- ni emite nada por red: es cosa de este cliente.
+            _cerrarVisorPropio() {
+                if (this._deckSearchActivo) return;
+                if (!this._visorSoloLectura) return;
+                const visor = document.getElementById('discard-viewer');
+                if (visor) visor.style.display = 'none';
+                this._visorSoloLectura = null;
+                this._purgarVisor();
+                this.cerrarDetalle();
+            }
+
             closeDiscardViewer(isRemote = false) {
                 // La regla depende de QUÉ PILA es (Toto, 7-ago-2026, corrigiéndome):
                 //   · MAZO — una vez abierto, elegir es OBLIGATORIO. Abrirlo ya te ha enseñado
@@ -5979,8 +6011,14 @@
                     return;
                 }
 
-                // SEGURO ANTI-BUGS: El espectador no molesta a los jugadores enviando órdenes por red
-                if (this.gameMode === 'online' && !isRemote && this.myPlayerId !== 'spectator') {
+                // SOLO SE AVISA AL RIVAL SI LO QUE SE CIERRA ES UNA BÚSQUEDA (Toto, 20-ago-2026).
+                // Antes se avisaba siempre, así que mirar tranquilamente una pila de descartes y
+                // cerrarla le cerraba también la suya al otro. La pila de descartes es pública y
+                // se consulta cuando a cada uno le da la gana: que yo deje de mirarla no es asunto
+                // del rival. Lo ÚNICO que el rival tiene puesto por mi culpa es el cartel de
+                // "espera, que estoy buscando", y eso solo existe durante una búsqueda.
+                // SEGURO ANTI-BUGS: El espectador no molesta a los jugadores enviando órdenes.
+                if (this._deckSearchActivo && this.gameMode === 'online' && !isRemote && this.myPlayerId !== 'spectator') {
                     this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'CLOSE_VIEWER' });
                 }
 
@@ -6933,6 +6971,7 @@
                 
                 const pName = this.getDisplayName(this.activePlayerId);
                 this.inputState = 'EXECUTING';
+                this._cerrarVisorPropio();   // el turno se acaba: fuera la pila que se estuviera mirando
                 
                 // Vaciamos la memoria de clics para asegurar que el banner de Efectos Finales siempre se muestre al principio
                 this.pendingBannerSkip = false;
@@ -9046,6 +9085,9 @@
                     });
                 }
 
+                // Igual que en pickBoardTargets: si el modal es para MÍ, se cierra la pila que
+                // estuviera mirando. Si es para el otro, a él no se le toca nada.
+                if (intendedPlayer === this.myPlayerId || this.gameMode !== 'online') this._cerrarVisorPropio();
                 return new Promise((resolve) => {
                     const modal = document.createElement('div');
                     modal.className = 'search-modal';
