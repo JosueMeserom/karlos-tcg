@@ -581,6 +581,15 @@ const _sesolapan = (a, b, w = 100, h = 18) => Math.abs(_x(a) - _x(b)) < w && Mat
           'x=' + _x(a) + ' y ' + _x(b));
 }
 {
+    // SOLO HORIZONTAL (Toto, 20-ago-2026): aunque separarlas en vertical costase menos píxeles,
+    // la altura la manda la flecha de cada una y moverla la despega de lo que señala.
+    const a = _etiq(300, 400), b = _etiq(340, 402);
+    _separarEtiquetas([a, b]);
+    check('se apartan en horizontal aunque el vertical fuese más corto', !_sesolapan(a, b),
+          'x=' + _x(a) + ' y ' + _x(b));
+    check('...y ninguna cambia de altura', _y(a) === 400 && _y(b) === 402, _y(a) + ' / ' + _y(b));
+}
+{
     // Lo que NO debe pasar: mover las que ya se leían bien.
     const a = _etiq(200, 300), b = _etiq(600, 300), c = _etiq(200, 500);
     _separarEtiquetas([a, b, c]);

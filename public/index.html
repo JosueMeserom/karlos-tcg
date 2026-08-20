@@ -1760,11 +1760,16 @@
         }
         // Dos flechas que salen de cartas contiguas dejan su etiqueta casi en el mismo sitio y
         // las letras se juntan (Toto, 20-ago-2026: Alabanza cobrando a Némesis y a Eris a la vez,
-        // los dos "Tributa 2 FUR" montados). Esto las APARTA lo justo: se miden ya puestas y, por
-        // cada par que se toque, se separan por el eje que menos haya que mover, repartiendo el
-        // empujón entre las dos para que ninguna se aleje sola de su flecha. Se repite unas
-        // pocas pasadas porque apartar dos puede meter a una en la tercera; con dos o tres
-        // etiquetas converge a la primera.
+        // los dos "Tributa 2 FUR" montados). Esto las APARTA lo justo: se miden ya puestas y cada
+        // par que se toque se separa repartiendo el empujón entre las dos, para que ninguna se
+        // aleje sola de su flecha. Se repite unas pocas pasadas porque apartar dos puede meter a
+        // una en la tercera; con dos o tres etiquetas converge a la primera.
+        // SOLO EN HORIZONTAL (Toto, 20-ago-2026). La primera versión apartaba por el eje que
+        // menos hubiera que mover, y con dos etiquetas a la MISMA altura ese eje era el vertical:
+        // salían desniveladas, con un escalón que no tenía nada que ver con las flechas. La
+        // altura de cada etiqueta la fija su propia flecha -va sobre su punto medio- así que
+        // moverla en vertical la despega de lo que está señalando. En horizontal siempre se
+        // resuelve el solape, porque dos cajas dejan de tocarse en cuanto se separan en un eje.
         // No se mueve nada si no hay solape: una etiqueta sola se queda exactamente donde estaba.
         function _separarEtiquetas(els, gap = 8) {
             const cajas = (els || []).filter(Boolean).map(el => {
@@ -1784,12 +1789,14 @@
                     const sy = (a.h + b.h) / 2 + gap - Math.abs(a.y - b.y);
                     if (sx <= 0 || sy <= 0) continue;
                     movida = true;
-                    if (sx <= sy) { const d = (a.x <= b.x ? 1 : -1) * sx / 2; a.x -= d; b.x += d; }
-                    else          { const d = (a.y <= b.y ? 1 : -1) * sy / 2; a.y -= d; b.y += d; }
+                    // El signo desempata las que estén EXACTAMENTE en la misma x: sin él se
+                    // empujarían la una a la otra en el mismo sentido y no se separarían nunca.
+                    const d = (a.x <= b.x ? 1 : -1) * sx / 2;
+                    a.x -= d; b.x += d;
                 }
                 if (!movida) break;
             }
-            cajas.forEach(c => { c.el.style.left = c.x + 'px'; c.el.style.top = c.y + 'px'; });
+            cajas.forEach(c => { c.el.style.left = c.x + 'px'; });   // `top` no se toca: ver arriba
         }
         async function _presentarCarta(cardId, origenSel, destinoSel, deDorso, opts) {
             const g = window.game;
