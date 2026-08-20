@@ -1771,12 +1771,15 @@
             // Por eso van en DOS capas: una sola no puede llevar las dos cosas sin que el
             // navegador se líe (su propio filtro le cambia el fondo que muestrea).
             //
-            // AVISO HONESTO sobre el desenfoque de fondo: Toto probó backdrop-filter a 3 y a 30
-            // sin ver diferencia. Puede ser porque el fondo de ahí es casi liso -desenfocar un
-            // color plano da el mismo color plano- o porque su navegador no lo pinte en esta
-            // capa. Para salir de dudas: ETIQ_HALO_ALFA a 0 (halo oscuro apagado) y
-            // ETIQ_FONDO_BLUR a 12; si aún así no se ve emborronado lo de debajo, es lo segundo,
-            // y entonces el contraste solo puede venir del oscurecido.
+            // POR QUÉ EL FUNDIDO NO VA EN ESTE DIV sino en sus tres hijos (Toto, 20-ago-2026:
+            // "el blur solo se aplica en el último fotograma"). Regla de oro del backdrop-filter:
+            // mientras un ANTECESOR tiene opacity < 1 se convierte en "backdrop root" y sus
+            // descendientes dejan de ver el fondo, así que el desenfoque queda inerte. Con la
+            // opacidad aquí, el blur no existía durante todo el fundido y aparecía de golpe al
+            // llegar a 1 exacto. Fundiendo cada hijo por su cuenta, el padre se queda siempre en
+            // opacidad 1 y el desenfoque entra progresivamente, a la vez que el texto.
+            // (Al DESAPARECER sigue siendo brusco: eso lo hace la capa entera, que se desvanece
+            // con su propia opacity y vuelve a activar la regla. Son 180ms yéndose del todo.)
             //
             // El margen va SEPARADO por ejes a propósito (Toto, 20-ago-2026: "por arriba y por
             // abajo se extiende mucho, pero muy poco por los lados"). No es una ilusión: la caja
@@ -1795,23 +1798,28 @@
             const etiqueta = (x, y, texto, color) => {
                 const d = document.createElement('div');
                 d.style.cssText = 'position:absolute; transform:translate(-50%,-50%); white-space:nowrap;'
-                    + `color:${color}; font-weight:bold; font-size:0.9rem; opacity:0;`
-                    + `text-shadow:0 1px 3px #000, 0 0 6px #000; transition:opacity ${PRESENTA_FLECHA_MS}ms ease;`
+                    + `color:${color}; font-weight:bold; font-size:0.9rem;`
+                    + `text-shadow:0 1px 3px #000, 0 0 6px #000;`
                     + `left:${x}px; top:${y}px;`;
+                const _fundido = `opacity:0; transition:opacity ${PRESENTA_FLECHA_MS}ms ease;`;
                 // 1) La que emborrona lo de detrás. Va sin color propio: solo desenfoca.
                 const fondo = document.createElement('div');
                 fondo.style.cssText = `position:absolute; inset:${_inset}; border-radius:8px;`
                     + ` backdrop-filter:blur(${ETIQ_FONDO_BLUR}px);`
-                    + ` -webkit-backdrop-filter:blur(${ETIQ_FONDO_BLUR}px);`;
+                    + ` -webkit-backdrop-filter:blur(${ETIQ_FONDO_BLUR}px);` + _fundido;
                 // 2) La que oscurece, con su propio borde difuminado para que muera suave.
                 const halo = document.createElement('div');
                 halo.style.cssText = `position:absolute; inset:${_inset}; border-radius:8px;`
-                    + ` background:rgba(8,10,18,${ETIQ_HALO_ALFA}); filter:blur(${ETIQ_HALO_BLUR}px);`;
+                    + ` background:rgba(8,10,18,${ETIQ_HALO_ALFA}); filter:blur(${ETIQ_HALO_BLUR}px);` + _fundido;
                 const txt = document.createElement('span');
-                txt.style.position = 'relative';   // por encima de las dos, sin z-index ni capas
+                // `relative`: por encima de las dos capas, sin z-index ni apilamientos nuevos.
+                txt.style.cssText = 'position:relative;' + _fundido;
                 txt.textContent = texto;
                 d.appendChild(fondo); d.appendChild(halo); d.appendChild(txt);
                 capa.appendChild(d);
+                // Aparecen las tres A LA VEZ. Se expone como método porque quien la enseña no
+                // tiene por qué saber que la etiqueta son tres capas: `et.mostrar()` y ya.
+                d.mostrar = () => { fondo.style.opacity = '1'; halo.style.opacity = '1'; txt.style.opacity = '1'; };
                 return d;
             };
             return { capa, svg, punta, etiqueta };
@@ -2054,7 +2062,7 @@
             try {
                 _lineas.forEach(({ ln, et, color }) => {
                     ln.setAttribute('marker-end', `url(#${flechas.punta(color)})`);
-                    et.style.opacity = '1';
+                    et.mostrar();
                 });
             } catch (err) { console.error(err); }
 

@@ -606,5 +606,30 @@ const _sesolapan = (a, b, w = 100, h = 18) => Math.abs(_x(a) - _x(b)) < w && Mat
           [_x(a), _x(b), _x(c)].join(' / '));
 }
 
+// El FUNDIDO de la etiqueta va en sus tres capas, NO en el div que las contiene. Regla del
+// backdrop-filter: un antecesor con opacity < 1 se vuelve "backdrop root" y sus descendientes
+// dejan de ver el fondo, asi que el desenfoque quedaba inerte durante todo el fundido y aparecia
+// de golpe en el ultimo fotograma (Toto, 20-ago-2026). El navegador es el unico que puede
+// enseñar ese efecto; lo que se fija aquí es la ESTRUCTURA que lo evita.
+console.log('\n--- fundido de las etiquetas de flecha ---');
+{
+    const cap = vm.runInContext('_capaFlechasPresenta', sandbox)();
+    const et = cap.etiqueta(300, 400, 'Tributa 2 FUR', '#ef4444');
+    check('el div contenedor NO lleva opacidad ni transicion propias',
+          !/opacity/.test(et.style.cssText || ''), et.style.cssText);
+    check('la etiqueta se enseña con mostrar(), no tocando su style', typeof et.mostrar === 'function');
+    const hijos = et.children;
+    check('son tres capas: desenfoque de fondo, halo oscuro y texto', hijos.length === 3,
+          'hijos=' + hijos.length);
+    check('las tres nacen invisibles y con su propia transicion',
+          hijos.every(h => /opacity:0/.test(h.style.cssText || '') && /transition:opacity/.test(h.style.cssText || '')));
+    check('solo la primera desenfoca el FONDO (backdrop-filter)',
+          /backdrop-filter/.test(hijos[0].style.cssText || '') && !/backdrop-filter/.test(hijos[1].style.cssText || ''));
+    et.mostrar();
+    check('mostrar() las enciende las tres a la vez', hijos.every(h => h.style.opacity === '1'),
+          hijos.map(h => h.style.opacity).join(','));
+    cap.capa.remove();
+}
+
 console.log(fallos === 0 ? '\nSUITE capas_cliente: ' + comprobaciones + '/' + comprobaciones + ' comprobaciones — CAPAS CORRECTAS' : '\nSUITE capas_cliente: ' + fallos + ' FALLOS de ' + comprobaciones + ' comprobaciones');
 process.exit(fallos ? 1 : 0);
