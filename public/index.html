@@ -1746,10 +1746,19 @@
                 }
                 return id;
             };
+            // El HALO de detrás del texto (Toto, 20-ago-2026). La etiqueta va del mismo color
+            // que su flecha, así que cuando cae encima de un trazo -el suyo o el de al lado- las
+            // letras se confunden con la línea: se lee, pero cuesta. Esto despega el texto de lo
+            // que tenga debajo sin tocar el color: un rectángulo mínimo, apenas más grande que
+            // las letras, que DESENFOCA el fondo (backdrop-filter) y lo oscurece un pelín.
+            // El `background` no es decoración redundante: es el plan B. Si el navegador no
+            // soporta backdrop-filter, ese velo oscuro sigue dando el contraste él solo.
             const etiqueta = (x, y, texto, color) => {
                 const d = document.createElement('div');
                 d.style.cssText = 'position:absolute; transform:translate(-50%,-50%); white-space:nowrap;'
                     + `color:${color}; font-weight:bold; font-size:0.9rem; opacity:0;`
+                    + 'padding:1px 6px; border-radius:7px; background:rgba(8,10,18,0.42);'
+                    + 'backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px);'
                     + `text-shadow:0 1px 3px #000, 0 0 6px #000; transition:opacity ${PRESENTA_FLECHA_MS}ms ease;`
                     + `left:${x}px; top:${y}px;`;
                 d.textContent = texto;
