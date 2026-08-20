@@ -2638,10 +2638,14 @@ const CARD_DB = [
                 { campo: "name", op: "contieneTexto", valor: "Karlos", msg: "Solo un 'Karlos' puede disparar el Cañón de positrones." },
                 { campo: "furor", op: ">=", valor: 2, msg: "{objetivo} necesita al menos 2 de Furor." } ],
               efectos: [
-                { op: "MODIFICAR_STAT", stat: "furor", delta: -2, esCoste: true, floating: { texto: "CAÑÓN DE POSITRONES", estilo: "ft-ability", offset: -30 } },
-                { op: "ELEGIR", de: "ENEMIGOS", cantidad: 1, cancelable: false,
+                // El cobro va DENTRO del ELEGIR y apunta al PAGADOR (el 'Karlos' al que le
+                // señalaste la Ayuda), no al elegido: mientras no hayas dicho a quién aniquilas
+                // no se paga nada y se puede cancelar (Toto, 20-ago-2026).
+                { op: "ELEGIR", de: "ENEMIGOS", cantidad: 1,
                   titulo: "Elige al enemigo que será aniquilado",
                   efectos: [
+                    { op: "MODIFICAR_STAT", target: { quien: "PAGADOR" }, stat: "furor", delta: -2, esCoste: true,
+                      floating: { texto: "CAÑÓN DE POSITRONES", estilo: "ft-ability", offset: -30 } },
                     { op: "MODIFICAR_STAT", stat: "currentHp", vaciar: true, sinRetribucion: true, comprobarMuerte: true,
                       log: "¡BZZZZT! El Cañón de positrones impacta de lleno en {objetivo}." } ] } ] }
         ],
@@ -2788,12 +2792,20 @@ const CARD_DB = [
                 { count: { de: "ENEMIGOS", filtros: [ { campo: "subtype", op: "==", valor: "Máquina" } ] }, op: ">=", valor: 1, msg: "El rival no tiene 'Máquinas'." } ] },
             { trigger: "AL_CONSUMIR",
               efectos: [
+                // EL COBRO VA AL FINAL (Toto, 20-ago-2026). Se sigue preguntando PRIMERO quién
+                // paga -el coste antes que el efecto, que es el orden lógico-, pero el Furor no
+                // se toca hasta que además has elegido a quién paralizas: mientras quede algo por
+                // decidir, cancelar no debe costar nada. Antes se cobraba al elegir pagador y el
+                // segundo ELEGIR era `cancelable: false`, o sea que pagabas y encima quedabas
+                // obligado a elegir objetivo. El pagador viaja en `guardaIdsEnSelf`, como en Rezo
+                // en grupo, porque dentro del segundo ELEGIR el "objetivo" ya es el enemigo.
                 { op: "ELEGIR", de: "ALIADOS", filtros: [ { campo: "furor", op: ">=", valor: 1 } ], cantidad: 1,
                   titulo: "¿QUIÉN DISPARA EL PEM? (-1 FUROR)",
-                  efectos: [ { op: "MODIFICAR_STAT", stat: "furor", delta: -1, esCoste: true } ] },
-                { op: "ELEGIR", de: "ENEMIGOS", filtros: [ { campo: "subtype", op: "==", valor: "Máquina" } ], cantidad: 1, cancelable: false,
+                  guardaIdsEnSelf: "pemPagador" },
+                { op: "ELEGIR", de: "ENEMIGOS", filtros: [ { campo: "subtype", op: "==", valor: "Máquina" } ], cantidad: 1,
                   titulo: "Elige al enemigo 'Máquina' para paralizarlo",
                   efectos: [
+                    { op: "MODIFICAR_STAT", target: { selfLista: "pemPagador" }, stat: "furor", delta: -1, esCoste: true },
                     { op: "MARCAR_TEMPORAL", pierdeSuTurno: true, floating: "PARALIZADO", floatingStyle: "ft-ability", offsetFloating: -30,
                       log: "¡El PEM fríe los circuitos de {objetivo}! Se saltará su próximo turno." } ] } ] }
         ],
@@ -3543,15 +3555,23 @@ const CARD_DB = [
               requisitosObjetivo: [
                 { o: [ [ { campo: "furor", op: ">=", valor: 2 } ], [ { campo: "name", op: "contieneTexto", valor: "Eris" }, { campo: "furor", op: ">=", valor: 1 } ] ], msg: "Este aliado necesita al menos 2 de Furor (o 1 si es Eris)." } ],
               efectos: [
-                { op: "MODIFICAR_STAT", stat: "furor", delta: -2, esCoste: true, deltaCondicional: [ { filtro: { campo: "name", op: "contieneTexto", valor: "Eris" }, delta: -1 } ],
-                  guardaNombre: "pagador" },
+                // El cobro va DESPUÉS de la elección y UNA sola vez, así que no puede ir dentro
+                // del ELEGIR -ahí correría por cada enemigo elegido y cobraría el doble-. Va
+                // detrás, con los elegidos guardados: patrón de Rezo en grupo. `{pagador}` ya no
+                // necesita el `guardaNombre` del coste, lo deja el compilador de AL_USAR_AYUDA.
+                // `permitirParar`: eliges 1 y pulsas el botón, como AL-FÉNIX. Cancelar sigue
+                // valiendo mientras no confirmes, y entonces no se paga nada (Toto, 20-ago-2026).
                 { op: "ELEGIR", de: "ENEMIGOS", zona: "VANGUARDIA", cantidad: 2, hastaCantidad: true,
-                  titulo: "Elige hasta 2 enemigos para la Granada de maná",
+                  permitirParar: true, guardaIdsEnSelf: "granadaObjetivos",
+                  titulo: "Elige hasta 2 enemigos para la Granada de maná (pulsa OK al terminar)",
                   logSiVacio: "¡{pagador} lanza la Granada de maná, pero no hay objetivos en vanguardia!",
                   logAntes: "¡{pagador} hace explotar la Granada de maná!",
-                  efectos: [ { op: "MODIFICAR_STAT", stat: "currentHp", delta: -1, comprobarMuerte: true,
-                               animacion: "DANO_VERDADERO",
-                               floating: { texto: "DAÑO VERDADERO", estilo: "ft-purple", offset: -30 } } ] } ] }
+                  efectos: [] },
+                { op: "MODIFICAR_STAT", target: { quien: "PAGADOR" }, stat: "furor", delta: -2, esCoste: true,
+                  deltaCondicional: [ { filtro: { campo: "name", op: "contieneTexto", valor: "Eris" }, delta: -1 } ] },
+                { op: "MODIFICAR_STAT", target: { selfLista: "granadaObjetivos" }, stat: "currentHp", delta: -1, comprobarMuerte: true,
+                  animacion: "DANO_VERDADERO",
+                  floating: { texto: "DAÑO VERDADERO", estilo: "ft-purple", offset: -30 } } ] }
         ],
     },
     {
@@ -7426,7 +7446,7 @@ const DSL = {
     // tras él, fijar el daño, autoataque del atacante).
     OPS_EFECTO: ['MODIFICAR_STAT', 'CURAR', 'DAÑO', 'APLICAR_ESTADO', 'MODIFICAR_CONTADORES', 'ATACAR', 'MONEDA', 'ROBAR', 'BUSCAR', 'MARCAR', 'VER_MANO', 'LIMPIAR_ESTADOS', 'ELEGIR', 'DESTRUIR_EVENTO', 'MARCAR_TEMPORAL', 'DESCARTAR', 'EQUIPAR', 'MARCAR_JUGADOR', 'FLOTANTE', 'FIJAR_STAT', 'REDIRIGIR', 'CANCELAR_ATAQUE', 'MARCAR_DRENAJE', 'FIJAR_DAÑO', 'ATACANTE_SE_AUTOATACA', 'VOLVER_A_MANO', 'RETRIBUCION', 'SUELO_STAT', 'TECHO_STAT', 'NO_CONSUMIR', 'BONO_ATAQUE', 'MARCAR_PARTIDA', 'ESQUIVAR', 'DESEQUIPAR', 'DAÑO_ATAQUE', 'REDIRIGIR_ATAQUE', 'SECUESTRAR_STAT', 'DEVOLVER_STAT', 'CUENTA_ATRAS'],
     OPS_CMP: ['==', '!=', '<=', '>=', '<', '>', 'includes', 'contieneTexto', 'includesCI', 'truthy', 'falsy'],
-    QUIEN: ['SELF', 'ALIADO', 'ENEMIGO', 'TODOS', 'ATACANTE', 'DEFENSOR', 'PORTADOR'], // ATACANTE/DEFENSOR: solo en GLOBAL_TRAS_ATAQUE y REACCION
+    QUIEN: ['SELF', 'ALIADO', 'ENEMIGO', 'TODOS', 'ATACANTE', 'DEFENSOR', 'PORTADOR', 'PAGADOR'], // ATACANTE/DEFENSOR: solo en GLOBAL_TRAS_ATAQUE y REACCION
 
     _tmpl(id) { return (typeof getCardTemplate === 'function') ? getCardTemplate(id) : CARD_DB.find(c => c.id === id); },
 
@@ -7505,6 +7525,15 @@ const DSL = {
         // el EQUIPO, así que "SELF" no sirve para apuntar a quien lo empuña. El trigger deja al
         // portador en este transitorio de `game` (no viaja en el estado, igual que ESQUIVAR).
         if (spec.quien === 'ATACANTE') return game._dslEquipoAtacante ? [game._dslEquipoAtacante] : [];
+        // PAGADOR (20-ago-2026): el aliado al que se le señaló la Ayuda, o sea quien paga su
+        // coste. Hermano de ATACANTE y PORTADOR: existe porque dentro de un ELEGIR anidado el
+        // "objetivo" pasa a ser el elegido, y el cobro necesita seguir apuntando al pagador.
+        // Es lo que permite que el coste se cobre DESPUÉS de elegir, que es la norma.
+        if (spec.quien === 'PAGADOR') {
+            const _v = (DSL._vars || {})[selfCard && selfCard.instanceId] || {};
+            const _p = _v.__pagador && typeof game.findCard === 'function' ? game.findCard(_v.__pagador) : null;
+            return _p ? [_p] : [];
+        }
         // PORTADOR (Guantes sedientos, 16-ago-2026): quien lleva ESTE equipo, resuelto desde
         // `equippedTo`. ATACANTE solo vale dentro de EQUIPO_ANTES_DE_ATACAR, que deja al portador
         // en un transitorio; esto sirve en cualquier trigger del equipo -su fin de turno, por
@@ -10107,7 +10136,14 @@ const DSL = {
                 // Anotamos QUIÉN PAGA para que las animaciones de efecto puedan anclarse en
                 // una carta del tablero: la Ayuda en sí no tiene ninguna (ver DSL._lanzador).
                 DSL._vars = DSL._vars || {};
-                (DSL._vars[card.instanceId] = DSL._vars[card.instanceId] || {}).__pagador = target.instanceId;
+                const _vp = (DSL._vars[card.instanceId] = DSL._vars[card.instanceId] || {});
+                _vp.__pagador = target.instanceId;
+                // Y su NOMBRE como variable normal, para que cualquier log de la cadena pueda
+                // decir "{pagador}" sin que la carta tenga que ir arrastrándolo con un
+                // `guardaNombre` colgado del efecto del coste — que además obligaba a que el
+                // coste corriera ANTES que el log, justo lo que la norma nos pide invertir.
+                _vp.pagador = DSL._nombre(game, target);
+                _vp.pagadorG = target.gender;
                 const res = await DSL._runEffectList(usar.efectos, card, game, card.owner, [target]);
                 return res.ok;
             };

@@ -26,29 +26,37 @@ const { correrSuite } = require('./harness');
 
 const escenarios = [
     {
-        nombre: 'PEM: el 2º ELEGIR (objetivo) ya no es cancelable tras pagar el Furor del payer',
-        diferenciasEsperadas: [
-            { contiene: 'tempEffects.0.pierdeSuTurno', motivo: 'la marca ahora LLEVA ESCRITO lo que antes hacía un hook a mano de la carta (20-ago-2026): el motor ya tenía handlers genéricos para `pierdeSuTurno`, así que la carta solo tiene que declararlo. Mismo comportamiento; lo que cambia es dónde está dicho' },
-        ],
+        // REESCRITO (Toto, 20-ago-2026). Este escenario fijaba como correcto justo lo que estaba
+        // mal: "el 2º ELEGIR ya no es cancelable tras pagar el Furor del payer". O sea que PEM
+        // cobraba al elegir pagador y luego te OBLIGABA a elegir objetivo. Con la norma del coste
+        // aplicada -el Furor no se toca mientras quede algo por decidir- ahora cancelar en el
+        // segundo paso no cuesta nada, y eso es lo que se fija aquí. La vieja no puede cancelar
+        // ahí (su flujo es el antiguo SELECT_ABILITY_TARGETS), así que a partir de ese punto los
+        // dos caminos divergen enteros y se declara la divergencia.
+        nombre: 'PEM: cancelar al elegir objetivo ya no cuesta el Furor (la vieja lo cobraba)',
         p1: { vanguardia: [{ carta: 'Oso con armadura', furor: 1 }], mano: ['PEM'] },
         p2: { vanguardia: ['Robot de seguridad SP', 'Mini-tigre'] },
         pasos: [
             { jugar: 'PEM' },
-            { elegir: ['Oso con armadura'] }, // payer: paga 1 Furor — commit irreversible
-            { soloEn: 'nueva', cancelar: true }, // intento de cancelar: ignorado (la vieja SÍ podría, no se prueba)
-            { elegir: ['Robot de seguridad SP'] }, // toca completar la elección igualmente
-        ],
-        logsIntencionados: [
-            { de: '¡El PEM fríe los circuitos de Robot de seguridad SP! Se saltará', a: '¡El PEM fríe los circuitos de Robot de seguridad SP [1] de J2 (Jugador 2)! Se saltará',
-              motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba target.name a secas; la nueva rellena {objetivo} con DSL._nombre' },
+            { elegir: ['Oso con armadura'] },          // quién paga: aún no se cobra nada
+            { soloEn: 'nueva', cancelar: true },       // arrepentirse ahora sale gratis
+            { soloEn: 'vieja', elegir: ['Robot de seguridad SP'] },
         ],
         logsSoloVieja: [
             { linea: 'Objetivos listos. ¡Ejecutando habilidad!',
-              motivo: 'igual que en r7: el 2º objetivo de PEM en la vieja usa el flujo antiguo SELECT_ABILITY_TARGETS (mensaje genérico del motor viejo, no de esta carta)' },
+              motivo: 'igual que en r7: el 2º objetivo de PEM en la vieja usa el flujo antiguo SELECT_ABILITY_TARGETS' },
+            { linea: '¡El PEM fríe los circuitos de Robot de seguridad SP! Se saltará su próximo turno.',
+              motivo: 'la vieja no deja cancelar y remata la carta; la nueva se ha cancelado y no paraliza a nadie' },
         ],
-        logsSoloNueva: [
-            { linea: 'Ya te has comprometido: no puedes cancelar esta elección.',
-              motivo: 'aviso del intento de cancelar bloqueado (solo se intenta en la nueva, vía {soloEn})' },
+        flotantesSoloVieja: [
+            { linea: 'inst_p1_1_16 · -1 FUR', motivo: 'lo mismo: la vieja ya había cobrado el Furor al elegir pagador' },
+            { linea: 'PARALIZADO', motivo: 'y aplica la parálisis' },
+        ],
+        diferenciasEsperadas: [
+            { contiene: 'p1.vanguard.0.furor', motivo: 'CANCELAR NO CUESTA NADA: la nueva conserva el Furor; la vieja lo había cobrado antes de dejarte elegir objetivo' },
+            { contiene: 'p1.hand', motivo: 'la carta se queda en la mano al cancelar; en la vieja está consumida' },
+            { contiene: 'p1.discard', motivo: 'ídem: la vieja la tiene ya en el descarte' },
+            { contiene: 'tempEffects', motivo: 'la vieja llegó a paralizar al Robot; la nueva no' },
         ],
     },
     {
