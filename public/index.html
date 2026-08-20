@@ -1762,26 +1762,55 @@
             // DESENFOCA ella sola (`filter`), lo que le da un borde suave y uniforme de punta a
             // punta. El texto va encima y no se desenfoca, porque el filtro es de la capa.
             //
-            // El backdrop-filter se ha ido: desenfocaba lo de detrás y sobre un fondo casi liso
-            // no se notaba ni a 30px, así que era una pieza que solo estorbaba al calibrar.
+            // SON DOS COSAS DISTINTAS, y conviene no confundirlas nunca más (Toto, 20-ago-2026:
+            // "lo de abajo no se difumina, solo se oscurece" - y tenía razón):
+            //   · `filter: blur()` sobre esta capa difumina LA CAPA, o sea sus propios bordes.
+            //     Eso es lo que hace que el halo muera suave en vez de tener borde duro.
+            //   · `backdrop-filter: blur()` difumina LO QUE HAY DETRÁS. Es lo único en la web
+            //     que emborrona la flecha o la carta de debajo.
+            // Por eso van en DOS capas: una sola no puede llevar las dos cosas sin que el
+            // navegador se líe (su propio filtro le cambia el fondo que muestrea).
             //
-            // LOS TRES NÚMEROS, y no hay más:
-            const ETIQ_HALO_MARGEN = 4;      // px que el halo sobresale por fuera de las letras
-            const ETIQ_HALO_BLUR   = 5;      // px de difuminado de su borde (0 = borde duro)
+            // AVISO HONESTO sobre el desenfoque de fondo: Toto probó backdrop-filter a 3 y a 30
+            // sin ver diferencia. Puede ser porque el fondo de ahí es casi liso -desenfocar un
+            // color plano da el mismo color plano- o porque su navegador no lo pinte en esta
+            // capa. Para salir de dudas: ETIQ_HALO_ALFA a 0 (halo oscuro apagado) y
+            // ETIQ_FONDO_BLUR a 12; si aún así no se ve emborronado lo de debajo, es lo segundo,
+            // y entonces el contraste solo puede venir del oscurecido.
+            //
+            // El margen va SEPARADO por ejes a propósito (Toto, 20-ago-2026: "por arriba y por
+            // abajo se extiende mucho, pero muy poco por los lados"). No es una ilusión: la caja
+            // del texto mide ~18px de alto y ~110 de ancho, así que los mismos 4px de margen son
+            // casi la mitad de la altura y una milésima del ancho. Con un valor único no había
+            // forma de equilibrarlo.
+            //
+            // LOS CINCO NÚMEROS, y no hay más:
+            const ETIQ_HALO_MARGEN_Y = 2;    // px que el halo sobresale por ARRIBA y por ABAJO
+            const ETIQ_HALO_MARGEN_X = 7;    // px que sobresale por los LADOS
+            const ETIQ_HALO_BLUR   = 5;      // px de difuminado de SU BORDE (0 = borde duro)
             const ETIQ_HALO_ALFA   = 0.62;   // cuánto oscurece (0 = halo apagado)
+            const ETIQ_FONDO_BLUR  = 4;      // px de desenfoque de LO QUE HAY DETRÁS (0 = nada)
+            // `inset` con dos valores: el primero es arriba/abajo y el segundo los lados.
+            const _inset = `${-ETIQ_HALO_MARGEN_Y}px ${-ETIQ_HALO_MARGEN_X}px`;
             const etiqueta = (x, y, texto, color) => {
                 const d = document.createElement('div');
                 d.style.cssText = 'position:absolute; transform:translate(-50%,-50%); white-space:nowrap;'
                     + `color:${color}; font-weight:bold; font-size:0.9rem; opacity:0;`
                     + `text-shadow:0 1px 3px #000, 0 0 6px #000; transition:opacity ${PRESENTA_FLECHA_MS}ms ease;`
                     + `left:${x}px; top:${y}px;`;
+                // 1) La que emborrona lo de detrás. Va sin color propio: solo desenfoca.
+                const fondo = document.createElement('div');
+                fondo.style.cssText = `position:absolute; inset:${_inset}; border-radius:8px;`
+                    + ` backdrop-filter:blur(${ETIQ_FONDO_BLUR}px);`
+                    + ` -webkit-backdrop-filter:blur(${ETIQ_FONDO_BLUR}px);`;
+                // 2) La que oscurece, con su propio borde difuminado para que muera suave.
                 const halo = document.createElement('div');
-                halo.style.cssText = `position:absolute; inset:${-ETIQ_HALO_MARGEN}px; border-radius:8px;`
+                halo.style.cssText = `position:absolute; inset:${_inset}; border-radius:8px;`
                     + ` background:rgba(8,10,18,${ETIQ_HALO_ALFA}); filter:blur(${ETIQ_HALO_BLUR}px);`;
                 const txt = document.createElement('span');
-                txt.style.position = 'relative';   // por encima del halo, sin z-index ni capas
+                txt.style.position = 'relative';   // por encima de las dos, sin z-index ni capas
                 txt.textContent = texto;
-                d.appendChild(halo); d.appendChild(txt);
+                d.appendChild(fondo); d.appendChild(halo); d.appendChild(txt);
                 capa.appendChild(d);
                 return d;
             };
