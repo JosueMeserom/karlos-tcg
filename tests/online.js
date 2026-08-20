@@ -308,15 +308,31 @@ async function reposar(clientes, vueltas = 60) {
         check('...y cuando le sale el modal de búsqueda visual', !B._visorSoloLectura,
             'B._visorSoloLectura=' + JSON.stringify(B._visorSoloLectura));
 
-        // Y el fin de turno, que es el otro momento en que se cierra sola. SIN `await`: la
-        // secuencia de fin de turno se queda esperando carteles y temporizadores que solo mueve
-        // `reposar`, así que esperarla aquí cuelga la suite sin imprimir ni el resumen (pasó).
+        // Y el cambio de turno. Que es el CAMBIO, no la fase de efectos finales: esa es todavía
+        // el turno del mismo jugador (Toto, 20-ago-2026, corrigiéndome). Si la pila se cerrara
+        // ahí, el jugador perdería de vista su descarte a mitad de SU turno.
+        //
+        // Se comprueba por el ORDEN de los sucesos y no por el estado final, porque al final del
+        // todo la pila está cerrada de las dos maneras: la primera versión de esta prueba miraba
+        // el estado tras dejar correr la secuencia y pasaba en falso, con el turno ya cambiado.
         A.openDiscardViewer('p1', null);
         A.activePlayerId = 'p1';
+        const orden = [];
+        const _faseOrig = A.updatePhaseDisplay.bind(A);
+        A.updatePhaseDisplay = (f) => { orden.push('fase:' + f); return _faseOrig(f); };
+        const _cerrarOrig = A._cerrarVisorPropio.bind(A);
+        A._cerrarVisorPropio = () => { orden.push('cierra'); return _cerrarOrig(); };
+        // SIN `await`: la secuencia de fin de turno espera carteles y temporizadores que solo
+        // mueve `reposar`, así que esperarla aquí cuelga la suite sin imprimir ni el resumen.
         A.confirmEndTurn(true);
         await reposar(cl);
-        check('...y al terminarse el turno', !A._visorSoloLectura,
-            'A._visorSoloLectura=' + JSON.stringify(A._visorSoloLectura));
+
+        check('la pila NO se cierra al entrar en EFECTOS FINALES: sigue siendo tu turno',
+            orden.indexOf('cierra') > orden.indexOf('fase:EFECTOS FINALES'),
+            'orden = ' + orden.join(' -> '));
+        check('...se cierra al cambiar el turno de verdad',
+            A.activePlayerId === 'p2' && !A._visorSoloLectura,
+            'turno=' + A.activePlayerId + ' visor=' + JSON.stringify(A._visorSoloLectura));
     }
 
     console.log('');

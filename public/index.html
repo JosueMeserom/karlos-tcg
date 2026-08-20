@@ -6971,7 +6971,6 @@
                 
                 const pName = this.getDisplayName(this.activePlayerId);
                 this.inputState = 'EXECUTING';
-                this._cerrarVisorPropio();   // el turno se acaba: fuera la pila que se estuviera mirando
                 
                 // Vaciamos la memoria de clics para asegurar que el banner de Efectos Finales siempre se muestre al principio
                 this.pendingBannerSkip = false;
@@ -7049,6 +7048,12 @@
                 // una fase sin nada visible no cuesta ni un milisegundo (Toto, 7-ago-2026).
                 await this.esperarFlotantes();
 
+                // AQUÍ es donde el turno cambia de verdad, y por tanto donde se cierra la pila
+                // que cada uno estuviera mirando (Toto, 20-ago-2026, corrigiéndome: lo tenía al
+                // ENTRAR en la fase de efectos finales, que todavía es el turno del mismo
+                // jugador). El orden importa: primero se cierra, y con la pantalla ya despejada
+                // sale el cartel de turno.
+                this._cerrarVisorPropio();
                 this.activePlayerId = this.activePlayerId === 'p1' ? 'p2' : 'p1';
                 if (this.activePlayerId === this.startingPlayerId) this.turn++;
 
