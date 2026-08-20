@@ -406,6 +406,13 @@ const CARD_DB = [
             const target = game.abilityContext.targets[0];
             game.modifyStat(card, 'furor', -1);
             showFloatingText(card.instanceId, card.activeName, "ft-ability", -30); // Animación en Kyle de que usa la habilidad
+            // AURA DE HABILIDAD, versión buena (Toto, 20-ago-2026): Kyle canaliza en su sitio y
+            // le cae un halo verde ascendente al aliado, y SOLO DESPUÉS se aplica la curación.
+            // Kyle sigue siendo imperativa, así que la llamada va a mano; en una carta del DSL
+            // basta con `animacion: "HABILIDAD_BUENA"` en el efecto.
+            if (typeof animateAbilityAura === 'function') {
+                try { await animateAbilityAura(card.instanceId, [target.instanceId], true); } catch (err) {}
+            }
 
             if (target.attachedTo) {
                 game.logMsg(`${game.getCardNameWithOwner(target)} está Zombificado y rechaza la reparación.`, 'system');
@@ -6569,7 +6576,7 @@ const CARD_DB = [
                 { op: "ELEGIR", de: "ENEMIGOS", zona: "VANGUARDIA", cantidad: 3,
                   titulo: "DERRENGAR: elige 3 enemigos",
                   efectos: [
-                    { op: "MODIFICAR_STAT", stat: "furor", delta: -2 },
+                    { op: "MODIFICAR_STAT", stat: "furor", delta: -2, animacion: "HABILIDAD_MALA" },
                     { op: "APLICAR_ESTADO", estado: "silencio", duracion: 2,
                       log: "{objetivo} queda {objetivoG?silenciado|silenciada} por la resaca." } ] } ] }
         ]
@@ -8116,7 +8123,10 @@ const DSL = {
             // revelado...). Muñeca del mal NO entra aquí: su víctima SÍ da Retribución
             // (comprobarMuerte sin sinRetribucion), así que sigue siendo una muerte normal.
             const _esDestruccion = e.vaciar && e.sinRetribucion && e.stat === 'currentHp';
-            game.modifyStat(target, e.stat, d, e.offsetY || 0, e.fuente !== undefined ? e.fuente : sourceCard, _esDestruccion ? { silent: true } : null);
+            // La fuente del flotante ("-2 FUR (Nethuns)") se calla si la animación de Habilidad
+            // ya está enseñando de quién viene. `fuente` declarada a mano manda por encima.
+            const _fte = e.fuente !== undefined ? e.fuente : (DSL._animaQuien(e) ? null : sourceCard);
+            game.modifyStat(target, e.stat, d, e.offsetY || 0, _fte, _esDestruccion ? { silent: true } : null);
             if (_esDestruccion) game.floatingDestruido(target, e.offsetY || 0);
             // Furor y demás cambios sin comprobarMuerte: el flotante custom se queda en su
             // posición ORIGINAL (después del cambio de stat) — sin reordenar (ver nota arriba).
@@ -9301,16 +9311,30 @@ const DSL = {
     // no la repita. Devuelve el efecto animado (o null) para que la supresión sea PRECISA:
     // si la animación vive más adentro (otro ELEGIR, un siExito), aquí no se encuentra, no
     // se suprime nada y la anima quien corresponda.
+    // Las animaciones de EFECTO que existen, y con qué las pinta el cliente. Tabla y no un `if`
+    // porque ya son tres (20-ago-2026) y la siguiente no debería obligar a tocar tres sitios.
+    _ANIMS: {
+        DANO_VERDADERO:  (caster, ids) => (typeof animateTrueDamage === 'function') && animateTrueDamage(caster, ids),
+        HABILIDAD_BUENA: (caster, ids) => (typeof animateAbilityAura === 'function') && animateAbilityAura(caster, ids, true),
+        HABILIDAD_MALA:  (caster, ids) => (typeof animateAbilityAura === 'function') && animateAbilityAura(caster, ids, false),
+    },
+    // ¿La animación de este efecto ENSEÑA de quién viene? Las de Habilidad salen de la carta que
+    // la usa y caen sobre el objetivo a la vista, así que el "(Nombre)" del flotante automático
+    // sobra: es lo que hacía que tres "-2 FUR (Nethuns)" simultáneos se pisaran las letras.
+    // DANO_VERDADERO no entra: su canalización puede anclarse en quien PAGA el coste de una
+    // Ayuda, que no siempre es de quien viene el efecto.
+    _animaQuien: (e) => e && (e.animacion === 'HABILIDAD_BUENA' || e.animacion === 'HABILIDAD_MALA'),
+
     async _animarLote(efectos, sourceCard, game, lista) {
-        const e = (efectos || []).find(x => x.animacion === 'DANO_VERDADERO');
-        if (!e || !lista || !lista.length || typeof animateTrueDamage !== 'function') return null;
+        const e = (efectos || []).find(x => DSL._ANIMS[x.animacion]);
+        if (!e || !lista || !lista.length) return null;
         // Aquí ya está decidido que HAY animación de efecto, así que este es el punto exacto en
         // el que la carta debe estar presentada: el casteo forma parte del efecto y va detrás
         // (§14). Ponerlo en la llamada, fuera, disparaba también cuando el lote no animaba nada
         // — y con Atomización eso significaba presentarla al elegir el pagador, cuando todavía
         // se puede cancelar (Toto, 8-ago-2026).
         await DSL._comprometer(sourceCard, game);
-        await animateTrueDamage(DSL._lanzador(sourceCard), lista.map(t => t.instanceId));
+        await DSL._ANIMS[e.animacion](DSL._lanzador(sourceCard), lista.map(t => t.instanceId));
         return e;
     },
 
@@ -9395,8 +9419,8 @@ const DSL = {
             // recién entonces empieza el efecto, animación incluida.
             // Cualquier efecto que NO sea una elección ya cambia algo: punto de compromiso.
             if (e.op !== 'ELEGIR' && e.op !== 'BUSCAR') await DSL._comprometer(sourceCard, game);
-            if (e.animacion === 'DANO_VERDADERO' && targets.length && !(opts && opts.sinAnimacion) && typeof animateTrueDamage === 'function') {
-                await animateTrueDamage(DSL._lanzador(sourceCard), targets.map(t => t.instanceId));
+            if (DSL._ANIMS[e.animacion] && targets.length && !(opts && opts.sinAnimacion)) {
+                await DSL._ANIMS[e.animacion](DSL._lanzador(sourceCard), targets.map(t => t.instanceId));
             }
             // logResumen (Consagración, 7-ago-2026): UN log agregado para un efecto que se aplica
             // a TODO un grupo, en vez de silencio o un log por carta. Genérico -no es cosa de

@@ -1033,6 +1033,73 @@
             });
         }
 
+        // AURA DE HABILIDAD (Toto, 20-ago-2026). El cuarto lenguaje, para Habilidades que no son
+        // un ataque pero sí cambian algo en OTRA carta: DERRENGAR de Nethuns, REPARACIÓN
+        // MOLECULAR de Kyle. Mismos dos tiempos que el daño verdadero:
+        //   1. Quien la usa canaliza EN SU SITIO, con el mismo tambaleo de castCharge que el
+        //      ataque especial y Atomización (Toto lo pidió así, textualmente).
+        //   2. Cae un halo sobre CADA objetivo, escalonado, y la carta se estira o se hunde.
+        // Lo que la distingue: el COLOR y la DIRECCIÓN. Verde y hacia ARRIBA si beneficia, ámbar
+        // y hacia ABAJO si perjudica. Sin rojo y sin hardShake: no es daño, y el rojo es la señal
+        // universal de haberlo recibido. Ver el bloque de global.css para la paleta completa.
+        //
+        // Y para eso nació: cuando el efecto toca a tres cartas a la vez, los flotantes salían
+        // todos de golpe y el "(Nethuns)" que decía de quién venía hacía que las letras se
+        // pisaran. Con la animación, ese paréntesis sobra — el DSL lo quita solo en los efectos
+        // que la llevan (ver `_animaQuien` en cartas.js).
+        //
+        // Sin DOM (harness) getAnimEl devuelve null y toda la función es inerte, como sus tres
+        // hermanas.
+        async function animateAbilityAura(casterId, targetIds, buena) {
+            const ids = (Array.isArray(targetIds) ? targetIds : [targetIds]).filter(Boolean);
+            const clase = buena ? 'boon' : 'bane';
+
+            const casterEl = casterId ? getAnimEl(casterId) : null;
+            if (casterEl) {
+                casterEl.classList.add('channeling-' + clase);
+                await game.sleep(450);
+                casterEl.classList.remove('channeling-' + clase);
+            }
+
+            const tocados = [];
+            for (const id of ids) {
+                const el = getAnimEl(id);
+                if (!el) continue;
+                const cardEl = document.querySelector(`.card[data-id="${id}"]`);
+                const rect = (cardEl || el).getBoundingClientRect();
+                const fx = document.createElement('div');
+                fx.className = 'aura-impact ai-' + clase;
+                fx.style.left = `${rect.left + rect.width / 2}px`;
+                fx.style.top = `${rect.top + rect.height / 2}px`;
+                fx.innerHTML = '<div class="ai-glow"></div><div class="ai-halo"></div>';
+                document.body.appendChild(fx);
+                tocados.push({ fx, el, cardEl });
+                if (ids.length > 1) await game.sleep(70);
+            }
+            if (!tocados.length) return;
+
+            await game.sleep(180);
+            const borde = buena ? '#34d399' : '#f59e0b';
+            const halo = buena ? 'rgba(52, 211, 153, 0.85)' : 'rgba(245, 158, 11, 0.8)';
+            tocados.forEach(({ el, cardEl }) => {
+                if (el) el.style.animation = (buena ? 'auraLift' : 'auraSag') + ' 0.4s ease-out';
+                if (cardEl) {
+                    cardEl.style.borderColor = borde;
+                    cardEl.style.boxShadow = `0 0 18px ${halo} inset`;
+                }
+            });
+
+            await game.sleep(320);
+            tocados.forEach(({ fx, el, cardEl }) => {
+                fx.remove();
+                if (el) el.style.animation = "";
+                if (cardEl) {
+                    cardEl.style.borderColor = "";
+                    cardEl.style.boxShadow = "";
+                }
+            });
+        }
+
         async function animateDodge(attackerId, defenderId) {
             const attackerEl = getAnimEl(attackerId);
             const defenderEl = getAnimEl(defenderId);

@@ -180,6 +180,19 @@ const dur = (c, k) => (c.status && c.status[k] && c.status[k].duration) || 0;
         check('les quita 2 de Furor a los tres (sin bajar de 0)',
             ani.furor === 1 && kar.furor === 0 && mt.furor === 0,
             [ani.furor, kar.furor, mt.furor].join(','));
+        // El flotante NO debe decir "(Nethuns)": la animación de Habilidad ya enseña de quién
+        // viene, y con tres cartas a la vez ese paréntesis hacía que las letras se pisaran
+        // (Toto, 20-ago-2026). Se comprueba en la salida de flotantes, que es donde se vería.
+        const _fur = ctx.flotantes.filter(f => /FUR/.test(f.texto));
+        check('el flotante de Furor no repite la fuente (la animación ya la enseña)',
+            !_fur.some(f => /Nethuns/.test(f.texto)), _fur.map(f => f.texto).join(' | '));
+        // Uno por enemigo, y el de Karolina es "-1" porque solo tenía 1 de Furor que perder: el
+        // flotante dice lo que DE VERDAD pasó, no el -2 declarado.
+        const _enem = _fur.filter(f => f.carta.startsWith('inst_p2'));
+        check('...pero cada enemigo tiene el suyo, con lo que de verdad perdió',
+            _enem.length === 3 && _enem.filter(f => f.texto === '-2 FUR').length === 2
+                && _enem.filter(f => f.texto === '-1 FUR').length === 1,
+            _enem.map(f => f.texto).join(' | '));
         check('y los deja Silenciados 2 turnos',
             dur(ani, 'silencio') === 2 && dur(kar, 'silencio') === 2 && dur(mt, 'silencio') === 2,
             [dur(ani, 'silencio'), dur(kar, 'silencio'), dur(mt, 'silencio')].join(','));
