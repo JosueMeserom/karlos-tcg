@@ -10659,6 +10659,22 @@
                 p.rearguard.forEach(card => rearEl.appendChild(this.createCardEl(card)));
             }
 
+            // Ajuste de texto AUTOMÁTICO para cualquier carta recién creada (Toto, 20-ago-2026:
+            // "esto ya ha pasado varias veces; SIEMPRE hay que asegurarse de que haya ajuste de
+            // texto al mostrar CUALQUIER carta EN CUALQUIER circunstancia").
+            //
+            // Hasta hoy había que acordarse de llamar a adjustCardHeaders en cada sitio que
+            // pintara una carta fuera de render(), y de los diez que hay solo TRES lo hacían: el
+            // clon del visor de pila salía con el nombre desbordado, y antes le había pasado a la
+            // presentación y al escaparate. Parchear los diez no arregla el número once, así que
+            // el aviso se pide desde createCardEl -por donde pasan todas- y se COALESCE: da igual
+            // que un render() cree cuarenta cartas, se hace UNA pasada en el siguiente frame.
+            _pedirAjusteCabeceras() {
+                if (this._ajustePedido) return;
+                this._ajustePedido = true;
+                requestAnimationFrame(() => { this._ajustePedido = false; this.adjustCardHeaders(); });
+            }
+
             adjustCardHeaders() {
                 requestAnimationFrame(() => {
                     document.querySelectorAll('.card-header span').forEach(span => {
@@ -10773,6 +10789,12 @@
                 clon.style.margin = '0';
                 clon.style.pointerEvents = 'none'; // inerte: el clon no se cliquea ni hace hover
                 capa.appendChild(clon);
+                // AJUSTE DE TEXTO, SIEMPRE (Toto, 20-ago-2026: "esto ya ha pasado varias veces").
+                // El encogido del nombre para que quepa lo hace adjustCardHeaders sobre TODOS los
+                // .card-header span, y solo corre desde render(); una carta creada fuera de él se
+                // queda con el nombre desbordado. La norma es: cualquier carta que se pinte en
+                // cualquier circunstancia pasa por aquí.
+                if (typeof this.adjustCardHeaders === 'function') this.adjustCardHeaders();
                 this._visorClones.set(el, clon);
                 // El botón de una carta agotada-pero-usable tiene que quedar FUERA de la carta,
                 // igual que hace _liftExhaustedBtn con la carta real del tablero. El motivo exacto
@@ -11629,9 +11651,13 @@
                     el.style.position = "relative";
                     
                     wrapper.appendChild(el);
+                    this._pedirAjusteCabeceras();
                     return wrapper;
                 }
 
+                // TODA carta creada pide el ajuste del nombre, la pinte quien la pinte y donde
+                // sea. Ver _pedirAjusteCabeceras: es una sola pasada por frame, no una por carta.
+                this._pedirAjusteCabeceras();
                 return el;
               } catch (_e) {
                   console.error('[createCardEl] carta:', card && card.name, _e);

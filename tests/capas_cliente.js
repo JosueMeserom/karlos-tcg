@@ -631,5 +631,33 @@ console.log('\n--- fundido de las etiquetas de flecha ---');
     cap.capa.remove();
 }
 
+// AJUSTE DE TEXTO EN CUALQUIER CARTA (Toto, 20-ago-2026: "esto ya ha pasado varias veces").
+// El encogido del nombre lo hace adjustCardHeaders y solo corría desde render(), así que cada
+// sitio que pintara una carta fuera de él tenía que acordarse: de los diez que hay, solo tres lo
+// hacían -y el clon del visor de pila salía con el nombre desbordado-. Ahora lo pide createCardEl,
+// por donde pasan todas. Se comprueba el CONTRATO: que lo pida, y que lo pida UNA vez por frame
+// aunque se creen cuarenta cartas.
+console.log('\n--- ajuste del nombre en toda carta creada ---');
+{
+    const g = vm.runInContext('window.game', sandbox) || null;
+    const G = vm.runInContext('Game', sandbox);
+    const proto = G.prototype;
+    check('createCardEl pide el ajuste de cabeceras',
+          /_pedirAjusteCabeceras\(\)/.test(String(proto.createCardEl)),
+          'no aparece la llamada en createCardEl');
+    // Coalescido: N llamadas seguidas, UNA sola pasada en el siguiente frame.
+    const falso = { _ajustePedido: false, pasadas: 0,
+                    adjustCardHeaders() { this.pasadas++; },
+                    _pedirAjusteCabeceras: proto._pedirAjusteCabeceras };
+    rafCola.length = 0;
+    falso._pedirAjusteCabeceras(); falso._pedirAjusteCabeceras(); falso._pedirAjusteCabeceras();
+    check('tres cartas seguidas piden UN solo repintado', rafCola.length === 1,
+          'rAF encolados: ' + rafCola.length);
+    rafCola.forEach(fn => fn());
+    check('...y al llegar el frame se hace la pasada', falso.pasadas === 1, 'pasadas=' + falso.pasadas);
+    falso._pedirAjusteCabeceras();
+    check('...y después vuelve a poder pedirse', rafCola.length === 2, 'rAF encolados: ' + rafCola.length);
+}
+
 console.log(fallos === 0 ? '\nSUITE capas_cliente: ' + comprobaciones + '/' + comprobaciones + ' comprobaciones — CAPAS CORRECTAS' : '\nSUITE capas_cliente: ' + fallos + ' FALLOS de ' + comprobaciones + ' comprobaciones');
 process.exit(fallos ? 1 : 0);
