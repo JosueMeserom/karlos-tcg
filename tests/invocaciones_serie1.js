@@ -1,0 +1,190 @@
+// tests/invocaciones_serie1.js — Erazor Djinn, Elsa y Nethuns, las tres Invocaciones de Serie 1
+// (20-ago-2026).
+//
+// Aserciones directas, no viejo-vs-nuevo: son cartas NUEVAS y no existen en la base congelada.
+// Lo que se fija aquí es su contrato y, sobre todo, las dos cosas que pueden romper a otras:
+//
+//   · El estado `silencio` CON DURACIÓN, que estrena Nethuns. El motor lo soportaba entero
+//     -corta las Habilidades, pinta su chapa con la cuenta atrás- pero ninguna carta lo aplicaba:
+//     los silencios de hoy son auras sin cuenta (`isSilenced`), que es otro camino. Se comprueba
+//     que el silencio MUERDE de verdad, no solo que el campo esté puesto.
+//   · El `siObjetivo` de Elsa, que evita congelar a quien acaba de morir del propio golpe.
+'use strict';
+const fs = require('fs');
+const path = require('path');
+
+const RAIZ = path.join(__dirname, '..');
+const H = fs.readFileSync(path.join(RAIZ, 'tests/harness.js'), 'utf8');
+const mod = { exports: {} };
+new Function('module', 'exports', 'require', '__dirname',
+    H + '\n;module.exports.__i={crearContexto,crearJuego,construirEstado,asentar,ejecutarPaso};'
+)(mod, mod.exports, require, path.join(RAIZ, 'tests'));
+const { crearContexto, crearJuego, construirEstado, asentar, ejecutarPaso } = mod.exports.__i;
+
+let comprobaciones = 0, fallos = 0;
+function check(titulo, ok, detalle) {
+    comprobaciones++;
+    if (ok) console.log('  OK    · ' + titulo);
+    else { fallos++; console.log('  FALLO · ' + titulo + (detalle ? '  [' + detalle + ']' : '')); }
+}
+
+async function mesa(esc, monedas) {
+    const ctx = crearContexto('nueva');
+    ctx.semilla = 1;
+    const g = crearJuego(ctx);
+    await asentar(ctx);
+    construirEstado(ctx, g, esc);
+    // Misma traducción que ejecutarEscenario: la cola guionizada del motor habla en inglés.
+    ctx.monedas.push(...(monedas || []).map(m => m === 'cara' ? 'heads' : m === 'cruz' ? 'tails' : m));
+    return { ctx, g, paso: (p) => ejecutarPaso(ctx, g, p) };
+}
+const buscar = (g, pid, nombre) => [...g.players[pid].vanguard, ...g.players[pid].rearguard].find(c => c.name === nombre);
+const dur = (c, k) => (c.status && c.status[k] && c.status[k].duration) || 0;
+
+(async () => {
+    console.log('--- Erazor Djinn: INCINERAR ---');
+    {
+        const { g, paso } = await mesa({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'Erazor Djinn', furor: 2 }] },
+            p2: { vanguardia: [{ carta: 'Aniceto', vida: 9 }, { carta: 'Karolina', vida: 9 }] },
+        });
+        const dj = buscar(g, 'p1', 'Erazor Djinn');
+        await paso({ habilidad: 'Erazor Djinn' });
+        await paso({ confirmar: true });
+        await paso({ elegir: ['Aniceto', 'Karolina'] });
+        const ani = buscar(g, 'p2', 'Aniceto'), kar = buscar(g, 'p2', 'Karolina');
+        check('paga los 2 de Furor de su Activa', dj.furor === 0, 'furor=' + dj.furor);
+        check('golpea a los DOS enemigos elegidos', ani.currentHp < 9 && kar.currentHp < 9,
+            'aniceto=' + ani.currentHp + ' karolina=' + kar.currentHp);
+        check('y a los dos les deja Daño por tiempo (3 turnos)',
+            dur(ani, 'dot') === 3 && dur(kar, 'dot') === 3,
+            'aniceto=' + dur(ani, 'dot') + ' karolina=' + dur(kar, 'dot'));
+    }
+    {
+        // Con un solo enemigo no hay dos objetivos distintos que golpear: la Activa no arranca.
+        const { g, paso } = await mesa({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'Erazor Djinn', furor: 2 }] },
+            p2: { vanguardia: [{ carta: 'Aniceto', vida: 9 }] },
+        });
+        const dj = buscar(g, 'p1', 'Erazor Djinn');
+        await paso({ habilidad: 'Erazor Djinn' });
+        check('con un solo enemigo en vanguardia, INCINERAR se rechaza', dj.furor === 2, 'furor=' + dj.furor);
+        check('...y el enemigo queda intacto', buscar(g, 'p2', 'Aniceto').currentHp === 9);
+    }
+    {
+        // El estado va en `siExito`: a quien muere del golpe no se le prende fuego (y de paso, no
+        // se le deja un estado puesto en la pila de descartes).
+        const { g, paso } = await mesa({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'Erazor Djinn', furor: 2 }] },
+            p2: { vanguardia: [{ carta: 'Aniceto', vida: 1, def: 0 }, { carta: 'Karolina', vida: 9 }] },
+        });
+        await paso({ habilidad: 'Erazor Djinn' });
+        await paso({ confirmar: true });
+        await paso({ elegir: ['Aniceto', 'Karolina'] });
+        check('el que muere del golpe NO acaba ardiendo',
+            !g.players.p2.discard.some(c => c.name === 'Aniceto' && dur(c, 'dot') > 0),
+            'descartes=' + g.players.p2.discard.map(c => c.name).join(','));
+        check('...pero el que sobrevive sí', dur(buscar(g, 'p2', 'Karolina'), 'dot') === 3);
+    }
+
+    console.log('\n--- Elsa: CRIOGENIZAR ---');
+    {
+        const { g, paso } = await mesa({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'Elsa', furor: 1 }] },
+            p2: { vanguardia: [{ carta: 'Aniceto', vida: 9 }] },
+        }, ['cara']);
+        await paso({ habilidad: 'Elsa' });
+        await paso({ confirmar: true });
+        await paso({ elegir: ['Aniceto'] });
+        const ani = buscar(g, 'p2', 'Aniceto');
+        check('el ataque especial entra', ani.currentHp < 9, 'vida=' + ani.currentHp);
+        check('con CARA, el enemigo queda marcado', (ani.tempEffects || []).length > 0,
+            'tempEffects=' + JSON.stringify(ani.tempEffects || []));
+        // Y la marca MUERDE: al llegar el turno de su dueño se agota solo y pierde la acción.
+        await paso({ finTurno: true });
+        check('...y pierde su turno de verdad (se agota solo)', ani.exhausted === true,
+            'exhausted=' + ani.exhausted);
+    }
+    {
+        const { g, paso } = await mesa({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'Elsa', furor: 1 }] },
+            p2: { vanguardia: [{ carta: 'Aniceto', vida: 9 }] },
+        }, ['cruz']);
+        await paso({ habilidad: 'Elsa' });
+        await paso({ confirmar: true });
+        await paso({ elegir: ['Aniceto'] });
+        const ani = buscar(g, 'p2', 'Aniceto');
+        check('con CRUZ ataca igual', ani.currentHp < 9, 'vida=' + ani.currentHp);
+        check('...pero no congela a nadie', (ani.tempEffects || []).length === 0,
+            'tempEffects=' + JSON.stringify(ani.tempEffects || []));
+    }
+    {
+        // La moneda se echa aunque el golpe mate, pero congelar a un muerto no significa nada:
+        // eso lo corta el `siObjetivo` (mira al OBJETIVO, no a la carta fuente).
+        const { g, paso } = await mesa({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'Elsa', furor: 1 }] },
+            p2: { vanguardia: [{ carta: 'Aniceto', vida: 1, def: 0 }] },
+        }, ['cara']);
+        await paso({ habilidad: 'Elsa' });
+        await paso({ confirmar: true });
+        await paso({ elegir: ['Aniceto'] });
+        const muerto = g.players.p2.discard.find(c => c.name === 'Aniceto');
+        check('el golpe letal manda al enemigo al descarte', !!muerto,
+            'descartes=' + g.players.p2.discard.map(c => c.name).join(','));
+        check('...y no se congela a un muerto', !muerto || (muerto.tempEffects || []).length === 0,
+            'tempEffects=' + JSON.stringify((muerto || {}).tempEffects || []));
+    }
+
+    console.log('\n--- Nethuns: DERRENGAR ---');
+    {
+        const { ctx, g, paso } = await mesa({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'Nethuns', furor: 2 }] },
+            p2: { vanguardia: [{ carta: 'Aniceto', furor: 3 }, { carta: 'Karolina', furor: 1 },
+                               { carta: 'Mini-tigre', furor: 2 }] },
+        });
+        await paso({ habilidad: 'Nethuns' });
+        await paso({ confirmar: true });
+        await paso({ elegir: ['Aniceto', 'Karolina', 'Mini-tigre'] });
+        const ani = buscar(g, 'p2', 'Aniceto'), kar = buscar(g, 'p2', 'Karolina'), mt = buscar(g, 'p2', 'Mini-tigre');
+        check('les quita 2 de Furor a los tres (sin bajar de 0)',
+            ani.furor === 1 && kar.furor === 0 && mt.furor === 0,
+            [ani.furor, kar.furor, mt.furor].join(','));
+        check('y los deja Silenciados 2 turnos',
+            dur(ani, 'silencio') === 2 && dur(kar, 'silencio') === 2 && dur(mt, 'silencio') === 2,
+            [dur(ani, 'silencio'), dur(kar, 'silencio'), dur(mt, 'silencio')].join(','));
+        // EL SILENCIO MUERDE. No basta con que el campo esté puesto: la comprobación de verdad es
+        // que la Habilidad del silenciado no arranque. Aniceto se queda con 1 de Furor, el que
+        // cuesta su LUZ VIRTUOSA, así que si la Activa corriera se lo gastaría.
+        await paso({ finTurno: true });
+        // El Furor se mide JUSTO ANTES del intento: al empezar su turno, p2 cobra Furor y ese +1
+        // se comía la prueba (el primer intento marcaba 2 y parecía que no había gastado nada).
+        const _antes = ani.furor;
+        await paso({ habilidad: 'Aniceto', jugador: 'p2' });
+        check('un Silenciado no puede usar su Habilidad',
+            ani.furor === _antes && ctx.pendientes.length === 0,
+            'furor=' + ani.furor + '/' + _antes + ' pendientes=' + ctx.pendientes.length);
+    }
+    {
+        const { g, paso } = await mesa({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'Nethuns', furor: 2 }] },
+            p2: { vanguardia: [{ carta: 'Aniceto', furor: 3 }, { carta: 'Karolina', furor: 1 }] },
+        });
+        const net = buscar(g, 'p1', 'Nethuns');
+        await paso({ habilidad: 'Nethuns' });
+        check('con solo 2 enemigos en vanguardia, DERRENGAR se rechaza', net.furor === 2, 'furor=' + net.furor);
+        check('...y nadie pierde Furor', buscar(g, 'p2', 'Aniceto').furor === 3);
+    }
+
+    console.log('\n' + (fallos
+        ? `SUITE invocaciones_serie1: ${comprobaciones - fallos}/${comprobaciones} comprobaciones — ${fallos} FALLOS`
+        : `SUITE invocaciones_serie1: ${comprobaciones}/${comprobaciones} comprobaciones — LAS TRES CORRECTAS`));
+    if (fallos) process.exit(1);
+})();

@@ -76,7 +76,12 @@ for (const c of CARTAS) {
             if (/etiquetas?\s*$/i.test(m[1])) continue;
             // Encadenado: "sin etiqueta 'A' ni 'B'". El nexo basta, pero SOLO si la frase ya
             // dijo "etiqueta" antes; si no, cualquier texto colaría poniéndole un "o" delante.
-            const frase = txt.slice(0, m.index).split(/[.;]/).pop();
+            // La frase incluye m[1] (Toto, 20-ago-2026). `m.index` es donde empieza el trozo
+            // capturado, no la comilla, así que cortando ahí se perdían hasta 14 caracteres — los
+            // justos para partir la palabra "etiqueta" por la mitad y no reconocerla. Alabanza
+            // ("con la etiqueta 'Dios/a' o 'Genio'") salía marcada estando bien escrita, y solo
+            // se vio cuando 'Genio' existió como etiqueta de verdad.
+            const frase = (txt.slice(0, m.index) + m[1]).split(/[.;]/).pop();
             if (/\b(ni|o|y)\s*$/i.test(m[1]) && /etiquetas?\b/i.test(frase)) continue;
             add('ETIQUETA-SIN-DECIRLO', c, `'${g}' es una ETIQUETA y se nombra como si fuera una carta: "...${m[1].trim()} '${g}'". Debe decir "con etiqueta '${g}'"`);
         }

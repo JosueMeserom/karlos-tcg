@@ -6446,6 +6446,111 @@ const CARD_DB = [
                       siExito: [ { op: "APLICAR_ESTADO", estado: "ceguera", duracion: 2, log: "El fogonazo ciega a {objetivo}." } ] } ] } ] }
         ]
     },
+    // ── LAS TRES INVOCACIONES DE SERIE 1 (20-ago-2026) ────────────────────────────────────
+    // OJO CON LOS IDS: llevan uno EXPLÍCITO (2006-2008) por la misma razón que Hagoromo y las
+    // demás cartas nuevas. Los ids se autogeneran recorriendo CARD_DB en orden desde 1000, así
+    // que una carta sin id metida en MEDIO del array le corre el id a todas las de detrás — y
+    // como la base congelada no las tiene, la batería entera de regresión se pone en rojo por
+    // ids que no coinciden. Pasó al escribirlas (35 suites rojas de golpe) y se arregló así.
+    // Genio y dos Diosas. Se hacen juntas porque son la misma familia -"Invocación", Ser mágico,
+    // rareza C, sin Pasiva y con una sola Activa- y porque hasta hoy NINGUNA carta llevaba las
+    // etiquetas 'Genio' ni 'Diosa' salvo Némesis: Alabanza podía alabar a una sola carta del
+    // juego. Las tres salen del Excel de Toto; la redacción es de la rúbrica, no suya.
+    {
+        id: 2006, name: "Erazor Djinn", hp: 5, def: 4, atk: 5, type: "Personaje", subtype: "Ser mágico",
+        tags: ["Invocación", "Genio"], gender: "M", rarity: "C", cost: 0, series: 1,
+        text: "A: INCINERAR (2F): Realiza 2 ataques especiales a enemigos distintos y les aplica Daño por tiempo (3 turnos).",
+        activeName: "INCINERAR", activeCost: 2,
+        // Mismo esqueleto que FOSFORESCENCIA de Raiju (ELEGIR de cantidad exacta 2 + ATACAR
+        // especial anidado), cambiando la Ceguera por Daño por tiempo. El estado va en `siExito`
+        // como allí: a un enemigo que muere del golpe no se le prende fuego.
+        abilities: [
+            { trigger: "ACTIVA", nombre: "INCINERAR", coste: { furor: 2 }, sinObjetivo: true,
+              requisitos: [
+                { count: { quien: "ENEMIGO", zona: "vanguardia" }, op: ">=", valor: 2,
+                  msg: "Necesitas al menos 2 enemigos en vanguardia para golpear a objetivos distintos." } ],
+              log: "¡Erazor Djinn prende la vanguardia enemiga!",
+              efectos: [
+                { op: "ELEGIR", de: "ENEMIGOS", zona: "VANGUARDIA", cantidad: 2, cancelable: false,
+                  titulo: "INCINERAR: elige 2 enemigos distintos",
+                  efectos: [
+                    { op: "ATACAR", especial: true,
+                      siExito: [ { op: "APLICAR_ESTADO", estado: "dot", duracion: 3,
+                                   log: "Las brasas siguen ardiendo en {objetivo}." } ] } ] } ] }
+        ]
+    },
+    {
+        id: 2007, name: "Elsa", hp: 4, def: 3, atk: 6, type: "Personaje", subtype: "Ser mágico",
+        tags: ["Invocación", "Diosa"], gender: "F", rarity: "C", cost: 0, series: 1,
+        // Misma redacción que la Canceladora para lo de "no podrá actuar": es exactamente el
+        // mismo efecto, y la rúbrica (§9) manda que las cartas que hacen lo mismo se lean igual.
+        text: "A: CRIOGENIZAR (1F): Realiza un ataque especial y echa una moneda. Si sale cara, el enemigo atacado no podrá actuar (atacar, usar Habilidad o retirarse) en su próximo turno.",
+        activeName: "CRIOGENIZAR", activeCost: 1,
+        tempEffectText: "{genero?Congelado|Congelada} por CRIOGENIZAR: perderá su próximo turno",
+        abilities: [
+            { trigger: "ACTIVA", nombre: "CRIOGENIZAR", coste: { furor: 1 },
+              requisitos: [
+                { count: { quien: "ENEMIGO", zona: "vanguardia" }, op: ">=", valor: 1,
+                  msg: "No hay enemigos en la vanguardia del rival." } ],
+              target: { quien: "ENEMIGO", cantidad: 1 },
+              validarObjetivo: [ { campo: "location", op: "==", valor: "vanguard", msg: "Debe estar en vanguardia." } ],
+              log: "¡Elsa congela el aire alrededor de su objetivo!",
+              efectos: [
+                { op: "ATACAR", especial: true, chequearEstado: true },
+                // La moneda va FUERA del `siExito` a propósito: el texto dice que se echa tras el
+                // ataque, no que dependa de que este acierte. Lo que sí se comprueba es que el
+                // objetivo siga EN LA VANGUARDIA -congelar a quien acaba de morir no significa
+                // nada-, y eso lo hace `siObjetivo`, que mira al OBJETIVO y no a la carta fuente.
+                // Se mira la ZONA y no la Vida: al morir, la carta se RESETEA al irse al descarte
+                // y vuelve a tener su Vida de plantilla, así que un `currentHp > 0` da true para
+                // un muerto. Comprobado, no supuesto (20-ago-2026).
+                { op: "MONEDA",
+                  logCara: { msg: "Moneda: CARA - ¡El hielo lo atrapa!", tipo: "ability" },
+                  logCruz: { msg: "Moneda: CRUZ - el hielo no llega a cuajar.", tipo: "ability" },
+                  cara: [
+                    { op: "MARCAR_TEMPORAL", conOwner: true,
+                      siObjetivo: { campo: "location", op: "==", valor: "vanguard" },
+                      floating: { texto: "CONGELADO", estilo: "ft-ability", offset: -40 },
+                      log: "¡{objetivo} queda congelado! Perderá su próximo turno." } ] } ] }
+        ],
+        // Copiado de la Canceladora, que hace justo esto: al llegar el turno de su dueño, se
+        // agota solo y el efecto se consume. Devolver false es lo que lo borra.
+        onStartTurnTempEffect: function(target, effect, game, currentTurnPlayerId) {
+            if (currentTurnPlayerId === target.owner) {
+                target.exhausted = true;
+                game.logMsg(`¡${game.getCardNameWithOwner(target)} sigue congelado y no puede actuar este turno!`, 'system');
+                return false;
+            }
+            return true;
+        }
+    },
+    {
+        id: 2008, name: "Nethuns", hp: 5, def: 3, atk: 4, type: "Personaje", subtype: "Ser mágico",
+        tags: ["Invocación", "Diosa"], gender: "F", rarity: "C", cost: 0, series: 1,
+        text: "A: DERRENGAR (2F): Elige 3 enemigos de la vanguardia: pierden 2 de Furor y quedan Silenciados (2 turnos).",
+        activeName: "DERRENGAR", activeCost: 2,
+        // Estrena el estado `silencio` CON DURACIÓN. El motor ya lo soportaba entero -corta las
+        // Habilidades en canActivateAbility, pinta su chapa con la cuenta atrás y sale en el
+        // detalle- pero ninguna carta lo aplicaba: los silencios de hoy (Feria del cómic, Deuda
+        // con la mafia) son auras sin cuenta, que es el flag `isSilenced`, otra cosa.
+        // Pide 3 enemigos EXACTOS, como CASTIGO de Némesis, en vez de adaptarse a los que haya:
+        // el texto dice tres y esa es la familia más cercana. Si Toto lo prefiere adaptable, es
+        // un `hastaCantidad: true` en el ELEGIR y bajar el requisito a 1.
+        abilities: [
+            { trigger: "ACTIVA", nombre: "DERRENGAR", coste: { furor: 2 }, sinObjetivo: true,
+              requisitos: [
+                { count: { quien: "ENEMIGO", zona: "vanguardia" }, op: ">=", valor: 3,
+                  msg: "Necesitas 3 enemigos en la vanguardia del rival para derrengarlos." } ],
+              log: "¡Nethuns arrastra a la vanguardia enemiga bajo la marea!",
+              efectos: [
+                { op: "ELEGIR", de: "ENEMIGOS", zona: "VANGUARDIA", cantidad: 3, cancelable: false,
+                  titulo: "DERRENGAR: elige 3 enemigos",
+                  efectos: [
+                    { op: "MODIFICAR_STAT", stat: "furor", delta: -2 },
+                    { op: "APLICAR_ESTADO", estado: "silencio", duracion: 2,
+                      log: "{objetivo} queda {objetivoG?silenciado|silenciada} por la resaca." } ] } ] }
+        ]
+    },
     {
         name: "Muñeca del mal", hp: 2, def: 2, atk: 4, type: "Esbirro", subtype: "No-muerto", tags: ["Monstruo", "Creación artificial"], rarity: "B", cost: 1, series: 2,
         text: "P: IMPRECACIÓN: Cuando su Vida llegue a 0 debido a un ataque, echa una moneda. Si sale cara, destruye la carta que realizó ese ataque.",
