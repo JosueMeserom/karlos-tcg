@@ -3,7 +3,7 @@
 Lo que queda por hacer, con su porqué. Se actualiza al cerrar cada cosa: lo que Toto no rebate
 después de hacerlo se da por bueno y se quita de aquí.
 
-> Última revisión: 21-ago-2026 · 167 cartas en CARD_DB · 100 suites en verde
+> Última revisión: 21-ago-2026 · 167 cartas en CARD_DB · 102 suites en verde
 
 ---
 
@@ -17,13 +17,12 @@ existe 'Diosa').
 
 ---
 
-## 2. Migración al DSL: 11 imperativas puras
+## 2. Migración al DSL: 9 imperativas puras
 
-Quedan (entre paréntesis, sus hooks a mano). En total, 166 hooks escritos a mano en el fichero.
+Quedan (entre paréntesis, sus hooks a mano). En total, 164 hooks escritos a mano en el fichero.
 
 | Carta | Qué le falta al DSL |
 |---|---|
-| **Guardaespaldas** (1), **Uniojo** (1) | reacciones a la muerte de un aliado, una desde el campo y otra desde la mano. Misma familia; el trigger `REACCION` ya existe |
 | **Unmei** (2), **NoName** (9) | `CREAR_CLON` — una pieza, dos cartas |
 | **K.I.N.O.** (2) | `INTERCAMBIAR_POSICION` y "al entrar en esta zona" |
 | **Erasmo** (5), **Silhouette** (7), **Sadame** (7), **Mill** (7), **Xanadu** (6), **Arthas** (8) | sin leer a fondo todavía: cada una pide su propio análisis |
@@ -46,9 +45,9 @@ Aparte, **Tengu orgulloso** (ya mixta) necesita "contar caras de moneda" para mi
 **Aparcado a propósito, pero es deuda real y medida**: el editor solo cubre el tercio más antiguo
 del lenguaje.
 
-- **21 de los 35 triggers** no existen ahí: `REACCION`, `AL_MORIR`, `AL_EQUIPAR`, los
-  interceptores, `COSTE_COLOCACION`, `PERIODICO`…
-- **31 de las 40 ops** tampoco: `ELEGIR`, `EQUIPAR`, `MARCAR_TEMPORAL`, `DESCARTAR`…
+- **22 de los 36 triggers** no existen ahí: `REACCION`, `AL_MORIR`, `AL_EQUIPAR`, los
+  interceptores, `COSTE_COLOCACION`, `PERIODICO`, `INTERCEPTOR_LETAL`…
+- **32 de las 41 ops** tampoco: `ELEGIR`, `EQUIPAR`, `MARCAR_TEMPORAL`, `DESCARTAR`, `COLOCARSE`…
 
 Cuando se retome, además de ponerlo al día, Toto quiere:
 - un **"detalle" que se renderice igual que en partida**, con los datos que estés metiendo;
@@ -81,6 +80,12 @@ Norma a partir de ahora: cada pieza nueva del DSL entra también en el editor.
   "correr en la fase de Furor".
 - **Si una carta hace algo que solo aplicará en un momento concreto, se marca visiblemente** desde
   ya (marca con chapa), y el aviso se retira cuando el efecto llega.
+- **Morir en el lugar de otro es un TRIGGER, no un efecto** (21-ago-2026, Guardaespaldas):
+  `INTERCEPTOR_LETAL` hace él mismo la muerte por sustitución, porque eso ES lo que el trigger
+  significa; la carta solo pone el texto. Su hermana desde la mano es `REACCION` con
+  `sobre: 'MUERTE_ALIADO'`, que estrena el op `COLOCARSE` (entrar desde la mano en el hueco del
+  muerto). La zona en la que murió la pasa el MOTOR: para cuando corre la reacción, la carta
+  muerta ya está en el descarte y su `location` no sirve de nada.
 - **`INICIO_TURNO` y `FIN_TURNO` se compilan a `PERIODICO`** (21-ago-2026). Se mantienen como
   sinónimos: hay cartas escritas con ellos y no hay razón para prohibirlos.
 - **El "o bien" de los costes es `alternativas`** en COSTE_COLOCACION: se recorren EN ORDEN y manda

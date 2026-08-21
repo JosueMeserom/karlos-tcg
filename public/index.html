@@ -3714,6 +3714,15 @@
                     card.currentDef += amount;
                     text = amount > 0 ? `+${amount} DEF` : `${amount} DEF`;
                     color = amount > 0 ? "ft-green" : "ft-yellow";
+                } else if (stat === 'maxHp') {
+                    // Subir el techo de Vida sube tambien la Vida actual: quien gana 2 de Vida
+                    // maxima gana 2 de Vida, no un hueco vacio que rellenar luego. El texto es el
+                    // mismo que ya usaban a mano las dos sobrecuraciones (RAICES NINJA y el
+                    // trigger SOBRECURACION), que siguen tocando maxHp por su cuenta.
+                    card.maxHp += amount;
+                    card.currentHp += amount;
+                    text = amount > 0 ? `+${amount} VIDA MÁX.` : `${amount} VIDA MÁX.`;
+                    color = amount > 0 ? "ft-green" : "ft-yellow";
                 } else if (typeof card[stat] === 'number') {
                     // Genérico (Gólem multielemental, 31-jul-2026): stats de BASE fuera de las
                     // 4 rutas de arriba (p. ej. 'def' permanente -no 'currentDef', que se
@@ -9992,7 +10001,11 @@
                             const handCard = defPlayer.hand[i];
                             const handTemplate = getCardTemplate(handCard.id);
                             if (typeof handTemplate.onHandReactionToAllyDeath === 'function') {
-                                const used = await handTemplate.onHandReactionToAllyDeath(handCard, card, this);
+                                // La ZONA en la que murió viaja aparte: para cuando llega aquí,
+                                // `card.location` ya vale 'discard' (lo pone resetCard más
+                                // arriba), así que quien quiera ocupar su hueco no puede
+                                // deducirla de la carta muerta.
+                                const used = await handTemplate.onHandReactionToAllyDeath(handCard, card, this, wasInVanguard ? 'vanguard' : 'rearguard');
                                 if (used) {
                                     defPlayer.hand.splice(i, 1);
                                     i--; // Ajustamos el índice tras borrar

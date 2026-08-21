@@ -5951,25 +5951,15 @@ const CARD_DB = [
         name: "Guardaespaldas", hp: 4, def: 4, atk: 3, type: "Esbirro", subtype: "Ser vivo", tags: ["Mafia"], rarity: "B", cost: 1, series: 2,
         text: "P: YO SIEMPRE TE AMARÉ: Cuando un aliado vaya a recibir un ataque letal, puedes destruir a Guardaespaldas en su lugar. El rival se lleva la Retribución y se activan los efectos de muerte.",
         passiveName: "YO SIEMPRE TE AMARÉ",
-        onLethalDamageIntercept: async function(card, defender, attacker, game) {
-            const pName = card.owner === 'p1' ? 'JUGADOR 1' : 'JUGADOR 2';
-            const used = await new Promise(resolve => {
-                game.openChoiceModal(`¿SACRIFICAR AL GUARDAESPALDAS?\n\n¡${defender.name} va a recibir un golpe letal!`, [
-                    { label: `SÍ, SACRIFICAR A GUARDAESPALDAS`, action: () => resolve(true) },
-                    { label: `NO, DEJAR MORIR A ${defender.name.toUpperCase()}`, action: () => resolve(false) }
-                ], card.owner);
-            });
-
-            if (used) {
-                game.logMsg(`¡${card.passiveName}! Guardaespaldas se arroja heroicamente frente al ataque de ${game.getCardNameWithOwner(attacker)}.`, 'ability');
-                showFloatingText(card.instanceId, "¡NOOO!", "ft-purple", -30);
-                
-                card.currentHp = 0;
-                await game.checkDeath(card, true); // True = el rival roba retribución
-                return true; 
-            }
-            return false;
-        }
+        // Migrada a DSL (trigger INTERCEPTOR_LETAL, 21-ago-2026). La muerte por sustitución la
+        // hace el compilador: es lo que ESE trigger significa, no un efecto que esta carta elija.
+        abilities: [
+            { trigger: "INTERCEPTOR_LETAL", nombre: "YO SIEMPRE TE AMARÉ",
+              prompt: "¿SACRIFICAR AL GUARDAESPALDAS?\n\n¡{defensor} va a recibir un golpe letal!",
+              opciones: { si: "SÍ, SACRIFICAR A GUARDAESPALDAS", no: "NO, DEJAR MORIR A {defensor}" },
+              log: { msg: "¡{habilidad}! {cartaRef} se arroja heroicamente frente al ataque de {atacante}.", tipo: "ability" },
+              floating: { texto: "¡NOOO!", estilo: "ft-purple", offset: -30 } }
+        ]
     },
     {
         name: "Sra. Kumicho", hp: 3, def: 3, atk: 4, type: "Esbirro", subtype: "Ser vivo", tags: ["Mafia"], gender: "F", rarity: "B", cost: 1, series: 2,
@@ -6650,35 +6640,19 @@ const CARD_DB = [
         name: "Uniojo", hp: 2, def: 1, atk: 4, type: "Esbirro", subtype: "Ser vivo", tags: ["Animal salvaje"], rarity: "C", cost: 1, series: 2,
         text: "P: COMENSAL: Reacción. Si la Vida de un aliado 'Ser vivo' llega a 0, puedes colocar a Uniojo desde tu mano en su misma posición. Si lo haces, aumenta su Vida máxima en 2.",
         passiveName: "COMENSAL",
-        onHandReactionToAllyDeath: async function(handCard, deadCard, game) {
-            if (deadCard.subtype !== 'Ser vivo') return false;
-            
-            const pName = handCard.owner === 'p1' ? 'JUGADOR 1' : 'JUGADOR 2';
-            const wantUse = await new Promise(resolve => {
-                game.openChoiceModal(`REACCIÓN DE ${pName}\n\n¿Colocar a Uniojo en el lugar de ${deadCard.name}?`, [
-                    { label: 'SÍ', action: () => resolve(true) },
-                    { label: 'NO', action: () => resolve(false) }
-                ], handCard.owner);
-            });
-
-            if (wantUse) {
-                game.logMsg(`¡Uniojo aprovecha el vacío de ${game.getCardNameWithOwner(deadCard)} y entra al campo!`, 'ability');
-                const p = game.players[handCard.owner];
-                
-                handCard.location = deadCard.location;
-                if (deadCard.location === 'vanguard') p.vanguard.push(handCard);
-                else p.rearguard.push(handCard);
-                
-                handCard.maxHp += 2;
-                handCard.currentHp = handCard.maxHp;
-                showFloatingText(handCard.instanceId, "+2 VIDA MÁX.", "ft-green", -30);
-                
-                game.render();
-                try { await animateResurrect(handCard.owner, handCard.instanceId); } catch(e){}
-                return true;
-            }
-            return false;
-        }
+        // Migrada a DSL (trigger REACCION sobre MUERTE_ALIADO, 21-ago-2026). Estrena el op
+        // COLOCARSE: la carta entra desde la mano en el hueco del muerto. Al ser un Esbirro y no
+        // una Ayuda, sigue pudiéndose colocar por la vía normal (ver el compilador de REACCION).
+        abilities: [
+            { trigger: "REACCION", sobre: "MUERTE_ALIADO", nombre: "COMENSAL",
+              si: { defensor: { campo: "subtype", op: "==", valor: "Ser vivo" } },
+              prompt: "¿Colocar a Uniojo en el lugar de {muerto}?",
+              log: { msg: "¡Uniojo aprovecha el vacío de {muerto} y entra al campo!", tipo: "ability" },
+              efectos: [
+                { op: "COLOCARSE" },
+                { op: "MODIFICAR_STAT", quien: "SELF", stat: "maxHp", delta: 2 },
+              ] }
+        ]
     },
     {
         name: "Limo crecido", hp: 4, def: 2, atk: 2, type: "Esbirro", subtype: "Ser vivo", tags: ["Creación artificial"], rarity: "B", cost: 1, series: 2,
@@ -7482,12 +7456,12 @@ const KARLOS_RULES = {
 //  Valores: número | {COUNT:{...}} | {REF:"objetivo.furorMax"} (campos computados)
 // ===================================================================
 const DSL = {
-    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE', 'AURA', 'ANTES_DE_JUGAR', 'PUEDE_ATACAR', 'SOBRECURACION', 'REACCION', 'AL_MORIR', 'AL_MORIR_ALIADO', 'AL_DESTRUIR', 'ESPEJO', 'ANTES_DE_ATACAR', 'TRAS_ATACAR', 'TRAS_DEFENDER', 'ANTES_DE_DEFENDER', 'INTERCEPTOR_ATAQUE', 'EQUIPO_ANTES_DE_DEFENDER', 'EQUIPO_ANTES_DE_ATACAR', 'GLOBAL_ANTES_DE_CAMBIO_STAT', 'COSTE_COLOCACION', 'PERIODICO'],
+    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE', 'AURA', 'ANTES_DE_JUGAR', 'PUEDE_ATACAR', 'SOBRECURACION', 'REACCION', 'AL_MORIR', 'AL_MORIR_ALIADO', 'AL_DESTRUIR', 'ESPEJO', 'ANTES_DE_ATACAR', 'TRAS_ATACAR', 'TRAS_DEFENDER', 'ANTES_DE_DEFENDER', 'INTERCEPTOR_ATAQUE', 'EQUIPO_ANTES_DE_DEFENDER', 'EQUIPO_ANTES_DE_ATACAR', 'GLOBAL_ANTES_DE_CAMBIO_STAT', 'COSTE_COLOCACION', 'PERIODICO', 'INTERCEPTOR_LETAL'],
     // Los 5 últimos ops solo tienen sentido dentro de una REACCION (los interpreta
     // DSL._runReaccion, no _doEffect): controlan el resultado que la reacción
     // devuelve al motor de combate (redirigir el ataque, cancelarlo, drenar Furor
     // tras él, fijar el daño, autoataque del atacante).
-    OPS_EFECTO: ['MODIFICAR_STAT', 'CURAR', 'DAÑO', 'APLICAR_ESTADO', 'MODIFICAR_CONTADORES', 'ATACAR', 'MONEDA', 'ROBAR', 'BUSCAR', 'MARCAR', 'VER_MANO', 'LIMPIAR_ESTADOS', 'ELEGIR', 'DESTRUIR_EVENTO', 'MARCAR_TEMPORAL', 'DESCARTAR', 'EQUIPAR', 'MARCAR_JUGADOR', 'FLOTANTE', 'FIJAR_STAT', 'REDIRIGIR', 'CANCELAR_ATAQUE', 'MARCAR_DRENAJE', 'FIJAR_DAÑO', 'ATACANTE_SE_AUTOATACA', 'VOLVER_A_MANO', 'RETRIBUCION', 'SUELO_STAT', 'TECHO_STAT', 'NO_CONSUMIR', 'BONO_ATAQUE', 'MARCAR_PARTIDA', 'ESQUIVAR', 'DESEQUIPAR', 'DAÑO_ATAQUE', 'REDIRIGIR_ATAQUE', 'SECUESTRAR_STAT', 'DEVOLVER_STAT', 'CUENTA_ATRAS', 'QUITAR_MARCA'],
+    OPS_EFECTO: ['MODIFICAR_STAT', 'CURAR', 'DAÑO', 'APLICAR_ESTADO', 'MODIFICAR_CONTADORES', 'ATACAR', 'MONEDA', 'ROBAR', 'BUSCAR', 'MARCAR', 'VER_MANO', 'LIMPIAR_ESTADOS', 'ELEGIR', 'DESTRUIR_EVENTO', 'MARCAR_TEMPORAL', 'DESCARTAR', 'EQUIPAR', 'MARCAR_JUGADOR', 'FLOTANTE', 'FIJAR_STAT', 'REDIRIGIR', 'CANCELAR_ATAQUE', 'MARCAR_DRENAJE', 'FIJAR_DAÑO', 'ATACANTE_SE_AUTOATACA', 'VOLVER_A_MANO', 'RETRIBUCION', 'SUELO_STAT', 'TECHO_STAT', 'NO_CONSUMIR', 'BONO_ATAQUE', 'MARCAR_PARTIDA', 'ESQUIVAR', 'DESEQUIPAR', 'DAÑO_ATAQUE', 'REDIRIGIR_ATAQUE', 'SECUESTRAR_STAT', 'DEVOLVER_STAT', 'CUENTA_ATRAS', 'QUITAR_MARCA', 'COLOCARSE'],
     OPS_CMP: ['==', '!=', '<=', '>=', '<', '>', 'includes', 'contieneTexto', 'includesCI', 'truthy', 'falsy'],
     QUIEN: ['SELF', 'ALIADO', 'ENEMIGO', 'TODOS', 'ATACANTE', 'DEFENSOR', 'PORTADOR', 'PAGADOR'], // ATACANTE/DEFENSOR: solo en GLOBAL_TRAS_ATAQUE y REACCION
 
@@ -9716,10 +9690,7 @@ const DSL = {
     // reacción sin consumir la carta (p. ej. cancelar la elección de Pequeña traición).
     async _runReaccion(efectos, handCard, game, cx, result) {
         const reactor = handCard.owner;
-        const RF = (txt, extra) => DSL._fill(txt, Object.assign({
-            carta: handCard.name,
-            atacante: DSL._nombre(game, cx.attacker), atacanteG: cx.attacker.gender,
-            defensor: DSL._nombre(game, cx.defensor), defensorG: cx.defensor.gender,
+        const RF = (txt, extra) => DSL._fill(txt, Object.assign(DSL._relleno(game, handCard, cx), {
             reactor: (typeof game.getDisplayName === 'function' ? game.getDisplayName(reactor) : reactor),
         }, extra || {}));
         for (const e of (efectos || [])) {
@@ -9745,6 +9716,21 @@ const DSL = {
                 result.newDefender = sel;
                 if (e.log) game.logMsg(RF(e.log.msg, { objetivo: DSL._nombre(game, sel), objetivoG: sel.gender }), e.log.tipo || 'ability');
                 if (e.floating && typeof showFloatingText === 'function') showFloatingText(sel.instanceId, e.floating.texto, e.floating.estilo || 'ft-purple', e.floating.offset !== undefined ? e.floating.offset : -30);
+                continue;
+            }
+            // COLOCARSE (Uniojo): la carta que reacciona SE PONE ella misma en el campo, en el
+            // hueco que acaba de dejar el aliado muerto. La zona la trae el motor (`cx.zona`):
+            // no se puede leer de la carta muerta, que para entonces ya está en el descarte. Si
+            // la vanguardia se ha llenado entretanto (alguien subió de retaguardia al recolocar
+            // los huecos), entra atrás, como cualquier otra carta que no cabe delante.
+            if (e.op === 'COLOCARSE') {
+                const p = game.players[reactor];
+                const zona = (cx.zona === 'vanguard' && p.vanguard.length < 4) ? 'vanguard' : 'rearguard';
+                handCard.location = zona;
+                p[zona === 'vanguard' ? 'vanguard' : 'rearguard'].push(handCard);
+                if (typeof game.assignCopyId === 'function') game.assignCopyId(handCard); // el [n] nace al salir de la mano
+                if (typeof game.render === 'function') game.render();
+                if (typeof animateResurrect === 'function') { try { await animateResurrect(reactor, handCard.instanceId); } catch (err) {} }
                 continue;
             }
             if (e.op === 'CANCELAR_ATAQUE') { result.cancelAttack = true; continue; }
@@ -9787,14 +9773,31 @@ const DSL = {
         }
     },
 
+    // Relleno común de una reacción. `atacante` solo existe si la reacción viene de un
+    // combate: `sobre: 'MUERTE_ALIADO'` reacciona a una muerte, que puede no tener atacante
+    // (veneno, un efecto, un sacrificio propio). `muerto` es el alias legible de `defensor`
+    // para ese caso, para que el texto de la carta no hable de "defensor" cuando no hay ataque.
+    _relleno(game, handCard, cx) {
+        const r = {
+            carta: handCard.name,
+            defensor: DSL._nombre(game, cx.defensor), defensorG: cx.defensor.gender,
+            muerto: DSL._nombre(game, cx.defensor), muertoG: cx.defensor.gender,
+        };
+        // `carta` es el nombre a secas (una carta en la mano aún no tiene [n]); `cartaRef` es el
+        // nombre completo con dueño, para la que reacciona DESDE EL CAMPO y ya está identificada.
+        r.cartaRef = DSL._nombre(game, handCard);
+        if (cx.attacker) { r.atacante = DSL._nombre(game, cx.attacker); r.atacanteG = cx.attacker.gender; }
+        return r;
+    },
+
     // Comprueba el gate `si` de una reacción (¿siquiera se ofrece el modal?).
     _reaccionGate(si, handCard, game, cx) {
         si = si || {};
         if (si.soloAtaqueNormal) { const esNormal = !game.abilityContext || game.abilityContext.isNormalAttack; if (!esNormal) return false; }
         if (si.soloDañoNormal && cx.isSpecial) return false;
         if (si.defensorEsPropio && cx.defensor.owner !== handCard.owner) return false;
-        if (si.atacanteNoAvatar && (getCardTemplate(cx.attacker.id) || {}).isAvatar) return false;
-        if (si.atacante && !DSL._cmp(DSL._field(cx.attacker, si.atacante.campo), si.atacante.op, si.atacante.valor)) return false;
+        if (si.atacanteNoAvatar && cx.attacker && (getCardTemplate(cx.attacker.id) || {}).isAvatar) return false;
+        if (si.atacante && (!cx.attacker || !DSL._cmp(DSL._field(cx.attacker, si.atacante.campo), si.atacante.op, si.atacante.valor))) return false;
         if (si.defensor && !DSL._cmp(DSL._field(cx.defensor, si.defensor.campo), si.defensor.op, si.defensor.valor)) return false;
         return true;
     },
@@ -9807,7 +9810,7 @@ const DSL = {
             game.openChoiceModal(prompt, [
                 { label: 'SÍ', action: () => resolve(true) },
                 { label: 'NO REACCIONAR', action: () => resolve(false) },
-            ], handCard.owner, cx ? { reaccion: { atacante: cx.attacker, defensor: cx.defensor, mano: handCard } } : null);
+            ], handCard.owner, (cx && cx.attacker) ? { reaccion: { atacante: cx.attacker, defensor: cx.defensor, mano: handCard } } : null);
         });
     },
 
@@ -10959,18 +10962,11 @@ const DSL = {
                     if (!hay) return false;
                 }
                 const quiere = await DSL._reaccionPrompt(
-                    DSL._fill(reaccion.prompt || '¿Reaccionar?', {
-                        carta: handCard.name,
-                        atacante: DSL._nombre(game, cx.attacker), atacanteG: cx.attacker.gender,
-                        defensor: DSL._nombre(game, cx.defensor), defensorG: cx.defensor.gender,
-                    }), handCard, game, cx);
+                    DSL._fill(reaccion.prompt || '¿Reaccionar?', DSL._relleno(game, handCard, cx)), handCard, game, cx);
                 if (!quiere) return false;
-                if (reaccion.log) game.logMsg(DSL._fill(reaccion.log.msg, {
-                    carta: handCard.name,
-                    atacante: DSL._nombre(game, cx.attacker), atacanteG: cx.attacker.gender,
-                    defensor: DSL._nombre(game, cx.defensor), defensorG: cx.defensor.gender,
+                if (reaccion.log) game.logMsg(DSL._fill(reaccion.log.msg, Object.assign(DSL._relleno(game, handCard, cx), {
                     reactor: (typeof game.getDisplayName === 'function' ? game.getDisplayName(handCard.owner) : handCard.owner),
-                }), reaccion.log.tipo || 'ability');
+                })), reaccion.log.tipo || 'ability');
                 await DSL._runReaccion(reaccion.efectos, handCard, game, cx, result);
                 return !result.abortar;
             };
@@ -10982,6 +10978,18 @@ const DSL = {
                     if (!ok) return { used: false, newDmg: dmg };
                     return result;
                 };
+            } else if (reaccion.sobre === 'MUERTE_ALIADO' && typeof tmpl.onHandReactionToAllyDeath !== 'function') {
+                // Reacción a la MUERTE de un aliado (Uniojo). No hay combate: el motor solo pasa
+                // la carta muerta, así que cx va sin atacante (`_relleno` lo omite y el modal no
+                // enseña el par atacante->objetivo). Devolver true hace que el motor la saque de
+                // la mano; con el op COLOCARSE la carta ya se ha metido ella misma en el campo,
+                // que es justo lo que el motor espera de este hook.
+                tmpl.onHandReactionToAllyDeath = async function (handCard, deadCard, game, zona) {
+                    const cx = { attacker: null, defensor: deadCard, zona };
+                    const result = { used: true };
+                    if (!await correr(handCard, game, cx, result)) return false;
+                    return true;
+                };
             } else if (typeof tmpl.onHandReactionToAttack !== 'function') {
                 tmpl.onHandReactionToAttack = async function (handCard, attacker, defender, game) {
                     const cx = { attacker, defensor: defender };
@@ -10991,13 +10999,47 @@ const DSL = {
                     return result;
                 };
             }
-            // Las reacciones no se juegan como una Ayuda normal: se quedan en la mano.
-            if (typeof tmpl.canPlayCard !== 'function') {
+            // Las Ayudas de reacción no se juegan como una Ayuda normal: se quedan en la mano.
+            // Una carta de CAMPO que reacciona desde la mano (Uniojo) sigue siendo jugable a mano
+            // por la vía normal: su reacción es una alternativa, no un sustituto.
+            if (tmpl.type === 'Ayuda' && typeof tmpl.canPlayCard !== 'function') {
                 tmpl.canPlayCard = function (card, game) {
                     if (reaccion.avisoNoJugable) game.logMsg(DSL._fill(reaccion.avisoNoJugable, { carta: card.name }), 'system');
                     return false;
                 };
             }
+        }
+
+        // INTERCEPTOR_LETAL -> onLethalDamageIntercept(card, defender, attacker, game).
+        // "Muero yo en su lugar": el motor recorre el campo del defensor justo antes de aplicar
+        // un golpe que lo mataría y, si alguien devuelve true, el golpe se anula entero. Esa
+        // muerte por sustitución ES el trigger, así que la hace el compilador y no hay op que
+        // declarar; la carta solo pone el texto (prompt, etiquetas del modal, log y flotante) y,
+        // si quiere, un gate `si` con la misma gramática que las reacciones (`si.defensor`).
+        // La Retribución se la lleva el rival (checkDeath con true): lo dice el texto de la carta.
+        const interceptorLetal = abs.find(a2 => a2.trigger === 'INTERCEPTOR_LETAL');
+        if (interceptorLetal && typeof tmpl.onLethalDamageIntercept !== 'function') {
+            tmpl.onLethalDamageIntercept = async function (card, defender, attacker, game) {
+                const cx = { attacker, defensor: defender };
+                if (!DSL._reaccionGate(interceptorLetal.si, card, game, cx)) return false;
+                const R = (txt) => DSL._fill(txt, Object.assign(DSL._relleno(game, card, cx), {
+                    habilidad: interceptorLetal.nombre || tmpl.passiveName || '',
+                }));
+                const op = interceptorLetal.opciones || {};
+                const quiere = await new Promise(resolve => {
+                    game.openChoiceModal(R(interceptorLetal.prompt || '¿Reaccionar?'), [
+                        { label: R(op.si || 'SÍ'), action: () => resolve(true) },
+                        { label: R(op.no || 'NO'), action: () => resolve(false) },
+                    ], card.owner, { reaccion: { atacante: attacker, defensor: defender, mano: card } });
+                });
+                if (!quiere) return false;
+                if (interceptorLetal.log) game.logMsg(R(interceptorLetal.log.msg), interceptorLetal.log.tipo || 'ability');
+                const f = interceptorLetal.floating;
+                if (f && typeof showFloatingText === 'function') showFloatingText(card.instanceId, R(f.texto), f.estilo || 'ft-purple', f.offset !== undefined ? f.offset : -30);
+                card.currentHp = 0;
+                await game.checkDeath(card, true);
+                return true;
+            };
         }
 
         // AL_MORIR -> onDeath(card, game). El motor lo llama en checkDeath con hp<=0. Si
