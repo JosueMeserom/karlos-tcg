@@ -6812,8 +6812,9 @@
                 this.updatePhaseDisplay('EFECTOS INICIALES');
                 await showPhaseBanner(pName, 'FASE DE EFECTOS INICIALES');
                 await _periodicos(this, 'EFECTOS INICIALES', 'ANTES');
+                // El momento NORMAL corre DENTRO de processStartPhaseEffects, en el sitio exacto
+                // que ocupaban los viejos onStartTurn (ver allí).
                 await this.processStartPhaseEffects(this.activePlayerId); 
-                await _periodicos(this, 'EFECTOS INICIALES', 'NORMAL');
                 await _periodicos(this, 'EFECTOS INICIALES', 'DESPUES');
 
                 this.updatePhaseDisplay('EVENTO');
@@ -6947,6 +6948,13 @@
                         await template.onStartTurn(card, this);
                     }
                 }
+
+                // Los periódicos de esta fase corren AQUÍ y no al final de la fase (21-ago-2026):
+                // `INICIO_TURNO` se compila a un PERIODICO, así que tiene que ocupar exactamente
+                // el sitio que ocupaba, entre los efectos de inicio y los Daños por tiempo. El
+                // orden de las reglas -Evento, vanguardia, retaguardia, Daños por tiempo- lo
+                // mantiene el propio despachador.
+                await _periodicos(this, 'EFECTOS INICIALES', 'NORMAL');
 
                 for (const card of [...p.vanguard, ...p.rearguard]) {
                     if (card.status && card.status.dot && card.status.dot.duration > 0) {
@@ -7153,6 +7161,10 @@
                     }
                 }
 
+                // Mismo motivo que en Efectos Iniciales: `FIN_TURNO` se compila a un PERIODICO y
+                // debe correr donde corría, antes de que los estados descuenten su turno.
+                await _periodicos(this, 'EFECTOS FINALES', 'NORMAL');
+
                 [...p.vanguard, ...p.rearguard].forEach(card => {
                     // 1. Gestión de Estados Alterados base
                     if (card.status) {
@@ -7212,7 +7224,7 @@
                 // Los periódicos de EFECTOS FINALES corren aquí, con la fase ya hecha y antes de
                 // que el turno cambie de manos. `NORMAL` y `DESPUES` van seguidos porque dentro de
                 // cada grupo ya manda el orden de las reglas.
-                await _periodicos(this, 'EFECTOS FINALES', 'NORMAL');
+                // El NORMAL ya corrió arriba, junto a los viejos onEndTurn.
                 await _periodicos(this, 'EFECTOS FINALES', 'DESPUES');
 
                 await this.esperarFlotantes();

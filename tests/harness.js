@@ -868,10 +868,25 @@ function compararCapturas(esc, vieja, nueva) {
         }
     }
 
-    const maxF = Math.max(flotantesViejos.length, flotantesNuevos.length);
-    for (let i = 0; i < maxF; i++) {
-        if (flotantesViejos[i] !== flotantesNuevos[i]) {
-            diffs.push(`flotante[${i}]:\n      vieja: ${flotantesViejos[i]}\n      nueva: ${flotantesNuevos[i]}`);
+    // `flotantesReordenados`: los MISMOS flotantes, en distinto orden, a propósito. Nace de que
+    // el Evento pasara a resolver su fin de turno ANTES que las cartas (21-ago-2026), que es el
+    // orden de las reglas -Evento, vanguardia, retaguardia, Daños por tiempo-; la vieja lo hacía
+    // al revés. No es un cambio de CONTENIDO, así que declararlo pieza a pieza con
+    // flotantesSoloVieja/SoloNueva sería mentir: no falta ni sobra ninguno.
+    // Estricto igual que el resto: exige que el CONJUNTO sea idéntico. Si de verdad aparece o
+    // desaparece un flotante, esto NO lo tapa.
+    if (esc.flotantesReordenados) {
+        if (!esc.flotantesReordenados.motivo) throw new Error(`escenario "${esc.nombre}": flotantesReordenados sin "motivo" documentado`);
+        const _orden = (xs) => [...xs].sort();
+        if (JSON.stringify(_orden(flotantesViejos)) !== JSON.stringify(_orden(flotantesNuevos))) {
+            diffs.push(`flotantesReordenados: no son los mismos flotantes, solo cambiados de orden.\n      vieja: ${flotantesViejos.join(' | ')}\n      nueva: ${flotantesNuevos.join(' | ')}`);
+        }
+    } else {
+        const maxF = Math.max(flotantesViejos.length, flotantesNuevos.length);
+        for (let i = 0; i < maxF; i++) {
+            if (flotantesViejos[i] !== flotantesNuevos[i]) {
+                diffs.push(`flotante[${i}]:\n      vieja: ${flotantesViejos[i]}\n      nueva: ${flotantesNuevos[i]}`);
+            }
         }
     }
 

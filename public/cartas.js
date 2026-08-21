@@ -7674,6 +7674,16 @@ const DSL = {
     },
     _cond(card, game, c) {
         if (!c) return true;
+        // `de: "PORTADOR"`: la condición se mide sobre quien LLEVA este equipo, no sobre el equipo
+        // (Guantes sedientos, 21-ago-2026). Los contadores de su cuenta atrás viven en el
+        // portador, así que sin esto la condición miraba un campo que en el equipo no existe y
+        // salía siempre falsa. `_pool` ya sabía resolver PORTADOR; esto es lo mismo para `_cond`.
+        if (c.de === 'PORTADOR') {
+            const _h = DSL._pool(card.owner, game, { quien: 'PORTADOR' }, card)[0];
+            if (!_h) return false;
+            const _sinDe = Object.assign({}, c); delete _sinDe.de;
+            return DSL._cond(_h, game, _sinDe);
+        }
         // Array de condiciones (Matón, 31-jul-2026): TODAS deben cumplirse (AND). Extensión
         // mínima, genérica — hasta ahora `if` solo admitía una condición suelta.
         if (Array.isArray(c)) return c.every(x => DSL._cond(card, game, x));
@@ -7780,24 +7790,27 @@ const DSL = {
     // viva en un solo sitio y no repartido por los hooks de cada carta.
     async correrPeriodicos(game, fase, momento) {
         if (!game || !game.players) return;
+        let algo = false;
         const activePid = game.activePlayerId;
         const otro = activePid === 'p1' ? 'p2' : 'p1';
         for (const pid of [activePid, otro]) {
             const p = game.players[pid];
             if (!p) continue;
-            const enJuego = [p.activeEvent, ...p.vanguard, ...p.rearguard].filter(Boolean);
+            // Y los EQUIPOS de cada carta, justo detrás de su portador. Se les olvidaba (21-ago
+            // -2026): el fin de turno de los equipos se recorría en su propio bucle anidado, así
+            // que al pasar `FIN_TURNO` a PERIODICO la cuenta atrás de Súper Evolución dejó de
+            // bajar. Lo cazó su suite.
+            const enJuego = [];
+            for (const c of [p.activeEvent, ...p.vanguard, ...p.rearguard]) {
+                if (!c) continue;
+                enJuego.push(c);
+                for (const eq of (c.equippedCards || [])) enJuego.push(eq);
+            }
             for (const card of enJuego) {
                 const tmpl = DSL._tmpl(card.id);
                 if (tmpl && typeof tmpl.onPeriodico === 'function') {
-                    try {
-                        await tmpl.onPeriodico(card, game, fase, momento, activePid);
-                        // Y SE REPINTA. Sin esto el estado cambia en su fase pero la pantalla no
-                        // se entera hasta el siguiente render, que es el de Efectos Iniciales: de
-                        // ahí que el Oculto de Simon "solo saliera en la fase de efectos
-                        // iniciales" aunque se aplicara en la de Robo (Toto, 21-ago-2026).
-                        if (typeof game.updatePassives === 'function') game.updatePassives();
-                        if (typeof game.render === 'function') game.render();
-                    } catch (err) { console.error(err); }
+                    try { if (await tmpl.onPeriodico(card, game, fase, momento, activePid)) algo = true; }
+                    catch (err) { console.error(err); }
                 }
                 // Marcas temporales con caducidad declarada: misma idea, mismo vocabulario.
                 if (Array.isArray(card.tempEffects) && card.tempEffects.length) {
@@ -7806,12 +7819,21 @@ const DSL = {
                         let sigue = true;
                         try { sigue = await DSL._tickMarca(card, eff, game, fase, momento, activePid); }
                         catch (err) { console.error(err); }
-                        if (sigue) vivas.push(eff); else if (typeof game.render === 'function') game.render();
+                        if (sigue) vivas.push(eff); else algo = true;
                     }
                     card.tempEffects = vivas;
                 }
             }
         }
+        // UNA sola vez, y solo si algo ha corrido de verdad. Sin esto el estado cambia en su fase
+        // pero la pantalla no se entera hasta el siguiente render -de ahí que el Oculto de Simon
+        // "solo saliera en la fase de efectos iniciales" aunque se aplicara antes-; y haciéndolo
+        // por carta, cada pasada de pasivas reemitía los flotantes de estado.
+        // Solo REPINTA: recalcular las pasivas aquí añadía una pasada de más, y cada pasada
+        // reemite los flotantes de estado -el SILENCIADO de la Feria del cómic salía una vez de
+        // más- (21-ago-2026). No hace falta: la secuencia del turno recalcula por su cuenta justo
+        // después, y lo que cambia un estado (las marcas al caducar) ya lo pide por su lado.
+        if (algo && typeof game.render === 'function') game.render();
     },
 
     // Una marca con `caduca` declarado descuenta su cuenta atrás en el punto que diga, y al llegar
@@ -9869,9 +9891,43 @@ const DSL = {
         tmpl.abilities = abs.filter(a => a.trigger !== 'COSTE_COLOCACION');
     },
 
+    // INICIO_TURNO y FIN_TURNO -> PERIODICO (Toto, 21-ago-2026). Son la misma idea con la fase
+    // escondida en el NOMBRE del trigger: "inicio de turno" es Efectos Iniciales y "fin de turno"
+    // es Efectos Finales, en el momento NORMAL y solo en el turno propio. Con la fase como dato ya
+    // no hacen falta dos triggers que hacen lo mismo, así que se traducen al compilar y el motor
+    // solo tiene un camino que mantener.
+    //
+    // `soloTurnoPropio: false` -> `deQuien: "AMBOS"`, que es lo que significaba.
+    //
+    // Corren EXACTAMENTE donde corrían: el despachador de esas dos fases se llama en el sitio que
+    // ocupaban los hooks (ver processStartPhaseEffects y el fin de turno en index.html), no al
+    // final de la fase, para no colarse por delante o por detrás de los Daños por tiempo.
+    // Se mantienen los dos triggers como sinónimos: hay 11 cartas escritas con ellos y no hay
+    // ninguna razón para tocarlas ni para prohibirlos en el editor.
+    _expandirTriggersDeTurno(tmpl) {
+        const abs = tmpl.abilities || [];
+        const FASE = { INICIO_TURNO: 'EFECTOS INICIALES', FIN_TURNO: 'EFECTOS FINALES' };
+        let hubo = false;
+        tmpl.abilities = abs.map(a => {
+            const fase = FASE[a.trigger];
+            if (!fase) return a;
+            hubo = true;
+            const nueva = Object.assign({}, a, {
+                trigger: 'PERIODICO', fase, momento: 'NORMAL',
+                deQuien: a.soloTurnoPropio === false ? 'AMBOS' : 'PROPIO',
+            });
+            // `si` era el nombre de la condición en INICIO_TURNO; PERIODICO la llama `if`.
+            if (nueva.si && !nueva.if) { nueva.if = nueva.si; delete nueva.si; }
+            delete nueva.soloTurnoPropio;
+            return nueva;
+        });
+        return hubo;
+    },
+
     compile(tmpl) {
         if (!DSL.validate(tmpl)) return false;
         DSL._expandirCosteColocacion(tmpl);
+        DSL._expandirTriggersDeTurno(tmpl);
         const abs = tmpl.abilities || [];
 
         // Atribución por defecto de una habilidad de UNIDAD (Toto, 5-ago-2026). El "por
@@ -11381,13 +11437,19 @@ const DSL = {
         // recorren todos y no solo el primero.
         const periodicos = abs.filter(a => a.trigger === 'PERIODICO');
         if (periodicos.length && typeof tmpl.onPeriodico !== 'function') {
+            // Devuelve si ha CORRIDO algo: el despachador lo usa para repintar una sola vez al
+            // final en vez de por carta. Repintar por carta reemitía los flotantes de estado en
+            // cada pasada de pasivas -el SILENCIADO de la Feria salía catorce veces- (21-ago-2026).
             tmpl.onPeriodico = async function (card, game, fase, momento, activePid) {
+                let corrio = false;
                 for (const a of periodicos) {
                     if (!DSL._tocaAhora(a, fase, momento, card.owner, activePid)) continue;
                     if (a.if && !DSL._cond(card, game, a.if)) continue;
+                    corrio = true;
                     if (a.log) game.logMsg(DSL._fill(a.log, { carta: DSL._nombre(game, card) }), a.logTipo || 'ability');
                     await DSL._runEffectList(a.efectos || [], card, game, card.owner, [card], _habDeCarta(a));
                 }
+                return corrio;
             };
         }
 

@@ -822,9 +822,11 @@ console.log('\n--- chapas de marca temporal ---');
     // siguiente render que caiga por otro motivo. Era lo que hacía que el Oculto "solo saliera en
     // la fase de efectos iniciales" aunque se aplicara en la de Robo.
     const srcDsl = fs.readFileSync(path.join(RAIZ, 'public/cartas.js'), 'utf8');
-    check('los periódicos repintan al terminar',
-          srcDsl.includes('await tmpl.onPeriodico(card, game, fase, momento, activePid);')
-          && /onPeriodico\(card, game, fase, momento, activePid\);[\s\S]{0,600}game\.render\(\);/.test(srcDsl));
+    // El repintado va UNA vez al final del despacho y solo si algo corrió: por carta reemitía los
+    // flotantes de estado en cada pasada (21-ago-2026).
+    check('los periódicos repintan al terminar, una sola vez',
+          /if \(await tmpl\.onPeriodico\(card, game, fase, momento, activePid\)\) algo = true;/.test(srcDsl)
+          && /if \(algo && typeof game\.render === 'function'\) game\.render\(\);/.test(srcDsl));
     check('una marca con chapa se ve en cuanto se pone', /if \(e\.badge && typeof game\.render === 'function'\) game\.render\(\)/.test(srcDsl));
     // `ANTES` es antes de lo que la FASE HACE, no antes de su cartel (Toto, 21-ago-2026,
     // corrigiéndome: "ANTES es antes de los demás efectos, no antes del cartel"). Para lo que

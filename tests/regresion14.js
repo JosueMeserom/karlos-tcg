@@ -15,6 +15,7 @@ const M3 = 'norma del proyecto (logs en 3ª persona con {jugador}/dueño): la vi
 const escenarios = [
     {
         nombre: 'Feria del cómic silencia a los no-Otaku de ambos campos (el Otaku se libra)',
+        flotantesReordenados: { motivo: 'el Evento resuelve ahora su fin de turno ANTES que las cartas, que es el orden de las reglas (Evento, vanguardia, retaguardia, Daños por tiempo); la vieja lo hacía al revés. Son los MISMOS flotantes, solo cambiados de sitio: el harness exige que el conjunto sea idéntico' },
         p1: { vanguardia: ['Frikazo', 'Oso con armadura'], mano: ['Feria del cómic'] },
         p2: { vanguardia: ['Mini-tigre'], retaguardia: ['Droide antidisturbios'] },
         pasos: [
@@ -23,6 +24,7 @@ const escenarios = [
     },
     {
         nombre: 'Fin de turno con cara: compra la carta Otaku del mazo y baraja',
+        flotantesReordenados: { motivo: 'el Evento resuelve ahora su fin de turno ANTES que las cartas, que es el orden de las reglas (Evento, vanguardia, retaguardia, Daños por tiempo); la vieja lo hacía al revés. Son los MISMOS flotantes, solo cambiados de sitio: el harness exige que el conjunto sea idéntico' },
         semilla: 13,
         monedas: ['cara'],
         turnoDe: 'p1',
@@ -46,6 +48,7 @@ const escenarios = [
     },
     {
         nombre: 'Fin de turno con cara pero declinando la compra: sin búsqueda ni barajado',
+        flotantesReordenados: { motivo: 'el Evento resuelve ahora su fin de turno ANTES que las cartas, que es el orden de las reglas (Evento, vanguardia, retaguardia, Daños por tiempo); la vieja lo hacía al revés. Son los MISMOS flotantes, solo cambiados de sitio: el harness exige que el conjunto sea idéntico' },
         semilla: 13,
         monedas: ['cara'],
         turnoDe: 'p1',
@@ -65,6 +68,7 @@ const escenarios = [
     },
     {
         nombre: 'Fin de turno con cruz: manos vacías, sin modales',
+        flotantesReordenados: { motivo: 'el Evento resuelve ahora su fin de turno ANTES que las cartas, que es el orden de las reglas (Evento, vanguardia, retaguardia, Daños por tiempo); la vieja lo hacía al revés. Son los MISMOS flotantes, solo cambiados de sitio: el harness exige que el conjunto sea idéntico' },
         monedas: ['cruz'],
         turnoDe: 'p1',
         p1: {
@@ -85,6 +89,7 @@ const escenarios = [
         // ANTES de mirar si hay Otakus (preguntarSiempre); si aceptas y no hay, se
         // avisa y se baraja igualmente. La vieja ni preguntaba ni barajaba.
         nombre: 'Cara sin Otakus en el mazo: la nueva pregunta igualmente y baraja al aceptar',
+        flotantesReordenados: { motivo: 'el Evento resuelve ahora su fin de turno ANTES que las cartas, que es el orden de las reglas (Evento, vanguardia, retaguardia, Daños por tiempo); la vieja lo hacía al revés. Son los MISMOS flotantes, solo cambiados de sitio: el harness exige que el conjunto sea idéntico' },
         semilla: 3, // elegida para que el barajado REORDENE el mazo de 3 (con 19 quedaba igual y el contrato estricto lo detectó)
         monedas: ['cara'],
         turnoDe: 'p1',
@@ -110,6 +115,7 @@ const escenarios = [
     },
     {
         nombre: 'Cara sin Otakus, declinando la compra: sin barajado (nuevo flujo, la vieja ni pregunta)',
+        flotantesReordenados: { motivo: 'el Evento resuelve ahora su fin de turno ANTES que las cartas, que es el orden de las reglas (Evento, vanguardia, retaguardia, Daños por tiempo); la vieja lo hacía al revés. Son los MISMOS flotantes, solo cambiados de sitio: el harness exige que el conjunto sea idéntico' },
         semilla: 19,
         monedas: ['cara'],
         turnoDe: 'p1',
@@ -136,6 +142,7 @@ const escenarios = [
         // segundo jugador; además activateAbility no comprobaba el silencio (solo
         // se ocultaba el botón en el render). Ambas bases comparten el fix.
         nombre: 'El silencio de la Feria alcanza al campo ENEMIGO y bloquea su habilidad',
+        flotantesReordenados: { motivo: 'el Evento resuelve ahora su fin de turno ANTES que las cartas, que es el orden de las reglas (Evento, vanguardia, retaguardia, Daños por tiempo); la vieja lo hacía al revés. Son los MISMOS flotantes, solo cambiados de sitio: el harness exige que el conjunto sea idéntico' },
         turnoDe: 'p2',
         p1: {
             vanguardia: ['Frikazo', 'Oso con armadura'],
@@ -149,6 +156,7 @@ const escenarios = [
     },
     {
         nombre: 'La Feria caduca y cierra sus puertas (los silenciados se liberan)',
+        flotantesReordenados: { motivo: 'el Evento resuelve ahora su fin de turno ANTES que las cartas, que es el orden de las reglas (Evento, vanguardia, retaguardia, Daños por tiempo); la vieja lo hacía al revés. Son los MISMOS flotantes, solo cambiados de sitio: el harness exige que el conjunto sea idéntico' },
         turnoDe: 'p2',
         p1: {
             vanguardia: ['Oso con armadura'],

@@ -34,11 +34,6 @@ Aparte, **Tengu orgulloso** (ya mixta) necesita "contar caras de moneda" para mi
 
 ## 3. Piezas del DSL pendientes
 
-- **`PERIODICO` absorbe a `INICIO_TURNO` y `FIN_TURNO`** (11 abilities). Son la misma idea con la
-  fase escondida en el nombre. OJO: hay que mover el despacho al punto EXACTO donde hoy se les
-  llama, o cambia el orden respecto a los Daños por tiempo y los contadores.
-  **Norma del orden, que debe cumplirse siempre**: Evento → vanguardia → retaguardia → Daños por
-  tiempo, y dentro de cada fila de izquierda a derecha (que es el orden del array).
 - **Costes y requisitos con "o bien"**: varios grupos alternativos en una carta, mezclando coste y
   requisito. Desbloquea **Karlos (KL)** y todas las del Excel que traigan "o bien". La mitad ya
   existe: el detalle YA pinta esas híbridas en caja apilada.
@@ -89,6 +84,11 @@ Norma a partir de ahora: cada pieza nueva del DSL entra también en el editor.
   "correr en la fase de Furor".
 - **Si una carta hace algo que solo aplicará en un momento concreto, se marca visiblemente** desde
   ya (marca con chapa), y el aviso se retira cuando el efecto llega.
+- **`INICIO_TURNO` y `FIN_TURNO` se compilan a `PERIODICO`** (21-ago-2026). Se mantienen como
+  sinónimos: hay cartas escritas con ellos y no hay razón para prohibirlos.
+- **El orden de una fase es el de las reglas**: Evento → vanguardia → retaguardia → Daños por
+  tiempo, y dentro de cada fila de izquierda a derecha (que es el orden del array, y el mismo en
+  que se ven en la mesa).
 - **MARAVILLA (Serafín) es Requisito, no autodestrucción**: si ya tienes uno, la carta ni se juega
   y avisa. La Pasiva se queda solo para lo que el requisito no ve (dos por resurrección o clon),
   destruyendo los más antiguos hasta que quede uno.

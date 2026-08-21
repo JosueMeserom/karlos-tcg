@@ -106,7 +106,10 @@ for (const c of CARTAS) {
 }
 
 const T_COLOCAR = ['AL_JUGAR', 'ANTES_DE_JUGAR', 'AL_ENTRAR', 'onPlay', 'onAfterPlayAsync', 'onBeforePlayAsync'];
-const T_CONTINUO = ['PASIVA_CONTINUA', 'AURA', 'PREVIEW_GLOBAL', 'GLOBAL_MODIFICAR_FUROR',
+// PERIODICO cuenta como continuo: es lo que absorbió a INICIO_TURNO y FIN_TURNO (21-ago-2026),
+// que ya estaban aquí. Sin esto, las cartas que se compilan a él perdían su disparador continuo a
+// ojos de la auditoría y salían como si su "Mientras…" no lo hiciera nadie.
+const T_CONTINUO = ['PASIVA_CONTINUA', 'AURA', 'PREVIEW_GLOBAL', 'GLOBAL_MODIFICAR_FUROR', 'PERIODICO',
     'GLOBAL_ANTES_DE_CAMBIO_STAT', 'PUEDE_ATACAR', 'SOBRECURACION', 'FIN_TURNO', 'INICIO_TURNO',
     'GLOBAL_INICIO_TURNO', 'INTERCEPTOR_ATAQUE', 'onUpdatePassive', 'onEquipUpdate',
     'onGlobalGetPreviewEffects', 'onGetPreviewEffects', 'onGlobalBeforeStatChange',
