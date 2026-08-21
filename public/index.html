@@ -5248,8 +5248,11 @@
                         const porFuente = new Map();
                         const _refMod = (m) => (m.srcId === card.instanceId) ? 'esta carta' : (m.ref || m.fuente);
                         mods.forEach(m => {
-                            if (m.stat === 'OCULTO') { if (!curadoOculto) effects.push(this.lineaEfecto(this.generoTexto(card, 'Oculto', 'Oculta'), { habilidad: m.habilidad, ref: _refMod(m) })); return; }
-                            if (m.stat === 'SILENCIO') { if (!curadoSilencio) effects.push(this.lineaEfecto(this.generoTexto(card, 'Silenciado', 'Silenciada'), { habilidad: m.habilidad, ref: _refMod(m) })); return; }
+                            // `nota` también aquí (Toto, 21-ago-2026): la coletilla de la carta
+                            // origen valía para las líneas de stats pero no para estas dos, y es
+                            // donde más falta hacía -un "Oculto" a secas no dice CUÁNDO se nota-.
+                            if (m.stat === 'OCULTO') { if (!curadoOculto) effects.push(this.lineaEfecto(this.generoTexto(card, 'Oculto', 'Oculta'), { habilidad: m.habilidad, ref: _refMod(m), nota: this._notaDeFuente(m.srcId) })); return; }
+                            if (m.stat === 'SILENCIO') { if (!curadoSilencio) effects.push(this.lineaEfecto(this.generoTexto(card, 'Silenciado', 'Silenciada'), { habilidad: m.habilidad, ref: _refMod(m), nota: this._notaDeFuente(m.srcId) })); return; }
                             if (m.stat === 'ATQ') acumA += m.delta; else if (m.stat === 'DEF') acumD += m.delta;
                             // (VIDA MÁX. -stat "VIDA"- no entra en el residuo de ATQ/DEF: no hay
                             // "tope 0-9" que lo genere, así que no necesita acumulador propio.)
@@ -5365,8 +5368,8 @@
                         ((this._statMods && this._statMods[otra.instanceId]) || []).forEach(m => {
                             if (m.srcId === card.instanceId || m.srcAltId === card.instanceId) {
                                 const _cs = curadoPorObjetivo.get(otra.instanceId);
-                                if (m.stat === 'OCULTO') { if (!_cs || !_cs.has('oculto')) _salientes.push(this.lineaEfecto(this.generoTexto(otra, 'Oculto', 'Oculta'), { habilidad: m.habilidad, ref: _obj, comoObjetivo: true })); return; }
-                                if (m.stat === 'SILENCIO') { if (!_cs || !_cs.has('silencio')) _salientes.push(this.lineaEfecto(this.generoTexto(otra, 'Silenciado', 'Silenciada'), { habilidad: m.habilidad, ref: _obj, comoObjetivo: true })); return; }
+                                if (m.stat === 'OCULTO') { if (!_cs || !_cs.has('oculto')) _salientes.push(this.lineaEfecto(this.generoTexto(otra, 'Oculto', 'Oculta'), { habilidad: m.habilidad, ref: _obj, comoObjetivo: true, nota: this._notaDeFuente(m.srcId) })); return; }
+                                if (m.stat === 'SILENCIO') { if (!_cs || !_cs.has('silencio')) _salientes.push(this.lineaEfecto(this.generoTexto(otra, 'Silenciado', 'Silenciada'), { habilidad: m.habilidad, ref: _obj, comoObjetivo: true, nota: this._notaDeFuente(m.srcId) })); return; }
                                 const clave = (m.srcId || '') + '|' + (m.habilidad || '');
                                 if (!_grupos.has(clave)) _grupos.set(clave, { partes: [], habilidad: m.habilidad, turnos: m.turnos, srcId: m.srcId });
                                 _grupos.get(clave).partes.push({ stat: m.stat, txt: `${m.delta > 0 ? '+' : ''}${m.delta} ${m.stat}` });

@@ -3194,13 +3194,16 @@ const CARD_DB = [
         //
         // OJO BIÓNICO no es una ability: son dos BANDERAS de plantilla (canAttackStealth,
         // immuneToApagon) que lee el motor. No hay nada que migrar ahí.
-        // Los textos NO hablan de humo (Toto, 21-ago-2026): Simon no lanza nada, se queda
-        // aguantando a la desesperada -su ÚLTIMA RESISTENCIA- para que el rival tenga que mirarle
-        // a él. Y el estado dice CUÁNDO se nota: la marca se pone al usar la Habilidad, pero lo
-        // que hace solo importa en el turno del rival, y sin decirlo parece un fallo.
-        // La fuente y el "por ÚLTIMA RESISTENCIA" NO se escriben aquí: los pone la línea
-        // automática del detalle, que ya conoce la gramática de §13.
-        tempEffectText: "A cubierto: durante el turno del rival no puede ser objetivo de ataques normales",
+        // SIN `tempEffectText` (Toto, 21-ago-2026, con captura): el Oculto ya lo cuenta la línea
+        // AUTOMÁTICA -"Oculto por ÚLTIMA RESISTENCIA, fuente: Simon de J1 (…)"-, así que
+        // declararlo aquí solo añadía una segunda línea diciendo lo mismo. El automático de
+        // `_statMods` no cubre solo stats: también registra OCULTO y SILENCIO.
+        //
+        // Lo único que le faltaba a esa línea era el matiz de CUÁNDO se nota -la marca se pone al
+        // usar la Habilidad, pero lo que hace solo importa en el turno del rival, y sin decirlo
+        // parece un fallo-. Eso es exactamente para lo que existe `notaEfecto`: una coletilla que
+        // la carta ORIGEN le añade a su línea automática, sin escribir la línea entera.
+        notaEfecto: "durante el turno del rival",
         tempEffectExpiraLog: "{objetivo} deja de estar a cubierto.",
         abilities: [
             { trigger: "ACTIVA", nombre: "ÚLTIMA RESISTENCIA", coste: { furor: 3 },
@@ -11206,7 +11209,10 @@ const DSL = {
                     // regla de que el "por HABILIDAD" se omita en Eventos y Ayudas sale gratis:
                     // ahí el compilador nunca rellena ese campo (ver _habDeCarta).
                     if (typeof game.lineaEfecto === 'function') {
-                        return [game.lineaEfecto(txt, { turnos: eff.duration, habilidad: eff.habilidad, ref: src || tmpl.name })];
+                        // `ref` es el TEXTO ya formateado (refCarta), no la carta: lineaEfecto lo
+                        // interpola tal cual y con el objeto salía un "[object Object]" (Toto,
+                        // 21-ago-2026, con captura).
+                        return [game.lineaEfecto(txt, { turnos: eff.duration, habilidad: eff.habilidad, ref })];
                     }
                     return [`${txt}, fuente: ${ref}`];
                 };

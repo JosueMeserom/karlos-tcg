@@ -753,5 +753,31 @@ console.log('\n--- el modal de la moneda dice por qué se lanza ---');
     check('_fmtLog escapa antes de formatear', /_fmtLog\(msg\) \{[\s\S]{0,400}replace\(\/&\/g, '&amp;'\)/.test(src));
 }
 
+// LA COLETILLA DE UN EFECTO AUTOMÁTICO (Toto, 21-ago-2026). El detalle escribe solo las líneas
+// de "Afectado por", y no solo para stats: OCULTO y SILENCIO también salen del registro
+// automático. Lo que faltaba era poder AMPLIAR esa línea sin escribirla entera: Simon oculta a
+// sus compañeros, pero eso solo se nota en el turno del rival, y un "Oculto" a secas parecía un
+// fallo. `notaEfecto` en la carta ORIGEN añade esa coletilla. Declarar la línea a mano en su
+// lugar daba DOS diciendo lo mismo, que es lo que Toto vio en el navegador.
+console.log('\n--- coletilla (notaEfecto) en las líneas automáticas ---');
+{
+    const G = vm.runInContext('Game', sandbox);
+    const src = fs.readFileSync(path.join(RAIZ, 'public/index.html'), 'utf8');
+    check('la línea de OCULTO admite coletilla', /stat === 'OCULTO'[\s\S]{0,220}nota: this\._notaDeFuente/.test(src));
+    check('...y la de SILENCIO', /stat === 'SILENCIO'[\s\S]{0,240}nota: this\._notaDeFuente/.test(src));
+    check('...en las dos vistas (Afectado por y Efectos actuales)',
+          (src.match(/stat === 'OCULTO'[\s\S]{0,240}nota: this\._notaDeFuente/g) || []).length === 2);
+    // Y la gramática: la coletilla va entre el efecto y la fuente, con " · ".
+    const juego = Object.create(G.prototype);
+    const linea = G.prototype.lineaEfecto.call(juego, 'Oculto', { habilidad: 'ÚLTIMA RESISTENCIA', ref: 'Simon de J1 (Nick)', nota: 'durante el turno del rival' });
+    check('la coletilla va entre el efecto y la fuente',
+          linea === 'Oculto por ÚLTIMA RESISTENCIA · durante el turno del rival, fuente: Simon de J1 (Nick)', linea);
+    // El [object Object] que vio Toto: `ref` es TEXTO ya formateado, nunca la carta.
+    const cartas = vm.runInContext('CARD_DB', sandbox);
+    const simon = cartas.find(c => c.name === 'Simon');
+    check('Simon NO declara tempEffectText: su Oculto ya sale automático', !simon.tempEffectText);
+    check('...y sí declara la coletilla', simon.notaEfecto === 'durante el turno del rival', simon.notaEfecto);
+}
+
 console.log(fallos === 0 ? '\nSUITE capas_cliente: ' + comprobaciones + '/' + comprobaciones + ' comprobaciones — CAPAS CORRECTAS' : '\nSUITE capas_cliente: ' + fallos + ' FALLOS de ' + comprobaciones + ' comprobaciones');
 process.exit(fallos ? 1 : 0);
