@@ -776,28 +776,48 @@
         //
         // Solo se escalona lo que cae junto y en cartas DISTINTAS: dos flotantes seguidos sobre la
         // misma carta ya los separa su propia cola (400 ms), y meterles retraso los duplicaría.
+        //
+        // ALTURAS ALTERNAS, que es lo que de verdad arregla el cruce (Toto, 21-ago-2026). Repartir
+        // en el tiempo no bastaba, y el motivo es que cada carta no emite UN flotante sino DOS: la
+        // etiqueta ("DAÑO VERDADERO") y, 400 ms después, el cambio de stat ("-1 VIDA"). Con las dos
+        // secuencias entrelazadas y flotantes que viven 1,5 s, siempre hay uno de cada carta en
+        // pantalla a la vez -"en una dice DAÑO VERDADERO y en la otra -1 VIDA, y luego al revés"-.
+        // Subir el escalón por encima de 400 lo arreglaría, pero eso es la cola global: con nueve
+        // cartas serían varios segundos.
+        // Así que dentro de un lote las cartas alternan RENGLÓN: pares abajo, impares arriba. Dos
+        // vecinas dejan de compartir altura, que es lo único que hacía inevitable el choque. Y
+        // alterna entre DOS niveles, no uno por carta: no acumula por muchas cartas que haya, que
+        // es el problema que tendría apartarlos en horizontal.
         const FT_ESCALON = 110;   // ms entre flotantes del mismo lote
         const FT_VENTANA = 50;    // ms dentro de los cuales dos flotantes se consideran del mismo lote
-        let _ftLote = { t: -1e9, n: 0, id: null };
+        const FT_RENGLON = 28;    // px que sube el renglón alterno (0 = todos a la misma altura)
+        // El lote lleva un MAPA carta -> puesto, no un contador de llamadas: cada carta emite
+        // normalmente DOS flotantes (etiqueta y stat) y los dos tienen que caer en el mismo
+        // renglón y con el mismo retraso, o la carta se lee partida en dos sitios.
+        let _ftLote = { t: -1e9, orden: new Map() };
 
         function showFloatingText(elementId, text, colorClass, offsetY = 0) {
             const _ahora = Date.now();
-            if (_ahora - _ftLote.t <= FT_VENTANA && elementId !== _ftLote.id) _ftLote.n++;
-            else _ftLote.n = 0;
+            if (_ahora - _ftLote.t > FT_VENTANA) _ftLote.orden = new Map();   // lote nuevo
             _ftLote.t = _ahora;
-            _ftLote.id = elementId;
+            if (!_ftLote.orden.has(elementId)) _ftLote.orden.set(elementId, _ftLote.orden.size);
+            const _puesto = _ftLote.orden.get(elementId);
 
+            // El renglón depende de la POSICIÓN en el lote, no del flotante: así los DOS de una
+            // misma carta (etiqueta y stat) comparten altura y siguen leyéndose como una unidad,
+            // y lo que se separa es una carta de la siguiente.
+            const _dy = offsetY - ((_puesto % 2) * FT_RENGLON);
             const _poner = () => {
                 if (!window.ftQueues[elementId]) {
                     window.ftQueues[elementId] = { items: [], processing: false };
                 }
-                window.ftQueues[elementId].items.push({text, colorClass, offsetY});
+                window.ftQueues[elementId].items.push({ text, colorClass, offsetY: _dy });
                 processFtQueue(elementId);
             };
             // Sin retraso se hace EN EL ACTO, no en un setTimeout(0): así un flotante suelto se
             // comporta exactamente igual que antes de este cambio.
-            if (_ftLote.n === 0) _poner();
-            else setTimeout(_poner, _ftLote.n * FT_ESCALON);
+            if (_puesto === 0) _poner();
+            else setTimeout(_poner, _puesto * FT_ESCALON);
         }
 
         /* GLOBAL BANNER RESOLVER TO SKIP */

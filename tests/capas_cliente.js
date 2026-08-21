@@ -668,8 +668,9 @@ console.log('\n--- escalonado de flotantes de un mismo lote ---');
 {
     const sft = vm.runInContext('showFloatingText', sandbox);
     const programados = [];
+    const pendientes = [];
     const _st = sandbox.setTimeout;
-    sandbox.setTimeout = (fn, ms) => { programados.push(ms); return 0; };
+    sandbox.setTimeout = (fn, ms) => { programados.push(ms); pendientes.push(fn); return 0; };
 
     // Se filtran los 400 y 1500: son las esperas de la PROPIA cola de flotantes (el hueco entre
     // dos de la misma carta y el borrado del nodo), no el escalonado que se está midiendo.
@@ -687,14 +688,32 @@ console.log('\n--- escalonado de flotantes de un mismo lote ---');
 
     // Dos seguidos sobre la MISMA carta no se escalonan: ya los separa su propia cola de 400 ms,
     // y meterles retraso encima los duplicaría.
-    // Dos seguidos sobre la MISMA carta: el primero cuenta como uno más del lote (viene de otra
-    // carta), pero el SEGUNDO no añade escalón — su cola de 400 ms ya los separa, y meterle
-    // retraso encima los duplicaría. Se mide que el segundo no programa nada nuevo.
+    // Dos flotantes sobre la MISMA carta comparten PUESTO: mismo retraso y mismo renglón, o la
+    // carta se leería partida en dos sitios. Su cola propia (400 ms) ya los separa entre sí.
+    programados.length = 0;
     sft('cartaD', 'x', 'ft-green', 0);
-    const antes = escalones().length;
     sft('cartaD', 'y', 'ft-green', 0);
-    check('el segundo flotante de la MISMA carta no añade retraso', escalones().length === antes,
-          'antes=' + antes + ' despues=' + escalones().length);
+    const dosD = escalones();
+    check('los dos flotantes de una MISMA carta llevan el MISMO retraso',
+          dosD.length === 2 && dosD[0] === dosD[1], 'retrasos=' + JSON.stringify(dosD));
+
+    // Los diferidos no corren solos con el setTimeout de mentira: se disparan a mano para poder
+    // mirar qué offsetY ha acabado en la cola de cada carta.
+    pendientes.forEach(fn => { try { fn(); } catch (e) {} });
+
+    // Y LA ALTURA: dentro de un lote las cartas alternan renglón, que es lo que evita que dos
+    // vecinas compartan línea (el cruce "DAÑO VERDADERO" / "-1 VIDA" que vio Toto). Se miran los
+    // offsets que acaban en la cola de cada carta.
+    const _q = sandbox.window.ftQueues || {};
+    const _off = (id) => ((_q[id] && _q[id].items[0]) || {}).offsetY;
+    check('la 1ª carta del lote se queda en su altura', _off('cartaA') === -30,
+          'cartaA offsetY=' + _off('cartaA'));
+    check('la 2ª sube un renglón', _off('cartaB') < -30, 'cartaB offsetY=' + _off('cartaB'));
+    check('la 3ª vuelve abajo: alterna entre DOS niveles, no acumula', _off('cartaC') === _off('cartaA'),
+          'cartaC offsetY=' + _off('cartaC') + ' vs cartaA ' + _off('cartaA'));
+    check('los dos flotantes de una MISMA carta comparten renglón',
+          (_q['cartaD'] || { items: [] }).items.every(i => i.offsetY === (_q['cartaD'].items[0] || {}).offsetY),
+          'cartaD=' + JSON.stringify((_q['cartaD'] || {}).items));
     sandbox.setTimeout = _st;
 }
 
