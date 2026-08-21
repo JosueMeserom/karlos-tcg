@@ -27,11 +27,11 @@ const ML = 'MIGRACION A BUSCAR: los dos logs por zona que tenia la vieja ("anade
 const _MOT_ORDEN = 'el tributo se cobra ANTES de colocar la carta desde que Garret lo declara en ANTES_DE_JUGAR con esCoste; la vieja lo cobraba despues. Mismas lineas, otro orden';
 const YD_VIEJA = [
         { linea: 'entrega su Furor como tributo para Garret', motivo: _MOT_ORDEN },
-    { linea: 'juega Garret de J1 (Jugador 1) en la vanguardia', motivo: _MOT_ORDEN },
+    { linea: 'juega Garret en la vanguardia', motivo: _MOT_ORDEN },
 ];
 const YD_NUEVA = [
     { linea: 'entrega su Furor como tributo para Garret', motivo: _MOT_ORDEN },
-    { linea: 'juega Garret de J1 (Jugador 1) en la vanguardia', motivo: _MOT_ORDEN },
+    { linea: 'juega Garret en la vanguardia', motivo: _MOT_ORDEN },
 ];
 const YA_DIVERGIA = {
     logsIntencionados: [
