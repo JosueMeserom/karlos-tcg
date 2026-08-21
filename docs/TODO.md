@@ -3,7 +3,7 @@
 Lo que queda por hacer, con su porqué. Se actualiza al cerrar cada cosa: lo que Toto no rebate
 después de hacerlo se da por bueno y se quita de aquí.
 
-> Última revisión: 21-ago-2026 · 167 cartas en CARD_DB · 102 suites en verde
+> Última revisión: 22-ago-2026 · 167 cartas en CARD_DB · 103 suites en verde
 
 ---
 
@@ -17,13 +17,13 @@ existe 'Diosa').
 
 ---
 
-## 2. Migración al DSL: 9 imperativas puras
+## 2. Migración al DSL: 8 imperativas puras
 
-Quedan (entre paréntesis, sus hooks a mano). En total, 164 hooks escritos a mano en el fichero.
+Quedan (entre paréntesis, sus hooks a mano). En total, 162 hooks escritos a mano en el fichero.
 
 | Carta | Qué le falta al DSL |
 |---|---|
-| **Unmei** (2), **NoName** (9) | `CREAR_CLON` — una pieza, dos cartas |
+| **NoName** (9) | **corrección del 22-ago-2026**: esos 9 hooks NO son el clon, son **RÉPLICA**, que copia la Activa de un enemigo delegando `canActivateAbility`/`onExecuteAbility`/`onValidateTarget`/`onTargetsReady`/… al template ajeno. Candidata a irreducible: es *meta* sobre la interfaz de hooks, y funciona igual con cartas ya migradas (regresion68 lo fija) |
 | **K.I.N.O.** (2) | `INTERCAMBIAR_POSICION` y "al entrar en esta zona" |
 | **Erasmo** (5), **Silhouette** (7), **Sadame** (7), **Mill** (7), **Xanadu** (6), **Arthas** (8) | sin leer a fondo todavía: cada una pide su propio análisis |
 
@@ -47,7 +47,7 @@ del lenguaje.
 
 - **22 de los 36 triggers** no existen ahí: `REACCION`, `AL_MORIR`, `AL_EQUIPAR`, los
   interceptores, `COSTE_COLOCACION`, `PERIODICO`, `INTERCEPTOR_LETAL`…
-- **32 de las 41 ops** tampoco: `ELEGIR`, `EQUIPAR`, `MARCAR_TEMPORAL`, `DESCARTAR`, `COLOCARSE`…
+- **33 de las 42 ops** tampoco: `ELEGIR`, `EQUIPAR`, `MARCAR_TEMPORAL`, `DESCARTAR`, `COLOCARSE`, `CREAR_CLON`…
 
 Cuando se retome, además de ponerlo al día, Toto quiere:
 - un **"detalle" que se renderice igual que en partida**, con los datos que estés metiendo;
@@ -80,6 +80,10 @@ Norma a partir de ahora: cada pieza nueva del DSL entra también en el editor.
   "correr en la fase de Furor".
 - **Si una carta hace algo que solo aplicará en un momento concreto, se marca visiblemente** desde
   ya (marca con chapa), y el aviso se retira cuando el efecto llega.
+- **Una ficha se resuelve por NOMBRE, no por id** (22-ago-2026): `CREAR_CLON` busca
+  `"Clon de " + quien usa la Habilidad`. Es lo que hace que NoName, al REPLICAR la Activa de
+  Unmei, saque su propio clon sin que el op sepa nada de NoName (la vieja lo resolvía con un
+  `card.name === "NoName" ? 901 : 900` escondido dentro de Unmei).
 - **El hueco de un muerto no se cierra mientras su muerte siga teniendo consecuencias**
   (22-ago-2026). La recolocación (subir de retaguardia) espera a que se resuelvan las reacciones a
   esa muerte; si no, quien reacciona para ocupar el hueco se lo encuentra tapado. No es un

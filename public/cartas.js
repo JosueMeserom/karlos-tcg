@@ -3501,61 +3501,19 @@ const CARD_DB = [
         name: "Unmei", hp: 5, def: 7, atk: 4, type: "Personaje", subtype: "Ser vivo", tags: ["Ninja"], gender: "M", rarity: "B", cost: 1, series: 1,
         text: "A: MULTIPLICACIÓN DE CUERPO (4F): Crea un 'Clon de Unmei' en el campo: copia su Atq y Def en todo momento, tiene Vida propia y no gana Furor. Si Unmei muere, el clon se desvanece sin dar Retribución.",
         activeName: "MULTIPLICACIÓN DE CUERPO", activeCost: 4,
-        canActivateAbility: function(card, game) {
-            if (card.furor < 4) { game.logError("Falta Furor (4)."); return false; }
-            
-            const p = game.players[card.owner];
-            if (p.vanguard.length >= 4 && p.rearguard.length >= 4) {
-                game.logError("No tienes espacio en tu campo para materializar el clon.");
-                return false;
-            }
-            return true;
-        },
-        onExecuteAbility: async function(card, game) {
-            game.modifyStat(card, 'furor', -4);
-            showFloatingText(card.instanceId, card.activeName, "ft-ability", -30);
-            
-            const p = game.players[card.owner];
-            
-            // Buscamos un hueco: prioridad a vanguardia, luego retaguardia
-            let targetZone = 'vanguard';
-            if (p.vanguard.length >= 4) targetZone = 'rearguard';
-            
-            game.logMsg(`¡${game.getCardNameWithOwner(card)} traza unos sellos con las manos y se multiplica!`, 'ability');
-            
-            // --- ¿Quién está usando esto? ¿Unmei o NoName? ---
-            const cloneId = card.name === "NoName" ? 901 : 900;
-            const clone = game.createCardInstance(cloneId, card.owner);
-            
-            clone.parentId = card.instanceId; 
-            clone.location = targetZone;
-            
-            clone.maxHp = card.maxHp;
-            clone.currentHp = card.maxHp; 
-            
-            // --- SISTEMA DE ANEXO REAL (Vínculo morado) ---
-            if (!card.attachments) card.attachments = [];
-            card.attachments.push(clone.instanceId);
-            clone.attachedTo = card.instanceId;
-            
-            p[targetZone].push(clone);
-            
-            // Efecto visual rápido de temblor
-            const el = document.querySelector(`.card[data-id="${card.instanceId}"]`);
-            if (el) {
-                el.classList.add('shaking');
-                await game.sleep(400);
-                el.classList.remove('shaking');
-            }
-            
-            // --- LIBERAR EL BLOQUEO DE LA INTERFAZ ---
-            card.exhausted = true;
-            game.isActionLocked = false;
-            game.cancelAction();
-            
-            game.updatePassives();
-            game.render();
-        }
+        // Migrada a DSL (op CREAR_CLON, 22-ago-2026). El clon en sí ya era declarativo desde el
+        // 21-jul-2026 (trigger ESPEJO); lo que faltaba era CREARLO. La ficha se resuelve por
+        // NOMBRE ("Clon de " + quien usa la Habilidad), que es lo que hace que siga funcionando
+        // cuando NoName replica esta misma Activa y saca el suyo.
+        abilities: [
+            { trigger: "ACTIVA", nombre: "MULTIPLICACIÓN DE CUERPO", coste: { furor: 4 }, sinObjetivo: true,
+              requisitos: [ { count: { huecosEnCampo: true }, op: ">=", valor: 1,
+                              msg: "No tienes espacio en tu campo para materializar el clon." } ],
+              efectos: [
+                { op: "CREAR_CLON",
+                  log: "¡{carta} traza unos sellos con las manos y se multiplica!",
+                  msgSinHueco: "No tienes espacio en tu campo para materializar el clon." } ] }
+        ]
     },
     {
         id: 900, name: "Clon de Unmei", hp: 5, def: 7, atk: 4, type: "Esbirro", subtype: "Ser vivo", tags: ["Ninja"], gender: "M", rarity: "B", cost: 0, series: 1,
@@ -7461,7 +7419,7 @@ const DSL = {
     // DSL._runReaccion, no _doEffect): controlan el resultado que la reacción
     // devuelve al motor de combate (redirigir el ataque, cancelarlo, drenar Furor
     // tras él, fijar el daño, autoataque del atacante).
-    OPS_EFECTO: ['MODIFICAR_STAT', 'CURAR', 'DAÑO', 'APLICAR_ESTADO', 'MODIFICAR_CONTADORES', 'ATACAR', 'MONEDA', 'ROBAR', 'BUSCAR', 'MARCAR', 'VER_MANO', 'LIMPIAR_ESTADOS', 'ELEGIR', 'DESTRUIR_EVENTO', 'MARCAR_TEMPORAL', 'DESCARTAR', 'EQUIPAR', 'MARCAR_JUGADOR', 'FLOTANTE', 'FIJAR_STAT', 'REDIRIGIR', 'CANCELAR_ATAQUE', 'MARCAR_DRENAJE', 'FIJAR_DAÑO', 'ATACANTE_SE_AUTOATACA', 'VOLVER_A_MANO', 'RETRIBUCION', 'SUELO_STAT', 'TECHO_STAT', 'NO_CONSUMIR', 'BONO_ATAQUE', 'MARCAR_PARTIDA', 'ESQUIVAR', 'DESEQUIPAR', 'DAÑO_ATAQUE', 'REDIRIGIR_ATAQUE', 'SECUESTRAR_STAT', 'DEVOLVER_STAT', 'CUENTA_ATRAS', 'QUITAR_MARCA', 'COLOCARSE'],
+    OPS_EFECTO: ['MODIFICAR_STAT', 'CURAR', 'DAÑO', 'APLICAR_ESTADO', 'MODIFICAR_CONTADORES', 'ATACAR', 'MONEDA', 'ROBAR', 'BUSCAR', 'MARCAR', 'VER_MANO', 'LIMPIAR_ESTADOS', 'ELEGIR', 'DESTRUIR_EVENTO', 'MARCAR_TEMPORAL', 'DESCARTAR', 'EQUIPAR', 'MARCAR_JUGADOR', 'FLOTANTE', 'FIJAR_STAT', 'REDIRIGIR', 'CANCELAR_ATAQUE', 'MARCAR_DRENAJE', 'FIJAR_DAÑO', 'ATACANTE_SE_AUTOATACA', 'VOLVER_A_MANO', 'RETRIBUCION', 'SUELO_STAT', 'TECHO_STAT', 'NO_CONSUMIR', 'BONO_ATAQUE', 'MARCAR_PARTIDA', 'ESQUIVAR', 'DESEQUIPAR', 'DAÑO_ATAQUE', 'REDIRIGIR_ATAQUE', 'SECUESTRAR_STAT', 'DEVOLVER_STAT', 'CUENTA_ATRAS', 'QUITAR_MARCA', 'COLOCARSE', 'CREAR_CLON'],
     OPS_CMP: ['==', '!=', '<=', '>=', '<', '>', 'includes', 'contieneTexto', 'includesCI', 'truthy', 'falsy'],
     QUIEN: ['SELF', 'ALIADO', 'ENEMIGO', 'TODOS', 'ATACANTE', 'DEFENSOR', 'PORTADOR', 'PAGADOR'], // ATACANTE/DEFENSOR: solo en GLOBAL_TRAS_ATAQUE y REACCION
 
@@ -7624,6 +7582,13 @@ const DSL = {
         return pool;
     },
     _count(ownerId, game, spec, selfCard) {
+        // `huecosEnCampo`: no cuenta CARTAS sino SITIOS LIBRES (4 por fila) en el campo del
+        // dueño. Lo necesita cualquier carta que meta algo nuevo en la mesa —hoy el clon de
+        // Unmei; mañana cualquier invocación— para poder decir "no cabe" antes de empezar.
+        if (spec.huecosEnCampo) {
+            const _p = game.players[ownerId];
+            return Math.max(0, 4 - _p.vanguard.length) + Math.max(0, 4 - _p.rearguard.length);
+        }
         let n = DSL._pool(ownerId, game, spec, selfCard).length;
         if (typeof spec.max === 'number') n = Math.min(n, spec.max);
         return n;
@@ -9027,6 +8992,63 @@ const DSL = {
             // Un flotante suele venir acompañado de su línea de log, y sin esto había que meter
             // un efecto aparte solo para eso.
             if (e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
+            return true;
+        }
+        // CREAR_CLON (Unmei, 22-ago-2026). Mete en el campo una FICHA que es copia de quien la
+        // usa: Vida propia (la máxima del padre), Atq/Def copiados en vivo y muerte súbita si el
+        // padre se va — eso último ya lo hace el trigger ESPEJO, que la ficha declara.
+        //
+        // La ficha se busca POR NOMBRE, "Clon de <quien la usa>", y no por un id fijo: es lo que
+        // permite que NoName, al REPLICAR esta misma Habilidad, saque su propio clon en vez del
+        // de Unmei (la vieja lo resolvía con un `card.name === "NoName" ? 901 : 900` a pelo).
+        // Si no existe esa ficha, se dice en voz alta: un clon que no aparece es un bug mudo.
+        if (e.op === 'CREAR_CLON') {
+            const p = game.players[sourceCard.owner];
+            const nombre = e.token || `Clon de ${sourceCard.name}`;
+            const tmplClon = (typeof CARD_DB !== 'undefined') ? CARD_DB.find(c => c && c.name === nombre) : null;
+            if (!tmplClon) { game.logError(`No existe la ficha "${nombre}".`); return false; }
+            const zona = p.vanguard.length < 4 ? 'vanguard' : (p.rearguard.length < 4 ? 'rearguard' : null);
+            if (!zona) { game.logError(e.msgSinHueco || 'No tienes espacio en tu campo.'); return false; }
+
+            if (e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard) }), e.logTipo || 'ability');
+
+            const clon = game.createCardInstance(tmplClon.id, sourceCard.owner);
+            clon.parentId = sourceCard.instanceId;
+            clon.location = zona;
+            clon.maxHp = sourceCard.maxHp;
+            clon.currentHp = sourceCard.maxHp;
+            // Anexo real (el vínculo morado que dibuja el cliente): el clon cuelga del padre.
+            if (!sourceCard.attachments) sourceCard.attachments = [];
+            sourceCard.attachments.push(clon.instanceId);
+            clon.attachedTo = sourceCard.instanceId;
+
+            const colocar = () => {
+                p[zona].push(clon);
+                clon.justPlayed = true;
+                clon._presentada = true;   // su entrada la hace la presentación
+                setTimeout(() => { clon.justPlayed = false; }, 400);
+                setTimeout(() => { delete clon._presentada; }, 800);
+                if (typeof game.updatePassives === 'function') game.updatePassives();
+                if (typeof game.render === 'function') game.render();
+                return clon.instanceId;
+            };
+            // El padre CANALIZA mientras se desdobla, y el clon sale DE ÉL: la presentación
+            // arranca en la carta del padre en vez de en una mano (no viene de ninguna). La
+            // vieja usaba la clase `shaking`, que es el tambaleo + borde ROJO de recibir daño;
+            // aquí no hay daño, así que canaliza como cualquier otra Habilidad.
+            const _elPadre = (typeof document !== 'undefined' && document.querySelector)
+                ? document.querySelector(`.card[data-id="${sourceCard.instanceId}"]`) : null;
+            if (_elPadre && _elPadre.classList) _elPadre.classList.add('casting');
+            const _fin = () => { if (_elPadre && _elPadre.classList) _elPadre.classList.remove('casting'); };
+            if (typeof animarPresentacionCarta === 'function') {
+                const _filaSel = `#${sourceCard.owner}-${zona}`;
+                await animarPresentacionCarta(tmplClon.id, `.card[data-id="${sourceCard.instanceId}"]`,
+                    _filaSel, false, { zonaSel: () => _filaSel, colocar });
+                _fin();
+            } else {
+                colocar();
+                _fin();
+            }
             return true;
         }
         if (e.op === 'VOLVER_A_MANO') {
