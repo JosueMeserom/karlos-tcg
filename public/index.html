@@ -122,7 +122,7 @@
         <!-- POR QUÉ se lanza (Toto, 21-ago-2026): el modal no decía de dónde salía la moneda, y
              con varias cartas en juego no hay forma de saberlo. Mismo tono que los avisos de los
              visores de pila: gris, cursiva, debajo del titular. Lo rellena triggerCoinFlips. -->
-        <div id="coin-reason" style="margin-bottom:36px; color:#94a3b8; font-size:1.05rem; font-style:italic; text-align:center; max-width:520px; display:none;"></div>
+        <div id="coin-reason" class="fmt-log" style="margin-bottom:36px; color:#94a3b8; font-size:1.05rem; font-style:italic; text-align:center; max-width:520px; display:none;"></div>
         <div id="coin" class="hoverable">
             <div class="coin-side side-heads">CARA</div>
             <div class="coin-side side-tails">CRUZ</div>
@@ -464,8 +464,12 @@
             </div>
         </div>
         <style>
-            #log-content b { font-weight: 800; color: #fff; }
-            #log-content i { font-style: italic; color: #93c5fd; }
+            /* La ropa de lo que sale de _fmtLog: carta en blanco fuerte, nick en azul claro. Va
+               por CLASE además de por el id del log (Toto, 21-ago-2026) porque el formateador ya
+               lo reusa el motivo del modal de la moneda, y atado solo a #log-content sus negritas
+               salían sin color. Cualquier sitio nuevo que pinte _fmtLog: ponle `fmt-log`. */
+            #log-content b, .fmt-log b { font-weight: 800; color: #fff; }
+            #log-content i, .fmt-log i { font-style: italic; color: #93c5fd; }
         </style>
         <div id="log-content"></div>
     </div>

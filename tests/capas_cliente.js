@@ -742,6 +742,11 @@ console.log('\n--- el modal de la moneda dice por qué se lanza ---');
     // Y el modal tiene dónde pintarlo, con innerText: puede llevar dentro el nick del rival.
     const src = fs.readFileSync(path.join(RAIZ, 'public/index.html'), 'utf8');
     check('el overlay tiene su renglón', /id="coin-reason"/.test(src));
+    // Y con la clase que le da la ROPA del log: sin ella, las negritas y cursivas salen sin color,
+    // porque esas reglas estaban atadas al id #log-content (Toto lo vio: "no hay colores").
+    check('...con la clase fmt-log, que es la que trae los colores',
+          /id="coin-reason" class="fmt-log"/.test(src) && /\.fmt-log b \{[^}]*color: #fff/.test(src)
+          && /\.fmt-log i \{[^}]*color: #93c5fd/.test(src));
     // Se pinta con el MISMO formateador del log (negritas y cursivas), y _fmtLog escapa antes de
     // meter etiquetas, que es lo que lo hace seguro con un nick escrito por otra persona.
     check('...y lo pinta con _fmtLog, como el log', /_razon\.innerHTML = txt \? this\._fmtLog\(txt\)/.test(src));
