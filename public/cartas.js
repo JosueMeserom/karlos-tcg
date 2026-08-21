@@ -8206,10 +8206,13 @@ const DSL = {
     // Marca un PUNTO DE PANTALLA en vez de una carta o una zona: el hueco que ha dejado una
     // carta que ya no existe. El motor mide ese rectángulo en el último instante en que la carta
     // seguía pintada (checkDeath) y lo pasa a la reacción; aquí solo se encola.
-    _marcarHueco(game, rect, tipo, etiqueta) {
-        if (!game || !rect) return;
+    _marcarHueco(game, rect, tipo, etiqueta, sel) {
+        if (!game || !(rect || sel)) return;
         game._costesPresenta = game._costesPresenta || [];
-        game._costesPresenta.push({ rect, tipo, etiqueta, zona: 'zona' });
+        // `zonaSel` manda: es EL HUECO de la fila, que sigue ahí mientras esté congelada. El
+        // `rect` es solo la red de seguridad para cuando no hay hueco que enseñar (una muerte en
+        // retaguardia, que no se congela): entonces vale el sitio donde estaba la carta.
+        game._costesPresenta.push({ zonaSel: sel || undefined, rect, tipo, etiqueta, zona: 'zona' });
     },
 
     _marcarCoste(game, cartas, tipo, etiqueta) {
@@ -9756,6 +9759,12 @@ const DSL = {
                     fila.splice(idx, 0, handCard);
                     handCard.justPlayed = true;
                     handCard._presentada = true;   // su entrada la hace la presentación
+                    // Y LAS DOS BANDERAS SE APAGAN. `_presentada` es lo único que impide que el
+                    // render le ponga `entering` (el rebote viejo de entrada), así que dejar
+                    // `justPlayed` encendido para siempre -como estaba- hacía que a los 800 ms
+                    // CADA repintado le volviera a lanzar la animación de colocarse. Mismos
+                    // tiempos que playCard, que es de donde sale el patrón.
+                    setTimeout(() => { handCard.justPlayed = false; }, 400);
                     setTimeout(() => { delete handCard._presentada; }, 800);
                     if (typeof game.updatePassives === 'function') game.updatePassives();
                     if (typeof game.render === 'function') game.render();
@@ -9769,7 +9778,7 @@ const DSL = {
                 // el escaparate, con la etiqueta "Reemplazo". Mismo mecanismo que las flechas de
                 // coste/tributo/requisito, con su propio tipo porque no es ninguna de las tres.
                 if (typeof animarPresentacionCarta === 'function') {
-                    DSL._marcarHueco(game, cx.rectHueco, 'reemplazo');
+                    DSL._marcarHueco(game, cx.rectHueco, 'reemplazo', null, cx.selHueco);
                     await animarPresentacionCarta(handCard.id, `#${reactor}-hand`,
                         filaSel, game.gameMode === 'online' && game.myPlayerId !== reactor,
                         { origenId: handCard.instanceId, zonaSel: () => filaSel,
@@ -11040,7 +11049,7 @@ const DSL = {
                 // que es justo lo que el motor espera de este hook.
                 tmpl.onHandReactionToAllyDeath = async function (handCard, deadCard, game, hueco) {
                     const h = hueco || {};
-                    const cx = { attacker: null, defensor: deadCard, zona: h.zona, indice: h.indice, rectHueco: h.rect };
+                    const cx = { attacker: null, defensor: deadCard, zona: h.zona, indice: h.indice, rectHueco: h.rect, selHueco: h.sel };
                     const result = { used: true };
                     if (!await correr(handCard, game, cx, result)) return false;
                     return true;

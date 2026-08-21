@@ -10088,6 +10088,11 @@
                         }
                         p.vanguard = p.vanguard.filter(c => c.instanceId !== card.instanceId);
                         p.rearguard = p.rearguard.filter(c => c.instanceId !== card.instanceId);
+                        // Un repintado AQUI para que el hueco exista de verdad en el DOM antes de
+                        // que nadie reaccione: es lo que da algo a lo que apuntar (la flecha de
+                        // "Reemplazo" sale de ese hueco) y lo que hace que se VEA abierto
+                        // mientras el jugador decide. Solo cuando lo hemos congelado nosotros.
+                        if (_congeloYo) this.render();
 
                         // CANDADO DE RECOLOCACIÓN (Toto, 14-ago-2026). Si varias cartas mueren en
                         // el MISMO instante lógico, los huecos no se recalculan hasta que hayan
@@ -10141,7 +10146,8 @@
                                 // arriba), así que quien quiera ocupar su hueco no puede
                                 // deducirla de la carta muerta.
                                 const used = await handTemplate.onHandReactionToAllyDeath(handCard, card, this,
-                                    { zona: wasInVanguard ? 'vanguard' : 'rearguard', indice: _indiceMuerto, rect: _rectMuerto });
+                                    { zona: wasInVanguard ? 'vanguard' : 'rearguard', indice: _indiceMuerto, rect: _rectMuerto,
+                                      sel: _congeloYo ? `[data-hueco="${card.instanceId}"]` : null });
                                 if (used) {
                                     // POR IDENTIDAD y no por indice: la reaccion ha estado en el
                                     // aire (modal, animacion) y la mano puede haber cambiado
@@ -11069,6 +11075,11 @@
                         if (c) { vanEl.appendChild(this.createCardEl(c)); _vivas.delete(id); return; }
                         const hueco = document.createElement('div');
                         hueco.className = 'card hueco-fantasma';
+                        // De QUIEN es el hueco: lo necesita quien quiera dibujar algo desde el
+                        // (la flecha de "Reemplazo"). Es el sitio de verdad en la fila, que no
+                        // tiene por que ser donde estaba la carta al morir -el Guardaespaldas
+                        // muere en medio de la mesa, plantado delante del que iba a recibir-.
+                        hueco.dataset.hueco = id;
                         hueco.style.visibility = 'hidden';
                         hueco.style.pointerEvents = 'none';
                         vanEl.appendChild(hueco);
