@@ -800,13 +800,21 @@ console.log('\n--- chapas de marca temporal ---');
     const iMarca = src.indexOf('(card.tempEffects || []).forEach(eff => {\r\n                    if (!eff.badge) return;');
     const iCounters = src.indexOf("if (card.counters && typeof card.counters === 'object') {\r\n                    let counterOffset");
     check('la chapa de marca se pinta FUERA del bloque de estados', iMarca > 0 && iStatus > 0 && iMarca > iStatus);
-    check('...y junto a los contadores, no con los estados', iCounters > 0 && Math.abs(iCounters - iMarca) < 1200,
-          'marca=' + iMarca + ' counters=' + iCounters);
+    // Por ORDEN y no por distancia en bytes: lo que importa es que esté entre el bloque de
+    // estados y el de contadores, no cuántos caracteres los separan (esa versión se rompía sola
+    // en cuanto se añadían dos líneas).
+    check('...y junto a los contadores, no con los estados', iCounters > iMarca && iMarca > iStatus,
+          'status=' + iStatus + ' marca=' + iMarca + ' counters=' + iCounters);
     check('usa la clase de contador, no la de estado', /chapa\.className = 'counter-badge'/.test(src));
     // La flecha del detalle tiene que TERMINAR en la chapa, no en el centro de la carta: para eso
     // la marca declara su clave, igual que ya hacían estados, contadores y stats.
     check('la chapa lleva su clave para la flecha', /chapa\.dataset\.badge = 'marca-' \+ eff\.sourceId/.test(src));
     check('...y la flecha la usa como destino', /if \(eff\.badge\) f\.badgeKey = 'marca-' \+ eff\.sourceId/.test(src));
+    // El color de la flecha sale del fondo de la chapa, pero una chapa oscura da una flecha casi
+    // negra. Se puede declarar otro (Toto, 21-ago-2026): el Oculto usa el color de su aro.
+    check('la flecha admite color declarado por la chapa', /const _ov = b\.dataset && b\.dataset\.arrowColor;[\s\S]{0,120}if \(_ov\) col = _ov;/.test(src));
+    check('...el Oculto declara el color de su aro', /stealthBadge\.dataset\.arrowColor = '#6366f1'/.test(src));
+    check('...y una marca puede declararlo desde la carta', /if \(b\.colorFlecha\) chapa\.dataset\.arrowColor = b\.colorFlecha/.test(src));
     check('y RESERVA SITIO como cualquier otra chapa',
           /\(card\.tempEffects \|\| \[\]\)\.some\(e => e\.badge\)\) hasCounters = true/.test(src));
 

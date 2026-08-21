@@ -11237,7 +11237,17 @@
                         if (b) {
                             const bc = centro(b);
                             let col = GRIS;
-                            try { const c2 = getComputedStyle(b).backgroundColor; if (c2 && c2 !== 'rgba(0, 0, 0, 0)' && c2 !== 'transparent') col = c2; } catch (e) {}
+                            // El color sale del FONDO de la chapa, que es lo que la ata
+                            // visualmente a su flecha. Pero una chapa oscura da una flecha casi
+                            // negra -el Oculto, con su azul noche, no se veía (Toto,
+                            // 21-ago-2026)-, así que la chapa puede declarar OTRO color con
+                            // `data-arrow-color`. Lo suyo es el color de su propio aro: se
+                            // mantiene la temática y se lee.
+                            try {
+                                const _ov = b.dataset && b.dataset.arrowColor;
+                                if (_ov) col = _ov;
+                                else { const c2 = getComputedStyle(b).backgroundColor; if (c2 && c2 !== 'rgba(0, 0, 0, 0)' && c2 !== 'transparent') col = c2; }
+                            } catch (e) {}
                             return { x: bc.x, y: bc.y, color: col, esBadge: true };
                         }
                     }
@@ -11753,6 +11763,9 @@
                     const stealthBadge = document.createElement('div');
                     stealthBadge.className = 'stealth-badge';
                     stealthBadge.dataset.badge = 'oculto';
+                    // Su fondo es azul noche (#1e1b4b) y de flecha se ve casi negra: se declara el
+                    // color del aro, que es el mismo idioma visual y sí se lee.
+                    stealthBadge.dataset.arrowColor = '#6366f1';
                     stealthBadge.innerHTML = '👁️'; 
                     el.appendChild(stealthBadge);
                 }
@@ -11779,6 +11792,9 @@
                     chapa.dataset.badge = 'marca-' + eff.sourceId;
                     chapa.style.bottom = `${-6 + marcaOffset}px`;
                     if (b.color) chapa.style.background = b.color;
+                    // `colorFlecha` en el `badge` de la carta: mismo override, declarado desde el
+                    // DSL para cuando el fondo de la chapa sea demasiado oscuro para la flecha.
+                    if (b.colorFlecha) chapa.dataset.arrowColor = b.colorFlecha;
                     const n = (eff.duration !== undefined && eff.duration !== null) ? eff.duration : '';
                     chapa.innerHTML = `<span>${b.icono || '✳️'}${n}</span>`;
                     el.appendChild(chapa);
