@@ -470,6 +470,12 @@
                salían sin color. Cualquier sitio nuevo que pinte _fmtLog: ponle `fmt-log`. */
             #log-content b, .fmt-log b { font-weight: 800; color: #fff; }
             #log-content i, .fmt-log i { font-style: italic; color: #93c5fd; }
+            /* El renglón del modal de la moneda AFINA la negrita (Toto, 21-ago-2026: "los trazos
+               muy gordos"). No estaba duplicada: es que en el log estas negritas van en
+               monoespaciada a 0.75rem, donde el 800 se lee fino, y aquí es Segoe UI a 1.05rem y
+               ADEMÁS en cursiva, que las engorda. Se baja el peso y se ponen DERECHAS: un nombre
+               recto sobre una frase inclinada se distingue mejor que uno más gordo. */
+            #coin-reason b { font-weight: 700; font-style: normal; }
         </style>
         <div id="log-content"></div>
     </div>
