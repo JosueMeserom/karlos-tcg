@@ -123,6 +123,59 @@ const enMano = (g, pid, n) => g.players[pid].hand.some(c => c.name === n);
         check('...y la carta entra', !!enCampo(g, 'p1', 'Edrielle'));
     }
 
+    console.log('\n--- El "o bien": varias formas de pagar el peaje ---');
+    {
+        // Karlos (KL): "Karolina, Karlitos o Igniz en tu campo O BIEN 2 de Furor". Manda la
+        // PRIMERA alternativa que se cumpla, y el orden es el del texto: primero lo que no cuesta
+        // nada, así el jugador no tiene que elegir entre gratis y pagando -que no es una elección-.
+        const { ctx, g, paso } = await mesa({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'Karolina', furor: 3 }], mano: ['Karlos (KL)'] },
+            p2: { vanguardia: ['Aniceto'] },
+        });
+        await paso({ jugar: 'Karlos (KL)' });
+        check('con un amigo delante entra GRATIS', !!enCampo(g, 'p1', 'Karlos (KL)'));
+        check('...sin preguntar nada a nadie', ctx.pendientes.length === 0, 'pendientes=' + ctx.pendientes.length);
+        check('...y sin tocarle el Furor a Karolina', enCampo(g, 'p1', 'Karolina').furor === 3,
+            'furor=' + enCampo(g, 'p1', 'Karolina').furor);
+        check('...anunciándolo', g.logHistory.some(e => /se une al grupo sin cobrar/.test(e.msg)));
+    }
+    {
+        // Sin amigos, cae a la segunda alternativa: el tributo de siempre.
+        const { g, paso } = await mesa({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'Mini-tigre', furor: 3 }], mano: ['Karlos (KL)'] },
+            p2: { vanguardia: ['Aniceto'] },
+        });
+        await paso({ jugar: 'Karlos (KL)' });
+        await paso({ elegir: ['Mini-tigre'] });
+        check('sin amigos, se paga el tributo', enCampo(g, 'p1', 'Mini-tigre').furor === 1,
+            'furor=' + enCampo(g, 'p1', 'Mini-tigre').furor);
+        check('...y entra igualmente', !!enCampo(g, 'p1', 'Karlos (KL)'));
+    }
+    {
+        // El amigo vale AUNQUE no tenga Furor: es un requisito, no un pago.
+        const { ctx, g, paso } = await mesa({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'Igniz', furor: 0 }], mano: ['Karlos (KL)'] },
+            p2: { vanguardia: ['Aniceto'] },
+        });
+        await paso({ jugar: 'Karlos (KL)' });
+        check('el amigo vale aunque esté a 0 de Furor', !!enCampo(g, 'p1', 'Karlos (KL)') && ctx.pendientes.length === 0);
+    }
+    {
+        // Y si no se cumple NINGUNA, la carta no se juega.
+        const { ctx, g, paso } = await mesa({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'Mini-tigre', furor: 1 }], mano: ['Karlos (KL)'] },
+            p2: { vanguardia: ['Aniceto'] },
+        });
+        await paso({ jugar: 'Karlos (KL)' });
+        check('sin amigos y sin Furor suficiente, no se coloca', !enCampo(g, 'p1', 'Karlos (KL)'));
+        check('...se queda en la mano', enMano(g, 'p1', 'Karlos (KL)'));
+        check('...y no se abre ninguna elección', ctx.pendientes.length === 0);
+    }
+
     console.log('\n' + (fallos
         ? `SUITE coste_colocacion: ${comprobaciones - fallos}/${comprobaciones} comprobaciones — ${fallos} FALLOS`
         : `SUITE coste_colocacion: ${comprobaciones}/${comprobaciones} comprobaciones — LA PIEZA CUMPLE`));

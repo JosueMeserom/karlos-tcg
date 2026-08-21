@@ -19,7 +19,7 @@ existe 'Diosa').
 
 ## 2. Migración al DSL: 11 imperativas puras
 
-Quedan (entre paréntesis, sus hooks a mano). En total, 168 hooks escritos a mano en el fichero.
+Quedan (entre paréntesis, sus hooks a mano). En total, 166 hooks escritos a mano en el fichero.
 
 | Carta | Qué le falta al DSL |
 |---|---|
@@ -34,9 +34,6 @@ Aparte, **Tengu orgulloso** (ya mixta) necesita "contar caras de moneda" para mi
 
 ## 3. Piezas del DSL pendientes
 
-- **Costes y requisitos con "o bien"**: varios grupos alternativos en una carta, mezclando coste y
-  requisito. Desbloquea **Karlos (KL)** y todas las del Excel que traigan "o bien". La mitad ya
-  existe: el detalle YA pinta esas híbridas en caja apilada.
 - **Descuento de tributo de Fusión de planos** (aplazado de antes).
 - **Candado de la cola de reconexión** (aplazado de antes).
 - **Estasis**: estado nuevo, en la categoría 'ocultacion' junto al Oculto (no pueden convivir). Se
@@ -86,6 +83,9 @@ Norma a partir de ahora: cada pieza nueva del DSL entra también en el editor.
   ya (marca con chapa), y el aviso se retira cuando el efecto llega.
 - **`INICIO_TURNO` y `FIN_TURNO` se compilan a `PERIODICO`** (21-ago-2026). Se mantienen como
   sinónimos: hay cartas escritas con ellos y no hay razón para prohibirlos.
+- **El "o bien" de los costes es `alternativas`** en COSTE_COLOCACION: se recorren EN ORDEN y manda
+  la primera que se cumpla, así que lo que no cuesta nada va primero y el jugador no tiene que
+  elegir entre gratis y pagando.
 - **El orden de una fase es el de las reglas**: Evento → vanguardia → retaguardia → Daños por
   tiempo, y dentro de cada fila de izquierda a derecha (que es el orden del array, y el mismo en
   que se ven en la mesa).

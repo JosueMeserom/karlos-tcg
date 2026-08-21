@@ -4765,6 +4765,20 @@ const CARD_DB = [
         text: "Requisito: Karolina, Karlitos o Igniz en tu campo o bien Coste: 2 de Furor. P: DAME TRABAJOS: Si su Vida <= 3, +2 Atq. A: ULTRA-CHOQUE (2F): Dos ataques normales a vanguardia rival.",
         passiveName: "DAME TRABAJOS", activeName: "ULTRA-CHOQUE", activeCost: 2,
         abilities: [
+            // EL "O BIEN", DECLARATIVO (Toto, 21-ago-2026). Era el último trozo de código a mano
+            // de esta carta: comprobaba si estaba alguno de los tres y, si no, llamaba al tributo.
+            // Ahora se declara igual que se lee en la carta y en el mismo orden: manda la primera
+            // alternativa que se cumpla, así que con sus amigos delante entra gratis y no se le
+            // pregunta nada a nadie.
+            { trigger: "COSTE_COLOCACION",
+              msgSinPagador: "No tienes a Karolina, Karlitos ni Igniz, ni aliados con 2 de Furor para pagarle.",
+              alternativas: [
+                { requisito: { algunFiltro: [ { campo: "name", op: "==", valor: "Karolina" },
+                                              { campo: "name", op: "==", valor: "Karlitos" },
+                                              { campo: "name", op: "==", valor: "Igniz" } ] },
+                  log: "{carta} se une al grupo sin cobrar." },
+                { furor: 2, titulo: "DAME TRABAJOS: ELIGE QUIÉN PAGA (-2 FUROR)" } ] },
+
             // Sin silencioso (Toto, 23-jul-2026): es la MISMA pasiva que MEGADRENALINA de
             // Karlos (base) con el mismo umbral — solo cambia el Coste/Requisito para colocar
             // al Personaje, no la pasiva en sí. La vieja nunca la anunciaba (asimetría sin
@@ -4773,20 +4787,6 @@ const CARD_DB = [
               if: { campo: "self.hp", op: "<=", valor: 3 },
               then: [ { op: "MODIFICAR_STAT", stat: "atk", delta: 2 } ] }
         ],
-        onBeforePlayAsync: async function(card, game, p) {
-            const hasFriend = [...p.vanguard, ...p.rearguard].some(c => c.name === 'Karolina' || c.name === 'Karlitos' || c.name === 'Igniz');
-            if (hasFriend) {
-                game.logMsg(`Karlos (KL) se une al grupo sin cobrar.`, 'ability');
-                return true;
-            }
-
-            // DSL.tributoFuror (Toto, 7-ago-2026): hacía a mano exactamente lo que el helper ya
-            // hace -mismo filtro (Furor suficiente y no-Avatar), mismo cobro-, pero con el modal
-            // genérico en vez del reborde verde en tablero.
-            return await DSL.tributoFuror(card, game, p, 2, {
-                msgSinPagador: "No tienes a Karolina/Karlitos/Igniz, ni aliados con 2 de Furor para pagarle.",
-                titulo: 'DAME TRABAJOS: ELIGE QUIÉN PAGA (-2 FUROR)' });
-        },
         canActivateAbility: function(card, game) {
             if (card.furor < 2) { game.logError("Falta Furor (2)."); return false; }
             const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
@@ -9858,6 +9858,65 @@ const DSL = {
         const abs = tmpl.abilities || [];
         const cc = abs.find(a => a.trigger === 'COSTE_COLOCACION');
         if (!cc) return;
+
+        // ── "O BIEN": VARIAS FORMAS DE PAGAR EL PEAJE (Toto, 21-ago-2026) ──────────────────
+        //
+        //   { trigger: "COSTE_COLOCACION", alternativas: [
+        //       { requisito: { algunFiltro: [...] }, log: "…se une al grupo sin cobrar." },
+        //       { furor: 2, titulo: "…", msgSinPagador: "…" } ] }
+        //
+        // Se recorren EN ORDEN y manda la primera que se pueda cumplir: una `requisito` no cuesta
+        // nada -si está, la carta entra gratis- y una con `furor` cobra su tributo como siempre.
+        // Es lo que pide Karlos (KL): "Karolina, Karlitos o Igniz en tu campo O BIEN 2 de Furor",
+        // y lo que traen unas cuantas del Excel. El detalle YA sabía pintar esas híbridas en una
+        // caja apilada (REQUISITO arriba, "o bien", COSTE debajo); lo que faltaba era que la
+        // MECÁNICA se declarara igual que el texto en vez de a mano.
+        //
+        // El orden importa y es el del texto: primero se comprueba lo que no cuesta nada. Así el
+        // jugador no tiene que elegir entre "gratis" y "pagando", que no es una elección.
+        if (Array.isArray(cc.alternativas) && cc.alternativas.length) {
+            const _alts = cc.alternativas;
+            // Requisito de JUGAR: basta con que UNA sea viable. Se expresa como un solo `count`
+            // con `algunFiltro`, que es el OR que ya entiende el motor: cada alternativa aporta
+            // sus filtros -los de su requisito, o "alguien con N de Furor" si es un coste-.
+            const _filtrosDe = (a) => a.requisito
+                ? (a.requisito.algunFiltro || (a.requisito.filtros || []))
+                : [{ campo: 'furor', op: '>=', valor: a.furor || 0 }];
+            const _algun = _alts.reduce((acc, a) => acc.concat(_filtrosDe(a)), []);
+            const req = { count: { quien: 'ALIADO', algunFiltro: _algun }, op: '>=', valor: 1,
+                          msg: cc.msgSinPagador || `No se cumple ninguna de las condiciones para colocar a ${tmpl.name}.` };
+            const jugar0 = abs.find(a => a.trigger === 'JUGAR');
+            if (jugar0) (jugar0.requisitos = jugar0.requisitos || []).push(req);
+            else abs.push({ trigger: 'JUGAR', requisitos: [req] });
+
+            // Y la cadena: un `if` por alternativa, en orden. El `si` de cada rama es la condición
+            // de ESA alternativa, y su efecto es no hacer nada (gratis) o el tributo de siempre.
+            const efectos = [];
+            _alts.forEach((a, i) => {
+                const previas = _alts.slice(0, i);
+                const _noPrevias = previas.map(pv => ({ no: true, count: { quien: 'ALIADO', algunFiltro: _filtrosDe(pv) }, op: '>=', valor: 1 }));
+                const _mia = { count: { quien: 'ALIADO', algunFiltro: _filtrosDe(a) }, op: '>=', valor: 1 };
+                const cond = _noPrevias.length ? _noPrevias.concat([_mia]) : _mia;
+                if (a.requisito) {
+                    if (a.log) efectos.push({ op: 'FLOTANTE', if: cond, target: { quien: 'SELF' }, texto: '', log: a.log, logTipo: a.logTipo || 'ability' });
+                    return;   // gratis: no hay nada que cobrar
+                }
+                const filtros = [{ campo: 'furor', op: '>=', valor: a.furor || 0 }].concat(a.filtros || []);
+                efectos.push({
+                    op: 'ELEGIR', de: 'ALIADOS', cantidad: 1, if: cond, filtros,
+                    titulo: a.titulo || `${tmpl.name}: ELIGE TRIBUTO (-${a.furor} FUROR)`,
+                    efectos: [ Object.assign({ op: 'MODIFICAR_STAT', stat: 'furor', delta: -(a.furor || 0), esCoste: true, fuente: null },
+                                             a.log ? { log: a.log } : {}) ],
+                });
+            });
+            const antes0 = abs.find(a => a.trigger === 'ANTES_DE_JUGAR');
+            if (antes0) (antes0.efectos = antes0.efectos || []).unshift(...efectos);
+            else abs.push({ trigger: 'ANTES_DE_JUGAR', efectos });
+
+            tmpl.abilities = abs.filter(a => a.trigger !== 'COSTE_COLOCACION');
+            return;
+        }
+
         const n = cc.furor || 0;
         const filtros = [{ campo: 'furor', op: '>=', valor: n }].concat(cc.filtros || []);
 
