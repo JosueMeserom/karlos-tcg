@@ -717,5 +717,33 @@ console.log('\n--- escalonado de flotantes de un mismo lote ---');
     sandbox.setTimeout = _st;
 }
 
+// POR QUÉ SE LANZA LA MONEDA (Toto, 21-ago-2026). El modal solo decía "¡LANZA LA MONEDA!" y con
+// varias cartas en juego no había forma de saber cuál la pedía. Ahora lleva debajo una línea que
+// lo explica, redactada con la MISMA gramática que el detalle: la carta con su dueño, sobre quién
+// va, y "por HABILIDAD" solo cuando la causa una Pasiva o una Activa.
+console.log('\n--- el modal de la moneda dice por qué se lanza ---');
+{
+    const DSL = vm.runInContext('DSL', sandbox);
+    const juego = { getCardNameWithOwner: (c) => c.name + ' de J1 (Nick)' };
+    const cogorza = { name: 'Cogorza', instanceId: 'i1' };
+    const aliado = { name: 'Karlos', instanceId: 'i2' };
+    check('nombra la carta que la provoca',
+          DSL._motivoMoneda(juego, cogorza, null, null) === 'La echa Cogorza de J1 (Nick).',
+          DSL._motivoMoneda(juego, cogorza, null, null));
+    check('...y sobre quién va, si hay objetivo',
+          /sobre Karlos de J1 \(Nick\)/.test(DSL._motivoMoneda(juego, cogorza, null, aliado)),
+          DSL._motivoMoneda(juego, cogorza, null, aliado));
+    check('una Pasiva/Activa firma con "por NOMBRE"',
+          /, por JUSTICIERA ARDIENTE\.$/.test(DSL._motivoMoneda(juego, cogorza, 'JUSTICIERA ARDIENTE', null)),
+          DSL._motivoMoneda(juego, cogorza, 'JUSTICIERA ARDIENTE', null));
+    check('la propia carta como objetivo NO se repite',
+          !/sobre/.test(DSL._motivoMoneda(juego, cogorza, null, cogorza)),
+          DSL._motivoMoneda(juego, cogorza, null, cogorza));
+    // Y el modal tiene dónde pintarlo, con innerText: puede llevar dentro el nick del rival.
+    const src = fs.readFileSync(path.join(RAIZ, 'public/index.html'), 'utf8');
+    check('el overlay tiene su renglón y se rellena con innerText',
+          /id="coin-reason"/.test(src) && /_razon\.innerText = txt/.test(src));
+}
+
 console.log(fallos === 0 ? '\nSUITE capas_cliente: ' + comprobaciones + '/' + comprobaciones + ' comprobaciones — CAPAS CORRECTAS' : '\nSUITE capas_cliente: ' + fallos + ' FALLOS de ' + comprobaciones + ' comprobaciones');
 process.exit(fallos ? 1 : 0);

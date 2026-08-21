@@ -3831,6 +3831,10 @@ const CARD_DB = [
                 // La flecha la declara `costeVisible` arriba, no un `esCoste` aquí: este efecto
                 // corre DENTRO del escaparate y allí las marcas ya se han consumido.
                 { op: "MODIFICAR_STAT", target: { quien: "ALIADO", zona: "VANGUARDIA" }, stat: "currentHp",
+                  // Las cuatro caen A LA VEZ, así que la fila se queda quieta hasta que acaban
+                  // (Toto, 21-ago-2026): sin esto, las supervivientes se recentraban muerte a
+                  // muerte y la simultaneidad se perdía por el camino.
+                  sinRecolocar: true,
                   vaciar: true, sinRetribucion: true, comprobarMuerte: true } ] }
         ],
         onStartTurn: function(card, game) {
@@ -7658,6 +7662,22 @@ const DSL = {
     },
     _nombre(game, c) { return (game && typeof game.getCardNameWithOwner === 'function') ? game.getCardNameWithOwner(c) : c.name; },
 
+    // POR QUÉ SE LANZA ESTA MONEDA (Toto, 21-ago-2026). El modal solo decía "¡LANZA LA MONEDA!" y
+    // con varias cartas en juego no había forma de saber cuál la pedía. Se redacta con la MISMA
+    // gramática que el detalle y las flechas -la carta con su dueño, y "por HABILIDAD" solo si la
+    // causa una Pasiva o una Activa- para no inventar una tercera forma de nombrar lo mismo: en
+    // Eventos y Ayudas el `habilidad` llega en null a propósito (ver _habDeCarta), así que la
+    // frase se queda en la carta y ya.
+    _motivoMoneda(game, sourceCard, habilidad, target) {
+        if (!sourceCard) return '';
+        const quien = DSL._nombre(game, sourceCard);
+        // El objetivo se nombra cuando lo hay y no es la propia carta: una tirada POR CADA aliado
+        // (la Cogorza) abre un modal por cabeza, y sin decir sobre quién va, los cuatro son
+        // idénticos y no se sabe cuál se está resolviendo.
+        const sobre = (target && target.instanceId !== sourceCard.instanceId) ? ` sobre ${DSL._nombre(game, target)}` : '';
+        return `La echa ${quien}${sobre}` + (habilidad ? `, por ${habilidad}.` : '.');
+    },
+
     // Tributo de Furor al colocar una carta ("Coste: N de Furor"): elige un aliado del CAMPO
     // que pueda pagarlo y le resta el Furor. Devuelve true si se pagó (la colocación sigue) o
     // false si no hay pagador o se canceló. Comparte forma con una docena de cartas que lo
@@ -8279,9 +8299,19 @@ const DSL = {
             // log (Muñeca del mal, 31-jul-2026): anuncio ANTES de lanzar la moneda (p. ej. "lanza
             // una maldición final..."), distinto de logCara/logCruz (que anuncian el resultado).
             if (e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), objetivo: target ? DSL._nombre(game, target) : '' }), e.logTipo || 'ability');
-            const res = await game.triggerCoinFlips(e.cantidad || 1, ownerId);
-            const cruz = res && res[0] === 'tails'; // sin resultado (cancelado) => rama de cara, como las cartas originales
+            // `dnM` sube aquí: el motivo lo necesita y estaba declarado más abajo (con `const`,
+            // así que usarlo antes reventaba por zona muerta temporal).
             const dnM = typeof game.getDisplayName === 'function' ? game.getDisplayName(ownerId) : ownerId;
+            // `motivo`: texto propio para el modal, con los mismos {marcadores} que los logs
+            // ({carta}, {objetivo}, {jugador}...). Admite un ARRAY si la carta echa varias monedas
+            // y quiere explicar cada una. Sin declararlo, se redacta solo.
+            const _motivoMoneda = e.motivo !== undefined
+                ? (Array.isArray(e.motivo)
+                    ? e.motivo.map(t => DSL._fill(t, { carta: DSL._nombre(game, sourceCard), objetivo: target ? DSL._nombre(game, target) : '', jugador: dnM, habilidad: habilidad || '' }))
+                    : DSL._fill(e.motivo, { carta: DSL._nombre(game, sourceCard), objetivo: target ? DSL._nombre(game, target) : '', jugador: dnM, habilidad: habilidad || '' }))
+                : DSL._motivoMoneda(game, sourceCard, habilidad, target);
+            const res = await game.triggerCoinFlips(e.cantidad || 1, ownerId, null, _motivoMoneda);
+            const cruz = res && res[0] === 'tails'; // sin resultado (cancelado) => rama de cara, como las cartas originales
             // objetivo (Muñeca del mal, 31-jul-2026): faltaba en el fill de logCara/logCruz.
             // objetivoG (Cogorza, 31-jul-2026): su código de género, para {objetivoG?masc|fem}.
             const FM = (t) => DSL._fill(t, { carta: DSL._nombre(game, sourceCard), jugador: dnM, objetivo: target ? DSL._nombre(game, target) : '', objetivoG: target ? target.gender : undefined });

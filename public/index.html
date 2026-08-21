@@ -118,7 +118,11 @@
     </style>
 
     <div id="coin-overlay">
-        <div style="margin-bottom:50px; font-size:2.2rem; font-weight:bold; color:white; text-shadow: 0 0 15px #eab308;" id="coin-title">¡LANZA LA MONEDA!</div>
+        <div style="margin-bottom:14px; font-size:2.2rem; font-weight:bold; color:white; text-shadow: 0 0 15px #eab308;" id="coin-title">¡LANZA LA MONEDA!</div>
+        <!-- POR QUÉ se lanza (Toto, 21-ago-2026): el modal no decía de dónde salía la moneda, y
+             con varias cartas en juego no hay forma de saberlo. Mismo tono que los avisos de los
+             visores de pila: gris, cursiva, debajo del titular. Lo rellena triggerCoinFlips. -->
+        <div id="coin-reason" style="margin-bottom:36px; color:#94a3b8; font-size:1.05rem; font-style:italic; text-align:center; max-width:520px; display:none;"></div>
         <div id="coin" class="hoverable">
             <div class="coin-side side-heads">CARA</div>
             <div class="coin-side side-tails">CRUZ</div>
@@ -6286,9 +6290,20 @@
             // qué punto, así que al recargar se volvía a empezar: el que lanza sacaba un resultado
             // NUEVO -cambiando lo que ya había salido- y el que mira se quedaba esperando una
             // tirada que ya había caído (softlock).
-            async triggerCoinFlips(count = 1, playerId, reanudar = null) {
+            // `motivo`: por qué se lanza esta moneda. Un string para toda la tanda, o un ARRAY con
+            // un texto por tirada (una carta que echa tres monedas puede querer explicar cada una).
+            // Lo escribe innerText, nunca innerHTML: puede llevar dentro el nick del rival.
+            async triggerCoinFlips(count = 1, playerId, reanudar = null, motivo = null) {
                 const results = reanudar && Array.isArray(reanudar.resultados) ? [...reanudar.resultados] : [];
                 const overlay = document.getElementById('coin-overlay');
+                const _razon = document.getElementById('coin-reason');
+                const _ponerMotivo = (i) => {
+                    if (!_razon) return;
+                    const txt = Array.isArray(motivo) ? (motivo[i] || motivo[motivo.length - 1] || '') : (motivo || '');
+                    _razon.innerText = txt;
+                    _razon.style.display = txt ? 'block' : 'none';
+                };
+                _ponerMotivo(reanudar ? reanudar.idx : 0);
                 const coin = document.getElementById('coin');
                 const title = document.getElementById('coin-title');
                 const instruction = document.getElementById('coin-instruction');
@@ -6360,6 +6375,7 @@
                 }
 
                 for (let i = (reanudar ? reanudar.idx : 0); i < count; i++) {
+                    _ponerMotivo(i);
                     // ¿Esta tirada concreta YA cayó y solo faltaba cerrar el modal? Entonces no se
                     // vuelve a lanzar (eso cambiaría un resultado ya visto por los dos): se repinta
                     // la moneda en su cara final y se salta directo a la fase de continuar.
@@ -9789,6 +9805,21 @@
                         // LIMPIEZA ABSOLUTA DE LA CARTA
                         this.resetCard(card);
 
+                        // FILA CONGELADA (Toto, 21-ago-2026). Con `_congelarFila` puesto, la
+                        // posición que deja la carta se apunta y se pinta como un hueco invisible
+                        // del mismo tamaño, así que las supervivientes NO se recentran mientras
+                        // cae el resto de la tanda. Némesis destruyendo su propia vanguardia era
+                        // lo que lo pedía: las cuatro mueren a la vez y verlas deslizarse hacia
+                        // el centro de una en una contradice esa simultaneidad. El candado de
+                        // recolocación (`_candadoRecolocar`) es OTRA cosa: ese impide que suba
+                        // gente de retaguardia. Este congela la fila que ya está.
+                        if (this._congelarFila) {
+                            const _i = p.vanguard.findIndex(c => c.instanceId === card.instanceId);
+                            if (_i !== -1) {
+                                this._huecosFantasma = this._huecosFantasma || { p1: [], p2: [] };
+                                (this._huecosFantasma[card.owner] = this._huecosFantasma[card.owner] || []).push(_i);
+                            }
+                        }
                         p.vanguard = p.vanguard.filter(c => c.instanceId !== card.instanceId);
                         p.rearguard = p.rearguard.filter(c => c.instanceId !== card.instanceId);
 
@@ -9872,6 +9903,23 @@
 
             // Corre `fn` con el candado echado: nadie sube de retaguardia hasta que termine, y al
             // terminar se recoloca UNA vez. Lo usa cualquier efecto que destruya en grupo.
+            // Como sinRecolocarHasta, y ADEMÁS congela la fila: mientras corre `fn`, las cartas
+            // que mueran dejan un hueco invisible en su sitio y las supervivientes no se mueven.
+            // Al terminar se sueltan los dos y la fila se recoloca UNA vez, ya con todo hecho.
+            // Es opt-in desde el DSL (`sinRecolocar: true` en el efecto): por defecto, apagado.
+            async congelarFilaHasta(fn) {
+                const antes = this._congelarFila;
+                this._congelarFila = true;
+                try { return await this.sinRecolocarHasta(fn); }
+                finally {
+                    this._congelarFila = antes;
+                    if (!this._congelarFila) {
+                        this._huecosFantasma = { p1: [], p2: [] };
+                        this.render();
+                    }
+                }
+            }
+
             async sinRecolocarHasta(fn) {
                 const antes = this._candadoRecolocar;
                 this._candadoRecolocar = true;
@@ -10702,6 +10750,21 @@
                 const vanEl = document.getElementById(`${pid}-vanguard`);
                 vanEl.innerHTML = '<div class="zone-label">Vanguardia</div>';
                 p.vanguard.forEach(card => vanEl.appendChild(this.createCardEl(card)));
+                // Huecos de una tanda con la fila congelada: van EN SU ÍNDICE, no al final, o las
+                // supervivientes se moverían igual. Misma clase que una carta, así que ocupan
+                // exactamente lo mismo sin tener que repetir medidas aquí.
+                const _fant = (this._huecosFantasma || {})[pid] || [];
+                if (_fant.length) {
+                    const _cartasFila = () => Array.from(vanEl.querySelectorAll(':scope > .card, :scope > .card-wrapper, :scope > .hueco-fantasma'));
+                    [..._fant].sort((a, b) => a - b).forEach(idx => {
+                        const hueco = document.createElement('div');
+                        hueco.className = 'card hueco-fantasma';
+                        hueco.style.visibility = 'hidden';
+                        hueco.style.pointerEvents = 'none';
+                        const ref = _cartasFila()[idx];
+                        if (ref) vanEl.insertBefore(hueco, ref); else vanEl.appendChild(hueco);
+                    });
+                }
 
                 const rearEl = document.getElementById(`${pid}-rearguard`);
                 rearEl.innerHTML = '<div class="zone-label">Retaguardia</div>';
