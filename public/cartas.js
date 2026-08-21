@@ -3701,53 +3701,51 @@ const CARD_DB = [
     },
     {
         name: "Serafín", hp: 5, def: 4, atk: 8, type: "Esbirro", subtype: "Ser mágico", rarity: "S", cost: 1, series: 1,
-        text: "Coste: 4 de Furor. P: MARAVILLA: Máximo 1 Serafín aliado en campo. Al colocar: cura 2 de Vida a tu vanguardia. A: CASTIGO (4F): Ataque especial a 3 enemigos de la vanguardia.",
+        // MARAVILLA reformulada (Toto, 21-ago-2026). Antes la carta se COLOCABA y acto seguido se
+        // autodestruía si ya había otro Serafín, que es raro de leer y peor de jugar: gastabas el
+        // tributo para ver cómo se desvanece. Ahora es un Requisito -ni se juega, con su aviso- y
+        // la Pasiva se queda solo para lo que el Requisito no puede cubrir: que lleguen dos por
+        // otra vía (una resurrección, un clon). Ahí se destruyen los MÁS ANTIGUOS hasta que quede
+        // uno, que es la regla general y no un caso particular del que acaba de entrar.
+        text: "Coste: 4 de Furor. Requiere que no haya otro Serafín en tu campo. P: MARAVILLA: Si llega a haber dos o más Serafines en tu campo, se destruyen los más antiguos hasta que quede uno. Al colocar: cura 2 de Vida a tu vanguardia. A: CASTIGO (4F): Ataque especial a 3 enemigos de la vanguardia.",
         passiveName: "MARAVILLA", activeName: "CASTIGO", activeCost: 4,
-        onBeforePlayAsync: async function(card, game, p) {
-            const validAllies = [...p.vanguard, ...p.rearguard].filter(c => c.furor >= 4 && !getCardTemplate(c.id).isAvatar);
-            if (validAllies.length === 0) {
-                game.logError(`Necesitas un aliado con al menos 4 de Furor para invocar al ${card.name}.`);
-                return false;
-            }
-            // Tributo en TABLERO (Toto, 7-ago-2026); gemela de la de Valafar, misma redacción.
-            const chosen = await game.pickBoardTargets(validAllies, 1, `${card.name}: elige quién tributa 4 de Furor`, card, card.owner, true);
-            if (chosen && chosen.length > 0) {
-                card.tributeSourceId = chosen[0].instanceId;
-                // Flecha de tributo al presentarse (§14.bis): de quién sale el Furor.
-                DSL._marcarCoste(game, chosen[0], "tributo", "Tributa 4 FUR");
-                return true;
-            }
-            return false;
-        },
-        onAfterPlayAsync: async function(card, game, p) {
-            const serafines = [...p.vanguard, ...p.rearguard].filter(c => c.name === "Serafín" && c.instanceId !== card.instanceId);
-            if (serafines.length > 0) {
-                game.logMsg(`MARAVILLA: ¡Ya hay un Serafín aliado en el campo! Este nuevo Serafín no puede existir y se desvanece.`, 'system');
-                card.currentHp = 0;
-                await game.checkDeath(card, false);
-                return; 
-            }
-            
-            let healed = false;
-            p.vanguard.forEach(c => {
-                if (c.currentHp < c.maxHp) {
-                    const healAmount = Math.min(2, c.maxHp - c.currentHp);
-                    game.modifyStat(c, 'currentHp', healAmount, -20, 'healing');
-                    showFloatingText(c.instanceId, "MARAVILLA", "ft-green", -40);
-                    healed = true;
-                }
-            });
-            if (healed) game.logMsg(`¡La MARAVILLA de Serafín purifica y cura 2 de Vida a la vanguardia!`, 'healing');
-        },
-        // CASTIGO migrada (31-jul-2026, mismo fix que COMA/SANCIÓN): la vieja solo exigía 1
-        // enemigo en vanguardia para activarse y dejaba `canStopEarly` resolver con 1-3
-        // objetivos — el mismo bug de diseño, no un requisito real (el texto dice "a 3
-        // enemigos"). `requisitos` exige >=3 antes de activar; con esa garantía la selección
-        // es "exactamente 3, sin parada anticipada", camino RAW ya soportado por el
-        // compilador de ACTIVA. MARAVILLA (Pasiva: cura 2 a la vanguardia al colocarse, con
-        // límite de 1 Serafín en campo) se queda imperativa: el autodestruir-si-hay-otro-igual
-        // es un mecanismo propio sin precedente reutilizable, no compensa arquitectura nueva.
         abilities: [
+            // El tributo, declarativo. Antes era un onBeforePlayAsync escrito a mano.
+            { trigger: "COSTE_COLOCACION", furor: 4,
+              msgSinPagador: "Necesitas un aliado con al menos 4 de Furor para invocar al Serafín." },
+
+            // El Requisito, con su aviso: si ya tienes uno, la carta NO se juega.
+            { trigger: "JUGAR", requisitos: [
+                { count: { filtros: [ { campo: "name", op: "==", valor: "Serafín" } ] }, op: "==", valor: 0,
+                  msg: "Ya tienes un Serafín en el campo: la MARAVILLA no admite dos." } ] },
+
+            // Al colocarlo, la curación de la vanguardia. `soloSiHerido` evita anunciar nada
+            // cuando no hay a quién curar, y `logResumen` lo cuenta en UNA línea en vez de una
+            // por aliado.
+            { trigger: "AL_JUGAR", nombre: "MARAVILLA",
+              efectos: [
+                { op: "CURAR", valor: 2, conBeforeHealed: false, soloSiHerido: true,
+                  target: { quien: "ALIADO", zona: "VANGUARDIA" },
+                  floating: "MARAVILLA", floatingStyle: "ft-green", offsetFloating: -40,
+                  logResumen: { msg: "¡La MARAVILLA de {carta} purifica y cura {delta} de Vida a {lista}!",
+                                msgVariado: "¡La MARAVILLA de {carta} purifica a {lista}!",
+                                tipo: "healing" } } ] },
+
+            // Y la red de seguridad, para cuando lleguen dos por una vía que el Requisito no ve
+            // (resurrección, clon). Se mira al empezar el turno, en el orden de las reglas.
+            { trigger: "PERIODICO", fase: "EFECTOS INICIALES", momento: "ANTES", deQuien: "AMBOS",
+              nombre: "MARAVILLA",
+              if: { count: { filtros: [ { campo: "name", op: "==", valor: "Serafín" } ] }, op: ">=", valor: 2 },
+              efectos: [
+                { op: "MODIFICAR_STAT", stat: "currentHp", vaciar: true, sinRetribucion: true, comprobarMuerte: true,
+                  sinRecolocar: true,
+                  // `dejarUltimos: 1` -> se destruyen todos menos el ÚLTIMO, que es el más
+                  // reciente: el array de cada fila va en orden de llegada (y es el mismo orden
+                  // en que se ven en la mesa, de izquierda a derecha).
+                  target: { quien: "ALIADO", filtros: [ { campo: "name", op: "==", valor: "Serafín" } ],
+                            dejarUltimos: 1 },
+                  log: "¡MARAVILLA! No puede haber dos Serafines: {objetivo} se desvanece." } ] },
+
             { trigger: "ACTIVA", nombre: "CASTIGO", coste: { furor: 4 },
               target: { quien: "ENEMIGO", cantidad: 3 },
               requisitos: [
@@ -7591,6 +7589,14 @@ const DSL = {
         // `conEstadoDeSelf`: cartas que sufren ESE estado y que se lo puse YO. Hermano de
         // conMarcaTemporalPropia, para cuando el aviso ya se ha retirado y hay que volver a
         // encontrar a los afectados por el estado en sí.
+        // `dejarUltimos: N`: quita del pool los N ÚLTIMOS, o sea los más RECIENTES. El array de
+        // cada fila va en orden de llegada -y es el mismo orden en que se ven en la mesa, de
+        // izquierda a derecha-, así que esto expresa "todos menos el más nuevo" sin necesidad de
+        // guardar marcas de tiempo en ninguna carta (Serafín, 21-ago-2026).
+        if (spec.dejarUltimos) {
+            const _b = DSL._pool(ownerId, game, Object.assign({}, spec, { dejarUltimos: 0 }), selfCard);
+            return _b.slice(0, Math.max(0, _b.length - spec.dejarUltimos));
+        }
         if (spec.conEstadoDeSelf && selfCard) {
             const _mio = (x) => x.status && x.status[spec.conEstadoDeSelf]
                 && x.status[spec.conEstadoDeSelf].sourceInstanceId === selfCard.instanceId;
