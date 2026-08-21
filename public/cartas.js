@@ -8203,6 +8203,15 @@ const DSL = {
         game._costesPresenta.push({ zonaSel, tipo, etiqueta, zona: 'zona' });
     },
 
+    // Marca un PUNTO DE PANTALLA en vez de una carta o una zona: el hueco que ha dejado una
+    // carta que ya no existe. El motor mide ese rectángulo en el último instante en que la carta
+    // seguía pintada (checkDeath) y lo pasa a la reacción; aquí solo se encola.
+    _marcarHueco(game, rect, tipo, etiqueta) {
+        if (!game || !rect) return;
+        game._costesPresenta = game._costesPresenta || [];
+        game._costesPresenta.push({ rect, tipo, etiqueta, zona: 'zona' });
+    },
+
     _marcarCoste(game, cartas, tipo, etiqueta) {
         if (!game || !cartas) return;
         const lista = Array.isArray(cartas) ? cartas : [cartas];
@@ -9741,6 +9750,9 @@ const DSL = {
                     if (typeof game.assignCopyId === 'function') game.assignCopyId(handCard); // el [n] nace al salir de la mano
                 };
                 const colocar = () => {
+                    // El hueco deja de existir en cuanto se mete dentro: se descongela la fila
+                    // ANTES de repintar, o el render lo pintaría al final (no está en la foto).
+                    if (typeof game._soltarHuecoDeMuerte === 'function') game._soltarHuecoDeMuerte();
                     fila.splice(idx, 0, handCard);
                     handCard.justPlayed = true;
                     handCard._presentada = true;   // su entrada la hace la presentación
@@ -9752,19 +9764,16 @@ const DSL = {
                 // Se PRESENTA desde la mano, como cualquier otra carta que entra al campo (§14).
                 // Antes usaba animateResurrect, que es la animación de salir de los DESCARTES: la
                 // carta aparecía brotando del descarte mientras seguía dibujada en la mano.
+                // Y la presentación sale CON su motivo: una flecha desde el hueco que sigue
+                // abierto -la fila está congelada hasta que alguien lo ocupe- hasta la carta en
+                // el escaparate, con la etiqueta "Reemplazo". Mismo mecanismo que las flechas de
+                // coste/tributo/requisito, con su propio tipo porque no es ninguna de las tres.
                 if (typeof animarPresentacionCarta === 'function') {
+                    DSL._marcarHueco(game, cx.rectHueco, 'reemplazo');
                     await animarPresentacionCarta(handCard.id, `#${reactor}-hand`,
                         filaSel, game.gameMode === 'online' && game.myPlayerId !== reactor,
                         { origenId: handCard.instanceId, zonaSel: () => filaSel,
                           alSalirDeLaMano: salirDeLaMano, colocar });
-                    // Y el remate de "colarse en el hueco": llega estrecha y se abre en su sitio.
-                    if (typeof document !== 'undefined' && document.querySelector) {
-                        const el = document.querySelector(`.card[data-id="${handCard.instanceId}"]`);
-                        if (el && el.classList) {
-                            el.classList.add('colandose');
-                            setTimeout(() => el.classList.remove('colandose'), 500);
-                        }
-                    }
                 } else {
                     salirDeLaMano();
                     colocar();
@@ -11029,8 +11038,9 @@ const DSL = {
                 // enseña el par atacante->objetivo). Devolver true hace que el motor la saque de
                 // la mano; con el op COLOCARSE la carta ya se ha metido ella misma en el campo,
                 // que es justo lo que el motor espera de este hook.
-                tmpl.onHandReactionToAllyDeath = async function (handCard, deadCard, game, zona, indice) {
-                    const cx = { attacker: null, defensor: deadCard, zona, indice };
+                tmpl.onHandReactionToAllyDeath = async function (handCard, deadCard, game, hueco) {
+                    const h = hueco || {};
+                    const cx = { attacker: null, defensor: deadCard, zona: h.zona, indice: h.indice, rectHueco: h.rect };
                     const result = { used: true };
                     if (!await correr(handCard, game, cx, result)) return false;
                     return true;

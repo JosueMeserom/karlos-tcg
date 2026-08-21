@@ -1014,6 +1014,12 @@
             //    del objetivo que del atacante. Con rebote, para que se lea como un lanzarse.
             const puntoX = attRect.left + dx * 0.5;
             const puntoY = attRect.top + dy * 0.5;
+            // El desplazamiento va TAMBIEN en variables CSS: el tambaleo de mas abajo es una
+            // animacion, y una animacion pisa el transform en linea. Sin esto la carta volvia a
+            // su hueco para temblar y saltaba otra vez aqui para morir.
+            guardEl.style.setProperty('--dx', (puntoX - gRect.left) + 'px');
+            guardEl.style.setProperty('--dy', (puntoY - gRect.top) + 'px');
+            guardEl.style.setProperty('--de', '1.08');
             guardEl.style.transition = "transform 0.15s cubic-bezier(0.2, 1.5, 0.4, 1)";
             guardEl.style.transform = `translate(${puntoX - gRect.left}px, ${puntoY - gRect.top}px) scale(1.08)`;
             guardEl.style.zIndex = 1001;
@@ -1025,7 +1031,7 @@
             attackerEl.style.transform = `translate(${(puntoX - attRect.left) * 0.85}px, ${(puntoY - attRect.top) * 0.85}px) scale(1.1)`;
             await game.sleep(100);
 
-            guardEl.style.animation = "hardShake 0.3s ease-out";
+            guardEl.style.animation = "hardShakeDesplazado 0.3s ease-out";
             if (guardCard) {
                 guardCard.style.borderColor = "red";
                 guardCard.style.boxShadow = "0 0 20px red inset";
@@ -1804,8 +1810,10 @@
         //     que pasa. Además así no se confunde con el lima del requisito (Toto, 13-ago-2026).
         //   · requisito (lima)   - no pierdes nada, solo se comprueba.
         // La etiqueta del tributo la pone el motor con la cantidad REAL de cada carta.
-        const PRESENTA_COLOR = { coste: '#fbbf24', tributo: '#ef4444', requisito: '#a3e635' };
-        const PRESENTA_ETIQ  = { coste: 'Coste',   tributo: 'Tributa',  requisito: 'Req. cumplido' };
+        //   · reemplazo (cian)   - no es coste ni requisito: es el HUECO del que se ocupa el
+        //     sitio (Uniojo con COMENSAL). Sale del hueco que sigue abierto, no de una carta.
+        const PRESENTA_COLOR = { coste: '#fbbf24', tributo: '#ef4444', requisito: '#a3e635', reemplazo: '#22d3ee' };
+        const PRESENTA_ETIQ  = { coste: 'Coste',   tributo: 'Tributa',  requisito: 'Req. cumplido', reemplazo: 'Reemplazo' };
         const PRESENTA_FLECHA_MS = 180;   // ms: brote de la flecha del acompañante, y su fundido
         // Separación entre la carta y sus costes en el escaparate. Es EL número a tocar si el
         // bloque se ve apretado: la flecha con "Coste" va en el hueco y necesita sitio para
@@ -2239,8 +2247,11 @@
             // punta y etiqueta- justo cuando la carta se posa en el escaparate.
             const _lineas = [];
             if (flechas) try { enCampo.forEach(c => {
-                const el = _elDe(c); if (!el) return;
-                const r = el.getBoundingClientRect();
+                // `c.rect`: la marca no apunta a un elemento sino a un PUNTO ya medido (el hueco
+                // de una carta que ha muerto y ya no esta en el DOM).
+                const el = _elDe(c);
+                const r = el ? el.getBoundingClientRect() : c.rect;
+                if (!r || !r.width) return;
                 const ox = r.left + r.width / 2, oy = r.top + r.height / 2;
                 const color = PRESENTA_COLOR[c.tipo] || PRESENTA_COLOR.coste;
                 // La punta se queda a las puertas del escaparate: si apunta al centro exacto
@@ -9111,13 +9122,28 @@
                         // ocultamos la original con visibility:hidden (mantiene el hueco, sin reflow).
                         const r = manoEl.getBoundingClientRect();
                         if (r.width) {
+                            // POR DEBAJO DEL DIALOGO (Toto, 22-ago-2026). La capa va DENTRO del
+                            // modal, no en el body: asi el clon se ve por encima del velo pero
+                            // por debajo del titulo y los botones, que son opacos y lo tapan
+                            // limpiamente (una carta de tu vanguardia cae justo sobre los
+                            // botones y se comia el texto de "SI, SACRIFICAR A..."). Al pasarle
+                            // el raton se adelanta, para poder verla entera sin cerrar el modal.
+                            const _dialogo = document.getElementById('choice-modal');
                             let layer = document.getElementById('reaccion-lift');
                             if (!layer) {
                                 layer = document.createElement('div');
                                 layer.id = 'reaccion-lift';
-                                layer.style.cssText = 'position:fixed; inset:0; pointer-events:none; z-index:4600;'; // sobre el overlay (4500), bajo el detalle (5000)
-                                document.body.appendChild(layer);
+                                layer.style.cssText = 'position:fixed; inset:0; pointer-events:none;';
+                                // Dentro del modal el z-index es RELATIVO a el; fuera, sobre el
+                                // overlay (4500) y bajo el detalle (5000).
+                                layer.style.zIndex = _dialogo ? '1' : '4600';
+                                (_dialogo || document.body).appendChild(layer);
                             }
+                            // El contenido del modal, por encima de la capa (son hermanos ya).
+                            ['choice-title', 'choice-body', 'choice-cards', 'choice-buttons'].forEach(id => {
+                                const el = document.getElementById(id);
+                                if (el) { el.style.position = 'relative'; el.style.zIndex = '2'; }
+                            });
                             layer.innerHTML = '';
                             const clon = this.createCardEl(rc.mano, false, true);
                             clon.removeAttribute('data-id'); // solo visual: que no colisione en querySelector
@@ -9129,8 +9155,8 @@
                             clon.style.margin = '0';
                             clon.style.pointerEvents = 'auto';
                             clon.classList.add('valid-target'); // reborde verde
-                            clon.onmouseenter = () => this.startPreview(rc.mano);
-                            clon.onmouseleave = () => this.stopPreview();
+                            clon.onmouseenter = () => { layer.style.zIndex = _dialogo ? '3' : '4600'; this.startPreview(rc.mano); };
+                            clon.onmouseleave = () => { layer.style.zIndex = _dialogo ? '1' : '4600'; this.stopPreview(); };
                             layer.appendChild(clon);
                             manoEl.style.visibility = 'hidden';
                             this._reaccionManoOrig = manoEl;
@@ -10039,6 +10065,27 @@
                         // es el ultimo momento en que ese sitio existe.
                         const _filaMuerto = wasInVanguard ? p.vanguard : p.rearguard;
                         const _indiceMuerto = _filaMuerto.findIndex(c => c.instanceId === card.instanceId);
+                        // Y DONDE CAE EN PANTALLA, para quien quiera dibujar algo desde ese hueco
+                        // (la flecha de "Reemplazo" de Uniojo). Se mide aqui por lo mismo: es el
+                        // ultimo instante en que la carta sigue pintada en su sitio.
+                        let _rectMuerto = null;
+                        try {
+                            const _elM = document.querySelector(`.card[data-id="${card.instanceId}"]`);
+                            const _rM = _elM && _elM.getBoundingClientRect();
+                            if (_rM && _rM.width) _rectMuerto = { left: _rM.left, top: _rM.top, width: _rM.width, height: _rM.height };
+                        } catch (e0) {}
+                        // Y SE CONGELA LA FILA hasta que se resuelvan las reacciones a esta
+                        // muerte: el hueco tiene que seguir ahi, visible, mientras el jugador
+                        // decide si lo ocupa. Solo si no habia ya una tanda congelada por encima
+                        // (Nemesis): esa manda y la suelta quien la echo.
+                        const _congeloYo = wasInVanguard && !this._filaCongelada;
+                        if (_congeloYo) {
+                            this._filaCongelada = {
+                                p1: this.players.p1.vanguard.map(c => c.instanceId),
+                                p2: this.players.p2.vanguard.map(c => c.instanceId),
+                            };
+                            this._congelacionDeMuerte = true;
+                        }
                         p.vanguard = p.vanguard.filter(c => c.instanceId !== card.instanceId);
                         p.rearguard = p.rearguard.filter(c => c.instanceId !== card.instanceId);
 
@@ -10093,7 +10140,8 @@
                                 // `card.location` ya vale 'discard' (lo pone resetCard más
                                 // arriba), así que quien quiera ocupar su hueco no puede
                                 // deducirla de la carta muerta.
-                                const used = await handTemplate.onHandReactionToAllyDeath(handCard, card, this, wasInVanguard ? 'vanguard' : 'rearguard', _indiceMuerto);
+                                const used = await handTemplate.onHandReactionToAllyDeath(handCard, card, this,
+                                    { zona: wasInVanguard ? 'vanguard' : 'rearguard', indice: _indiceMuerto, rect: _rectMuerto });
                                 if (used) {
                                     // POR IDENTIDAD y no por indice: la reaccion ha estado en el
                                     // aire (modal, animacion) y la mano puede haber cambiado
@@ -10108,17 +10156,31 @@
                         }
 
                         // AHORA si: ya nadie va a reclamar el hueco.
+                        if (_congeloYo) this._soltarHuecoDeMuerte();
                         if (!this._candadoRecolocar) this._recolocarHuecos(p);
 
                         this.render(); 
                     }
                 } catch (e) {
+                    // Pase lo que pase, la fila no se queda congelada: un fallo a mitad dejaria
+                    // el tablero entero con el hueco abierto y sin recolocar nunca.
+                    this._soltarHuecoDeMuerte();
                     console.error("Error en checkDeath:", e);
                 }
             }
 
             // Sube de retaguardia a vanguardia a quien pueda, si hay hueco. Único sitio donde
             // ocurre: así el candado tiene un solo cierre que ejecutar.
+            // Suelta la fila congelada por una MUERTE (no la de una tanda tipo Nemesis, que la
+            // suelta su duenyo). Lo llama checkDeath al terminar las reacciones y, antes que el,
+            // quien ocupe el hueco: en cuanto alguien se mete dentro, el hueco deja de existir y
+            // la fila tiene que repintarse normal, con el recien llegado en su indice.
+            _soltarHuecoDeMuerte() {
+                if (!this._congelacionDeMuerte) return;
+                this._congelacionDeMuerte = false;
+                this._filaCongelada = null;
+            }
+
             _recolocarHuecos(p) {
                 // Se sube UNO POR HUECO abierto, no uno por tanda: si caen cuatro, suben cuatro
                 // (los que haya y quepan). Con el candado echado los huecos se acumulan aquí.
