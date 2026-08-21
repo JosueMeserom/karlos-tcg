@@ -2950,7 +2950,7 @@ const CARD_DB = [
     },
     {
         id: 2005, name: "Alabanza", type: "Ayuda", subtype: "Técnica", tags: ["Equipable"], rarity: "B", cost: 0, series: 1,
-        text: "Coste: 2 de Furor de cada aliado de tu vanguardia que pueda pagarlo. Requiere un aliado con la etiqueta 'Dios/a' o 'Genio'. Anéxasela a ese aliado: gana +1 de Vida, Def y Atq por cada aliado que tributó, mientras la lleve.",
+        text: "Requisito: Un aliado con la etiqueta 'Dios/a' o con etiqueta 'Genio'. Coste: 2 de Furor de cada aliado de tu vanguardia que pueda pagarlo. Anéxasela a ese aliado: gana +1 de Vida, Def y Atq por cada aliado que tributó, mientras la lleve.",
         abilities: [
             { trigger: "JUGAR", requisitos: [
                 { count: { algunFiltro: [ { campo: "tags", op: "includes", valor: "Dios" },
@@ -3707,7 +3707,7 @@ const CARD_DB = [
         // la Pasiva se queda solo para lo que el Requisito no puede cubrir: que lleguen dos por
         // otra vía (una resurrección, un clon). Ahí se destruyen los MÁS ANTIGUOS hasta que quede
         // uno, que es la regla general y no un caso particular del que acaba de entrar.
-        text: "Coste: 4 de Furor. Requiere que no haya otro Serafín en tu campo. P: MARAVILLA: Si llega a haber dos o más Serafines en tu campo, se destruyen los más antiguos hasta que quede uno. Al colocar: cura 2 de Vida a tu vanguardia. A: CASTIGO (4F): Ataque especial a 3 enemigos de la vanguardia.",
+        text: "Requisito: Ningún otro Serafín en tu campo. Coste: 4 de Furor. P: MARAVILLA: Si llega a haber dos o más Serafines en tu campo, se destruyen los más antiguos hasta que quede uno. Al colocar: cura 2 de Vida a tu vanguardia. A: CASTIGO (4F): Ataque especial a hasta 3 enemigos de la vanguardia.",
         passiveName: "MARAVILLA", activeName: "CASTIGO", activeCost: 4,
         abilities: [
             // El tributo, declarativo. Antes era un onBeforePlayAsync escrito a mano.
@@ -3747,10 +3747,17 @@ const CARD_DB = [
                   log: "¡MARAVILLA! No puede haber dos Serafines: {objetivo} se desvanece." } ] },
 
             { trigger: "ACTIVA", nombre: "CASTIGO", coste: { furor: 4 },
-              target: { quien: "ENEMIGO", cantidad: 3 },
+              // HASTA 3, no 3 exactos (Toto, 21-ago-2026): con el cupo fijo la Habilidad quedaba
+              // muerta salvo con la vanguardia rival medio llena, y así la carta es más jugosa.
+              // Mismo mecanismo que AL-FÉNIX: el cupo se ajusta a los enemigos que hay, se puede
+              // parar antes con el botón, y al elegir al último que queda arranca solo.
+              target: { quien: "ENEMIGO", cantidad: 3, hastaCantidad: true, permitirParar: true },
+              // El texto dice "de la vanguardia": sin esto, el "¿quedan objetivos?" contaría
+              // también la retaguardia y la elección no se cerraría sola.
+              validarObjetivo: [ { campo: "location", op: "==", valor: "vanguard", msg: "Debe ser de vanguardia." } ],
               requisitos: [
-                { count: { quien: "ENEMIGO", zona: "vanguardia" }, op: ">=", valor: 3,
-                  msg: "No hay suficientes enemigos en vanguardia para CASTIGO." } ],
+                { count: { quien: "ENEMIGO", zona: "vanguardia" }, op: ">=", valor: 1,
+                  msg: "No hay enemigos en la vanguardia del rival para CASTIGO." } ],
               log: "¡{carta} imparte su CASTIGO divino!",
               efectos: [ { op: "ATACAR", especial: true } ] }
         ],
@@ -6525,7 +6532,7 @@ const CARD_DB = [
     {
         id: 2008, name: "Nethuns", hp: 5, def: 3, atk: 4, type: "Personaje", subtype: "Ser mágico",
         tags: ["Invocación", "Diosa"], gender: "F", rarity: "C", cost: 0, series: 1,
-        text: "A: DERRENGAR (2F): Elige 3 enemigos de la vanguardia: pierden 2 de Furor y quedan Silenciados (2 turnos).",
+        text: "A: DERRENGAR (2F): Elige hasta 3 enemigos de la vanguardia: pierden 2 de Furor y quedan Silenciados (2 turnos).",
         activeName: "DERRENGAR", activeCost: 2,
         // Estrena el estado `silencio` CON DURACIÓN. El motor ya lo soportaba entero -corta las
         // Habilidades en canActivateAbility, pinta su chapa con la cuenta atrás y sale en el
@@ -6536,14 +6543,17 @@ const CARD_DB = [
         // un `hastaCantidad: true` en el ELEGIR y bajar el requisito a 1.
         abilities: [
             { trigger: "ACTIVA", nombre: "DERRENGAR", coste: { furor: 2 }, sinObjetivo: true,
+              // HASTA 3, no 3 exactos (Toto, 21-ago-2026): ver CASTIGO. El cupo se ajusta a los
+              // enemigos que haya y se puede parar antes con el botón.
               requisitos: [
-                { count: { quien: "ENEMIGO", zona: "vanguardia" }, op: ">=", valor: 3,
-                  msg: "Necesitas 3 enemigos en la vanguardia del rival para derrengarlos." } ],
+                { count: { quien: "ENEMIGO", zona: "vanguardia" }, op: ">=", valor: 1,
+                  msg: "No hay enemigos en la vanguardia del rival a los que derrengar." } ],
               log: "¡Nethuns arrastra a la vanguardia enemiga bajo la marea!",
               efectos: [
                 // Sin `cancelable: false`: ver el comentario de INCINERAR.
                 { op: "ELEGIR", de: "ENEMIGOS", zona: "VANGUARDIA", cantidad: 3,
-                  titulo: "DERRENGAR: elige 3 enemigos",
+                  hastaCantidad: true, permitirParar: true,
+                  titulo: "DERRENGAR: elige hasta 3 enemigos (pulsa OK al terminar)",
                   efectos: [
                     { op: "MODIFICAR_STAT", stat: "furor", delta: -2, animacion: "HABILIDAD_MALA" },
                     { op: "APLICAR_ESTADO", estado: "silencio", duracion: 2,
@@ -10517,9 +10527,33 @@ const DSL = {
                 game.inputState = 'SELECT_ABILITY_TARGETS';
                 const cx = { targets: [], maxTargets: cant, name: activa.nombre || tmpl.activeName, targetType: tt };
                 if (activa.ataqueNormal) cx.isNormalAttack = true;
+                // `hastaCantidad` / `permitirParar` en el target de una ACTIVA (21-ago-2026). El
+                // target de ability NO pasa por el op ELEGIR -lo resuelve el motor con
+                // abilityContext-, así que esas dos opciones se le quedaban fuera y el cupo era
+                // fijo: CASTIGO con 2 enemigos se quedaba esperando un tercero que no existía.
+                // El motor ya tenía la pieza (`canStopEarly`), que da las DOS cosas: el botón OK
+                // con al menos uno elegido, y el cierre automático cuando ya no quedan válidos.
+                if (activa.target && (activa.target.hastaCantidad || activa.target.permitirParar)) cx.canStopEarly = true;
                 game.abilityContext = cx;
                 game.render();
             };
+            // Con `hastaCantidad`, el motor pregunta si queda algún objetivo válido SIN elegir para
+            // decidir si cierra la selección sola. Se responde con el mismo criterio que usa el
+            // propio validarObjetivo, así que las dos cosas no pueden desalinearse.
+            if (activa.target && activa.target.hastaCantidad && typeof tmpl.hasMoreValidTargets !== 'function') {
+                tmpl.hasMoreValidTargets = function (card, game) {
+                    const enemigo = card.owner === 'p1' ? 'p2' : 'p1';
+                    const pid = (activa.target.quien === 'ALIADO') ? card.owner : enemigo;
+                    const p = game.players[pid];
+                    const yaElegidos = new Set(((game.abilityContext || {}).targets || []).map(t => t.instanceId));
+                    return [...p.vanguard, ...p.rearguard].some(c => {
+                        if (yaElegidos.has(c.instanceId)) return false;
+                        if ((DSL._tmpl(c.id) || {}).isAvatar) return false;
+                        if (typeof tmpl.onValidateTarget === 'function' && !tmpl.onValidateTarget(card, c, game, true)) return false;
+                        return true;
+                    });
+                };
+            }
             if (Array.isArray(activa.validarObjetivo) && typeof tmpl.onValidateTarget !== 'function') {
                 // _match y no _cmp a pelo (20-ago-2026): así `validarObjetivo` acepta los mismos
                 // filtros que ELEGIR y `count` -grupos `o`, `valorCampo` para comparar con OTRO

@@ -77,8 +77,12 @@ Norma a partir de ahora: cada pieza nueva del DSL entra también en el editor.
 
 ## 6. Decisiones cerradas (para no volver a preguntarlas)
 
-- **DERRENGAR y CASTIGO piden 3 enemigos EXACTOS**, no "hasta 3". Hace las cartas más jugosas.
+- **DERRENGAR y CASTIGO son "HASTA 3"**, no 3 exactos: con el cupo fijo quedaban muertas salvo con la vanguardia rival medio llena, y así son más jugosas. Con el botón de parar y cierre automático al no quedar objetivos, como AL-FÉNIX.
 - **'Tecnología' es un SUBTIPO**, no una etiqueta. Estaba bien así.
+- **La gramática del requisito depende del TIPO**: un Evento escribe `Requiere X.` y una carta
+  normal `Requisito: X.`, y no son intercambiables — la equivocada se queda como prosa suelta, sin
+  caja. COSTE y REQUISITO **sí conviven** en la misma carta, los dos al principio del texto.
+  Lo vigila `auditar_textos` desde el 21-ago-2026.
 - **`ANTES` es antes de lo que la FASE hace**, no antes de su cartel. Para lo que va nada más
   empezar el turno está la fase `INICIO DEL TURNO`.
 - **Los interceptores NO entran en `PERIODICO`**: interceptar el cálculo del Furor es más fino que

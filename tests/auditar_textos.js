@@ -88,6 +88,23 @@ for (const c of CARTAS) {
     }
 }
 
+// GRAMÁTICA DEL REQUISITO SEGÚN EL TIPO (Toto, 21-ago-2026, con captura). Un Evento escribe
+// "Requiere X." y una carta normal "Requisito: X." — y no son intercambiables: el detalle solo
+// reconoce cada forma en su sitio, así que la equivocada se queda como PROSA SUELTA, sin caja.
+// Pasó en Serafín y en Alabanza, las dos escritas del tirón copiando el patrón de un Evento.
+// Solo mira el ARRANQUE del texto: un "Requiere" dentro de la descripción de una Activa ("A:
+// SACRIFICIO EQUIVALENTE (1F): Requiere otro aliado…") es prosa correcta y no se toca.
+for (const c of CARTAS) {
+    const txt = String(c.text || '').trim();
+    if (c.type === 'Evento') {
+        if (/^\s*(?:\d+\s+turnos?\.\s*)?Requisito:/i.test(txt)) {
+            add('REQUISITO-MAL-ESCRITO', c, 'es un Evento y usa "Requisito:": su caja solo reconoce "Requiere X."');
+        }
+    } else if (/^Requiere\b/i.test(txt)) {
+        add('REQUISITO-MAL-ESCRITO', c, 'no es un Evento y usa "Requiere": su caja solo reconoce "Requisito: X." (si no, sale como prosa suelta)');
+    }
+}
+
 const T_COLOCAR = ['AL_JUGAR', 'ANTES_DE_JUGAR', 'AL_ENTRAR', 'onPlay', 'onAfterPlayAsync', 'onBeforePlayAsync'];
 const T_CONTINUO = ['PASIVA_CONTINUA', 'AURA', 'PREVIEW_GLOBAL', 'GLOBAL_MODIFICAR_FUROR',
     'GLOBAL_ANTES_DE_CAMBIO_STAT', 'PUEDE_ATACAR', 'SOBRECURACION', 'FIN_TURNO', 'INICIO_TURNO',

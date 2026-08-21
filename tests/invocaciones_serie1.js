@@ -209,6 +209,12 @@ const dur = (c, k) => (c.status && c.status[k] && c.status[k].duration) || 0;
             'furor=' + ani.furor + '/' + _antes + ' pendientes=' + ctx.pendientes.length);
     }
     {
+        // HASTA 3, no 3 exactos (Toto, 21-ago-2026): con el cupo fijo la Habilidad quedaba muerta
+        // salvo con la vanguardia rival medio llena. Con dos enemigos derrenga a los dos, y al
+        // elegir al último que queda arranca sola.
+        // OJO al escenario que había aquí antes: comprobaba "se rechaza" mirando que Nethuns no
+        // hubiera pagado... pero es que el coste se cobra al ELEGIR, así que pasaba igual sin
+        // rechazarse nada. Pasaba por el motivo equivocado.
         const { g, paso } = await mesa({
             turno: 2, turnoDe: 'p1', empieza: 'p2',
             p1: { vanguardia: [{ carta: 'Nethuns', furor: 2 }] },
@@ -216,8 +222,27 @@ const dur = (c, k) => (c.status && c.status[k] && c.status[k].duration) || 0;
         });
         const net = buscar(g, 'p1', 'Nethuns');
         await paso({ habilidad: 'Nethuns' });
-        check('con solo 2 enemigos en vanguardia, DERRENGAR se rechaza', net.furor === 2, 'furor=' + net.furor);
-        check('...y nadie pierde Furor', buscar(g, 'p2', 'Aniceto').furor === 3);
+        await paso({ confirmar: true });
+        await paso({ elegir: ['Aniceto', 'Karolina'] });
+        check('con solo 2 enemigos, DERRENGAR ya NO se rechaza: los derrenga', net.furor === 0, 'furor=' + net.furor);
+        check('...y los dos pierden su Furor',
+            buscar(g, 'p2', 'Aniceto').furor === 1 && buscar(g, 'p2', 'Karolina').furor === 0,
+            buscar(g, 'p2', 'Aniceto').furor + ' / ' + buscar(g, 'p2', 'Karolina').furor);
+        check('...y quedan Silenciados los dos',
+            dur(buscar(g, 'p2', 'Aniceto'), 'silencio') === 2 && dur(buscar(g, 'p2', 'Karolina'), 'silencio') === 2);
+    }
+    {
+        // Sin NINGÚN enemigo en vanguardia sí se rechaza: el requisito baja a 1, no a 0. Y aquí
+        // el rechazo se comprueba por donde de verdad se nota: no se abre ninguna elección.
+        const { ctx, g, paso } = await mesa({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'Nethuns', furor: 2 }] },
+            p2: { retaguardia: [{ carta: 'Aniceto', furor: 3 }] },
+        });
+        await paso({ habilidad: 'Nethuns' });
+        check('sin enemigos en vanguardia, DERRENGAR se rechaza', ctx.pendientes.length === 0,
+            'pendientes=' + ctx.pendientes.length);
+        check('...y nadie pierde Furor', buscar(g, 'p1', 'Nethuns').furor === 2 && buscar(g, 'p2', 'Aniceto').furor === 3);
     }
 
     console.log('\n' + (fallos
