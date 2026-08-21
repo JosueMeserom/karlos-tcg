@@ -9447,9 +9447,18 @@ const DSL = {
             }
             return { ok: true };
             };
-            const _rc = (_puedeMatarVarios && typeof game.sinRecolocarHasta === 'function')
-                ? await game.sinRecolocarHasta(_correrObjetivos)
-                : await _correrObjetivos();
+            // `sinRecolocar: true` (Toto, 21-ago-2026): además del candado de recolocación -que
+            // impide que suba gente de retaguardia mientras cae la tanda- CONGELA la fila: las que
+            // mueren dejan un hueco invisible en su sitio y las supervivientes no se recentran
+            // hasta que termina todo. Lo pidió viendo a Némesis destruir su propia vanguardia: las
+            // cuatro mueren a la vez, y verlas deslizarse de una en una lo contradice.
+            // Opt-in y por defecto apagado: una destrucción normal se recoloca al vuelo, como siempre.
+            const _envoltorio = (e.sinRecolocar && typeof game.congelarFilaHasta === 'function')
+                    ? game.congelarFilaHasta.bind(game)
+                : (_puedeMatarVarios && typeof game.sinRecolocarHasta === 'function')
+                    ? game.sinRecolocarHasta.bind(game)
+                : null;
+            const _rc = _envoltorio ? await _envoltorio(_correrObjetivos) : await _correrObjetivos();
             if (_rc && _rc.ok === false) return { ok: false, anyApplied };
             if (_resumen && _resumen.length) {
                 const mismos = _resumen.every(x => x.delta === _resumen[0].delta);

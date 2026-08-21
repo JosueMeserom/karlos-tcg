@@ -6292,7 +6292,11 @@
             // tirada que ya había caído (softlock).
             // `motivo`: por qué se lanza esta moneda. Un string para toda la tanda, o un ARRAY con
             // un texto por tirada (una carta que echa tres monedas puede querer explicar cada una).
-            // Lo escribe innerText, nunca innerHTML: puede llevar dentro el nick del rival.
+            // Se pinta con _fmtLog, el MISMO formateador del log (Toto, 21-ago-2026): nombres de
+            // carta en negrita, nicks en cursiva y el [n] de copia fuera de la negrita. Así las
+            // partes de la frase se distinguen igual que en el registro, sin inventar un segundo
+            // criterio. Y es seguro pese al innerHTML: _fmtLog ESCAPA &, < y > antes de meter sus
+            // etiquetas, que es justo lo que hace falta con un nick que escribe otra persona.
             async triggerCoinFlips(count = 1, playerId, reanudar = null, motivo = null) {
                 const results = reanudar && Array.isArray(reanudar.resultados) ? [...reanudar.resultados] : [];
                 const overlay = document.getElementById('coin-overlay');
@@ -6300,7 +6304,7 @@
                 const _ponerMotivo = (i) => {
                     if (!_razon) return;
                     const txt = Array.isArray(motivo) ? (motivo[i] || motivo[motivo.length - 1] || '') : (motivo || '');
-                    _razon.innerText = txt;
+                    _razon.innerHTML = txt ? this._fmtLog(txt) : '';
                     _razon.style.display = txt ? 'block' : 'none';
                 };
                 _ponerMotivo(reanudar ? reanudar.idx : 0);
@@ -9805,21 +9809,14 @@
                         // LIMPIEZA ABSOLUTA DE LA CARTA
                         this.resetCard(card);
 
-                        // FILA CONGELADA (Toto, 21-ago-2026). Con `_congelarFila` puesto, la
-                        // posición que deja la carta se apunta y se pinta como un hueco invisible
-                        // del mismo tamaño, así que las supervivientes NO se recentran mientras
-                        // cae el resto de la tanda. Némesis destruyendo su propia vanguardia era
-                        // lo que lo pedía: las cuatro mueren a la vez y verlas deslizarse hacia
-                        // el centro de una en una contradice esa simultaneidad. El candado de
-                        // recolocación (`_candadoRecolocar`) es OTRA cosa: ese impide que suba
-                        // gente de retaguardia. Este congela la fila que ya está.
-                        if (this._congelarFila) {
-                            const _i = p.vanguard.findIndex(c => c.instanceId === card.instanceId);
-                            if (_i !== -1) {
-                                this._huecosFantasma = this._huecosFantasma || { p1: [], p2: [] };
-                                (this._huecosFantasma[card.owner] = this._huecosFantasma[card.owner] || []).push(_i);
-                            }
-                        }
+                        // FILA CONGELADA (Toto, 21-ago-2026): mientras `_filaCongelada` tenga la
+                        // foto de la fila, el render deja un hueco invisible por cada carta que
+                        // falte, así que las supervivientes NO se recentran mientras cae el resto
+                        // de la tanda. Némesis destruyendo su propia vanguardia era lo que lo
+                        // pedía: las cuatro mueren a la vez y verlas deslizarse hacia el centro de
+                        // una en una contradice esa simultaneidad. El candado de recolocación
+                        // (`_candadoRecolocar`) es OTRA cosa: ese impide que suba gente de
+                        // retaguardia. Este congela la fila que ya está. Ver congelarFilaHasta.
                         p.vanguard = p.vanguard.filter(c => c.instanceId !== card.instanceId);
                         p.rearguard = p.rearguard.filter(c => c.instanceId !== card.instanceId);
 
@@ -9908,15 +9905,17 @@
             // Al terminar se sueltan los dos y la fila se recoloca UNA vez, ya con todo hecho.
             // Es opt-in desde el DSL (`sinRecolocar: true` en el efecto): por defecto, apagado.
             async congelarFilaHasta(fn) {
-                const antes = this._congelarFila;
-                this._congelarFila = true;
+                const antes = this._filaCongelada;
+                // La FOTO de las dos vanguardias tal y como están ahora. Mientras dure, el render
+                // las repinta siguiendo esta foto, con hueco invisible por cada una que falte.
+                this._filaCongelada = {
+                    p1: this.players.p1.vanguard.map(c => c.instanceId),
+                    p2: this.players.p2.vanguard.map(c => c.instanceId),
+                };
                 try { return await this.sinRecolocarHasta(fn); }
                 finally {
-                    this._congelarFila = antes;
-                    if (!this._congelarFila) {
-                        this._huecosFantasma = { p1: [], p2: [] };
-                        this.render();
-                    }
+                    this._filaCongelada = antes;
+                    if (!this._filaCongelada) this.render();
                 }
             }
 
@@ -10753,17 +10752,26 @@
                 // Huecos de una tanda con la fila congelada: van EN SU ÍNDICE, no al final, o las
                 // supervivientes se moverían igual. Misma clase que una carta, así que ocupan
                 // exactamente lo mismo sin tener que repetir medidas aquí.
-                const _fant = (this._huecosFantasma || {})[pid] || [];
-                if (_fant.length) {
-                    const _cartasFila = () => Array.from(vanEl.querySelectorAll(':scope > .card, :scope > .card-wrapper, :scope > .hueco-fantasma'));
-                    [..._fant].sort((a, b) => a - b).forEach(idx => {
+                const _orden = (this._filaCongelada || {})[pid];
+                if (_orden) {
+                    // Se repinta la fila SIGUIENDO LA FOTO que se tomó al congelarla: cada id que
+                    // ya no está deja un hueco invisible en su sitio exacto. Guardar índices no
+                    // valía -el array se encoge con cada muerte, así que el índice de la siguiente
+                    // ya no es el que era, y una muerta del medio descolocaba el resto-. La foto
+                    // no se encoge.
+                    vanEl.innerHTML = '<div class="zone-label">Vanguardia</div>';
+                    const _vivas = new Map(p.vanguard.map(c => [c.instanceId, c]));
+                    _orden.forEach(id => {
+                        const c = _vivas.get(id);
+                        if (c) { vanEl.appendChild(this.createCardEl(c)); _vivas.delete(id); return; }
                         const hueco = document.createElement('div');
                         hueco.className = 'card hueco-fantasma';
                         hueco.style.visibility = 'hidden';
                         hueco.style.pointerEvents = 'none';
-                        const ref = _cartasFila()[idx];
-                        if (ref) vanEl.insertBefore(hueco, ref); else vanEl.appendChild(hueco);
+                        vanEl.appendChild(hueco);
                     });
+                    // Las que hayan ENTRADO durante la tanda no salen en la foto: van al final.
+                    _vivas.forEach(c => vanEl.appendChild(this.createCardEl(c)));
                 }
 
                 const rearEl = document.getElementById(`${pid}-rearguard`);

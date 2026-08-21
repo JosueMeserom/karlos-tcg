@@ -741,8 +741,11 @@ console.log('\n--- el modal de la moneda dice por qué se lanza ---');
           DSL._motivoMoneda(juego, cogorza, null, cogorza));
     // Y el modal tiene dónde pintarlo, con innerText: puede llevar dentro el nick del rival.
     const src = fs.readFileSync(path.join(RAIZ, 'public/index.html'), 'utf8');
-    check('el overlay tiene su renglón y se rellena con innerText',
-          /id="coin-reason"/.test(src) && /_razon\.innerText = txt/.test(src));
+    check('el overlay tiene su renglón', /id="coin-reason"/.test(src));
+    // Se pinta con el MISMO formateador del log (negritas y cursivas), y _fmtLog escapa antes de
+    // meter etiquetas, que es lo que lo hace seguro con un nick escrito por otra persona.
+    check('...y lo pinta con _fmtLog, como el log', /_razon\.innerHTML = txt \? this\._fmtLog\(txt\)/.test(src));
+    check('_fmtLog escapa antes de formatear', /_fmtLog\(msg\) \{[\s\S]{0,400}replace\(\/&\/g, '&amp;'\)/.test(src));
 }
 
 console.log(fallos === 0 ? '\nSUITE capas_cliente: ' + comprobaciones + '/' + comprobaciones + ' comprobaciones — CAPAS CORRECTAS' : '\nSUITE capas_cliente: ' + fallos + ' FALLOS de ' + comprobaciones + ' comprobaciones');
