@@ -5955,8 +5955,8 @@ const CARD_DB = [
         // hace el compilador: es lo que ESE trigger significa, no un efecto que esta carta elija.
         abilities: [
             { trigger: "INTERCEPTOR_LETAL", nombre: "YO SIEMPRE TE AMARÉ",
-              prompt: "¿SACRIFICAR AL GUARDAESPALDAS?\n\n¡{defensor} va a recibir un golpe letal!",
-              opciones: { si: "SÍ, SACRIFICAR A GUARDAESPALDAS", no: "NO, DEJAR MORIR A {defensor}" },
+              prompt: "¿SACRIFICAR AL GUARDAESPALDAS?\n\n¡{defensorSolo} va a recibir un golpe letal!",
+              opciones: { si: "SÍ, SACRIFICAR A GUARDAESPALDAS", no: "NO, DEJAR MORIR A {defensorSolo}" },
               log: { msg: "¡{habilidad}! {cartaRef} se arroja heroicamente frente al ataque de {atacante}.", tipo: "ability" },
               floating: { texto: "¡NOOO!", estilo: "ft-purple", offset: -30 } }
         ]
@@ -6646,7 +6646,7 @@ const CARD_DB = [
         abilities: [
             { trigger: "REACCION", sobre: "MUERTE_ALIADO", nombre: "COMENSAL",
               si: { defensor: { campo: "subtype", op: "==", valor: "Ser vivo" } },
-              prompt: "¿Colocar a Uniojo en el lugar de {muerto}?",
+              prompt: "¿Colocar a Uniojo en el lugar de {muertoSolo}?",
               log: { msg: "¡Uniojo aprovecha el vacío de {muerto} y entra al campo!", tipo: "ability" },
               efectos: [
                 { op: "COLOCARSE" },
@@ -9786,6 +9786,13 @@ const DSL = {
         // `carta` es el nombre a secas (una carta en la mano aún no tiene [n]); `cartaRef` es el
         // nombre completo con dueño, para la que reacciona DESDE EL CAMPO y ya está identificada.
         r.cartaRef = DSL._nombre(game, handCard);
+        // Y la variante SIN dueño (nombre + [n]) de la otra carta: el prompt de una reacción es
+        // privado -solo lo ve quien reacciona, y siempre sobre una carta suya-, así que ahí el
+        // "de J1 (Jugador 1)" es ruido. Los LOGS, que ve todo el mundo, siguen usando el nombre
+        // completo: la norma es para lo que se comparte, no para lo que se pregunta.
+        const corto = (c) => (game && typeof game.nCarta === 'function') ? game.nCarta(c) : c.name;
+        r.defensorSolo = corto(cx.defensor);
+        r.muertoSolo = r.defensorSolo;
         if (cx.attacker) { r.atacante = DSL._nombre(game, cx.attacker); r.atacanteG = cx.attacker.gender; }
         return r;
     },
