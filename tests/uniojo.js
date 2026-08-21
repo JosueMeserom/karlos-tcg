@@ -52,7 +52,7 @@ const enMano = (g) => g.players.p1.hand.some(c => c.name === 'Uniojo');
     {
         const { g, paso } = await mesa({
             turno: 2, turnoDe: 'p2', empieza: 'p1',
-            p1: { vanguardia: ['Karlos', { carta: 'Mini-tigre', vida: 1 }], mano: ['Uniojo'], retribucion: ['Longaniza', 'Longaniza'] },
+            p1: { vanguardia: ['Karlos', { carta: 'Mini-tigre', vida: 1 }, 'Robot de seguridad SP'], mano: ['Uniojo'], retribucion: ['Longaniza', 'Longaniza'] },
             p2: { vanguardia: ['Mini-tigre'] },
         });
         await paso({ atacar: 'Mini-tigre', objetivo: 'Mini-tigre' });
@@ -60,7 +60,11 @@ const enMano = (g) => g.players.p1.hand.some(c => c.name === 'Uniojo');
         const u = uniojo(g);
         check('Uniojo entra al campo', !!u);
         check('...en la MISMA zona en la que murió el aliado (vanguardia)', !!u && u.location === 'vanguard', u && u.location);
-        check('...y de verdad está en el array de vanguardia', g.players.p1.vanguard.some(c => c.name === 'Uniojo'));
+        // "En su lugar" es el hueco EXACTO: el tigre era el segundo de la fila y Uniojo tiene que
+        // quedar segundo, no el último. El orden del array es el orden que se ve en la mesa.
+        check('...y en el MISMO hueco, no al final de la fila',
+            g.players.p1.vanguard.map(c => c.name).join(',') === 'Karlos,Uniojo,Robot de seguridad SP',
+            g.players.p1.vanguard.map(c => c.name).join(','));
         check('...sale de la mano', !enMano(g));
         check('...con su [n] de copia asignado', !!u && !!u.copyId, u && String(u.copyId));
         check('...con +2 de Vida máxima', !!u && u.maxHp === 4, u && String(u.maxHp));
@@ -94,10 +98,13 @@ const enMano = (g) => g.players.p1.hand.some(c => c.name === 'Uniojo');
         check('...y Uniojo sigue en la mano', enMano(g));
     }
 
-    console.log('--- La vanguardia se ha vuelto a llenar: entra atrás ---');
+    console.log('--- El hueco no se cierra antes de reaccionar ---');
     {
-        // Cuatro en vanguardia y uno detrás. Al morir el tigre, el motor sube al de retaguardia
-        // ANTES de ofrecer esta reacción: el hueco ya no existe cuando Uniojo llega.
+        // Cuatro en vanguardia y uno detrás. Si la fila se recolocara al morir el tigre -como
+        // hacía hasta el 22-ago-2026-, el Oso subiría a tapar el hueco y Uniojo se encontraría
+        // la vanguardia llena. La recolocación espera ahora a que se resuelvan las reacciones a
+        // esa muerte: el hueco de un muerto no se cierra mientras su muerte siga teniendo
+        // consecuencias.
         const { g, paso } = await mesa({
             turno: 2, turnoDe: 'p2', empieza: 'p1',
             p1: {
@@ -112,8 +119,14 @@ const enMano = (g) => g.players.p1.hand.some(c => c.name === 'Uniojo');
         await paso({ opcion: 'SÍ' });
         const u = uniojo(g);
         check('Uniojo entra igualmente', !!u);
-        check('...pero a la RETAGUARDIA', !!u && u.location === 'rearguard', u && u.location);
-        check('...sin dejar la vanguardia con cinco', g.players.p1.vanguard.length === 4,
+        check('...en el hueco del tigre, delante', !!u && u.location === 'vanguard', u && u.location);
+        check('...y en su sitio exacto',
+            g.players.p1.vanguard.map(c => c.name).join(',') === 'Karlos,Uniojo,Robot de seguridad SP,Hechicero',
+            g.players.p1.vanguard.map(c => c.name).join(','));
+        check('...sin que el Oso haya subido de retaguardia',
+            g.players.p1.rearguard.map(c => c.name).join(',') === 'Oso con armadura',
+            g.players.p1.rearguard.map(c => c.name).join(','));
+        check('...ni dejar la vanguardia con cinco', g.players.p1.vanguard.length === 4,
             'vanguardia=' + g.players.p1.vanguard.length);
     }
 

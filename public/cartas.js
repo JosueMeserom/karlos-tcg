@@ -9726,11 +9726,49 @@ const DSL = {
             if (e.op === 'COLOCARSE') {
                 const p = game.players[reactor];
                 const zona = (cx.zona === 'vanguard' && p.vanguard.length < 4) ? 'vanguard' : 'rearguard';
+                const fila = zona === 'vanguard' ? p.vanguard : p.rearguard;
+                // EL MISMO HUECO. "En su lugar" es el sitio exacto que ocupaba el muerto, no el
+                // final de la fila; el motor lo pasa en cx.indice porque para cuando llega aquí
+                // esa carta ya no está en ninguna fila. Solo vale si se entra a SU zona: si la
+                // vanguardia se llenó por otra vía y hay que ir atrás, el hueco es otro.
+                const idx = (cx.zona === zona && typeof cx.indice === 'number' && cx.indice >= 0)
+                    ? Math.min(cx.indice, fila.length) : fila.length;
                 handCard.location = zona;
-                p[zona === 'vanguard' ? 'vanguard' : 'rearguard'].push(handCard);
-                if (typeof game.assignCopyId === 'function') game.assignCopyId(handCard); // el [n] nace al salir de la mano
-                if (typeof game.render === 'function') game.render();
-                if (typeof animateResurrect === 'function') { try { await animateResurrect(reactor, handCard.instanceId); } catch (err) {} }
+                const filaSel = `#${reactor}-${zona}`;
+                const salirDeLaMano = () => {
+                    const j = p.hand.indexOf(handCard);
+                    if (j !== -1) p.hand.splice(j, 1);
+                    if (typeof game.assignCopyId === 'function') game.assignCopyId(handCard); // el [n] nace al salir de la mano
+                };
+                const colocar = () => {
+                    fila.splice(idx, 0, handCard);
+                    handCard.justPlayed = true;
+                    handCard._presentada = true;   // su entrada la hace la presentación
+                    setTimeout(() => { delete handCard._presentada; }, 800);
+                    if (typeof game.updatePassives === 'function') game.updatePassives();
+                    if (typeof game.render === 'function') game.render();
+                    return handCard.instanceId;
+                };
+                // Se PRESENTA desde la mano, como cualquier otra carta que entra al campo (§14).
+                // Antes usaba animateResurrect, que es la animación de salir de los DESCARTES: la
+                // carta aparecía brotando del descarte mientras seguía dibujada en la mano.
+                if (typeof animarPresentacionCarta === 'function') {
+                    await animarPresentacionCarta(handCard.id, `#${reactor}-hand`,
+                        filaSel, game.gameMode === 'online' && game.myPlayerId !== reactor,
+                        { origenId: handCard.instanceId, zonaSel: () => filaSel,
+                          alSalirDeLaMano: salirDeLaMano, colocar });
+                    // Y el remate de "colarse en el hueco": llega estrecha y se abre en su sitio.
+                    if (typeof document !== 'undefined' && document.querySelector) {
+                        const el = document.querySelector(`.card[data-id="${handCard.instanceId}"]`);
+                        if (el && el.classList) {
+                            el.classList.add('colandose');
+                            setTimeout(() => el.classList.remove('colandose'), 500);
+                        }
+                    }
+                } else {
+                    salirDeLaMano();
+                    colocar();
+                }
                 continue;
             }
             if (e.op === 'CANCELAR_ATAQUE') { result.cancelAttack = true; continue; }
@@ -10991,8 +11029,8 @@ const DSL = {
                 // enseña el par atacante->objetivo). Devolver true hace que el motor la saque de
                 // la mano; con el op COLOCARSE la carta ya se ha metido ella misma en el campo,
                 // que es justo lo que el motor espera de este hook.
-                tmpl.onHandReactionToAllyDeath = async function (handCard, deadCard, game, zona) {
-                    const cx = { attacker: null, defensor: deadCard, zona };
+                tmpl.onHandReactionToAllyDeath = async function (handCard, deadCard, game, zona, indice) {
+                    const cx = { attacker: null, defensor: deadCard, zona, indice };
                     const result = { used: true };
                     if (!await correr(handCard, game, cx, result)) return false;
                     return true;
@@ -11041,6 +11079,11 @@ const DSL = {
                 });
                 if (!quiere) return false;
                 if (interceptorLetal.log) game.logMsg(R(interceptorLetal.log.msg), interceptorLetal.log.tipo || 'ability');
+                // El golpe se ve: el motor anula el ataque en cuanto esto devuelve true, así que
+                // sin esto la carta se partía en dos sin que nadie la hubiera tocado. Va aquí,
+                // ANTES del flotante y de la muerte, porque es lo que los provoca. No se declara
+                // por carta: es la escena que describe el trigger.
+                if (typeof animateInterception === 'function') await animateInterception(attacker.instanceId, card.instanceId, defender.instanceId);
                 const f = interceptorLetal.floating;
                 if (f && typeof showFloatingText === 'function') showFloatingText(card.instanceId, R(f.texto), f.estilo || 'ft-purple', f.offset !== undefined ? f.offset : -30);
                 card.currentHp = 0;

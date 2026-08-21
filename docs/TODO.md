@@ -80,6 +80,12 @@ Norma a partir de ahora: cada pieza nueva del DSL entra también en el editor.
   "correr en la fase de Furor".
 - **Si una carta hace algo que solo aplicará en un momento concreto, se marca visiblemente** desde
   ya (marca con chapa), y el aviso se retira cuando el efecto llega.
+- **El hueco de un muerto no se cierra mientras su muerte siga teniendo consecuencias**
+  (22-ago-2026). La recolocación (subir de retaguardia) espera a que se resuelvan las reacciones a
+  esa muerte; si no, quien reacciona para ocupar el hueco se lo encuentra tapado. No es un
+  parámetro por carta: es la regla, hermana del candado de recolocación de las muertes en grupo.
+  Y **"en su lugar" es el hueco EXACTO**: quien ocupa el sitio de otro entra en su misma posición
+  del array, que es la que se ve en la mesa.
 - **Morir en el lugar de otro es un TRIGGER, no un efecto** (21-ago-2026, Guardaespaldas):
   `INTERCEPTOR_LETAL` hace él mismo la muerte por sustitución, porque eso ES lo que el trigger
   significa; la carta solo pone el texto. Su hermana desde la mano es `REACCION` con

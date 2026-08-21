@@ -971,6 +971,82 @@
             attackerEl.style.zIndex = "";
         }
 
+        // INTERCEPCION (Toto, 22-ago-2026). Cuando alguien muere EN LUGAR de otro
+        // (Guardaespaldas), hasta ahora no se veia nada: el motor anula el golpe antes de llamar
+        // a animateAttack, asi que la carta se partia en dos de la nada. Aqui no se intercepta el
+        // golpe -no hay bloqueo ni esquiva-, se recibe: por eso es una embestida normal a la que
+        // se le mete alguien en medio.
+        //   1. El atacante arranca su embestida hacia el objetivo, como siempre.
+        //   2. A media carrera, el que se sacrifica se PLANTA entre los dos, rapido y con un
+        //      punto de rebote (llega antes de que el otro termine el gesto: por eso el paso 1
+        //      es mas corto que la embestida normal).
+        //   3. El atacante se lo lleva por delante: tambaleo y borde rojo de siempre sobre quien
+        //      se ha puesto en medio, y el atacante rebota hacia atras.
+        // Se queda DESPLAZADO a proposito al terminar: el flotante y la muerte los dispara quien
+        // llama, y los dos se posicionan por el rect del elemento, asi que suceden ahi, en medio
+        // de la mesa, y no en el hueco del que ya se habia ido.
+        async function animateInterception(attackerId, guardId, defenderId) {
+            const attackerEl = getAnimEl(attackerId);
+            const guardEl = getAnimEl(guardId);
+            const defenderEl = getAnimEl(defenderId);
+            const guardCard = document.querySelector(`.card[data-id="${guardId}"]`);
+            if (!attackerEl || !guardEl || !defenderEl) return;
+
+            attackerEl.removeAttribute('style');
+            guardEl.removeAttribute('style');
+            void attackerEl.offsetWidth;
+
+            const attRect = attackerEl.getBoundingClientRect();
+            const defRect = defenderEl.getBoundingClientRect();
+            const gRect = guardEl.getBoundingClientRect();
+            const dx = defRect.left - attRect.left;
+            const dy = defRect.top - attRect.top;
+
+            // 1. El atacante sale hacia su objetivo (mas corto que la embestida normal: se le
+            //    van a cruzar).
+            attackerEl.style.transition = "transform 0.16s cubic-bezier(0.25, 1, 0.5, 1)";
+            attackerEl.style.transform = `translate(${dx * 0.3}px, ${dy * 0.3}px) scale(1.15)`;
+            attackerEl.style.zIndex = 1000;
+
+            await game.sleep(110);
+
+            // 2. El que se sacrifica se planta EN MEDIO, sobre la linea de ataque, algo mas cerca
+            //    del objetivo que del atacante. Con rebote, para que se lea como un lanzarse.
+            const puntoX = attRect.left + dx * 0.5;
+            const puntoY = attRect.top + dy * 0.5;
+            guardEl.style.transition = "transform 0.15s cubic-bezier(0.2, 1.5, 0.4, 1)";
+            guardEl.style.transform = `translate(${puntoX - gRect.left}px, ${puntoY - gRect.top}px) scale(1.08)`;
+            guardEl.style.zIndex = 1001;
+
+            await game.sleep(150);
+
+            // 3. El choque: el atacante llega hasta el y se lo lleva por delante.
+            attackerEl.style.transition = "transform 0.1s ease-in";
+            attackerEl.style.transform = `translate(${(puntoX - attRect.left) * 0.85}px, ${(puntoY - attRect.top) * 0.85}px) scale(1.1)`;
+            await game.sleep(100);
+
+            guardEl.style.animation = "hardShake 0.3s ease-out";
+            if (guardCard) {
+                guardCard.style.borderColor = "red";
+                guardCard.style.boxShadow = "0 0 20px red inset";
+            }
+
+            // El atacante rebota y vuelve a su sitio (se LIMPIA el transform, no se fija a
+            // scale(1): un scale en linea pisa el de `.selected` — ver animateAttack).
+            attackerEl.style.transition = "transform 0.3s ease-out";
+            attackerEl.style.transform = "";
+
+            await game.sleep(300);
+
+            attackerEl.style.transition = "";
+            attackerEl.style.zIndex = "";
+            guardEl.style.animation = "";
+            if (guardCard) {
+                guardCard.style.borderColor = "";
+                guardCard.style.boxShadow = "";
+            }
+        }
+
         // Ataque ESPECIAL (Toto, 28-jul-2026). Tres tiempos, frente al "embestir y volver" del
         // ataque normal:
         //   1. El atacante canaliza EN SU SITIO (castCharge): temblor fino y creciente con halo,
@@ -9957,6 +10033,12 @@
                         // una en una contradice esa simultaneidad. El candado de recolocación
                         // (`_candadoRecolocar`) es OTRA cosa: ese impide que suba gente de
                         // retaguardia. Este congela la fila que ya está. Ver congelarFilaHasta.
+                        // EL HUECO EXACTO que deja (Toto, 22-ago-2026). Una reaccion que dice
+                        // "ocupa su lugar" tiene que entrar DONDE ESTABA, no al final de la fila:
+                        // "en su lugar" siempre es el mismo hueco. Se mide antes de sacarla, que
+                        // es el ultimo momento en que ese sitio existe.
+                        const _filaMuerto = wasInVanguard ? p.vanguard : p.rearguard;
+                        const _indiceMuerto = _filaMuerto.findIndex(c => c.instanceId === card.instanceId);
                         p.vanguard = p.vanguard.filter(c => c.instanceId !== card.instanceId);
                         p.rearguard = p.rearguard.filter(c => c.instanceId !== card.instanceId);
 
@@ -9978,7 +10060,13 @@
                             this._recolocarPendiente = this._recolocarPendiente || {};
                             this._recolocarPendiente[card.owner] = (this._recolocarPendiente[card.owner] || 0) + 1;
                         }
-                        if (!this._candadoRecolocar) this._recolocarHuecos(p);
+                        // Y OJO al momento: la recolocacion NO se hace aqui, sino al final, ya
+                        // resueltas las reacciones a esta muerte (Toto, 22-ago-2026). Si la fila
+                        // se cierra antes, quien reacciona para ocupar el hueco se lo encuentra
+                        // tapado por el que acaba de subir de retaguardia. Es la misma idea del
+                        // candado, aplicada a la ventana de reacciones en vez de a una tanda de
+                        // muertes: el hueco de un muerto no se cierra mientras su muerte siga
+                        // teniendo consecuencias.
 
                         if (!p.discard) p.discard = [];
                         p.discard.push(card);
@@ -10005,13 +10093,22 @@
                                 // `card.location` ya vale 'discard' (lo pone resetCard más
                                 // arriba), así que quien quiera ocupar su hueco no puede
                                 // deducirla de la carta muerta.
-                                const used = await handTemplate.onHandReactionToAllyDeath(handCard, card, this, wasInVanguard ? 'vanguard' : 'rearguard');
+                                const used = await handTemplate.onHandReactionToAllyDeath(handCard, card, this, wasInVanguard ? 'vanguard' : 'rearguard', _indiceMuerto);
                                 if (used) {
-                                    defPlayer.hand.splice(i, 1);
+                                    // POR IDENTIDAD y no por indice: la reaccion ha estado en el
+                                    // aire (modal, animacion) y la mano puede haber cambiado
+                                    // debajo -incluso puede haberse sacado ella sola, si se
+                                    // presento desde la mano-. Con el indice se borraba a la
+                                    // vecina.
+                                    const _j = defPlayer.hand.indexOf(handCard);
+                                    if (_j !== -1) defPlayer.hand.splice(_j, 1);
                                     i--; // Ajustamos el índice tras borrar
                                 }
                             }
                         }
+
+                        // AHORA si: ya nadie va a reclamar el hueco.
+                        if (!this._candadoRecolocar) this._recolocarHuecos(p);
 
                         this.render(); 
                     }

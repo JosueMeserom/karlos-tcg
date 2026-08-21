@@ -16,7 +16,11 @@ const escenarios = [
     {
         nombre: 'TORMENTA PERFECTA: daño verdadero a los 2 enemigos (vanguardia+retaguardia), uno muere',
         p1: { vanguardia: [ { carta: 'Edrielle', furor: 4 } ] },
-        p2: { vanguardia: [ { carta: 'Mini-tigre', vida: 1 } ], retaguardia: [ { carta: 'Robot de seguridad SP', vida: 10 } ] },
+        // Con pila de Retribución (Toto, 22-ago-2026): sin ella, la muerte del tigre TERMINA la
+        // partida a media escena, y el arnés (que no tiene el cartel de fin de partida en su DOM)
+        // se lleva por delante lo que checkDeath hiciera después. El escenario quiere ver el daño
+        // verdadero a dos objetivos, no un game over.
+        p2: { vanguardia: [ { carta: 'Mini-tigre', vida: 1 } ], retaguardia: [ { carta: 'Robot de seguridad SP', vida: 10 } ], retribucion: [ 'Longaniza', 'Longaniza' ] },
         pasos: [ { habilidad: 'Edrielle' }, { confirmar: true } ],
         // Reordenamiento de flotantes (betasteo de Toto, 31-jul-2026): el flotante "razón"
         // (DAÑO VERDADERO) ahora sale ANTES del flotante del cambio de Vida en sí, no después
