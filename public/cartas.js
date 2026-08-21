@@ -3213,7 +3213,7 @@ const CARD_DB = [
         //   · y la simétrica en "Efectos actuales" de Simon.
         // Cuando llegue el turno del rival se le suma la línea del Oculto de verdad, que es
         // automática y trae su propia atribución.
-        tempEffectText: "A cubierto tras Simon: estará {genero?Oculto|Oculta} durante el próximo turno del rival",
+        tempEffectText: "A cubierto: estará {genero?Oculto|Oculta} durante el próximo turno del rival",
         tempEffectExpiraLog: "{objetivo} vuelve a ser visible.",
         abilities: [
             { trigger: "ACTIVA", nombre: "ÚLTIMA RESISTENCIA", coste: { furor: 3 },
@@ -3234,11 +3234,35 @@ const CARD_DB = [
                 // `actualizaPasivas`: el Oculto se aplica en la pasada de pasivas, y la vieja
                 // llamaba a updatePassives a mano al terminar. Sin esto las marcas quedan puestas
                 // pero nadie se esconde hasta el siguiente repintado.
-                { op: "MARCAR_TEMPORAL", conOwner: true, oculto: true, hastaInicioTurnoLanzador: true, actualizaPasivas: true,
+                { op: "MARCAR_TEMPORAL", conOwner: true, hastaInicioTurnoLanzador: true, actualizaPasivas: true,
                   badge: { icono: "🛡️", color: "#64748b" },
                   target: { quien: "ALIADO", zona: "VANGUARDIA", excludeSelf: true },
                   floating: "A CUBIERTO", floatingStyle: "ft-gray", offsetFloating: -20,
-                  log: "{carta} aguanta la posición y atrae toda la atención: el resto de su vanguardia queda a cubierto.", logUnaVez: true } ] }
+                  log: "{carta} aguanta la posición y atrae toda la atención: el resto de su vanguardia queda a cubierto.", logUnaVez: true } ] },
+
+            // Y AQUÍ se convierte en Oculto de verdad (Toto, 21-ago-2026). La marca de arriba es
+            // el aviso visible -"esto va a pasar"-; el Oculto llega nada más empezar el turno del
+            // rival, ANTES de su fase de Robo, y a partir de ahí es un estado normal y corriente:
+            // chapa con su cuenta, "Afectado por" y "Efectos actuales" automáticos con su fuente y
+            // su "por ÚLTIMA RESISTENCIA", y se va solo al acabar ese turno.
+            // Es el enfoque que pidió Toto: marcar primero, aplicar cuando toca.
+            { trigger: "PERIODICO", fase: "ROBO", momento: "ANTES", deQuien: "RIVAL",
+              nombre: "ÚLTIMA RESISTENCIA",
+              efectos: [
+                { op: "APLICAR_ESTADO", estado: "oculto", duracion: 1,
+                  target: { quien: "ALIADO", zona: "VANGUARDIA", excludeSelf: true,
+                            conMarcaTemporalPropia: true } } ] },
+
+            // Y se va cuando ese turno acaba. Hace falta decirlo: la cuenta atrás de los estados
+            // corre al final del turno de SU DUEÑO, y estas cartas son mías, así que un
+            // `duracion: 1` puesto en el turno del rival no se gastaría hasta el final del MÍO -o
+            // sea, un turno de más-. Con la fase declarada se dice exactamente cuándo termina.
+            { trigger: "PERIODICO", fase: "EFECTOS FINALES", momento: "DESPUES", deQuien: "RIVAL",
+              nombre: "ÚLTIMA RESISTENCIA",
+              efectos: [
+                { op: "LIMPIAR_ESTADOS", estados: ["oculto"], soloObjetivo: true,
+                  target: { quien: "ALIADO", zona: "VANGUARDIA", excludeSelf: true,
+                            conMarcaTemporalPropia: true } } ] }
         ]
     },
     {
@@ -7553,6 +7577,15 @@ const DSL = {
         }
         // selfLista: cartas en mesa cuyo instanceId está en la lista guardada en la
         // propia carta (p. ej. Esfuerzo dividido con chosenAllies). Ignora bandos.
+        // `conMarcaTemporalPropia`: solo las cartas que llevan una marca PUESTA POR ESTA CARTA
+        // (21-ago-2026). Es el positivo del `sinMarcaTemporalPropia` que ya existía, y hace falta
+        // para el patrón "marco ahora, aplico luego": el efecto diferido tiene que poder volver a
+        // encontrar exactamente a quienes marcó, aunque el campo haya cambiado.
+        if (spec.conMarcaTemporalPropia && selfCard) {
+            const _dentro = (x) => x.tempEffects && x.tempEffects.some(t => t.sourceInstanceId === selfCard.instanceId);
+            const _base = DSL._pool(ownerId, game, Object.assign({}, spec, { conMarcaTemporalPropia: false }), selfCard);
+            return _base.filter(_dentro);
+        }
         if (spec.selfLista) {
             const ids = (selfCard && Array.isArray(selfCard[spec.selfLista])) ? selfCard[spec.selfLista] : [];
             return [...DSL._zone(game, 'p1', spec.zona), ...DSL._zone(game, 'p2', spec.zona)].filter(c => ids.includes(c.instanceId));
@@ -11101,7 +11134,12 @@ const DSL = {
             // que la carta necesite su propio onUpdateTempEffect a mano.
             if (typeof tmpl.onUpdateTempEffect !== 'function') {
                 tmpl.onUpdateTempEffect = function (card, eff, game) {
-                    // `oculto` (Simon): hermano de `stats`, mismo sitio y mismo porqué.
+                    // `oculto` en una marca: ya NO escribe `stealth` a mano (21-ago-2026). El
+                    // Oculto es un ESTADO con su categoría, su duración y su fuente, y quien lo
+                    // pone es `APLICAR_ESTADO`. Este flag se queda solo para las marcas viejas que
+                    // aún lo usen, y su efecto es el mismo de siempre mientras dure la marca.
+                    // (Ver Simon: su marca es el aviso visible, y el Oculto se lo aplica un
+                    // PERIODICO al empezar el turno del rival.)
                     //
                     // SOLO EN EL TURNO DEL RIVAL (Toto, 21-ago-2026). "Oculto durante el próximo
                     // turno del rival" quiere decir eso: durante TU turno no está oculto, así que

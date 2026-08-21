@@ -3760,6 +3760,24 @@
                 this.render();
             }
 
+            // CATEGORÍAS DE ESTADO (Toto, 21-ago-2026). Hasta hoy todos los estados vivían en el
+            // mismo saco y uno nuevo BORRABA al anterior: "el nuevo estado reemplaza las
+            // alteraciones previas". Eso vale entre Sueño, Confusión y compañía -no tiene sentido
+            // estar dormido y ciego a la vez- pero deja fuera al Oculto, que no es una alteración
+            // sino una forma de estar en el campo, y que hoy es un booleano suelto sin duración,
+            // sin fuente y sin firma. Con categorías, el Oculto es un estado como los demás y
+            // solo compite con los de SU categoría (la Estasis que viene, que tampoco puede
+            // convivir con él).
+            //   · 'alteracion'  -> Sueño, Confusión, Ceguera, Daño por tiempo, Silencio.
+            //   · 'ocultacion'  -> Oculto (y la futura Estasis).
+            // Un estado sin categoría declarada cae en 'alteracion', que es como se comportaba
+            // todo hasta ahora: quien no se declare, no cambia.
+            static get CATEGORIA_ESTADO() {
+                return { dot: 'alteracion', confusion: 'alteracion', ceguera: 'alteracion',
+                         sueno: 'alteracion', silencio: 'alteracion', oculto: 'ocultacion' };
+            }
+            _categoriaEstado(type) { return Game.CATEGORIA_ESTADO[type] || 'alteracion'; }
+
             applyStatus(card, type, duration, sourceCard, sourceAbility) {
                 if (getCardTemplate(card.id).isAvatar) return; 
                 // Inmunidad concedida por un equipo (Hagoromo). Va aquí, con la de los Avatares,
@@ -3776,10 +3794,14 @@
                     return; 
                 }
 
-                const activeStatuses = Object.keys(card.status).filter(k => card.status[k].duration > 0);
+                // Solo se reemplazan los de la MISMA categoría: un Oculto no borra un Daño por
+                // tiempo, ni al revés. Antes se vaciaba `card.status` entero.
+                const _cat = this._categoriaEstado(type);
+                const activeStatuses = Object.keys(card.status)
+                    .filter(k => card.status[k].duration > 0 && this._categoriaEstado(k) === _cat);
                 if (activeStatuses.length > 0) {
                     this.logMsg(`El nuevo estado reemplaza las alteraciones previas de ${this.getCardNameWithOwner(card)}.`, 'system');
-                    card.status = {}; 
+                    activeStatuses.forEach(k => { delete card.status[k]; });
                 }
 
                 let sourceStr = 'esta carta';
@@ -5146,6 +5168,7 @@
                                 else if (key === 'confusion') name = 'Confusión';
                                 else if (key === 'ceguera') name = 'Ceguera';
                                 else if (key === 'sueno') name = 'Sueño';
+                                else if (key === 'oculto') name = this.generoTexto(card, 'Oculto', 'Oculta');
                                 const _fu = this.refFuente(val.sourceInstanceId, val.source || val.sourceName, card);
                                 effects.push(this.lineaEfecto(name, { turnos: val.duration, habilidad: val.sourceAbility, ref: _fu }));
                             }
@@ -5348,7 +5371,7 @@
                         const _obj = this.refCarta(otra); // misma sintaxis que "fuente:", pero como destino
                         if (otra.status) for (const [k, v2] of Object.entries(otra.status)) {
                             if (v2 && v2.duration > 0 && ((v2.sourceInstanceId && v2.sourceInstanceId === card.instanceId) || v2.sourceName === card.name || v2.source === card.name)) {
-                                const nm = k === 'dot' ? 'Daño por tiempo' : k === 'confusion' ? 'Confusión' : k === 'ceguera' ? 'Ceguera' : k === 'sueno' ? 'Sueño' : k;
+                                const nm = k === 'dot' ? 'Daño por tiempo' : k === 'confusion' ? 'Confusión' : k === 'ceguera' ? 'Ceguera' : k === 'sueno' ? 'Sueño' : k === 'oculto' ? this.generoTexto(otra, 'Oculto', 'Oculta') : k;
                                 _salientes.push(this.lineaEfecto(nm, { turnos: v2.duration, habilidad: v2.sourceAbility, ref: _obj, comoObjetivo: true }));
                             }
                         }
@@ -7134,6 +7157,13 @@
                             card.status.sueno.duration--;
                             if (card.status.sueno.duration <= 0) delete card.status.sueno;
                         }
+                        // El Oculto cuenta igual que los demás desde que es un estado con
+                        // categoría propia (21-ago-2026). Cuando se agota, `stealth` se apaga solo
+                        // en la siguiente pasada de pasivas, porque se deriva de aquí.
+                        if (card.status.oculto && card.status.oculto.duration > 0) {
+                            card.status.oculto.duration--;
+                            if (card.status.oculto.duration <= 0) delete card.status.oculto;
+                        }
                     }
 
                     // 2. Gestión de Tiempo en Efectos Temporales (Poción, etc.)
@@ -7213,7 +7243,26 @@
                 // Se reconstruye en cada pasada por diferencias: cada contribuidor (pasiva propia, equipo,
                 // evento, efecto temporal, límites) deja constancia de qué cambió, cuánto y desde dónde.
                 this._statMods = {}; // instanceId -> [{stat, delta, fuente, srcId, srcAltId, srcZone}]
+
+                // `stealth` se DERIVA del estado 'oculto' en cada pasada (Toto, 21-ago-2026).
+                // Antes era un booleano pegajoso que nadie apagaba: una vez puesto se quedaba para
+                // siempre, y su línea del detalle solo aparecía en la pasada en la que se
+                // encendía -de ahí las chapas sin "Afectado por" y las cartas que salían ocultas
+                // cuando ya no tocaba-. Ahora la verdad la tiene el estado, con su duración, su
+                // fuente y su Habilidad, y el booleano es solo la vista rápida que lee el resto
+                // del motor. Las fuentes PERMANENTES (Berry, Súcubo, Zoe) lo reimponen en su
+                // pasiva, que corre después de esto, así que siguen funcionando igual.
                 const _mesa = () => [...this.players.p1.vanguard, ...this.players.p1.rearguard, ...this.players.p2.vanguard, ...this.players.p2.rearguard];
+                // La derivación gestiona SOLO el Oculto que ella misma puso: si lo pone el estado,
+                // lo enciende y se apunta que es suyo; cuando el estado se va, lo apaga. Un
+                // `stealth` puesto por otra vía -una pasiva permanente, un escenario de pruebas,
+                // la base congelada- no se toca, porque aquí no hay forma de saber quién lo puso
+                // y borrarlo sería peor que dejarlo (Toto, 21-ago-2026).
+                _mesa().forEach(c => {
+                    const _est = !!(c.status && c.status.oculto && c.status.oculto.duration > 0);
+                    if (_est) { c.stealth = true; c._ocultoPorEstado = true; }
+                    else if (c._ocultoPorEstado) { c.stealth = false; delete c._ocultoPorEstado; }
+                });
                 const _foto = () => { const m = {}; _mesa().forEach(c => m[c.instanceId] = [c.currentAtk, c.currentDef, !!c.stealth, !!c.isSilenced]); return m; };
                 // `habilidad` (nombre de la Pasiva/Activa) y `ref` (referencia estándar a la carta
                 // origen) se guardan POR SEPARADO, no fusionados en un texto: el panel de detalle
@@ -11678,21 +11727,11 @@
                     // --- Silencio ---
                     if (card.status && card.status.silencio && card.status.silencio.duration > 0) el.appendChild(createBadge('🤐', card.status.silencio.duration, '#6b7280', 'silencio'));
                     if (card.isSilenced && (!card.status || !card.status.silencio || card.status.silencio.duration <= 0)) el.appendChild(createBadge('🤐', '∞', '#6b7280', 'silencio'));
-                    // Chapas de MARCAS TEMPORALES que las declaren (Toto, 21-ago-2026). Una carta
-                    // que va a hacer algo en un momento concreto -el resto de la vanguardia de
-                    // Simon, que estará Oculta en el turno del rival- tiene que verse marcada
-                    // desde ya, o el jugador no sabe que ha pasado nada. El número sale de la
-                    // cuenta atrás de la marca si la tiene; si no, la chapa va sin número.
-                    // `icono` y `color` los declara la carta, con valor por defecto.
-                    (card.tempEffects || []).forEach(eff => {
-                        if (!eff.badge) return;
-                        const b = (eff.badge === true) ? {} : eff.badge;
-                        el.appendChild(createBadge(b.icono || '✳️',
-                            (eff.duration !== undefined && eff.duration !== null) ? eff.duration : null,
-                            b.color || '#8b5cf6', 'marca'));
-                    });
                 }
 
+                // La chapa del ojo la pinta `stealth`, que desde hoy se DERIVA del estado 'oculto'
+                // (ver updatePassives). Las fuentes permanentes -Berry, Súcubo- lo siguen poniendo
+                // a mano en su pasiva, que corre después del recálculo.
                 if (card.stealth) {
                     const stealthBadge = document.createElement('div');
                     stealthBadge.className = 'stealth-badge';
@@ -11701,8 +11740,33 @@
                     el.appendChild(stealthBadge);
                 }
 
+                // Chapas de MARCAS TEMPORALES que las declaren (Toto, 21-ago-2026). Una carta que
+                // va a hacer algo en un momento concreto -el resto de la vanguardia de Simon, que
+                // estará Oculta en el turno del rival- tiene que verse marcada desde ya, o el
+                // jugador no sabe que ha pasado nada.
+                // VAN CON LOS CONTADORES, abajo, y NO arriba con los estados alterados: son otra
+                // cosa (Toto, 21-ago-2026). Además estaban DENTRO del `if (card.status)`, así que
+                // una carta sin ningún estado -el caso normal- no las pintaba: por eso la chapa
+                // "no aparecía al aplicar el efecto" y sí más tarde.
+                // El número sale de la cuenta atrás de la marca si la tiene; sin duración, la
+                // chapa va sin número. `icono` y `color` los declara la carta.
+                let marcaOffset = 0;
+                (card.tempEffects || []).forEach(eff => {
+                    if (!eff.badge) return;
+                    const b = (eff.badge === true) ? {} : eff.badge;
+                    const chapa = document.createElement('div');
+                    chapa.className = 'counter-badge';
+                    chapa.dataset.badge = 'marca';
+                    chapa.style.bottom = `${-6 + marcaOffset}px`;
+                    if (b.color) chapa.style.background = b.color;
+                    const n = (eff.duration !== undefined && eff.duration !== null) ? eff.duration : '';
+                    chapa.innerHTML = `<span>${b.icono || '✳️'}${n}</span>`;
+                    el.appendChild(chapa);
+                    marcaOffset += 26;
+                });
+
                 if (card.counters && typeof card.counters === 'object') {
-                    let counterOffset = 0;
+                    let counterOffset = marcaOffset;
                     for (const [key, data] of Object.entries(card.counters)) {
                         if (data.count > 0) {
                             const counterBadge = document.createElement('div');

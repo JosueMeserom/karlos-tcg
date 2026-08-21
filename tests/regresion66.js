@@ -38,7 +38,6 @@ const escenarios = [
             { contiene: 'vanguard.1.stealth', motivo: 'CAMBIO DELIBERADO (Toto, 21-ago-2026): "queda Oculto durante el próximo turno rival" quiere decir eso, así que durante TU turno no está oculto y no debe salirle la chapa. La vieja lo aplicaba desde el instante de usar la Habilidad, o sea un turno antes de que fuera verdad. El escenario "el Oculto llega en el turno del rival" comprueba que sí llega' },
             { contiene: 'vanguard.2.stealth', motivo: 'ídem con el segundo compañero' },
             { contiene: 'tempEffects.0.badge', motivo: 'la marca ahora LLEVA CHAPA (Toto, 21-ago-2026, decisión de diseño): si una carta hace algo que solo aplicará en un momento concreto, se marca visiblemente desde ya, o el jugador usa la Habilidad y no ve que haya pasado nada. Va sin número: no hay cuenta que llevar' },
-            { contiene: 'tempEffects.0.oculto', motivo: 'la marca ahora LLEVA ESCRITO que oculta, en vez de que lo haga un onUpdateTempEffect a mano de la carta' },
             { contiene: 'tempEffects.0.hastaInicioTurnoLanzador', motivo: 'ídem con la caducidad: la declara la marca en vez de un onStartTurnTempEffect' },
         ],
     },
@@ -61,7 +60,6 @@ const escenarios = [
         diferenciasEsperadas: [
             { contiene: 'vanguard.1.stealth', motivo: 'CAMBIO DELIBERADO (Toto, 21-ago-2026): "queda Oculto durante el próximo turno rival" quiere decir eso, así que durante TU turno no está oculto y no debe salirle la chapa. La vieja lo aplicaba desde el instante de usar la Habilidad, o sea un turno antes de que fuera verdad. El escenario "el Oculto llega en el turno del rival" comprueba que sí llega' },
             { contiene: 'tempEffects.0.badge', motivo: 'la marca ahora LLEVA CHAPA (Toto, 21-ago-2026, decisión de diseño): si una carta hace algo que solo aplicará en un momento concreto, se marca visiblemente desde ya, o el jugador usa la Habilidad y no ve que haya pasado nada. Va sin número: no hay cuenta que llevar' },
-            { contiene: 'tempEffects.0.oculto', motivo: 'la marca lo declara en vez de un hook' },
             { contiene: 'tempEffects.0.hastaInicioTurnoLanzador', motivo: 'ídem con la caducidad' },
         ],
     },
@@ -120,6 +118,36 @@ correrSuite('regresion66', escenarios);
     await ejecutarPaso(ctx, g, { finTurno: true }); await asentar(ctx);
     check('al volver tu turno se les quita', ocultos().length === 0, ocultos().join(','));
     check('...y la marca ya no está', g.players.p1.vanguard.every(c => !(c.tempEffects || []).length));
+
+    // EL OCULTO ES UN ESTADO DE VERDAD (Toto, 21-ago-2026), no un booleano suelto: tiene
+    // categoría propia, duración, fuente y Habilidad, y de ahí salen solas su chapa y sus líneas
+    // del detalle. Se comprueba lo que hace que eso sea cierto.
+    const ctx2 = crearContexto('nueva'); ctx2.semilla = 1;
+    const g2 = crearJuego(ctx2); await asentar(ctx2);
+    construirEstado(ctx2, g2, {
+        turno: 2, turnoDe: 'p1', empieza: 'p2',
+        p1: { vanguardia: [{ carta: 'Simon', furor: 3 }, 'Karlos'] },
+        p2: { vanguardia: [{ carta: 'Oso con armadura', vida: 9 }] },
+    });
+    await ejecutarPaso(ctx2, g2, { habilidad: 'Simon' });
+    await ejecutarPaso(ctx2, g2, { confirmar: true });
+    await ejecutarPaso(ctx2, g2, { elegir: ['Oso con armadura'] });
+    await ejecutarPaso(ctx2, g2, { finTurno: true }); await asentar(ctx2);
+    const karlos = g2.players.p1.vanguard.find(c => c.name === 'Karlos');
+    const est = (karlos.status || {}).oculto || {};
+    check('el Oculto es un estado con duración', est.duration > 0, JSON.stringify(karlos.status));
+    check('...que sabe de qué carta viene', /Simon/.test(est.source || ''), est.source);
+    check('...y por qué Habilidad', est.sourceAbility === 'ÚLTIMA RESISTENCIA', est.sourceAbility);
+    check('...y guarda el instanceId para la flecha', !!est.sourceInstanceId, est.sourceInstanceId);
+    // Categorías: un estado de OTRA categoría no lo borra, que era la razón de crearlas.
+    g2.applyStatus(karlos, 'dot', 3, 'prueba');
+    check('un Daño por tiempo NO borra el Oculto: son categorías distintas',
+        !!(karlos.status.oculto && karlos.status.dot), JSON.stringify(karlos.status));
+    // Y dentro de la MISMA categoría sí se reemplazan (lo comprobará la Estasis cuando exista).
+    check('...pero el Sueño sí borra la Confusión, que son la misma',
+        (() => { g2.applyStatus(karlos, 'confusion', 2, 'x'); g2.applyStatus(karlos, 'sueno', 2, 'x');
+                 return !karlos.status.confusion && !!karlos.status.sueno && !!karlos.status.oculto; })(),
+        JSON.stringify(karlos.status));
     if (fallos) { console.log('\nSUITE regresion66 (turnos): ' + fallos + ' FALLOS'); process.exit(1); }
     console.log('SUITE regresion66 (turnos): 4/4 comprobaciones — EL OCULTO LLEGA A SU HORA');
 })();
