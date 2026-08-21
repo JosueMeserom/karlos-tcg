@@ -3180,7 +3180,7 @@ const CARD_DB = [
         name: "Simon", hp: 5, def: 5, atk: 5, type: "Personaje", subtype: "Ser vivo", tags: ["Draconiano", "cyborg"], gender: "M", rarity: "A", cost: 0, series: 1,
         canAttackStealth: true,
         immuneToApagon: true,
-        text: "P: OJO BIÓNICO: Puede atacar a enemigos Ocultos de vanguardia. Inmune a 'Apagón'. A: ÚLTIMA RESISTENCIA (3F): Ataca normal. Tras atacar, atrae la atención del rival: el resto de tu vanguardia estará Oculto durante el próximo turno del rival.",
+        text: "P: OJO BIÓNICO: Puede atacar a enemigos Ocultos de vanguardia. Inmune a 'Apagón'. A: ÚLTIMA RESISTENCIA (3F): Ataca normal. Tras atacar, marca al resto de tu vanguardia. Estará Oculta durante el próximo turno del rival.",
         passiveName: "OJO BIÓNICO", activeName: "ÚLTIMA RESISTENCIA", activeCost: 3,
 
         // MIGRADA AL DSL (21-ago-2026). Era de las imperativas puras y llevaba la cuarteta
@@ -3204,10 +3204,16 @@ const CARD_DB = [
         // parece un fallo-. Eso es exactamente para lo que existe `notaEfecto`: una coletilla que
         // la carta ORIGEN le añade a su línea automática, sin escribir la línea entera.
         notaEfecto: "durante el turno del rival",
-        // La marca en sí no pinta línea propia: mientras es TU turno no hace nada todavía, y en
-        // el del rival lo que hay que contar es el Oculto, que ya sale automático. Sin esto salía
-        // un "Simon" suelto en el detalle de los compañeros, sin decir qué hacía.
-        tempEffectSinLinea: true,
+        // LA MARCA SE VE (Toto, 21-ago-2026, decisión de diseño): si una carta hace algo que solo
+        // va a aplicar en un momento concreto, se marca visiblemente desde ya. Si no, el jugador
+        // usa la Habilidad, no ve nada y no sabe si ha pasado algo. Son tres cosas a la vez:
+        //   · la chapa de la marca (`badge` en el op, sin número: no hay cuenta que llevar,
+        //     es "esto va a pasar"),
+        //   · su línea en "Afectado por" de los compañeros, con su flecha a Simon,
+        //   · y la simétrica en "Efectos actuales" de Simon.
+        // Cuando llegue el turno del rival se le suma la línea del Oculto de verdad, que es
+        // automática y trae su propia atribución.
+        tempEffectText: "A cubierto tras Simon: estará {genero?Oculto|Oculta} durante el próximo turno del rival",
         tempEffectExpiraLog: "{objetivo} vuelve a ser visible.",
         abilities: [
             { trigger: "ACTIVA", nombre: "ÚLTIMA RESISTENCIA", coste: { furor: 3 },
@@ -3229,6 +3235,7 @@ const CARD_DB = [
                 // llamaba a updatePassives a mano al terminar. Sin esto las marcas quedan puestas
                 // pero nadie se esconde hasta el siguiente repintado.
                 { op: "MARCAR_TEMPORAL", conOwner: true, oculto: true, hastaInicioTurnoLanzador: true, actualizaPasivas: true,
+                  badge: { icono: "🛡️", color: "#64748b" },
                   target: { quien: "ALIADO", zona: "VANGUARDIA", excludeSelf: true },
                   floating: "A CUBIERTO", floatingStyle: "ft-gray", offsetFloating: -20,
                   log: "{carta} aguanta la posición y atrae toda la atención: el resto de su vanguardia queda a cubierto.", logUnaVez: true } ] }
@@ -9325,6 +9332,10 @@ const DSL = {
             // carta MARCADA y caduca al final de su turno.
             if (e.hastaInicioTurnoLanzador) marca.hastaInicioTurnoLanzador = true;
             if (e.caduca) marca.caduca = e.caduca;   // cuándo se descuenta (ver DSL._tickMarca)
+            // `badge`: chapa visible en la carta marcada. `true` para la de por defecto, o un
+            // objeto { icono, color } para la suya. El número lo pone la cuenta atrás si la marca
+            // la tiene; sin duración, la chapa va sin número (es "esto va a pasar", no "quedan N").
+            if (e.badge) marca.badge = e.badge;
             if (e.oculto) marca.oculto = true;                 // Oculta al portador mientras dure
             if (e.pierdeSuTurno) marca.pierdeSuTurno = true;   // se agota solo al llegar SU turno
             // provocaAtaque (Achmay, 31-jul-2026): ver el onStartTurnTempEffect genérico más

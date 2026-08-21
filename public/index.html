@@ -11660,7 +11660,12 @@
                         badge.style.top = `${-6 + badgeOffset}px`;
                         badgeOffset += 24; 
                         
-                        badge.innerHTML = `<span style="font-size:0.8rem; line-height:1; margin-left:-6px; margin-right:1px;">${icon}</span>
+                        // Sin número (Toto, 21-ago-2026): una marca que no lleva cuenta atrás
+                        // -"esto pasará en el turno del rival"- no tiene qué contar, así que la
+                        // chapa se queda solo con su icono en vez de enseñar un hueco o un cero.
+                        badge.innerHTML = (duration === null || duration === undefined || duration === '')
+                            ? `<span style="font-size:0.8rem; line-height:1;">${icon}</span>`
+                            : `<span style="font-size:0.8rem; line-height:1; margin-left:-6px; margin-right:1px;">${icon}</span>
                                            <span style="font-size:0.8rem; font-weight:bold; color:white; line-height:1; margin-right:-1px;">${duration}</span>`;
                         return badge;
                     };
@@ -11673,6 +11678,19 @@
                     // --- Silencio ---
                     if (card.status && card.status.silencio && card.status.silencio.duration > 0) el.appendChild(createBadge('🤐', card.status.silencio.duration, '#6b7280', 'silencio'));
                     if (card.isSilenced && (!card.status || !card.status.silencio || card.status.silencio.duration <= 0)) el.appendChild(createBadge('🤐', '∞', '#6b7280', 'silencio'));
+                    // Chapas de MARCAS TEMPORALES que las declaren (Toto, 21-ago-2026). Una carta
+                    // que va a hacer algo en un momento concreto -el resto de la vanguardia de
+                    // Simon, que estará Oculta en el turno del rival- tiene que verse marcada
+                    // desde ya, o el jugador no sabe que ha pasado nada. El número sale de la
+                    // cuenta atrás de la marca si la tiene; si no, la chapa va sin número.
+                    // `icono` y `color` los declara la carta, con valor por defecto.
+                    (card.tempEffects || []).forEach(eff => {
+                        if (!eff.badge) return;
+                        const b = (eff.badge === true) ? {} : eff.badge;
+                        el.appendChild(createBadge(b.icono || '✳️',
+                            (eff.duration !== undefined && eff.duration !== null) ? eff.duration : null,
+                            b.color || '#8b5cf6', 'marca'));
+                    });
                 }
 
                 if (card.stealth) {

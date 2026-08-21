@@ -37,6 +37,7 @@ const escenarios = [
         diferenciasEsperadas: [
             { contiene: 'vanguard.1.stealth', motivo: 'CAMBIO DELIBERADO (Toto, 21-ago-2026): "queda Oculto durante el próximo turno rival" quiere decir eso, así que durante TU turno no está oculto y no debe salirle la chapa. La vieja lo aplicaba desde el instante de usar la Habilidad, o sea un turno antes de que fuera verdad. El escenario "el Oculto llega en el turno del rival" comprueba que sí llega' },
             { contiene: 'vanguard.2.stealth', motivo: 'ídem con el segundo compañero' },
+            { contiene: 'tempEffects.0.badge', motivo: 'la marca ahora LLEVA CHAPA (Toto, 21-ago-2026, decisión de diseño): si una carta hace algo que solo aplicará en un momento concreto, se marca visiblemente desde ya, o el jugador usa la Habilidad y no ve que haya pasado nada. Va sin número: no hay cuenta que llevar' },
             { contiene: 'tempEffects.0.oculto', motivo: 'la marca ahora LLEVA ESCRITO que oculta, en vez de que lo haga un onUpdateTempEffect a mano de la carta' },
             { contiene: 'tempEffects.0.hastaInicioTurnoLanzador', motivo: 'ídem con la caducidad: la declara la marca en vez de un onStartTurnTempEffect' },
         ],
@@ -59,6 +60,7 @@ const escenarios = [
         ],
         diferenciasEsperadas: [
             { contiene: 'vanguard.1.stealth', motivo: 'CAMBIO DELIBERADO (Toto, 21-ago-2026): "queda Oculto durante el próximo turno rival" quiere decir eso, así que durante TU turno no está oculto y no debe salirle la chapa. La vieja lo aplicaba desde el instante de usar la Habilidad, o sea un turno antes de que fuera verdad. El escenario "el Oculto llega en el turno del rival" comprueba que sí llega' },
+            { contiene: 'tempEffects.0.badge', motivo: 'la marca ahora LLEVA CHAPA (Toto, 21-ago-2026, decisión de diseño): si una carta hace algo que solo aplicará en un momento concreto, se marca visiblemente desde ya, o el jugador usa la Habilidad y no ve que haya pasado nada. Va sin número: no hay cuenta que llevar' },
             { contiene: 'tempEffects.0.oculto', motivo: 'la marca lo declara en vez de un hook' },
             { contiene: 'tempEffects.0.hastaInicioTurnoLanzador', motivo: 'ídem con la caducidad' },
         ],

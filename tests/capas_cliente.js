@@ -775,8 +775,15 @@ console.log('\n--- coletilla (notaEfecto) en las líneas automáticas ---');
     // El [object Object] que vio Toto: `ref` es TEXTO ya formateado, nunca la carta.
     const cartas = vm.runInContext('CARD_DB', sandbox);
     const simon = cartas.find(c => c.name === 'Simon');
-    check('Simon NO declara tempEffectText: su Oculto ya sale automático', !simon.tempEffectText);
-    check('...y sí declara la coletilla', simon.notaEfecto === 'durante el turno del rival', simon.notaEfecto);
+    // Simon SÍ declara texto de marca (Toto, 21-ago-2026): la marca tiene que verse desde que se
+    // pone, aunque el Oculto no llegue hasta el turno del rival. Lo que NO puede es contar el
+    // Oculto -eso ya lo dice la línea automática-: cuenta la MARCA, que es otra cosa.
+    check('Simon declara el texto de la MARCA', /A cubierto/.test(simon.tempEffectText || ''), simon.tempEffectText);
+    check('...y la coletilla del Oculto automático', simon.notaEfecto === 'durante el turno del rival', simon.notaEfecto);
+    // La chapa: sin número, porque no hay cuenta atrás que enseñar.
+    const srcCli = fs.readFileSync(path.join(RAIZ, 'public/index.html'), 'utf8');
+    check('createBadge admite chapas SIN número', /duration === null \|\| duration === undefined/.test(srcCli));
+    check('...y las marcas con `badge` pintan la suya', /\(card\.tempEffects \|\| \[\]\)\.forEach\(eff => \{[\s\S]{0,200}eff\.badge/.test(srcCli));
 }
 
 console.log(fallos === 0 ? '\nSUITE capas_cliente: ' + comprobaciones + '/' + comprobaciones + ' comprobaciones — CAPAS CORRECTAS' : '\nSUITE capas_cliente: ' + fallos + ' FALLOS de ' + comprobaciones + ' comprobaciones');
