@@ -3182,56 +3182,44 @@ const CARD_DB = [
         immuneToApagon: true,
         text: "P: OJO BIÓNICO: Puede atacar a enemigos Ocultos de vanguardia. Inmune a 'Apagón'. A: ÚLTIMA RESISTENCIA (3F): Ataca normal. Tras atacar, oculta al resto de tu vanguardia durante el próximo turno rival.",
         passiveName: "OJO BIÓNICO", activeName: "ÚLTIMA RESISTENCIA", activeCost: 3,
-        
-        canActivateAbility: function(card, game) {
-            if (card.furor < 3) { game.logMsg("Falta Furor (3).", 'system'); return false; }
-            const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
-            if (game.players[enemyId].vanguard.length === 0) return false;
-            return true;
-        },
-        onExecuteAbility: function(card, game) {
-            game.selectedCard = card;
-            game.inputState = 'SELECT_ABILITY_TARGETS';
-            game.abilityContext = { targets: [], maxTargets: 1, name: 'ÚLTIMA RESISTENCIA', targetType: 'enemy' };
-            game.isActionLocked = true;
-            game.logMsg("Elige objetivo para la Última Resistencia.", 'system');
-            game.render();
-        },
-        onValidateTarget: function(card, target, game, isSilent) {
-            if (target.location !== 'vanguard') { if (!isSilent) game.logMsg("Debe ser de vanguardia."); return false; }
-            if (getCardTemplate(target.id).isAvatar) return false;
-            return true;
-        },
-        onTargetsReady: async function(card, game) {
-            const target = game.abilityContext.targets[0];
-            game.modifyStat(card, 'furor', -3);
-            showFloatingText(card.instanceId, card.activeName, "ft-ability", -30);
-            game.logMsg(`¡Simon lanza su ÚLTIMA RESISTENCIA!`, 'ability');
-            
-            await game.performAttack(card, target);
-            
-            game.logMsg(`El humo de su arma cubre al resto de la vanguardia.`, 'ability');
-            const p = game.players[card.owner];
-            
-            p.vanguard.forEach(c => {
-                if (c.instanceId !== card.instanceId) {
-                    if (!c.tempEffects) c.tempEffects = [];
-                    c.tempEffects.push({ sourceId: card.id, ownerId: card.owner });
-                    showFloatingText(c.instanceId, "OCULTO", "ft-gray", -20);
-                }
-            });
-            game.updatePassives();
-        },
-        onUpdateTempEffect: function(target, effect, game) {
-            target.stealth = true;
-        },
-        onStartTurnTempEffect: function(target, effect, game, currentTurnPlayerId) {
-            if (currentTurnPlayerId === effect.ownerId) {
-                game.logMsg(`${game.getCardNameWithOwner(target)} sale del humo creado por Simon.`, 'system');
-                return false; 
-            }
-            return true;
-        }
+
+        // MIGRADA AL DSL (21-ago-2026). Era de las imperativas puras y llevaba la cuarteta
+        // completa a mano -canActivateAbility + onExecuteAbility + onValidateTarget +
+        // onTargetsReady- más sus dos hooks de marca temporal. Lo único que le faltaba al DSL era
+        // `oculto` en MARCAR_TEMPORAL, que se añadió con la tanda de marcas: el resto ya existía.
+        //
+        // Lo que se gana de serie al migrarla: el coste espera al punto de compromiso, los logs
+        // pasan al formato de la rúbrica y la marca aparece en el detalle -antes el humo no se
+        // explicaba en ninguna parte, solo salía un flotante y a adivinar-.
+        //
+        // OJO BIÓNICO no es una ability: son dos BANDERAS de plantilla (canAttackStealth,
+        // immuneToApagon) que lee el motor. No hay nada que migrar ahí.
+        tempEffectText: "{genero?Oculto|Oculta} por el humo de Simon: no puede ser objetivo de ataques normales",
+        tempEffectExpiraLog: "{objetivo} sale del humo creado por Simon.",
+        abilities: [
+            { trigger: "ACTIVA", nombre: "ÚLTIMA RESISTENCIA", coste: { furor: 3 },
+              requisitos: [
+                { count: { quien: "ENEMIGO", zona: "vanguardia" }, op: ">=", valor: 1,
+                  msg: "No hay enemigos en la vanguardia del rival." } ],
+              target: { quien: "ENEMIGO", cantidad: 1 },
+              ataqueNormal: true,
+              validarObjetivo: [
+                { campo: "location", op: "==", valor: "vanguard", msg: "Debe ser de vanguardia." },
+                // La vieja lo comprobaba a mano; se conserva, que un Avatar es intocable.
+                { campo: "isAvatar", op: "falsy", dePlantilla: true } ],
+              log: "¡{carta} lanza su ÚLTIMA RESISTENCIA!",
+              efectos: [
+                { op: "ATACAR" },
+                // El humo cubre al RESTO de tu vanguardia -ella no- hasta que vuelva a ser tu
+                // turno, que es exactamente lo que significa "durante el próximo turno rival".
+                // `actualizaPasivas`: el Oculto se aplica en la pasada de pasivas, y la vieja
+                // llamaba a updatePassives a mano al terminar. Sin esto las marcas quedan puestas
+                // pero nadie se esconde hasta el siguiente repintado.
+                { op: "MARCAR_TEMPORAL", conOwner: true, oculto: true, hastaInicioTurnoLanzador: true, actualizaPasivas: true,
+                  target: { quien: "ALIADO", zona: "VANGUARDIA", excludeSelf: true },
+                  floating: "OCULTO", floatingStyle: "ft-gray", offsetFloating: -20,
+                  log: "El humo del arma de {carta} cubre al resto de la vanguardia.", logUnaVez: true } ] }
+        ]
     },
     {
         name: "Cogorza", type: "Evento", cost: 1, rarity: "C", series: 1,
@@ -8059,7 +8047,10 @@ const DSL = {
         return d;
     },
 
-    async _doEffect(e, sourceCard, target, game, ownerId, habilidad) {
+    // `opts.sinLog`: cállate el log de este efecto (lo usa `logUnaVez`, que ya lo ha escrito una
+    // sola vez para toda la tanda). Va por parámetro y no dentro del `ctx` de abajo porque ese lo
+    // construye la propia función para resolver {REF} y no puede traer nada de fuera.
+    async _doEffect(e, sourceCard, target, game, ownerId, habilidad, opts) {
         // `vars` en el contexto (Toto, 16-ago-2026): sin esto un `{REF:"vars.x"}` dentro de un
         // efecto normal no resolvía y llegaba undefined -curar {REF:"vars.dano"} dejaba la Vida en
         // NaN-. FIJAR_STAT ya se lo construía a mano por su cuenta; ahora lo tienen todos igual.
@@ -9249,7 +9240,7 @@ const DSL = {
             }
             target.tempEffects.push(marca);
             if (e.floating && typeof showFloatingText === 'function') showFloatingText(target.instanceId, e.floating.texto || e.floating, e.floating.estilo || e.floatingStyle || 'ft-ability', (e.floating.offset !== undefined ? e.floating.offset : (e.offsetFloating !== undefined ? e.offsetFloating : -40)));
-            if (e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
+            if (e.log && !(opts && opts.sinLog)) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
             if (e.actualizaPasivas && typeof game.updatePassives === 'function') game.updatePassives();
             return true;
         }
@@ -9428,6 +9419,12 @@ const DSL = {
             // que pasa cualquier efecto de grupo; no hace falta tocar ninguna carta.
             const _puedeMatarVarios = targets.length > 1 && e.op === 'MODIFICAR_STAT'
                 && e.stat === 'currentHp' && (e.vaciar || e.comprobarMuerte);
+            // `logUnaVez` (Simon, 21-ago-2026): un efecto de GRUPO escribe su log una sola vez, no
+            // uno por objetivo. "El humo cubre al resto de la vanguardia" es una frase sobre la
+            // tanda entera; repetida por cabeza queda absurda. El log sale ANTES del bucle -que es
+            // donde ocurre la frase- y a los objetivos se les pasa `sinLog` para que no lo repitan.
+            const _unaVez = !!(e.logUnaVez && e.log && targets.length);
+            if (_unaVez) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, targets[0]) }), e.logTipo || 'ability');
             const _correrObjetivos = async () => {
             for (const t of targets) {
                 // ifObjetivo (Imp mayor, 31-jul-2026): condición evaluada sobre EL OBJETIVO en
@@ -9437,7 +9434,7 @@ const DSL = {
                 // un objetivo sin cumplir la condición simplemente se salta.
                 if (e.ifObjetivo && !DSL._match(t, e.ifObjetivo)) continue;
                 const _antesResumen = _resumen ? DSL._field(t, _campoResumen) : null;
-                const r = await DSL._doEffect(e, sourceCard, t, game, ownerId, habilidad);
+                const r = await DSL._doEffect(e, sourceCard, t, game, ownerId, habilidad, _unaVez ? { sinLog: true } : undefined);
                 if (r === false) return { ok: false };   // aborta el lote; lo propaga _rc, abajo
                 if (r === true) anyApplied = true;
                 if (_resumen && r === true) {
