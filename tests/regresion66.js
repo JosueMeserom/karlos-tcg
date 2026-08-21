@@ -27,8 +27,12 @@ const escenarios = [
         logsSoloVieja: [PROMPT_VIEJO],
         logsIntencionados: [
             { de: 'El humo de su arma cubre al resto de la vanguardia.',
-              a: 'El humo del arma de Simon de J1 (Jugador 1) cubre al resto de la vanguardia.',
-              motivo: 'NORMA DEL PROYECTO: un log visible por los dos nombra la carta, no dice "su" -que en un registro compartido no se sabe de quién es-. La frase se escribe UNA vez para toda la tanda (`logUnaVez`), igual que la vieja' },
+              a: 'Simon de J1 (Jugador 1) aguanta la posición y atrae toda la atención: el resto de su vanguardia queda a cubierto.',
+              motivo: 'DOS cambios a la vez (Toto, 21-ago-2026). Uno de norma: un log visible por los dos nombra la carta y no dice "su". Y otro de FONDO: Simon no lanza humo -no tiene arma de humo-, se queda aguantando a la desesperada para que el rival tenga que mirarle a él, que es lo que significa ÚLTIMA RESISTENCIA. La frase se escribe UNA vez para toda la tanda (`logUnaVez`), como la vieja' },
+        ],
+        flotantesIntencionados: [
+            { de: 'OCULTO ·', a: 'A CUBIERTO ·',
+              motivo: 'mismo motivo: el flotante dice lo que le pasa al aliado -queda a cubierto tras Simon- en vez de repetir el nombre del estado' },
         ],
         diferenciasEsperadas: [
             { contiene: 'tempEffects.0.oculto', motivo: 'la marca ahora LLEVA ESCRITO que oculta, en vez de que lo haga un onUpdateTempEffect a mano de la carta' },
@@ -44,8 +48,12 @@ const escenarios = [
         logsSoloVieja: [PROMPT_VIEJO],
         logsIntencionados: [
             { de: 'El humo de su arma cubre al resto de la vanguardia.',
-              a: 'El humo del arma de Simon de J1 (Jugador 1) cubre al resto de la vanguardia.',
-              motivo: 'NORMA DEL PROYECTO: un log visible por los dos nombra la carta, no dice "su" -que en un registro compartido no se sabe de quién es-. La frase se escribe UNA vez para toda la tanda (`logUnaVez`), igual que la vieja' },
+              a: 'Simon de J1 (Jugador 1) aguanta la posición y atrae toda la atención: el resto de su vanguardia queda a cubierto.',
+              motivo: 'DOS cambios a la vez (Toto, 21-ago-2026). Uno de norma: un log visible por los dos nombra la carta y no dice "su". Y otro de FONDO: Simon no lanza humo -no tiene arma de humo-, se queda aguantando a la desesperada para que el rival tenga que mirarle a él, que es lo que significa ÚLTIMA RESISTENCIA. La frase se escribe UNA vez para toda la tanda (`logUnaVez`), como la vieja' },
+        ],
+        flotantesIntencionados: [
+            { de: 'OCULTO ·', a: 'A CUBIERTO ·',
+              motivo: 'mismo motivo: el flotante dice lo que le pasa al aliado -queda a cubierto tras Simon- en vez de repetir el nombre del estado' },
         ],
         diferenciasEsperadas: [
             { contiene: 'tempEffects.0.oculto', motivo: 'la marca lo declara en vez de un hook' },

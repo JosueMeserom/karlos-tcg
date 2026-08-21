@@ -5400,7 +5400,16 @@
                             // nada (el "Wolfgang" suelto bajo cada aliado inspirado).
                             if (eff.stats) return;
                             if (eff.sourceInstanceId ? eff.sourceInstanceId === card.instanceId : (t && t.name === card.name)) {
-                                _salientes.push(this.lineaEfecto(t ? t.name : 'Efecto', { turnos: eff.duration, ref: _obj, comoObjetivo: true }));
+                                // La MISMA afección que se le pinta al afectado, no el nombre de
+                                // la carta a secas (Toto, 21-ago-2026): "Efectos actuales" es la
+                                // vista inversa de "Afectado por", así que tiene que decir lo
+                                // mismo y solo cambiar `fuente:` por `objetivo:` (§13). Antes
+                                // salía un "Simon" suelto que no contaba ni qué hacía ni por qué
+                                // Habilidad, y no cuadraba con lo que veía el otro jugador.
+                                const _txtTemp = (t && t.tempEffectText && typeof DSL !== 'undefined')
+                                    ? DSL._fill(t.tempEffectText, { genero: otra.gender })
+                                    : (t ? t.name : 'Efecto');
+                                _salientes.push(this.lineaEfecto(_txtTemp, { turnos: eff.duration, habilidad: eff.habilidad, ref: _obj, comoObjetivo: true }));
                             }
                         });
                     });

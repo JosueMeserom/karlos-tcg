@@ -3180,7 +3180,7 @@ const CARD_DB = [
         name: "Simon", hp: 5, def: 5, atk: 5, type: "Personaje", subtype: "Ser vivo", tags: ["Draconiano", "cyborg"], gender: "M", rarity: "A", cost: 0, series: 1,
         canAttackStealth: true,
         immuneToApagon: true,
-        text: "P: OJO BIÓNICO: Puede atacar a enemigos Ocultos de vanguardia. Inmune a 'Apagón'. A: ÚLTIMA RESISTENCIA (3F): Ataca normal. Tras atacar, oculta al resto de tu vanguardia durante el próximo turno rival.",
+        text: "P: OJO BIÓNICO: Puede atacar a enemigos Ocultos de vanguardia. Inmune a 'Apagón'. A: ÚLTIMA RESISTENCIA (3F): Ataca normal. Tras atacar, atrae la atención del rival: el resto de tu vanguardia queda Oculto durante el próximo turno rival.",
         passiveName: "OJO BIÓNICO", activeName: "ÚLTIMA RESISTENCIA", activeCost: 3,
 
         // MIGRADA AL DSL (21-ago-2026). Era de las imperativas puras y llevaba la cuarteta
@@ -3194,8 +3194,14 @@ const CARD_DB = [
         //
         // OJO BIÓNICO no es una ability: son dos BANDERAS de plantilla (canAttackStealth,
         // immuneToApagon) que lee el motor. No hay nada que migrar ahí.
-        tempEffectText: "{genero?Oculto|Oculta} por el humo de Simon: no puede ser objetivo de ataques normales",
-        tempEffectExpiraLog: "{objetivo} sale del humo creado por Simon.",
+        // Los textos NO hablan de humo (Toto, 21-ago-2026): Simon no lanza nada, se queda
+        // aguantando a la desesperada -su ÚLTIMA RESISTENCIA- para que el rival tenga que mirarle
+        // a él. Y el estado dice CUÁNDO se nota: la marca se pone al usar la Habilidad, pero lo
+        // que hace solo importa en el turno del rival, y sin decirlo parece un fallo.
+        // La fuente y el "por ÚLTIMA RESISTENCIA" NO se escriben aquí: los pone la línea
+        // automática del detalle, que ya conoce la gramática de §13.
+        tempEffectText: "A cubierto: durante el turno del rival no puede ser objetivo de ataques normales",
+        tempEffectExpiraLog: "{objetivo} deja de estar a cubierto.",
         abilities: [
             { trigger: "ACTIVA", nombre: "ÚLTIMA RESISTENCIA", coste: { furor: 3 },
               requisitos: [
@@ -3217,8 +3223,8 @@ const CARD_DB = [
                 // pero nadie se esconde hasta el siguiente repintado.
                 { op: "MARCAR_TEMPORAL", conOwner: true, oculto: true, hastaInicioTurnoLanzador: true, actualizaPasivas: true,
                   target: { quien: "ALIADO", zona: "VANGUARDIA", excludeSelf: true },
-                  floating: "OCULTO", floatingStyle: "ft-gray", offsetFloating: -20,
-                  log: "El humo del arma de {carta} cubre al resto de la vanguardia.", logUnaVez: true } ] }
+                  floating: "A CUBIERTO", floatingStyle: "ft-gray", offsetFloating: -20,
+                  log: "{carta} aguanta la posición y atrae toda la atención: el resto de su vanguardia queda a cubierto.", logUnaVez: true } ] }
         ]
     },
     {
@@ -11193,7 +11199,16 @@ const DSL = {
                     // se busca por instanceId y, si no aparece, queda su nombre como respaldo.
                     const src = (eff.sourceInstanceId && typeof game.findCard === 'function') ? game.findCard(eff.sourceInstanceId) : null;
                     const ref = src && typeof game.refCarta === 'function' ? game.refCarta(src) : tmpl.name;
-                    return [`${DSL._fill(tmpl.tempEffectText, { genero: card.gender })}, fuente: ${ref}`];
+                    const txt = DSL._fill(tmpl.tempEffectText, { genero: card.gender });
+                    // La línea se monta con `lineaEfecto`, que es quien conoce la gramática de §13:
+                    // así la marca añade sola su "(N turnos restantes)" y su "por HABILIDAD"
+                    // -que la marca ya traía en `eff.habilidad` y esto se dejaba sin usar-. La
+                    // regla de que el "por HABILIDAD" se omita en Eventos y Ayudas sale gratis:
+                    // ahí el compilador nunca rellena ese campo (ver _habDeCarta).
+                    if (typeof game.lineaEfecto === 'function') {
+                        return [game.lineaEfecto(txt, { turnos: eff.duration, habilidad: eff.habilidad, ref: src || tmpl.name })];
+                    }
+                    return [`${txt}, fuente: ${ref}`];
                 };
             }
         }
