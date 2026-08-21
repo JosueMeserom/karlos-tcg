@@ -11756,7 +11756,10 @@
                     const b = (eff.badge === true) ? {} : eff.badge;
                     const chapa = document.createElement('div');
                     chapa.className = 'counter-badge';
-                    chapa.dataset.badge = 'marca';
+                    // Clave propia por carta ORIGEN: es lo que permite que la flecha del detalle
+                    // termine en la chapa y no en el centro de la carta (ver `punto` en las
+                    // flechas de modificadores).
+                    chapa.dataset.badge = 'marca-' + eff.sourceId;
                     chapa.style.bottom = `${-6 + marcaOffset}px`;
                     if (b.color) chapa.style.background = b.color;
                     const n = (eff.duration !== undefined && eff.duration !== null) ? eff.duration : '';
@@ -11825,6 +11828,10 @@
                             if (card.counters[key].count > 0) hasCounters = true;
                         }
                     }
+                    // Las chapas de MARCA cuentan igual que los contadores: usan su misma clase y
+                    // su mismo lado, asi que reservan el mismo sitio. Sin esto la carta no
+                    // apartaba a la de al lado y se solapaban (Toto, 21-ago-2026).
+                    if ((card.tempEffects || []).some(e => e.badge)) hasCounters = true;
                     if (hasCounters) marginRight = Math.max(marginRight, getCssOffset('.counter-badge', 'right') + 4); 
 
                     // LOS EQUIPOS TAMBIEN OCUPAN SITIO A LA DERECHA (Toto, 18-ago-2026). No

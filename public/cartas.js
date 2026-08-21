@@ -7754,7 +7754,15 @@ const DSL = {
             for (const card of enJuego) {
                 const tmpl = DSL._tmpl(card.id);
                 if (tmpl && typeof tmpl.onPeriodico === 'function') {
-                    try { await tmpl.onPeriodico(card, game, fase, momento, activePid); } catch (err) { console.error(err); }
+                    try {
+                        await tmpl.onPeriodico(card, game, fase, momento, activePid);
+                        // Y SE REPINTA. Sin esto el estado cambia en su fase pero la pantalla no
+                        // se entera hasta el siguiente render, que es el de Efectos Iniciales: de
+                        // ahí que el Oculto de Simon "solo saliera en la fase de efectos
+                        // iniciales" aunque se aplicara en la de Robo (Toto, 21-ago-2026).
+                        if (typeof game.updatePassives === 'function') game.updatePassives();
+                        if (typeof game.render === 'function') game.render();
+                    } catch (err) { console.error(err); }
                 }
                 // Marcas temporales con caducidad declarada: misma idea, mismo vocabulario.
                 if (Array.isArray(card.tempEffects) && card.tempEffects.length) {
@@ -7763,7 +7771,7 @@ const DSL = {
                         let sigue = true;
                         try { sigue = await DSL._tickMarca(card, eff, game, fase, momento, activePid); }
                         catch (err) { console.error(err); }
-                        if (sigue) vivas.push(eff);
+                        if (sigue) vivas.push(eff); else if (typeof game.render === 'function') game.render();
                     }
                     card.tempEffects = vivas;
                 }
@@ -9392,6 +9400,10 @@ const DSL = {
             if (e.floating && typeof showFloatingText === 'function') showFloatingText(target.instanceId, e.floating.texto || e.floating, e.floating.estilo || e.floatingStyle || 'ft-ability', (e.floating.offset !== undefined ? e.floating.offset : (e.offsetFloating !== undefined ? e.offsetFloating : -40)));
             if (e.log && !(opts && opts.sinLog)) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
             if (e.actualizaPasivas && typeof game.updatePassives === 'function') game.updatePassives();
+            // Una marca con chapa tiene que VERSE en cuanto se pone, no en el siguiente repintado
+            // que caiga por otro motivo (Toto, 21-ago-2026: "no aparece la chapa cuando se aplica
+            // el estado; sale al empezar el turno del rival").
+            if (e.badge && typeof game.render === 'function') game.render();
             return true;
         }
         if (e.op === 'VER_MANO') {
@@ -11260,6 +11272,9 @@ const DSL = {
                     if (eff.oculto) card.stealth = false;
                     if (tmpl.tempEffectExpiraLog) game.logMsg(DSL._fill(tmpl.tempEffectExpiraLog, { objetivo: DSL._nombre(game, card), genero: card.gender }), 'system');
                     if (typeof game.updatePassives === 'function') game.updatePassives();
+                    // Repintado: la chapa de la marca tiene que IRSE al caducar, no quedarse hasta
+                    // el siguiente render que caiga por otro motivo.
+                    if (typeof game.render === 'function') game.render();
                     return false;
                 };
             }

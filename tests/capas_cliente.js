@@ -786,5 +786,36 @@ console.log('\n--- coletilla (notaEfecto) en las líneas automáticas ---');
     check('...y las marcas con `badge` pintan la suya', /\(card\.tempEffects \|\| \[\]\)\.forEach\(eff => \{[\s\S]{0,200}eff\.badge/.test(srcCli));
 }
 
+// CHAPAS DE MARCA TEMPORAL (Toto, 21-ago-2026, tras verlo en el navegador). Tres cosas que
+// estaban mal y que no son de diseño, son de bulto:
+//   · la chapa se pintaba DENTRO del `if (card.status)`, así que una carta sin ningún estado
+//     -el caso normal- no la pintaba nunca;
+//   · iba arriba con los estados alterados en vez de abajo con los contadores, que es donde va
+//     un contador personalizado;
+//   · y no reservaba sitio, así que la carta no apartaba a la de al lado y se solapaban.
+console.log('\n--- chapas de marca temporal ---');
+{
+    const src = fs.readFileSync(path.join(RAIZ, 'public/index.html'), 'utf8');
+    const iStatus = src.indexOf('if (card.status) {\r\n                    let badgeOffset');
+    const iMarca = src.indexOf('(card.tempEffects || []).forEach(eff => {\r\n                    if (!eff.badge) return;');
+    const iCounters = src.indexOf("if (card.counters && typeof card.counters === 'object') {\r\n                    let counterOffset");
+    check('la chapa de marca se pinta FUERA del bloque de estados', iMarca > 0 && iStatus > 0 && iMarca > iStatus);
+    check('...y junto a los contadores, no con los estados', iCounters > 0 && Math.abs(iCounters - iMarca) < 1200,
+          'marca=' + iMarca + ' counters=' + iCounters);
+    check('usa la clase de contador, no la de estado', /chapa\.className = 'counter-badge'/.test(src));
+    check('y RESERVA SITIO como cualquier otra chapa',
+          /\(card\.tempEffects \|\| \[\]\)\.some\(e => e\.badge\)\) hasCounters = true/.test(src));
+
+    // Y el repintado: el estado cambia en su fase, pero si nadie repinta no se ve hasta el
+    // siguiente render que caiga por otro motivo. Era lo que hacía que el Oculto "solo saliera en
+    // la fase de efectos iniciales" aunque se aplicara en la de Robo.
+    const srcDsl = fs.readFileSync(path.join(RAIZ, 'public/cartas.js'), 'utf8');
+    check('los periódicos repintan al terminar',
+          srcDsl.includes('await tmpl.onPeriodico(card, game, fase, momento, activePid);')
+          && /onPeriodico\(card, game, fase, momento, activePid\);[\s\S]{0,600}game\.render\(\);/.test(srcDsl));
+    check('una marca con chapa se ve en cuanto se pone', /if \(e\.badge && typeof game\.render === 'function'\) game\.render\(\)/.test(srcDsl));
+    check('...y la chapa se va al caducar la marca', /card\.stealth = false;[\s\S]{0,600}game\.render\(\);\r?\n\s*return false;/.test(srcDsl));
+}
+
 console.log(fallos === 0 ? '\nSUITE capas_cliente: ' + comprobaciones + '/' + comprobaciones + ' comprobaciones — CAPAS CORRECTAS' : '\nSUITE capas_cliente: ' + fallos + ' FALLOS de ' + comprobaciones + ' comprobaciones');
 process.exit(fallos ? 1 : 0);
