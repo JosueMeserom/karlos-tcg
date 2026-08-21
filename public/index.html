@@ -732,6 +732,15 @@
         /* --- ANIMATION HELPERS --- */
         window.ftQueues = {};
 
+        // Puente al despachador de efectos periódicos del DSL (Toto, 21-ago-2026). El motor solo
+        // marca DÓNDE está cada punto del turno; qué corre ahí lo decide cada carta con su
+        // `{ trigger: "PERIODICO", fase, momento, deQuien }`. Si el DSL no estuviera cargado, esto
+        // no hace nada y el turno sigue igual.
+        async function _periodicos(game, fase, momento) {
+            if (typeof DSL === 'undefined' || typeof DSL.correrPeriodicos !== 'function') return;
+            try { await DSL.correrPeriodicos(game, fase, momento); } catch (err) { console.error(err); }
+        }
+
         function getAnimEl(cardId) {
             const cardEl = document.querySelector(`.card[data-id="${cardId}"]`);
             if (cardEl && cardEl.parentElement && cardEl.parentElement.classList.contains('card-wrapper')) {
@@ -6744,19 +6753,32 @@
                 this.updatePhaseDisplay('ROBO');
                 await showPhaseBanner(pName, 'FASE DE ROBO');
 
+                // Los periódicos de cada fase, en sus tres momentos (Toto, 21-ago-2026). El
+                // despachador vive en el DSL y recorre las cartas en el orden de las reglas; aquí
+                // solo se marca DÓNDE está cada punto del turno. En ROBO y FUROR no hay lista que
+                // recorrer, así que solo hay antes y después (NORMAL se trata como DESPUES).
+                await _periodicos(this, 'ROBO', 'ANTES');
                 if (this.turn > 1 || this.activePlayerId === 'p2') {
                     await this.drawCard(this.activePlayerId);
                 }
+                await _periodicos(this, 'ROBO', 'DESPUES');
 
                 this.updatePhaseDisplay('EFECTOS INICIALES');
                 await showPhaseBanner(pName, 'FASE DE EFECTOS INICIALES');
+                await _periodicos(this, 'EFECTOS INICIALES', 'ANTES');
                 await this.processStartPhaseEffects(this.activePlayerId); 
+                await _periodicos(this, 'EFECTOS INICIALES', 'NORMAL');
+                await _periodicos(this, 'EFECTOS INICIALES', 'DESPUES');
 
                 this.updatePhaseDisplay('EVENTO');
                 await showPhaseBanner(pName, 'FASE DE EVENTO');
+                await _periodicos(this, 'EVENTO', 'ANTES');
+                await _periodicos(this, 'EVENTO', 'NORMAL');
+                await _periodicos(this, 'EVENTO', 'DESPUES');
 
                 this.updatePhaseDisplay('FUROR');
                 await showPhaseBanner(pName, 'FASE DE FUROR');
+                await _periodicos(this, 'FUROR', 'ANTES');
 
                 // --- Eventos activos: hook global de inicio de turno, ANTES de ganar Furor (p. ej. Apuesta) ---
                 for (let evPid of ['p1', 'p2']) {
@@ -6806,8 +6828,11 @@
                 this.render();
                 if (furorGained) await waitForFurorAnimation();
 
+                await _periodicos(this, 'FUROR', 'DESPUES');
+
                 this.updatePhaseDisplay('PRINCIPAL');
                 await showPhaseBanner(pName, 'FASE PRINCIPAL');
+                await _periodicos(this, 'PRINCIPAL', 'ANTES');
 
                 this.phase = 'PRINCIPAL';
                 this.inputState = 'IDLE';
@@ -7055,8 +7080,14 @@
                 this.pendingBannerSkip = false;
                 this.pendingFurorSkip = false;
                 
+                // El final de la Principal, que es "al acabar tu turno pero ANTES de los efectos
+                // finales": una distinción que hasta ahora no se podía expresar.
+                await _periodicos(this, 'PRINCIPAL', 'NORMAL');
+                await _periodicos(this, 'PRINCIPAL', 'DESPUES');
+
                 this.updatePhaseDisplay('EFECTOS FINALES');
                 await showPhaseBanner(pName, 'FASE DE EFECTOS FINALES');
+                await _periodicos(this, 'EFECTOS FINALES', 'ANTES');
 
                 const p = this.players[this.activePlayerId];
 
@@ -7125,6 +7156,12 @@
                 // se emitían y el turno cambiaba en el mismo tick: aparecían por detrás del
                 // cartel de turno. No es un `sleep` fijo: espera a que la cola se vacíe, así que
                 // una fase sin nada visible no cuesta ni un milisegundo (Toto, 7-ago-2026).
+                // Los periódicos de EFECTOS FINALES corren aquí, con la fase ya hecha y antes de
+                // que el turno cambie de manos. `NORMAL` y `DESPUES` van seguidos porque dentro de
+                // cada grupo ya manda el orden de las reglas.
+                await _periodicos(this, 'EFECTOS FINALES', 'NORMAL');
+                await _periodicos(this, 'EFECTOS FINALES', 'DESPUES');
+
                 await this.esperarFlotantes();
 
                 // AQUÍ es donde el turno cambia de verdad, y por tanto donde se cierra la pila

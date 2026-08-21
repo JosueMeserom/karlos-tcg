@@ -25,6 +25,10 @@ const { correrSuite } = require('./harness');
 const escenarios = [
     {
         nombre: 'Bebe la Poción: +1 Atq/+1 Def durante 3 turnos',
+        diferenciasEsperadas: [
+            { contiene: 'tempEffects.0.stats', motivo: 'la marca ahora LLEVA ESCRITO el +1/+1 (`stats`) en vez de aplicarlo un onUpdateTempEffect a mano de la carta (21-ago-2026). Mismo bono; cambia dónde está dicho' },
+            { contiene: 'tempEffects.0.caduca', motivo: 'y su caducidad va declarada (`caduca`): esta carta descuenta al FIN del turno de quien la jugó, y el despachador de fases la descuenta ahí. El escenario de "expira tras 3 turnos" pasa idéntico, que es la prueba de que se comporta igual' },
+        ],
         p1: { vanguardia: ['Mini-tigre'], mano: ['Poción revitalizante'] },
         p2: { vanguardia: ['Robot de seguridad SP'] },
         pasos: [
@@ -48,6 +52,10 @@ const escenarios = [
     },
     {
         nombre: 'Rechazada si el único aliado ya tiene el efecto activo',
+        diferenciasEsperadas: [
+            { contiene: 'tempEffects.0.stats', motivo: 'la marca ahora LLEVA ESCRITO el +1/+1 (`stats`) en vez de aplicarlo un onUpdateTempEffect a mano de la carta (21-ago-2026). Mismo bono; cambia dónde está dicho' },
+            { contiene: 'tempEffects.0.caduca', motivo: 'y su caducidad va declarada (`caduca`): esta carta descuenta al FIN del turno de quien la jugó, y el despachador de fases la descuenta ahí. El escenario de "expira tras 3 turnos" pasa idéntico, que es la prueba de que se comporta igual' },
+        ],
         p1: { vanguardia: ['Mini-tigre'], mano: ['Poción revitalizante', 'Poción revitalizante'] },
         p2: { vanguardia: ['Robot de seguridad SP'] },
         pasos: [
@@ -63,6 +71,10 @@ const escenarios = [
     },
     {
         nombre: 'No acumulable: con dos aliados, uno ya marcado, el pool excluye al marcado',
+        diferenciasEsperadas: [
+            { contiene: 'tempEffects.0.stats', motivo: 'la marca ahora LLEVA ESCRITO el +1/+1 (`stats`) en vez de aplicarlo un onUpdateTempEffect a mano de la carta (21-ago-2026). Mismo bono; cambia dónde está dicho' },
+            { contiene: 'tempEffects.0.caduca', motivo: 'y su caducidad va declarada (`caduca`): esta carta descuenta al FIN del turno de quien la jugó, y el despachador de fases la descuenta ahí. El escenario de "expira tras 3 turnos" pasa idéntico, que es la prueba de que se comporta igual' },
+        ],
         p1: { vanguardia: ['Mini-tigre', 'Oso con armadura'], mano: ['Poción revitalizante', 'Poción revitalizante'] },
         p2: { vanguardia: ['Robot de seguridad SP'] },
         pasos: [

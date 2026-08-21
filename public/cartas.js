@@ -3970,29 +3970,21 @@ const CARD_DB = [
                 { op: "ELEGIR", de: "ALIADOS", sinMarcaTemporalPropia: true, cantidad: 1,
                   titulo: "Elige a quién revitalizar",
                   efectos: [
+                    // ESTRENA LA CADUCIDAD DECLARADA (Toto, 21-ago-2026). Su cuenta atrás corre
+                    // al FIN del turno de quien la jugó -"baja la cuenta al final de tu turno", lo
+                    // dice su propio texto- y el `cuentaAtras` genérico corre al INICIO del turno
+                    // del portador: son puntos distintos, y por eso esta carta se quedó fuera de
+                    // la tanda de marcas. Ahora la marca declara CUÁNDO caduca con el mismo
+                    // vocabulario que los efectos periódicos y el despachador de fases la
+                    // descuenta ahí. Sus dos hooks a mano se van enteros.
                     { op: "MARCAR_TEMPORAL", conOwner: true, actualizaPasivas: true, duracion: 3,
+                      stats: { atk: 1, def: 1 },
+                      caduca: { fase: "EFECTOS FINALES", momento: "NORMAL", deQuien: "PROPIO" },
                       floating: { texto: "REVITALIZANTE", estilo: "ft-ability", offset: -40 },
                       log: "¡{objetivo} bebe la Poción revitalizante! (+1 Atq, +1 Def por 3 turnos)." },
                     { op: "FLOTANTE", texto: "+1 ATQ / +1 DEF", estilo: "ft-green", offset: -20 } ] } ] }
         ],
-        onUpdateTempEffect: function(target, effect, game) {
-            target.currentAtk += 1;
-            target.currentDef += 1;
-        },
-        onEndTurnTempEffect: function(target, effect, game, currentTurnPlayerId) {
-            // Si estamos en el mismo turno en el que se bebió la poción, ignoramos el descuento
-            if (effect.turnApplied === game.turn) return true;
-
-            // Solo baja la cuenta si es el final de tu turno
-            if (currentTurnPlayerId === effect.ownerId) {
-                effect.duration--;
-                if (effect.duration <= 0) {
-                    game.logMsg(`Los efectos de la Poción revitalizante sobre ${DSL._nombre(game, target)} se han desvanecido.`, 'system');
-                    return false; // Se elimina el efecto
-                }
-            }
-            return true;
-        },
+        tempEffectExpiraLog: "Los efectos de la Poción revitalizante sobre {objetivo} se han desvanecido.",
         // Sin onGetPreviewEffects (27-jul-2026): el registro automático de modificadores
         // (updatePassives -> _anota sobre onUpdateTempEffect) ya produce la línea con la
         // sintaxis estándar, incluida su cuenta atrás y la referencia a la carta en el
@@ -7431,7 +7423,7 @@ const KARLOS_RULES = {
 //  Valores: número | {COUNT:{...}} | {REF:"objetivo.furorMax"} (campos computados)
 // ===================================================================
 const DSL = {
-    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE', 'AURA', 'ANTES_DE_JUGAR', 'PUEDE_ATACAR', 'SOBRECURACION', 'REACCION', 'AL_MORIR', 'AL_MORIR_ALIADO', 'AL_DESTRUIR', 'ESPEJO', 'ANTES_DE_ATACAR', 'TRAS_ATACAR', 'TRAS_DEFENDER', 'ANTES_DE_DEFENDER', 'INTERCEPTOR_ATAQUE', 'EQUIPO_ANTES_DE_DEFENDER', 'EQUIPO_ANTES_DE_ATACAR', 'GLOBAL_ANTES_DE_CAMBIO_STAT', 'COSTE_COLOCACION'],
+    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE', 'AURA', 'ANTES_DE_JUGAR', 'PUEDE_ATACAR', 'SOBRECURACION', 'REACCION', 'AL_MORIR', 'AL_MORIR_ALIADO', 'AL_DESTRUIR', 'ESPEJO', 'ANTES_DE_ATACAR', 'TRAS_ATACAR', 'TRAS_DEFENDER', 'ANTES_DE_DEFENDER', 'INTERCEPTOR_ATAQUE', 'EQUIPO_ANTES_DE_DEFENDER', 'EQUIPO_ANTES_DE_ATACAR', 'GLOBAL_ANTES_DE_CAMBIO_STAT', 'COSTE_COLOCACION', 'PERIODICO'],
     // Los 5 últimos ops solo tienen sentido dentro de una REACCION (los interpreta
     // DSL._runReaccion, no _doEffect): controlan el resultado que la reacción
     // devuelve al motor de combate (redirigir el ataque, cancelarlo, drenar Furor
@@ -7649,6 +7641,106 @@ const DSL = {
         cp.fn();
     },
     _nombre(game, c) { return (game && typeof game.getCardNameWithOwner === 'function') ? game.getCardNameWithOwner(c) : c.name; },
+
+    // ── EFECTOS PERIÓDICOS: EN QUÉ FASE Y EN QUÉ MOMENTO (Toto, 21-ago-2026) ─────────────────
+    //
+    // Hasta hoy la fase en la que ocurría algo NO la decidía la carta: la decidía qué hook
+    // elegías. `INICIO_TURNO` cae en Efectos Iniciales no porque nadie lo dijera, sino porque es
+    // donde el motor lo llama. La prueba de que se queda corto es la fase de ROBO: no tenía ni un
+    // gancho, así que "en tu fase de Robo, roba una más" no se podía escribir ni a mano sin tocar
+    // el motor. Con la fase como DATO, esa carta es una línea.
+    //
+    //   { trigger: "PERIODICO", fase: "EFECTOS FINALES", momento: "NORMAL", deQuien: "PROPIO",
+    //     efectos: [...] }
+    //
+    // Los tres ejes, que son cosas distintas y conviene no mezclar:
+    //   · `fase`    — DÓNDE. Las seis del turno, aunque hoy la mitad no tenga ninguna carta: el
+    //                 coste de declararlas es esta tabla, y el de no tenerlas es que la primera
+    //                 carta que las pida obligue a rediseñar.
+    //   · `momento` — ANTES / NORMAL / DESPUES de lo que esa fase hace. Dentro de cada grupo se
+    //                 respeta el orden de las reglas (Evento, vanguardia de izquierda a derecha,
+    //                 retaguardia, Daños por tiempo), así que ANTES no significa "yo primero"
+    //                 sino "este grupo va antes, y dentro del grupo manda el orden de siempre".
+    //                 En ROBO y FUROR no hay lista que recorrer -hay una acción única-, así que
+    //                 ahí NORMAL se trata como DESPUES; se admite igual por consistencia.
+    //   · `deQuien` — de quién es el turno: PROPIO (el dueño de la carta), RIVAL o AMBOS.
+    //
+    // Lo que NO entra aquí, a propósito: los INTERCEPTORES. El x2 de Dáedra no es "corre en la
+    // fase de Furor", es interceptar el cálculo del Furor de cada carta, que es más fino. Meterlo
+    // en el mismo saco perdería precisión.
+    FASES: ['ROBO', 'EFECTOS INICIALES', 'EVENTO', 'FUROR', 'PRINCIPAL', 'EFECTOS FINALES'],
+    MOMENTOS: ['ANTES', 'NORMAL', 'DESPUES'],
+
+    // ¿Le toca a esta declaración correr ahora? `cuando` es cualquier objeto con fase/momento/
+    // deQuien: lo usan tanto las abilities PERIODICO como el `caduca` de una marca temporal, que
+    // son la misma idea (algo que pasa en un punto del turno) escrita en dos sitios.
+    _tocaAhora(cuando, fase, momento, propietario, activePid) {
+        if (!cuando) return false;
+        if ((cuando.fase || 'EFECTOS INICIALES') !== fase) return false;
+        let m = cuando.momento || 'NORMAL';
+        // ROBO y FUROR no recorren cartas: ahí NORMAL y DESPUES son el mismo instante.
+        if (m === 'NORMAL' && (fase === 'ROBO' || fase === 'FUROR')) m = 'DESPUES';
+        if (m !== momento) return false;
+        const q = cuando.deQuien || 'PROPIO';
+        if (q === 'AMBOS') return true;
+        return q === 'RIVAL' ? propietario !== activePid : propietario === activePid;
+    },
+
+    // El despachador. Lo llama el motor en cada fase y momento del turno, y recorre las cartas en
+    // el ORDEN DE LAS REGLAS: primero el jugador activo y luego el rival, y dentro de cada uno
+    // Evento -> vanguardia (izquierda a derecha) -> retaguardia. Ese orden es la razón de que esto
+    // viva en un solo sitio y no repartido por los hooks de cada carta.
+    async correrPeriodicos(game, fase, momento) {
+        if (!game || !game.players) return;
+        const activePid = game.activePlayerId;
+        const otro = activePid === 'p1' ? 'p2' : 'p1';
+        for (const pid of [activePid, otro]) {
+            const p = game.players[pid];
+            if (!p) continue;
+            const enJuego = [p.activeEvent, ...p.vanguard, ...p.rearguard].filter(Boolean);
+            for (const card of enJuego) {
+                const tmpl = DSL._tmpl(card.id);
+                if (tmpl && typeof tmpl.onPeriodico === 'function') {
+                    try { await tmpl.onPeriodico(card, game, fase, momento, activePid); } catch (err) { console.error(err); }
+                }
+                // Marcas temporales con caducidad declarada: misma idea, mismo vocabulario.
+                if (Array.isArray(card.tempEffects) && card.tempEffects.length) {
+                    const vivas = [];
+                    for (const eff of card.tempEffects) {
+                        let sigue = true;
+                        try { sigue = await DSL._tickMarca(card, eff, game, fase, momento, activePid); }
+                        catch (err) { console.error(err); }
+                        if (sigue) vivas.push(eff);
+                    }
+                    card.tempEffects = vivas;
+                }
+            }
+        }
+    },
+
+    // Una marca con `caduca` declarado descuenta su cuenta atrás en el punto que diga, y al llegar
+    // a cero se va. Devuelve si la marca sigue viva. Sin `caduca`, no se toca: las marcas de
+    // siempre siguen caducando por sus hooks de inicio/fin de turno.
+    async _tickMarca(card, eff, game, fase, momento, activePid) {
+        const c = eff.caduca;
+        if (!c) return true;
+        // `deQuien` de una marca se mide sobre QUIEN LA PUSO si lo sabemos (ownerId), que es lo
+        // que quiere decir "al final de TU turno" en una Ayuda; si no, sobre el portador.
+        const propietario = c.deQuien === 'PORTADOR' ? card.owner : (eff.ownerId || card.owner);
+        if (!DSL._tocaAhora({ fase: c.fase, momento: c.momento, deQuien: c.deQuien === 'PORTADOR' ? 'PROPIO' : (c.deQuien || 'PROPIO') },
+                            fase, momento, propietario, activePid)) return true;
+        // El turno en que se puso NO cuenta: si no, una carta jugada en tu turno gastaría un tick
+        // al instante. Mismo criterio que la cuenta atrás de los equipos.
+        if (eff.turnApplied === game.turn) return true;
+        eff.duration = (eff.duration || 0) - 1;
+        if (eff.duration > 0) return true;
+        const tmpl = DSL._tmpl(eff.sourceId) || {};
+        if (tmpl.tempEffectExpiraLog) {
+            game.logMsg(DSL._fill(tmpl.tempEffectExpiraLog, { objetivo: DSL._nombre(game, card), genero: card.gender }), 'system');
+        }
+        if (typeof game.updatePassives === 'function') game.updatePassives();
+        return false;
+    },
 
     // POR QUÉ SE LANZA ESTA MONEDA (Toto, 21-ago-2026). El modal solo decía "¡LANZA LA MONEDA!" y
     // con varias cartas en juego no había forma de saber cuál la pedía. Se redacta con la MISMA
@@ -9219,6 +9311,7 @@ const DSL = {
             // turno del rival. Distinto de `hastaFinDeTurnoPropio`, que mira al dueño de la
             // carta MARCADA y caduca al final de su turno.
             if (e.hastaInicioTurnoLanzador) marca.hastaInicioTurnoLanzador = true;
+            if (e.caduca) marca.caduca = e.caduca;   // cuándo se descuenta (ver DSL._tickMarca)
             if (e.oculto) marca.oculto = true;                 // Oculta al portador mientras dure
             if (e.pierdeSuTurno) marca.pierdeSuTurno = true;   // se agota solo al llegar SU turno
             // provocaAtaque (Achmay, 31-jul-2026): ver el onStartTurnTempEffect genérico más
@@ -11103,6 +11196,22 @@ const DSL = {
                     return [`${DSL._fill(tmpl.tempEffectText, { genero: card.gender })}, fuente: ${ref}`];
                 };
             }
+        }
+
+        // PERIODICO -> onPeriodico: efectos que ocurren en un punto declarado del turno. El
+        // despachador (DSL.correrPeriodicos) llama a esto en cada fase y momento; la ability dice
+        // si le toca. Una carta puede declarar VARIOS periódicos (uno por fase), así que se
+        // recorren todos y no solo el primero.
+        const periodicos = abs.filter(a => a.trigger === 'PERIODICO');
+        if (periodicos.length && typeof tmpl.onPeriodico !== 'function') {
+            tmpl.onPeriodico = async function (card, game, fase, momento, activePid) {
+                for (const a of periodicos) {
+                    if (!DSL._tocaAhora(a, fase, momento, card.owner, activePid)) continue;
+                    if (a.if && !DSL._cond(card, game, a.if)) continue;
+                    if (a.log) game.logMsg(DSL._fill(a.log, { carta: DSL._nombre(game, card) }), a.logTipo || 'ability');
+                    await DSL._runEffectList(a.efectos || [], card, game, card.owner, [card], _habDeCarta(a));
+                }
+            };
         }
 
         // ANTES_DE_JUGAR -> onBeforePlayAsync: efectos previos a la colocación
