@@ -3246,10 +3246,16 @@ const CARD_DB = [
             // chapa con su cuenta, "Afectado por" y "Efectos actuales" automáticos con su fuente y
             // su "por ÚLTIMA RESISTENCIA", y se va solo al acabar ese turno.
             // Es el enfoque que pidió Toto: marcar primero, aplicar cuando toca.
-            { trigger: "PERIODICO", fase: "ROBO", momento: "ANTES", deQuien: "RIVAL",
+            { trigger: "PERIODICO", fase: "INICIO DEL TURNO", momento: "NORMAL", deQuien: "RIVAL",
               nombre: "ÚLTIMA RESISTENCIA",
               efectos: [
                 { op: "APLICAR_ESTADO", estado: "oculto", duracion: 1,
+                  target: { quien: "ALIADO", zona: "VANGUARDIA", excludeSelf: true,
+                            conMarcaTemporalPropia: true } },
+                // Y el aviso se retira: ya no anuncia nada, ha pasado. Si se quedara, la carta
+                // tendría la chapa de "esto va a pasar" al lado del Oculto que ya está puesto, y
+                // el detalle lo contaría dos veces.
+                { op: "QUITAR_MARCA",
                   target: { quien: "ALIADO", zona: "VANGUARDIA", excludeSelf: true,
                             conMarcaTemporalPropia: true } } ] },
 
@@ -3261,8 +3267,9 @@ const CARD_DB = [
               nombre: "ÚLTIMA RESISTENCIA",
               efectos: [
                 { op: "LIMPIAR_ESTADOS", estados: ["oculto"], soloObjetivo: true,
+                  // Por ESTADO y no por marca: la marca ya se retiró al aplicarlo.
                   target: { quien: "ALIADO", zona: "VANGUARDIA", excludeSelf: true,
-                            conMarcaTemporalPropia: true } } ] }
+                            conEstadoDeSelf: "oculto" } } ] }
         ]
     },
     {
@@ -7472,7 +7479,7 @@ const DSL = {
     // DSL._runReaccion, no _doEffect): controlan el resultado que la reacción
     // devuelve al motor de combate (redirigir el ataque, cancelarlo, drenar Furor
     // tras él, fijar el daño, autoataque del atacante).
-    OPS_EFECTO: ['MODIFICAR_STAT', 'CURAR', 'DAÑO', 'APLICAR_ESTADO', 'MODIFICAR_CONTADORES', 'ATACAR', 'MONEDA', 'ROBAR', 'BUSCAR', 'MARCAR', 'VER_MANO', 'LIMPIAR_ESTADOS', 'ELEGIR', 'DESTRUIR_EVENTO', 'MARCAR_TEMPORAL', 'DESCARTAR', 'EQUIPAR', 'MARCAR_JUGADOR', 'FLOTANTE', 'FIJAR_STAT', 'REDIRIGIR', 'CANCELAR_ATAQUE', 'MARCAR_DRENAJE', 'FIJAR_DAÑO', 'ATACANTE_SE_AUTOATACA', 'VOLVER_A_MANO', 'RETRIBUCION', 'SUELO_STAT', 'TECHO_STAT', 'NO_CONSUMIR', 'BONO_ATAQUE', 'MARCAR_PARTIDA', 'ESQUIVAR', 'DESEQUIPAR', 'DAÑO_ATAQUE', 'REDIRIGIR_ATAQUE', 'SECUESTRAR_STAT', 'DEVOLVER_STAT', 'CUENTA_ATRAS'],
+    OPS_EFECTO: ['MODIFICAR_STAT', 'CURAR', 'DAÑO', 'APLICAR_ESTADO', 'MODIFICAR_CONTADORES', 'ATACAR', 'MONEDA', 'ROBAR', 'BUSCAR', 'MARCAR', 'VER_MANO', 'LIMPIAR_ESTADOS', 'ELEGIR', 'DESTRUIR_EVENTO', 'MARCAR_TEMPORAL', 'DESCARTAR', 'EQUIPAR', 'MARCAR_JUGADOR', 'FLOTANTE', 'FIJAR_STAT', 'REDIRIGIR', 'CANCELAR_ATAQUE', 'MARCAR_DRENAJE', 'FIJAR_DAÑO', 'ATACANTE_SE_AUTOATACA', 'VOLVER_A_MANO', 'RETRIBUCION', 'SUELO_STAT', 'TECHO_STAT', 'NO_CONSUMIR', 'BONO_ATAQUE', 'MARCAR_PARTIDA', 'ESQUIVAR', 'DESEQUIPAR', 'DAÑO_ATAQUE', 'REDIRIGIR_ATAQUE', 'SECUESTRAR_STAT', 'DEVOLVER_STAT', 'CUENTA_ATRAS', 'QUITAR_MARCA'],
     OPS_CMP: ['==', '!=', '<=', '>=', '<', '>', 'includes', 'contieneTexto', 'includesCI', 'truthy', 'falsy'],
     QUIEN: ['SELF', 'ALIADO', 'ENEMIGO', 'TODOS', 'ATACANTE', 'DEFENSOR', 'PORTADOR', 'PAGADOR'], // ATACANTE/DEFENSOR: solo en GLOBAL_TRAS_ATAQUE y REACCION
 
@@ -7581,6 +7588,15 @@ const DSL = {
         // (21-ago-2026). Es el positivo del `sinMarcaTemporalPropia` que ya existía, y hace falta
         // para el patrón "marco ahora, aplico luego": el efecto diferido tiene que poder volver a
         // encontrar exactamente a quienes marcó, aunque el campo haya cambiado.
+        // `conEstadoDeSelf`: cartas que sufren ESE estado y que se lo puse YO. Hermano de
+        // conMarcaTemporalPropia, para cuando el aviso ya se ha retirado y hay que volver a
+        // encontrar a los afectados por el estado en sí.
+        if (spec.conEstadoDeSelf && selfCard) {
+            const _mio = (x) => x.status && x.status[spec.conEstadoDeSelf]
+                && x.status[spec.conEstadoDeSelf].sourceInstanceId === selfCard.instanceId;
+            const _b = DSL._pool(ownerId, game, Object.assign({}, spec, { conEstadoDeSelf: null }), selfCard);
+            return _b.filter(_mio);
+        }
         if (spec.conMarcaTemporalPropia && selfCard) {
             const _dentro = (x) => x.tempEffects && x.tempEffects.some(t => t.sourceInstanceId === selfCard.instanceId);
             const _base = DSL._pool(ownerId, game, Object.assign({}, spec, { conMarcaTemporalPropia: false }), selfCard);
@@ -7721,7 +7737,10 @@ const DSL = {
     // Lo que NO entra aquí, a propósito: los INTERCEPTORES. El x2 de Dáedra no es "corre en la
     // fase de Furor", es interceptar el cálculo del Furor de cada carta, que es más fino. Meterlo
     // en el mismo saco perdería precisión.
-    FASES: ['ROBO', 'EFECTOS INICIALES', 'EVENTO', 'FUROR', 'PRINCIPAL', 'EFECTOS FINALES'],
+    // 'INICIO DEL TURNO' va la primera y no es una fase de las reglas: es el instante en que el
+    // turno arranca -al despachar el cartel de TURNO DE JX- antes de que se pinte nada. Ahí es
+    // donde tiene sentido lo que debe estar puesto ANTES de que el jugador vea su tablero.
+    FASES: ['INICIO DEL TURNO', 'ROBO', 'EFECTOS INICIALES', 'EVENTO', 'FUROR', 'PRINCIPAL', 'EFECTOS FINALES'],
     MOMENTOS: ['ANTES', 'NORMAL', 'DESPUES'],
 
     // ¿Le toca a esta declaración correr ahora? `cuando` es cualquier objeto con fase/momento/
@@ -9404,6 +9423,20 @@ const DSL = {
             // que caiga por otro motivo (Toto, 21-ago-2026: "no aparece la chapa cuando se aplica
             // el estado; sale al empezar el turno del rival").
             if (e.badge && typeof game.render === 'function') game.render();
+            return true;
+        }
+        // QUITAR_MARCA (21-ago-2026): retira del objetivo las marcas que puso ESTA carta. Es la
+        // otra mitad del patrón "marco ahora, aplico luego": cuando el efecto diferido llega, el
+        // aviso ya no pinta nada y tiene que irse, o la carta queda con la chapa de "esto va a
+        // pasar" al lado de la cosa que ya ha pasado, contándolo dos veces (Toto lo vio así).
+        if (e.op === 'QUITAR_MARCA') {
+            if (!target || !Array.isArray(target.tempEffects) || !target.tempEffects.length) return 'skip';
+            const antes = target.tempEffects.length;
+            target.tempEffects = target.tempEffects.filter(t => t.sourceInstanceId !== sourceCard.instanceId);
+            if (target.tempEffects.length === antes) return 'skip';
+            if (e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target) }), e.logTipo || 'system');
+            if (typeof game.updatePassives === 'function') game.updatePassives();
+            if (typeof game.render === 'function') game.render();
             return true;
         }
         if (e.op === 'VER_MANO') {

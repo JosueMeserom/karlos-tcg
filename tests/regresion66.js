@@ -119,6 +119,27 @@ correrSuite('regresion66', escenarios);
     check('al volver tu turno se les quita', ocultos().length === 0, ocultos().join(','));
     check('...y la marca ya no está', g.players.p1.vanguard.every(c => !(c.tempEffects || []).length));
 
+    // EL AVISO Y EL EFECTO NO CONVIVEN (Toto, 21-ago-2026, con captura): la marca anuncia lo que
+    // va a pasar, así que cuando pasa se retira. Si se quedara, la carta tendría la chapa de
+    // "esto va a pasar" al lado de la cosa ya hecha y el detalle lo contaría dos veces.
+    const ctx3 = crearContexto('nueva'); ctx3.semilla = 1;
+    const g3 = crearJuego(ctx3); await asentar(ctx3);
+    construirEstado(ctx3, g3, {
+        turno: 2, turnoDe: 'p1', empieza: 'p2',
+        p1: { vanguardia: [{ carta: 'Simon', furor: 3 }, 'Karlos'] },
+        p2: { vanguardia: [{ carta: 'Oso con armadura', vida: 9 }] },
+    });
+    await ejecutarPaso(ctx3, g3, { habilidad: 'Simon' });
+    await ejecutarPaso(ctx3, g3, { confirmar: true });
+    await ejecutarPaso(ctx3, g3, { elegir: ['Oso con armadura'] });
+    await asentar(ctx3);
+    const kar = () => g3.players.p1.vanguard.find(c => c.name === 'Karlos');
+    check('en tu turno solo está el AVISO', (kar().tempEffects || []).length === 1 && !kar().stealth);
+    await ejecutarPaso(ctx3, g3, { finTurno: true }); await asentar(ctx3); g3.updatePassives();
+    check('en el turno del rival solo está el OCULTO: el aviso se retira',
+        (kar().tempEffects || []).length === 0 && kar().stealth,
+        'marcas=' + (kar().tempEffects || []).length + ' oculto=' + !!kar().stealth);
+
     // EL OCULTO ES UN ESTADO DE VERDAD (Toto, 21-ago-2026), no un booleano suelto: tiene
     // categoría propia, duración, fuente y Habilidad, y de ahí salen solas su chapa y sus líneas
     // del detalle. Se comprueba lo que hace que eso sea cierto.

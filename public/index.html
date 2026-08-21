@@ -6751,6 +6751,14 @@
                 overlay.onclick = null;
                 
                 setTimeout(() => { overlay.style.display = 'none'; }, 300);
+                // INICIO DEL TURNO (Toto, 21-ago-2026): el punto de "nada más empezar el turno",
+                // justo al despachar el cartel de TURNO DE JX y antes de que se pinte nada de la
+                // secuencia de fases. Es donde tiene sentido lo que debe estar puesto ANTES de
+                // que el jugador vea su tablero -el Oculto que le espera de un turno anterior-,
+                // que en la fase de Robo llegaba tarde.
+                await _periodicos(this, 'INICIO DEL TURNO', 'ANTES');
+                await _periodicos(this, 'INICIO DEL TURNO', 'NORMAL');
+                await _periodicos(this, 'INICIO DEL TURNO', 'DESPUES');
                 await this.startTurn();
 
                 const audio = document.getElementById('bg-music');
@@ -6785,13 +6793,16 @@
                 // volvía a agotarse en el updatePassives de la Fase Principal.
                 this.updatePassives();
 
-                this.updatePhaseDisplay('ROBO');
-                await showPhaseBanner(pName, 'FASE DE ROBO');
-
                 // Los periódicos de cada fase, en sus tres momentos (Toto, 21-ago-2026). El
                 // despachador vive en el DSL y recorre las cartas en el orden de las reglas; aquí
                 // solo se marca DÓNDE está cada punto del turno. En ROBO y FUROR no hay lista que
                 // recorrer, así que solo hay antes y después (NORMAL se trata como DESPUES).
+                //
+                // OJO: `ANTES` es antes de lo que la FASE hace, no antes de su cartel (Toto,
+                // 21-ago-2026, corrigiéndome). Para lo que ocurre nada más empezar el turno, antes
+                // de todo esto, está la fase INICIO DEL TURNO.
+                this.updatePhaseDisplay('ROBO');
+                await showPhaseBanner(pName, 'FASE DE ROBO');
                 await _periodicos(this, 'ROBO', 'ANTES');
                 if (this.turn > 1 || this.activePlayerId === 'p2') {
                     await this.drawCard(this.activePlayerId);

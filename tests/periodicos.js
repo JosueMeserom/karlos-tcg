@@ -36,8 +36,10 @@ function check(titulo, ok, detalle) {
     const DSL = vm.runInContext('DSL', ctx.sandbox);
 
     console.log('--- Las seis fases y los tres momentos existen ---');
-    check('las seis fases del turno están declaradas',
-        JSON.stringify(DSL.FASES) === JSON.stringify(['ROBO', 'EFECTOS INICIALES', 'EVENTO', 'FUROR', 'PRINCIPAL', 'EFECTOS FINALES']),
+    // 'INICIO DEL TURNO' no es una fase de las reglas: es el instante en que el turno arranca,
+    // antes de que se pinte nada. Va la primera (Toto, 21-ago-2026).
+    check('las fases declaradas, con el arranque del turno delante',
+        JSON.stringify(DSL.FASES) === JSON.stringify(['INICIO DEL TURNO', 'ROBO', 'EFECTOS INICIALES', 'EVENTO', 'FUROR', 'PRINCIPAL', 'EFECTOS FINALES']),
         JSON.stringify(DSL.FASES));
     check('y los tres momentos',
         JSON.stringify(DSL.MOMENTOS) === JSON.stringify(['ANTES', 'NORMAL', 'DESPUES']));

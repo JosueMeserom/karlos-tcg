@@ -814,6 +814,19 @@ console.log('\n--- chapas de marca temporal ---');
           srcDsl.includes('await tmpl.onPeriodico(card, game, fase, momento, activePid);')
           && /onPeriodico\(card, game, fase, momento, activePid\);[\s\S]{0,600}game\.render\(\);/.test(srcDsl));
     check('una marca con chapa se ve en cuanto se pone', /if \(e\.badge && typeof game\.render === 'function'\) game\.render\(\)/.test(srcDsl));
+    // `ANTES` es antes de lo que la FASE HACE, no antes de su cartel (Toto, 21-ago-2026,
+    // corrigiéndome: "ANTES es antes de los demás efectos, no antes del cartel"). Para lo que
+    // ocurre nada más empezar el turno está la fase INICIO DEL TURNO, que corre al despachar el
+    // cartel de TURNO DE JX y antes de que se pinte nada de la secuencia.
+    const iAntes = src.indexOf("_periodicos(this, 'ROBO', 'ANTES')");
+    const iCartel = src.indexOf("showPhaseBanner(pName, 'FASE DE ROBO')");
+    check('el momento ANTES corre DESPUÉS del cartel de su fase', iAntes > iCartel && iCartel > 0,
+          'antes=' + iAntes + ' cartel=' + iCartel);
+    const iInicio = src.indexOf("_periodicos(this, 'INICIO DEL TURNO'");
+    check('...y la fase INICIO DEL TURNO corre antes que todo eso', iInicio > 0 && iInicio < iCartel,
+          'inicio=' + iInicio + ' cartel=' + iCartel);
+    check('...al despachar el cartel de turno, antes de startTurn',
+          /INICIO DEL TURNO', 'DESPUES'\);[\s\S]{0,80}await this\.startTurn\(\)/.test(src));
     check('...y la chapa se va al caducar la marca', /card\.stealth = false;[\s\S]{0,600}game\.render\(\);\r?\n\s*return false;/.test(srcDsl));
 }
 
