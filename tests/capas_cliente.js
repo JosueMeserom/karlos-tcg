@@ -803,6 +803,10 @@ console.log('\n--- chapas de marca temporal ---');
     check('...y junto a los contadores, no con los estados', iCounters > 0 && Math.abs(iCounters - iMarca) < 1200,
           'marca=' + iMarca + ' counters=' + iCounters);
     check('usa la clase de contador, no la de estado', /chapa\.className = 'counter-badge'/.test(src));
+    // La flecha del detalle tiene que TERMINAR en la chapa, no en el centro de la carta: para eso
+    // la marca declara su clave, igual que ya hacían estados, contadores y stats.
+    check('la chapa lleva su clave para la flecha', /chapa\.dataset\.badge = 'marca-' \+ eff\.sourceId/.test(src));
+    check('...y la flecha la usa como destino', /if \(eff\.badge\) f\.badgeKey = 'marca-' \+ eff\.sourceId/.test(src));
     check('y RESERVA SITIO como cualquier otra chapa',
           /\(card\.tempEffects \|\| \[\]\)\.some\(e => e\.badge\)\) hasCounters = true/.test(src));
 

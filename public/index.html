@@ -11176,9 +11176,15 @@
                     ((this._statMods && this._statMods[c.instanceId]) || []).forEach(m => out.push({ srcId: m.srcId, srcAltId: m.srcAltId, srcZone: m.srcZone, badgeKey: m.badgeKey }));
                     if (c.status) for (const [k, v] of Object.entries(c.status)) { if (v && v.duration > 0 && v.source) out.push({ srcId: v.sourceInstanceId || null, srcName: v.sourceName || v.source, badgeKey: k }); }
                     if (c.counters) for (const [k, d] of Object.entries(c.counters)) { if (d && d.count > 0 && d.source) out.push({ srcId: d.sourceInstanceId || null, srcName: d.source, badgeKey: 'counter-' + k }); }
+                    // Las marcas CON CHAPA declaran a cuál apunta su flecha (Toto, 21-ago-2026).
+                    // Era la única rama que no lo hacía -los estados, los contadores y los stats
+                    // ya lo traían-, así que su flecha se iba al centro de la carta en vez de a
+                    // la chapa que la representa. La clave es la misma que estampa el render.
                     [...(c.tempEffects || []), ...(c.activeEffects || [])].forEach(eff => {
                         const t = getCardTemplate(eff.sourceId);
-                        out.push({ srcId: eff.sourceInstanceId || null, srcName: t ? t.name : null });
+                        const f = { srcId: eff.sourceInstanceId || null, srcName: t ? t.name : null };
+                        if (eff.badge) f.badgeKey = 'marca-' + eff.sourceId;
+                        out.push(f);
                     });
                     for (const pid of ['p1', 'p2']) {
                         const ev = this.players[pid].activeEvent;
