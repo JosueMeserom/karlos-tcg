@@ -3180,7 +3180,7 @@ const CARD_DB = [
         name: "Simon", hp: 5, def: 5, atk: 5, type: "Personaje", subtype: "Ser vivo", tags: ["Draconiano", "cyborg"], gender: "M", rarity: "A", cost: 0, series: 1,
         canAttackStealth: true,
         immuneToApagon: true,
-        text: "P: OJO BIÓNICO: Puede atacar a enemigos Ocultos de vanguardia. Inmune a 'Apagón'. A: ÚLTIMA RESISTENCIA (3F): Ataca normal. Tras atacar, atrae la atención del rival: el resto de tu vanguardia queda Oculto durante el próximo turno rival.",
+        text: "P: OJO BIÓNICO: Puede atacar a enemigos Ocultos de vanguardia. Inmune a 'Apagón'. A: ÚLTIMA RESISTENCIA (3F): Ataca normal. Tras atacar, atrae la atención del rival: el resto de tu vanguardia estará Oculto durante el próximo turno del rival.",
         passiveName: "OJO BIÓNICO", activeName: "ÚLTIMA RESISTENCIA", activeCost: 3,
 
         // MIGRADA AL DSL (21-ago-2026). Era de las imperativas puras y llevaba la cuarteta
@@ -3204,7 +3204,11 @@ const CARD_DB = [
         // parece un fallo-. Eso es exactamente para lo que existe `notaEfecto`: una coletilla que
         // la carta ORIGEN le añade a su línea automática, sin escribir la línea entera.
         notaEfecto: "durante el turno del rival",
-        tempEffectExpiraLog: "{objetivo} deja de estar a cubierto.",
+        // La marca en sí no pinta línea propia: mientras es TU turno no hace nada todavía, y en
+        // el del rival lo que hay que contar es el Oculto, que ya sale automático. Sin esto salía
+        // un "Simon" suelto en el detalle de los compañeros, sin decir qué hacía.
+        tempEffectSinLinea: true,
+        tempEffectExpiraLog: "{objetivo} vuelve a ser visible.",
         abilities: [
             { trigger: "ACTIVA", nombre: "ÚLTIMA RESISTENCIA", coste: { furor: 3 },
               requisitos: [
@@ -11086,10 +11090,19 @@ const DSL = {
             // que la carta necesite su propio onUpdateTempEffect a mano.
             if (typeof tmpl.onUpdateTempEffect !== 'function') {
                 tmpl.onUpdateTempEffect = function (card, eff, game) {
-                    // `oculto` (Simon, 20-ago-2026): hermano de `stats`, mismo sitio y mismo
-                    // porqué. Su ÚLTIMA RESISTENCIA esconde al resto de la vanguardia, y eso era
-                    // un onUpdateTempEffect de una línea escrito a mano.
-                    if (eff.oculto) card.stealth = true;
+                    // `oculto` (Simon): hermano de `stats`, mismo sitio y mismo porqué.
+                    //
+                    // SOLO EN EL TURNO DEL RIVAL (Toto, 21-ago-2026). "Oculto durante el próximo
+                    // turno del rival" quiere decir eso: durante TU turno no está oculto, así que
+                    // no debe salirle la chapa ni ser intocable. Antes la marca aplicaba el Oculto
+                    // desde el instante en que se ponía, y el detalle lo anunciaba un turno antes
+                    // de que fuera verdad -que es justo lo que parecía un fallo-.
+                    // El efecto arranca solo al empezar el turno del rival, y ahí el Oculto ya es
+                    // un Oculto normal y corriente: chapa, línea automática en el detalle con su
+                    // "por HABILIDAD" y su fuente, todo lo de siempre.
+                    // Sin `ownerId` (marca sin `conOwner`) se aplica siempre: no hay de quién
+                    // medir el turno y quitarlo sería peor que dejarlo.
+                    if (eff.oculto && (!eff.ownerId || (game && game.activePlayerId !== eff.ownerId))) card.stealth = true;
                     if (!eff.stats) return;
                     if (eff.stats.atk) card.currentAtk += eff.stats.atk;
                     if (eff.stats.def) card.currentDef += eff.stats.def;
@@ -11191,7 +11204,13 @@ const DSL = {
                         return false;
                     }
                     if (!(eff.hastaInicioTurnoLanzador && eff.ownerId === activePid)) return true;
+                    // Lo que la marca puso, la marca lo quita. `stealth` es PEGAJOSO -no lo apaga
+                    // nadie en cada pasada de pasivas, solo el daño o salir de juego-, así que sin
+                    // esto un Oculto de marca se quedaba puesto para siempre (Toto, 21-ago-2026:
+                    // seguían ocultos de vuelta en su turno).
+                    if (eff.oculto) card.stealth = false;
                     if (tmpl.tempEffectExpiraLog) game.logMsg(DSL._fill(tmpl.tempEffectExpiraLog, { objetivo: DSL._nombre(game, card), genero: card.gender }), 'system');
+                    if (typeof game.updatePassives === 'function') game.updatePassives();
                     return false;
                 };
             }

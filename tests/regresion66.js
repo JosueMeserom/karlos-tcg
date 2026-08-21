@@ -35,6 +35,8 @@ const escenarios = [
               motivo: 'mismo motivo: el flotante dice lo que le pasa al aliado -queda a cubierto tras Simon- en vez de repetir el nombre del estado' },
         ],
         diferenciasEsperadas: [
+            { contiene: 'vanguard.1.stealth', motivo: 'CAMBIO DELIBERADO (Toto, 21-ago-2026): "queda Oculto durante el próximo turno rival" quiere decir eso, así que durante TU turno no está oculto y no debe salirle la chapa. La vieja lo aplicaba desde el instante de usar la Habilidad, o sea un turno antes de que fuera verdad. El escenario "el Oculto llega en el turno del rival" comprueba que sí llega' },
+            { contiene: 'vanguard.2.stealth', motivo: 'ídem con el segundo compañero' },
             { contiene: 'tempEffects.0.oculto', motivo: 'la marca ahora LLEVA ESCRITO que oculta, en vez de que lo haga un onUpdateTempEffect a mano de la carta' },
             { contiene: 'tempEffects.0.hastaInicioTurnoLanzador', motivo: 'ídem con la caducidad: la declara la marca en vez de un onStartTurnTempEffect' },
         ],
@@ -56,6 +58,7 @@ const escenarios = [
               motivo: 'mismo motivo: el flotante dice lo que le pasa al aliado -queda a cubierto tras Simon- en vez de repetir el nombre del estado' },
         ],
         diferenciasEsperadas: [
+            { contiene: 'vanguard.1.stealth', motivo: 'CAMBIO DELIBERADO (Toto, 21-ago-2026): "queda Oculto durante el próximo turno rival" quiere decir eso, así que durante TU turno no está oculto y no debe salirle la chapa. La vieja lo aplicaba desde el instante de usar la Habilidad, o sea un turno antes de que fuera verdad. El escenario "el Oculto llega en el turno del rival" comprueba que sí llega' },
             { contiene: 'tempEffects.0.oculto', motivo: 'la marca lo declara en vez de un hook' },
             { contiene: 'tempEffects.0.hastaInicioTurnoLanzador', motivo: 'ídem con la caducidad' },
         ],
@@ -78,4 +81,43 @@ const escenarios = [
     },
 ];
 
+// Y el cambio de fondo, que no se puede comparar contra la vieja porque la vieja no lo hace:
+// el Oculto llega EN EL TURNO DEL RIVAL, no antes, y se va cuando vuelve el tuyo. Se comprueba
+// aparte, con aserciones directas, recorriendo los turnos.
+const fs = require('fs');
+const path = require('path');
+const H = fs.readFileSync(path.join(__dirname, 'harness.js'), 'utf8');
+const _m = { exports: {} };
+new Function('module', 'exports', 'require', '__dirname',
+    H + '\n;module.exports.__i={crearContexto,crearJuego,construirEstado,asentar,ejecutarPaso};'
+)(_m, _m.exports, require, __dirname);
+
 correrSuite('regresion66', escenarios);
+
+(async () => {
+    const { crearContexto, crearJuego, construirEstado, asentar, ejecutarPaso } = _m.exports.__i;
+    const ctx = crearContexto('nueva'); ctx.semilla = 1;
+    const g = crearJuego(ctx); await asentar(ctx);
+    construirEstado(ctx, g, {
+        turno: 2, turnoDe: 'p1', empieza: 'p2',
+        p1: { vanguardia: [{ carta: 'Simon', furor: 3 }, 'Karlos', 'Mini-tigre'] },
+        p2: { vanguardia: [{ carta: 'Oso con armadura', vida: 9 }] },
+    });
+    await ejecutarPaso(ctx, g, { habilidad: 'Simon' });
+    await ejecutarPaso(ctx, g, { confirmar: true });
+    await ejecutarPaso(ctx, g, { elegir: ['Oso con armadura'] });
+    await asentar(ctx);
+    const ocultos = () => { g.updatePassives(); return g.players.p1.vanguard.filter(c => c.stealth).map(c => c.name); };
+    let fallos = 0;
+    const check = (t, ok, extra) => { if (ok) console.log('  OK    · ' + t); else { fallos++; console.log('  FALLO · ' + t + (extra ? '  [' + extra + ']' : '')); } };
+    console.log('\n--- El Oculto llega en el turno del rival, no antes ---');
+    check('en TU turno nadie está Oculto todavía', ocultos().length === 0, ocultos().join(','));
+    await ejecutarPaso(ctx, g, { finTurno: true }); await asentar(ctx);
+    check('en el turno del RIVAL sí, y solo los compañeros',
+        ocultos().length === 2 && !ocultos().includes('Simon'), ocultos().join(','));
+    await ejecutarPaso(ctx, g, { finTurno: true }); await asentar(ctx);
+    check('al volver tu turno se les quita', ocultos().length === 0, ocultos().join(','));
+    check('...y la marca ya no está', g.players.p1.vanguard.every(c => !(c.tempEffects || []).length));
+    if (fallos) { console.log('\nSUITE regresion66 (turnos): ' + fallos + ' FALLOS'); process.exit(1); }
+    console.log('SUITE regresion66 (turnos): 4/4 comprobaciones — EL OCULTO LLEGA A SU HORA');
+})();
