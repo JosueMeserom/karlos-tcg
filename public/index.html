@@ -9991,7 +9991,10 @@
             }
 
             // LOS NÚMEROS DEL INTERCAMBIO, en un solo sitio: recorrido, curva e inclinación.
-            static get SWAP() { return { MS: 500, EASE: 'cubic-bezier(0.68, -0.55, 0.27, 1.55)', ROT: 5 }; }
+            // ENDEREZA: el remate. Las cartas llegan inclinadas y quitarles el giro de golpe daba
+            // un tirón en el último fotograma (Toto, 23-ago-2026): se desinclinan con su propia
+            // transición, cortita, ya paradas en su destino.
+            static get SWAP() { return { MS: 500, EASE: 'cubic-bezier(0.68, -0.55, 0.27, 1.55)', ROT: 5, ENDEREZA: 160 }; }
 
             async animateSwap(id1, id2) {
                 const el1 = document.querySelector(`.card[data-id="${id1}"]`);
@@ -10016,6 +10019,14 @@
                 el2.style.transform = `translate(${-deltaX}px, ${-deltaY}px) rotate(${-S.ROT}deg)`;
 
                 await this.sleep(S.MS);
+
+                // Ya en su sitio: se enderezan sin moverse (mismo translate, giro a 0).
+                el1.style.transition = `transform ${S.ENDEREZA}ms ease-out`;
+                el2.style.transition = `transform ${S.ENDEREZA}ms ease-out`;
+                el1.style.transform = `translate(${deltaX}px, ${deltaY}px) rotate(0deg)`;
+                el2.style.transform = `translate(${-deltaX}px, ${-deltaY}px) rotate(0deg)`;
+
+                await this.sleep(S.ENDEREZA);
 
                 el1.style.transition = 'none';
                 el2.style.transition = 'none';
