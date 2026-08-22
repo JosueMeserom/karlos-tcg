@@ -1285,60 +1285,58 @@ const CARD_DB = [
         text: "P: POCA PACIENCIA: En vanguardia, +2 Contadores (se pierden en retaguardia). Fin de turno tuyo: -1 Contador. A 0, fuerza intercambio o muere.", 
         passiveName: "POCA PACIENCIA", series: 1,
 
-        onUpdatePassive: function(card, game) {
-            if (card.lastLocation !== card.location) {
-                if (card.location === 'vanguard') {
-                    game.modifyCounters(card, 'kino_paciencia', 2, 'Contadores', card, '⚙️', 'POCA PACIENCIA');
-                    game.logMsg(`¡${game.getCardNameWithOwner(card)} entra a vanguardia y gana 2 Contadores!`, 'ability');
-                } else if (card.location === 'rearguard') {
-                    if (card.counters && card.counters['kino_paciencia']) {
-                        game.modifyCounters(card, 'kino_paciencia', -card.counters['kino_paciencia'].count);
-                    }
-                    game.logMsg(`¡${game.getCardNameWithOwner(card)} se retira y pierde sus Contadores!`, 'ability');
-                }
-                card.lastLocation = card.location;
-            }
-        },
-        onEndTurn: async function(card, game) {
-            if (card.location !== 'vanguard' || card.owner !== game.activePlayerId) return;
-            if (!card.counters || !card.counters['kino_paciencia']) return; 
-            
-            game.modifyCounters(card, 'kino_paciencia', -1, 'Contadores', card, '⚙️', 'POCA PACIENCIA');
-            const countLeft = card.counters && card.counters['kino_paciencia'] ? card.counters['kino_paciencia'].count : 0;
-            game.logMsg(`¡${card.passiveName}! ${game.getCardNameWithOwner(card)} pierde 1 Contador (quedan ${countLeft}).`, 'ability');
-            showFloatingText(card.instanceId, "-1 CONTADOR", "ft-red-stat");
-            game.render();
-            await game.sleep(600);
+        // Migrada a DSL (22-ago-2026). Dos piezas nuevas y las dos genéricas: el trigger
+        // AL_CAMBIAR_DE_ZONA -que lleva la cuenta de la última fila por su cuenta, en vez de que
+        // la carta se guarde un `lastLocation` a mano- y el op INTERCAMBIAR_POSICION.
+        abilities: [
+            { trigger: "AL_CAMBIAR_DE_ZONA", nombre: "POCA PACIENCIA",
+              zonas: {
+                vanguard: { efectos: [
+                    { op: "MODIFICAR_CONTADORES", contador: "kino_paciencia", delta: 2,
+                      nombreContador: "Contadores", icono: "⚙️",
+                      log: "¡{carta} entra a vanguardia y gana 2 Contadores!" } ] },
+                rearguard: { efectos: [
+                    { op: "MODIFICAR_CONTADORES", contador: "kino_paciencia", vaciar: true,
+                      nombreContador: "Contadores", icono: "⚙️",
+                      log: "¡{carta} se retira y pierde sus Contadores!" } ] },
+              } },
 
-            if (countLeft === 0) {
-                game.logMsg(`¡A ${game.getCardNameWithOwner(card)} se le ha agotado la paciencia!`, 'ability');
-                const p = game.players[card.owner];
-                const rearguardAllies = p.rearguard;
-                
-                if (rearguardAllies.length > 0) {
-                    // Selección en TABLERO (Toto, 7-ago-2026): elegir una carta ya en el campo
-                    // es reborde verde, nunca el modal genérico. cancelable:false porque el
-                    // intercambio no es opcional -el contador ya llegó a 0-.
-                    const chosen = await game.pickBoardTargets(rearguardAllies, 1, 'POCA PACIENCIA: elige con quién intercambiarte', card, card.owner, false);
-                    if (chosen && chosen.length > 0) {
-                        const ally = chosen[0];
-                        const vIdx = p.vanguard.findIndex(c => c.instanceId === card.instanceId);
-                        const rIdx = p.rearguard.findIndex(c => c.instanceId === ally.instanceId);
-                        p.vanguard.splice(vIdx, 1, ally);
-                        p.rearguard.splice(rIdx, 1, card);
-                        card.location = 'rearguard';
-                        ally.location = 'vanguard';
-                        game.logMsg(`${game.getCardNameWithOwner(card)} fuerza un intercambio con ${game.getCardNameWithOwner(ally)}.`, 'ability');
-                        game.render();
-                    }
-                } else {
-                    game.logMsg(`No hay aliados en retaguardia. ¡${game.getCardNameWithOwner(card)} se auto-destruye!`, 'ability');
-                    showFloatingText(card.instanceId, "DESTRUIDO", "ft-red-stat");
-                    card.currentHp = 0;
-                    await game.checkDeath(card, false); 
-                }
-            }
-        }
+            // La cuenta atrás corre al final de TU turno y solo en vanguardia. Si no le quedan
+            // Contadores no pasa nada: el gate de la habilidad es el mismo `return` temprano que
+            // tenía la versión imperativa.
+            { trigger: "FIN_TURNO", nombre: "POCA PACIENCIA",
+              si: [ { campo: "location", op: "==", valor: "vanguard" },
+                    { campo: "counters.kino_paciencia.count", op: "truthy" } ],
+              efectos: [
+                { op: "MODIFICAR_CONTADORES", contador: "kino_paciencia", delta: -1,
+                  nombreContador: "Contadores", icono: "⚙️",
+                  floating: { texto: "-1 CONTADOR", estilo: "ft-red-stat" },
+                  log: "¡POCA PACIENCIA! {carta} pierde 1 Contador (quedan {restan})." },
+
+                // A 0 el contador se borra, así que a partir de aquí se pregunta por `falsy`.
+                // Con alguien detrás, el intercambio es OBLIGATORIO (cancelable: false): la
+                // paciencia ya se agotó, no es una oferta.
+                // El aviso de que se acabó va ANTES de decidir qué pasa: primero se dice que se
+                // agotó la paciencia y luego si hay intercambio o destrucción.
+                { if: { campo: "counters.kino_paciencia.count", op: "falsy" },
+                  op: "LOG", log: "¡A {carta} se le ha agotado la paciencia!" },
+
+                { if: [ { campo: "counters.kino_paciencia.count", op: "falsy" },
+                        { count: { quien: "ALIADO", zona: "RETAGUARDIA" }, op: ">=", valor: 1 } ],
+                  op: "ELEGIR", de: "ALIADOS", zona: "RETAGUARDIA", cantidad: 1, cancelable: false,
+                  titulo: "POCA PACIENCIA: elige con quién intercambiarte",
+                  efectos: [
+                    { op: "INTERCAMBIAR_POSICION",
+                      log: "{carta} fuerza un intercambio con {objetivo}." } ] },
+
+                // Y sin nadie a quien empujar, se destruye. Sin Retribución: no es una muerte en
+                // combate, es que se harta.
+                { if: [ { campo: "counters.kino_paciencia.count", op: "falsy" },
+                        { count: { quien: "ALIADO", zona: "RETAGUARDIA" }, op: "==", valor: 0 } ],
+                  op: "MODIFICAR_STAT", stat: "currentHp", vaciar: true, sinRetribucion: true,
+                  comprobarMuerte: true, target: { quien: "SELF" },
+                  log: "No hay aliados en retaguardia. ¡{objetivo} se auto-destruye!" } ] }
+        ]
     },
     { 
         id: 22, name: "Té helado", type: "Ayuda", subtype: "Ingerible", tags: ["Consumible"], rarity: "B", text: "Coste: 1 de Furor. Cura 4 de Vida al aliado que tributó.", cost: 0,
@@ -7427,12 +7425,12 @@ const KARLOS_RULES = {
 //  Valores: número | {COUNT:{...}} | {REF:"objetivo.furorMax"} (campos computados)
 // ===================================================================
 const DSL = {
-    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE', 'AURA', 'ANTES_DE_JUGAR', 'PUEDE_ATACAR', 'SOBRECURACION', 'REACCION', 'AL_MORIR', 'AL_MORIR_ALIADO', 'AL_DESTRUIR', 'ESPEJO', 'ANTES_DE_ATACAR', 'TRAS_ATACAR', 'TRAS_DEFENDER', 'ANTES_DE_DEFENDER', 'INTERCEPTOR_ATAQUE', 'EQUIPO_ANTES_DE_DEFENDER', 'EQUIPO_ANTES_DE_ATACAR', 'GLOBAL_ANTES_DE_CAMBIO_STAT', 'COSTE_COLOCACION', 'PERIODICO', 'INTERCEPTOR_LETAL'],
+    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE', 'AURA', 'ANTES_DE_JUGAR', 'PUEDE_ATACAR', 'SOBRECURACION', 'REACCION', 'AL_MORIR', 'AL_MORIR_ALIADO', 'AL_DESTRUIR', 'ESPEJO', 'ANTES_DE_ATACAR', 'TRAS_ATACAR', 'TRAS_DEFENDER', 'ANTES_DE_DEFENDER', 'INTERCEPTOR_ATAQUE', 'EQUIPO_ANTES_DE_DEFENDER', 'EQUIPO_ANTES_DE_ATACAR', 'GLOBAL_ANTES_DE_CAMBIO_STAT', 'COSTE_COLOCACION', 'PERIODICO', 'INTERCEPTOR_LETAL', 'AL_CAMBIAR_DE_ZONA'],
     // Los 5 últimos ops solo tienen sentido dentro de una REACCION (los interpreta
     // DSL._runReaccion, no _doEffect): controlan el resultado que la reacción
     // devuelve al motor de combate (redirigir el ataque, cancelarlo, drenar Furor
     // tras él, fijar el daño, autoataque del atacante).
-    OPS_EFECTO: ['MODIFICAR_STAT', 'CURAR', 'DAÑO', 'APLICAR_ESTADO', 'MODIFICAR_CONTADORES', 'ATACAR', 'MONEDA', 'ROBAR', 'BUSCAR', 'MARCAR', 'VER_MANO', 'LIMPIAR_ESTADOS', 'ELEGIR', 'DESTRUIR_EVENTO', 'MARCAR_TEMPORAL', 'DESCARTAR', 'EQUIPAR', 'MARCAR_JUGADOR', 'FLOTANTE', 'FIJAR_STAT', 'REDIRIGIR', 'CANCELAR_ATAQUE', 'MARCAR_DRENAJE', 'FIJAR_DAÑO', 'ATACANTE_SE_AUTOATACA', 'VOLVER_A_MANO', 'RETRIBUCION', 'SUELO_STAT', 'TECHO_STAT', 'NO_CONSUMIR', 'BONO_ATAQUE', 'MARCAR_PARTIDA', 'ESQUIVAR', 'DESEQUIPAR', 'DAÑO_ATAQUE', 'REDIRIGIR_ATAQUE', 'SECUESTRAR_STAT', 'DEVOLVER_STAT', 'CUENTA_ATRAS', 'QUITAR_MARCA', 'COLOCARSE', 'CREAR_CLON'],
+    OPS_EFECTO: ['MODIFICAR_STAT', 'CURAR', 'DAÑO', 'APLICAR_ESTADO', 'MODIFICAR_CONTADORES', 'ATACAR', 'MONEDA', 'ROBAR', 'BUSCAR', 'MARCAR', 'VER_MANO', 'LIMPIAR_ESTADOS', 'ELEGIR', 'DESTRUIR_EVENTO', 'MARCAR_TEMPORAL', 'DESCARTAR', 'EQUIPAR', 'MARCAR_JUGADOR', 'FLOTANTE', 'FIJAR_STAT', 'REDIRIGIR', 'CANCELAR_ATAQUE', 'MARCAR_DRENAJE', 'FIJAR_DAÑO', 'ATACANTE_SE_AUTOATACA', 'VOLVER_A_MANO', 'RETRIBUCION', 'SUELO_STAT', 'TECHO_STAT', 'NO_CONSUMIR', 'BONO_ATAQUE', 'MARCAR_PARTIDA', 'ESQUIVAR', 'DESEQUIPAR', 'DAÑO_ATAQUE', 'REDIRIGIR_ATAQUE', 'SECUESTRAR_STAT', 'DEVOLVER_STAT', 'CUENTA_ATRAS', 'QUITAR_MARCA', 'COLOCARSE', 'CREAR_CLON', 'INTERCAMBIAR_POSICION', 'LOG'],
     OPS_CMP: ['==', '!=', '<=', '>=', '<', '>', 'includes', 'contieneTexto', 'includesCI', 'truthy', 'falsy'],
     QUIEN: ['SELF', 'ALIADO', 'ENEMIGO', 'TODOS', 'ATACANTE', 'DEFENSOR', 'PORTADOR', 'PAGADOR'], // ATACANTE/DEFENSOR: solo en GLOBAL_TRAS_ATAQUE y REACCION
 
@@ -7926,7 +7924,10 @@ const DSL = {
 
     // Acciones. Devuelve: true (aplicado) | false (fallo, aborta y no consume) | 'skip' (no aplicaba, sigue).
     // Subconjunto SÍNCRONO de efectos (para triggers que corren dentro de updatePassives, como AL_ENTRAR)
-    _doEffectSync(e, sourceCard, target, game, ownerId) {
+    // `habilidad` (opcional): el nombre de la Pasiva que causa el efecto, para el "por HABILIDAD"
+    // del detalle. Los llamadores viejos no lo pasaban y se leía como undefined, que es lo mismo
+    // que null: el comportamiento no cambia, solo deja de depender de un parámetro fantasma.
+    _doEffectSync(e, sourceCard, target, game, ownerId, habilidad) {
         if (e.op === 'MODIFICAR_STAT') {
             const v = DSL._value(ownerId, game, e.valor, sourceCard, { self: sourceCard, objetivo: target });
             game.modifyStat(target, e.stat, v);
@@ -7945,7 +7946,14 @@ const DSL = {
             // puede construir la referencia completa. `habilidad` va aparte y solo existe para
             // Pasivas/Activas, así que los Eventos/Ayudas no meten el "por HABILIDAD" que la
             // norma les prohíbe (sus triggers no llevan nombre de habilidad).
-            game.modifyCounters(target, e.contador, e.delta, e.nombreContador, e.fuente !== undefined ? e.fuente : sourceCard, e.icono, habilidad || null);
+            // `vaciar`: quita TODOS los que haya de ese contador, sin tener que saber cuántos
+            // son (K.I.N.O. los pierde enteros al retirarse a retaguardia).
+            const _dSync = e.vaciar
+                ? -(((target.counters || {})[e.contador] || {}).count || 0)
+                : e.delta;
+            // El log sale aunque no hubiera nada que quitar: "se retira y pierde sus Contadores"
+            // es la noticia del cambio de fila, no del contador.
+            if (_dSync) game.modifyCounters(target, e.contador, _dSync, e.nombreContador, e.fuente !== undefined ? e.fuente : sourceCard, e.icono, habilidad || null);
             if (e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
             return true;
         }
@@ -8409,12 +8417,16 @@ const DSL = {
             // {instancia} en el id (Milkor MGL, 31-jul-2026): un equipo con usos contados necesita
             // SU propio contador en el portador, o dos copias del arma compartirían la cuenta.
             const _idCont = DSL._fill(e.contador, { instancia: sourceCard.instanceId });
-            game.modifyCounters(target, _idCont, d, e.nombreContador || e.contador, e.fuente !== undefined ? e.fuente : sourceCard, e.icono || '⚙️', habilidad || null);
+            const _dCont = e.vaciar ? -(((target.counters || {})[_idCont] || {}).count || 0) : d;
+            if (_dCont) game.modifyCounters(target, _idCont, _dCont, e.nombreContador || e.contador, e.fuente !== undefined ? e.fuente : sourceCard, e.icono || '⚙️', habilidad || null);
             // floating (Karlitos, 31-jul-2026): faltaba, a diferencia de casi todos los demás
             // ops — un contador que sube en la propia Pasiva de la carta se notaba en el
             // registro de "Afectado por:" pero no en el tablero en el momento en que ocurre.
             if (e.floating && typeof showFloatingText === 'function') showFloatingText(target.instanceId, e.floating.texto, e.floating.estilo || 'ft-ability', e.floating.offset !== undefined ? e.floating.offset : -40);
-            if (e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target) }), 'ability');
+            // {restan}: cuántos quedan DESPUÉS del cambio. El contador se borra al llegar a 0,
+            // así que hay que leerlo con cuidado (undefined -> 0).
+            if (e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target),
+                restan: (((target.counters || {})[_idCont] || {}).count || 0) }), 'ability');
             return true;
         }
         if (e.op === 'ATACAR') {
@@ -9018,6 +9030,13 @@ const DSL = {
             if (e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard) }), e.logTipo || 'ability');
             return true;
         }
+        // LOG: una línea y nada más. Existe porque hay avisos que no acompañan a ningún efecto
+        // -"se le ha agotado la paciencia" va ANTES de decidir si hay intercambio o muerte- y
+        // colgarlos de un op cualquiera obliga a inventarse un efecto vacío.
+        if (e.op === 'LOG') {
+            game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
+            return true;
+        }
         if (e.op === 'FLOTANTE') {
             if (typeof showFloatingText === 'function') showFloatingText(target.instanceId, e.texto, e.estilo || 'ft-green', e.offset !== undefined ? e.offset : -20);
             // log (Karlitos, 31-jul-2026): le faltaba, a diferencia de casi todos los demás ops.
@@ -9081,6 +9100,30 @@ const DSL = {
                 colocar();
                 _fin();
             }
+            return true;
+        }
+        // INTERCAMBIAR_POSICION (K.I.N.O., 22-ago-2026): la carta fuente y el objetivo se
+        // cambian el sitio, cada uno EN EL ÍNDICE del otro. Vale para cualquier par de filas
+        // distintas del mismo jugador; si están en la misma no hay nada que intercambiar.
+        if (e.op === 'INTERCAMBIAR_POSICION') {
+            const p = game.players[sourceCard.owner];
+            if (!target || target.owner !== sourceCard.owner || target.location === sourceCard.location) return false;
+            const filaDe = (c) => c.location === 'vanguard' ? p.vanguard : p.rearguard;
+            const fa = filaDe(sourceCard), fb = filaDe(target);
+            const ia = fa.findIndex(c => c.instanceId === sourceCard.instanceId);
+            const ib = fb.findIndex(c => c.instanceId === target.instanceId);
+            if (ia === -1 || ib === -1) return false;
+            fa.splice(ia, 1, target);
+            fb.splice(ib, 1, sourceCard);
+            const zA = sourceCard.location;
+            sourceCard.location = target.location;
+            target.location = zA;
+            if (e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
+            // Cambiar de fila es cambiar de condiciones: hay Pasivas que solo valen en
+            // vanguardia (la del propio K.I.N.O., sin ir más lejos) y tienen que enterarse ya,
+            // no en el siguiente repaso que toque.
+            if (typeof game.updatePassives === 'function') game.updatePassives();
+            if (typeof game.render === 'function') game.render();
             return true;
         }
         if (e.op === 'VOLVER_A_MANO') {
@@ -11797,6 +11840,21 @@ const DSL = {
                         for (const e of (alEntrar.efectos || [])) DSL._doEffectSync(e, card, c, game, card.owner);
                     });
                 }
+            };
+        }
+
+        // AL_CAMBIAR_DE_ZONA -> onUpdatePassive. "Cuando ESTA carta entra en tal fila", que no
+        // es lo mismo que AL_ENTRAR (ese reacciona a que entren OTRAS al campo). El seguimiento
+        // de la última zona es la parte reutilizable y vive aquí, no en la carta: se declara qué
+        // pasa en cada fila y ya. Efectos SÍNCRONOS: corre dentro de updatePassives.
+        const cambioZona = abs.find(a => a.trigger === 'AL_CAMBIAR_DE_ZONA');
+        if (cambioZona && typeof tmpl.onUpdatePassive !== 'function') {
+            tmpl.onUpdatePassive = function (card, game) {
+                if (card.lastLocation === card.location) return;
+                const rama = (cambioZona.zonas || {})[card.location];
+                card.lastLocation = card.location;
+                if (!rama) return;
+                for (const e of (rama.efectos || [])) DSL._doEffectSync(e, card, card, game, card.owner, cambioZona.nombre || tmpl.passiveName || null);
             };
         }
 

@@ -3,7 +3,7 @@
 Lo que queda por hacer, con su porqué. Se actualiza al cerrar cada cosa: lo que Toto no rebate
 después de hacerlo se da por bueno y se quita de aquí.
 
-> Última revisión: 22-ago-2026 · 167 cartas en CARD_DB · 104 suites en verde
+> Última revisión: 22-ago-2026 · 167 cartas en CARD_DB · 105 suites en verde
 
 ---
 
@@ -17,14 +17,13 @@ existe 'Diosa').
 
 ---
 
-## 2. Migración al DSL: 8 imperativas puras
+## 2. Migración al DSL: 7 imperativas puras
 
-Quedan (entre paréntesis, sus hooks a mano). En total, 162 hooks escritos a mano en el fichero.
+Quedan (entre paréntesis, sus hooks a mano). En total, 160 hooks escritos a mano en el fichero.
 
 | Carta | Qué le falta al DSL |
 |---|---|
 | **NoName** (9) | **corrección del 22-ago-2026**: esos 9 hooks NO son el clon, son **RÉPLICA**, que copia la Activa de un enemigo delegando `canActivateAbility`/`onExecuteAbility`/`onValidateTarget`/`onTargetsReady`/… al template ajeno. Candidata a irreducible: es *meta* sobre la interfaz de hooks, y funciona igual con cartas ya migradas (regresion68 lo fija) |
-| **K.I.N.O.** (2) | `INTERCAMBIAR_POSICION` y "al entrar en esta zona" |
 | **Erasmo** (5), **Silhouette** (7), **Sadame** (7), **Mill** (7), **Xanadu** (6), **Arthas** (8) | sin leer a fondo todavía: cada una pide su propio análisis |
 
 Aparte, **Tengu orgulloso** (ya mixta) necesita "contar caras de moneda" para migrar su Activa.
@@ -45,9 +44,9 @@ Aparte, **Tengu orgulloso** (ya mixta) necesita "contar caras de moneda" para mi
 **Aparcado a propósito, pero es deuda real y medida**: el editor solo cubre el tercio más antiguo
 del lenguaje.
 
-- **22 de los 36 triggers** no existen ahí: `REACCION`, `AL_MORIR`, `AL_EQUIPAR`, los
+- **23 de los 37 triggers** no existen ahí: `REACCION`, `AL_MORIR`, `AL_EQUIPAR`, los
   interceptores, `COSTE_COLOCACION`, `PERIODICO`, `INTERCEPTOR_LETAL`…
-- **33 de las 42 ops** tampoco: `ELEGIR`, `EQUIPAR`, `MARCAR_TEMPORAL`, `DESCARTAR`, `COLOCARSE`, `CREAR_CLON`…
+- **36 de las 45 ops** tampoco: `ELEGIR`, `EQUIPAR`, `MARCAR_TEMPORAL`, `DESCARTAR`, `COLOCARSE`, `CREAR_CLON`, `INTERCAMBIAR_POSICION`, `LOG`…
 
 Cuando se retome, además de ponerlo al día, Toto quiere:
 - un **"detalle" que se renderice igual que en partida**, con los datos que estés metiendo;
@@ -88,6 +87,10 @@ Norma a partir de ahora: cada pieza nueva del DSL entra también en el editor.
 - **El `log` de una ACTIVA nunca lleva el nombre de su carta a pelo**: se rellena con `{carta}`,
   que es QUIEN la está usando, y con RÉPLICA esa no siempre es la dueña. Lo vigila
   `auditar_logs` desde el 22-ago-2026.
+- **Quién lleva la cuenta de la última zona es el MOTOR, no la carta** (22-ago-2026): el trigger
+  `AL_CAMBIAR_DE_ZONA` compara y actualiza `lastLocation` él solo, y la carta solo declara qué
+  pasa en cada fila. Y un `INTERCAMBIAR_POSICION` refresca las Pasivas al momento: cambiar de
+  fila es cambiar de condiciones.
 - **Una ficha se resuelve por NOMBRE, no por id** (22-ago-2026): `CREAR_CLON` busca
   `"Clon de " + quien usa la Habilidad`. Es lo que hace que NoName, al REPLICAR la Activa de
   Unmei, saque su propio clon sin que el op sepa nada de NoName (la vieja lo resolvía con un

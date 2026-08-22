@@ -731,6 +731,13 @@ function esDiffInerte(ruta, a, b) {
     // Si alguna vez una de estas marcas difiere por un motivo REAL, se notará en los stats, los
     // logs o la zona de la carta, que sí se comparan.
     if (/\._ha(Atacado|RecibidoDano|UsadoActiva)$/.test(ruta)) return true;
+    // FIRMA DE UN CONTADOR (22-ago-2026). Un contador se firma hoy con la CARTA que lo puso
+    // ({source: nombre, sourceInstanceId, sourceAbility}); las cartas más viejas pasaban una
+    // cadena ya compuesta ("esta carta (POCA PACIENCIA)"). Es metadato PURO -el único que lo
+    // lee es el panel de detalle, para escribir la línea de "Afectado por:"- y nadie decide
+    // nada con él. Mismo criterio que las marcas temporales de justo abajo. El COUNT, que sí
+    // es juego, se sigue comparando entero.
+    if (/\.counters\.[^.]+\.(source|sourceInstanceId|sourceAbility)$/.test(ruta)) return true;
     if (a !== undefined) return false;
     if (ruta.endsWith('.counters') && b && typeof b === 'object' && Object.keys(b).length === 0) return true;
     if (ruta.endsWith('.hasAttackedThisTurn') && b === false) return true;
