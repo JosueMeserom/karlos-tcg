@@ -3,7 +3,7 @@
 Lo que queda por hacer, con su porqué. Se actualiza al cerrar cada cosa: lo que Toto no rebate
 después de hacerlo se da por bueno y se quita de aquí.
 
-> Última revisión: 22-ago-2026 · 167 cartas en CARD_DB · 103 suites en verde
+> Última revisión: 22-ago-2026 · 167 cartas en CARD_DB · 104 suites en verde
 
 ---
 
@@ -80,6 +80,14 @@ Norma a partir de ahora: cada pieza nueva del DSL entra también en el editor.
   "correr en la fase de Furor".
 - **Si una carta hace algo que solo aplicará en un momento concreto, se marca visiblemente** desde
   ya (marca con chapa), y el aviso se retira cuando el efecto llega.
+- **El anuncio de una RÉPLICA espera al punto de compromiso de la habilidad COPIADA**
+  (22-ago-2026). Copiar es dos decisiones seguidas y el anuncio no puede salir entre medias: se
+  arma y lo dispara `DSL._comprometer`, igual que el cobro y la presentación. Con una copiada
+  **imperativa** no hay forma de saber dónde está ese punto, así que ahí se anuncia al escanear,
+  como siempre — resto que cada tanda de migración va reduciendo.
+- **El `log` de una ACTIVA nunca lleva el nombre de su carta a pelo**: se rellena con `{carta}`,
+  que es QUIEN la está usando, y con RÉPLICA esa no siempre es la dueña. Lo vigila
+  `auditar_logs` desde el 22-ago-2026.
 - **Una ficha se resuelve por NOMBRE, no por id** (22-ago-2026): `CREAR_CLON` busca
   `"Clon de " + quien usa la Habilidad`. Es lo que hace que NoName, al REPLICAR la Activa de
   Unmei, saque su propio clon sin que el op sepa nada de NoName (la vieja lo resolvía con un

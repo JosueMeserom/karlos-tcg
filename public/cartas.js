@@ -5526,14 +5526,23 @@ const CARD_DB = [
                 }
             }
 
-            game.logMsg(`¡NoName escanea y replica [${mimicTemplate.activeName}] de ${game.getCardNameWithOwner(target)}!`, 'ability');
-            showFloatingText(card.instanceId, "RÉPLICA", "ft-ability", -40);
-
-            // ENLACE MENTAL (Toto, 22-ago-2026): se ve DE QUIÉN está copiando. Ondas que salen
-            // del escaneado y viajan hasta NoName, que canaliza mientras las recibe. Sustituye a
-            // la pausa muda de medio segundo que había aquí.
-            if (typeof animateMindLink === 'function') await animateMindLink(target.instanceId, card.instanceId);
-            else await game.sleep(500);
+            // ANUNCIO APLAZADO (Toto, 22-ago-2026). Si la habilidad copiada es declarativa, su
+            // punto de compromiso lo conoce el DSL: se ARMA el anuncio de RÉPLICA -log, flotante
+            // y enlace mental- y lo dispara `DSL._comprometer` en cuanto la copiada deje de
+            // poder deshacerse. Así, cancelar a mitad de SU elección no deja dicho en público
+            // algo que no ha pasado.
+            // Con una copiada IMPERATIVA no hay forma de saber dónde está ese punto sin leerla
+            // una a una, así que ahí se anuncia al momento, como siempre. Cada tanda de
+            // migración reduce ese resto.
+            const _declarativa = (mimicTemplate.abilities || []).some(ab => ab.trigger === 'ACTIVA');
+            if (_declarativa && typeof DSL !== 'undefined') {
+                game._replicaArmada = { id: card.instanceId, objetivoId: target.instanceId, nombre: mimicTemplate.activeName };
+            } else {
+                game.logMsg(`¡${card.name} escanea y replica [${mimicTemplate.activeName}] de ${game.getCardNameWithOwner(target)}!`, 'ability');
+                showFloatingText(card.instanceId, "RÉPLICA", "ft-ability", -40);
+                if (typeof animateMindLink === 'function') await animateMindLink(target.instanceId, card.instanceId);
+                else await game.sleep(500);
+            }
             
             // Re-enrutamos la matriz de ejecución hacia la carta original haciéndole creer que somos ella
             if (typeof mimicTemplate.onExecuteAbility === 'function') {
@@ -6391,7 +6400,7 @@ const CARD_DB = [
               // `!getCardTemplate(c.id).isAvatar` a mano de la vieja — sin filtro adicional.
               requisitos: [
                 { count: { quien: "ENEMIGO", zona: "vanguardia" }, op: ">=", valor: 2, msg: "Necesitas al menos 2 enemigos en vanguardia para golpear a objetivos distintos." } ],
-              log: "¡Raiju desata una tormenta eléctrica cegadora!",
+              log: "¡{carta} desata una tormenta eléctrica cegadora!",
               efectos: [
                 // Sin `cancelable: false` (Toto, 20-ago-2026): ese flag apagaba la norma del
                 // coste y la Activa cobraba al confirmarla, antes de elegir a nadie. Lo llevaba
@@ -6427,7 +6436,7 @@ const CARD_DB = [
               requisitos: [
                 { count: { quien: "ENEMIGO", zona: "vanguardia" }, op: ">=", valor: 2,
                   msg: "Necesitas al menos 2 enemigos en vanguardia para golpear a objetivos distintos." } ],
-              log: "¡Erazor Djinn prende la vanguardia enemiga!",
+              log: "¡{carta} prende la vanguardia enemiga!",
               efectos: [
                 // SIN `cancelable: false`, aunque Raiju lo lleve (Toto, 20-ago-2026). Ese flag es
                 // justo el interruptor que apaga la norma del coste: el compilador de ACTIVA
@@ -6459,7 +6468,7 @@ const CARD_DB = [
                   msg: "No hay enemigos en la vanguardia del rival." } ],
               target: { quien: "ENEMIGO", cantidad: 1 },
               validarObjetivo: [ { campo: "location", op: "==", valor: "vanguard", msg: "Debe estar en vanguardia." } ],
-              log: "¡Elsa congela el aire alrededor de su objetivo!",
+              log: "¡{carta} congela el aire alrededor de su objetivo!",
               efectos: [
                 { op: "ATACAR", especial: true, chequearEstado: true },
                 // La moneda va FUERA del `siExito` a propósito: el texto dice que se echa tras el
@@ -6500,7 +6509,7 @@ const CARD_DB = [
               requisitos: [
                 { count: { quien: "ENEMIGO", zona: "vanguardia" }, op: ">=", valor: 1,
                   msg: "No hay enemigos en la vanguardia del rival a los que derrengar." } ],
-              log: "¡Nethuns arrastra a la vanguardia enemiga bajo la marea!",
+              log: "¡{carta} arrastra a la vanguardia enemiga bajo la marea!",
               efectos: [
                 // Sin `cancelable: false`: ver el comentario de INCINERAR.
                 { op: "ELEGIR", de: "ENEMIGOS", zona: "VANGUARDIA", cantidad: 3,
@@ -7954,6 +7963,13 @@ const DSL = {
     // no se cuentan elecciones, se mira cuándo MUTA el estado.
     async _comprometer(sourceCard, game) {
         if (!game) return;
+        // RÉPLICA ARMADA (Toto, 22-ago-2026). Copiar la Habilidad de otro es DOS decisiones
+        // seguidas: a quién escaneas y, después, lo que pida la habilidad copiada. Si el anuncio
+        // (log + flotante + enlace mental) salía al terminar la primera, cancelar la segunda
+        // dejaba dicho en público algo que no llegó a pasar. Ahora se ARMA y se dispara aquí, en
+        // el mismo instante en que la habilidad copiada deja de poder deshacerse — la misma
+        // regla que el cobro y la presentación (§14), y por eso vive en el mismo sitio.
+        await DSL._dispararReplica(sourceCard, game);
         DSL._dispararCobro(sourceCard);
         if (game._presentacionArmada) await game._dispararPresentacion();
         // Red de seguridad: lo que la presentación no haya llegado a cobrar se cobra aquí. La
@@ -7961,6 +7977,18 @@ const DSL = {
         // se la traga el .catch de la cola); un COSTE no puede perderse por eso. Se drena, no se
         // recorre, así que lo que ya cobró el escaparate no se cobra dos veces.
         await DSL._drenarCobros(game);
+    },
+
+    // Dispara el anuncio de RÉPLICA si lo hay armado para ESTA carta. Idempotente: se borra al
+    // dispararlo, así que da igual cuántas veces pase _comprometer.
+    async _dispararReplica(sourceCard, game) {
+        const r = game._replicaArmada;
+        if (!r || !sourceCard || r.id !== sourceCard.instanceId) return;
+        game._replicaArmada = null;
+        const objetivo = typeof game.findCard === 'function' ? game.findCard(r.objetivoId) : null;
+        game.logMsg(`¡${sourceCard.name} escanea y replica [${r.nombre}] de ${objetivo ? DSL._nombre(game, objetivo) : '?'}!`, 'ability');
+        if (typeof showFloatingText === 'function') showFloatingText(sourceCard.instanceId, 'RÉPLICA', 'ft-ability', -40);
+        if (objetivo && typeof animateMindLink === 'function') await animateMindLink(objetivo.instanceId, sourceCard.instanceId);
     },
 
     // Costes de una Ayuda DIRIGIDA, marcados ANTES de que la presentación se dispare.
@@ -10676,6 +10704,11 @@ const DSL = {
                 if (activa.log) game.logMsg(DSL._fill(activa.log, { carta: card.name }), activa.logTipo || 'ability');
             };
             const _ejecutarActiva = async (card, game, targets) => {
+                // Si esta Habilidad viene de una RÉPLICA, su anuncio va DELANTE del cobro: "te
+                // copio esto" y luego "y me cuesta tanto". Sin esto salía detrás, porque una
+                // Activa sin ventana cancelable cobra aquí mismo y el punto de compromiso
+                // (_comprometer) no llega hasta el primer efecto.
+                if (!_diferir) await DSL._dispararReplica(card, game);
                 if (!_diferir) _cobrarActiva(card, game);
                 // Cobro ARMADO, no aplazado al final (Toto, 7-ago-2026). Antes "diferir"
                 // significaba "cobrar después de TODOS los efectos", y eso arrastraba el anuncio

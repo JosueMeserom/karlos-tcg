@@ -10366,6 +10366,17 @@
                     // (Toto, 21-jul-2026): se cancela por el mismo canal fuera de cola que
                     // la elección completa (VISUAL_SEARCH_CONFIRM con ids:[]), no por
                     // CANCEL_ACTION en cola — ver comentario en pickBoardTargets.
+                    // Y la memoria de quien este IMITANDO a otra carta (RÉPLICA) se limpia
+                    // TAMBIEN por aqui (Toto, 22-ago-2026). Este `return` se salta el resto de
+                    // cancelAction, donde vivia la unica limpieza: cancelar la eleccion de una
+                    // habilidad copiada dejaba el mimicId puesto, asi que el siguiente clic en
+                    // RÉPLICA entraba directo a elegir objetivos de la OTRA habilidad -y en
+                    // online, cada cliente por su lado-. A estas alturas la imitacion ya no hace
+                    // falta: los hooks que delegan son los de la fase anterior.
+                    if (this.selectedCard) {
+                        const _t = getCardTemplate(this.selectedCard.id);
+                        if (typeof _t.onCancelAbility === 'function') _t.onCancelAbility(this.selectedCard, this);
+                    }
                     this.dslPick = null;
                     this.selectedCard = null;
                     this.inputState = 'IDLE';
@@ -10397,6 +10408,11 @@
                 }
                 
                 // --- Limpiar memoria de cartas imitadoras (RÉPLICA) ---
+                // El anuncio ARMADO que no llegara a dispararse se desarma aqui, igual que la
+                // presentacion armada: si la jugada no ha ocurrido, no se cuenta. Va en el
+                // camino normal y no arriba del todo a proposito, porque cancelar una eleccion
+                // suelta (la rama de SELECT_DSL_TARGETS) no siempre termina la habilidad.
+                this._replicaArmada = null;
                 if (this.selectedCard) {
                     const temp = getCardTemplate(this.selectedCard.id);
                     if (typeof temp.onCancelAbility === 'function') temp.onCancelAbility(this.selectedCard, this);

@@ -54,6 +54,32 @@ lineas.forEach((l, i) => {
     }
 });
 
+// SEGUNDA REGLA (22-ago-2026): el `log` de una ACTIVA no puede llevar el nombre de su propia
+// carta A PELO. Se rellena con {carta}, que es QUIEN ESTÁ USANDO la Habilidad, y esa no siempre es
+// la dueña: NoName copia Activas ajenas con RÉPLICA, así que un "¡Nethuns arrastra...!" escrito a
+// mano acababa diciendo que arrastra Nethuns cuando quien lo hace es NoName. Con {carta} sale
+// exactamente el mismo texto en el caso normal, así que no hay nada que perder.
+// Solo el log de NIVEL DE HABILIDAD: los de cada efecto rellenan {carta} con el nombre COMPLETO
+// (con dueño), que es otra cosa y no se puede sustituir a ciegas.
+{
+    const src = lineas.join('\n');
+    const bloques = [...src.matchAll(/\n\s*(?:id:\s*\d+,\s*)?name:\s*"([^"]+)"/g)];
+    bloques.forEach((m, k) => {
+        const ini = m.index, fin = k + 1 < bloques.length ? bloques[k + 1].index : src.length;
+        const bloque = src.slice(ini, fin);
+        if (!/trigger:\s*["']ACTIVA["']/.test(bloque)) return;
+        const nombre = m[1];
+        // `log:` a nivel de habilidad = el que NO lleva {objetivo} (ese solo existe en los de efecto).
+        for (const lm of bloque.matchAll(/\n\s*log:\s*"([^"]*)"/g)) {
+            const txt = lm.group === undefined ? lm[1] : lm[1];
+            if (/\{objetivo\}/.test(txt)) continue;
+            if (!txt.includes(nombre.split(' ')[0]) || txt.includes('{carta}')) continue;
+            const linea = src.slice(0, ini + lm.index).split('\n').length;
+            hallazgos.push({ carta: nombre, linea, tipo: 'nombre propio a pelo en el log de una ACTIVA', texto: txt.slice(0, 90) });
+        }
+    });
+}
+
 const porTipo = {};
 hallazgos.forEach(h => (porTipo[h.tipo] = porTipo[h.tipo] || []).push(h));
 
