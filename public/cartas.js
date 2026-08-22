@@ -7784,6 +7784,10 @@ const DSL = {
         // más- (21-ago-2026). No hace falta: la secuencia del turno recalcula por su cuenta justo
         // después, y lo que cambia un estado (las marcas al caducar) ya lo pide por su lado.
         if (algo && typeof game.render === 'function') game.render();
+        // Devuelve SI ha corrido algo: quien despacha la fase lo usa para dar un respiro antes de
+        // que el turno cambie de manos. Sin eso, lo último que pasa en la mesa se ve pisado por
+        // el cartel del turno siguiente.
+        return algo;
     },
 
     // Una marca con `caduca` declarado descuenta su cuenta atrás en el punto que diga, y al llegar
@@ -9113,6 +9117,9 @@ const DSL = {
             const ia = fa.findIndex(c => c.instanceId === sourceCard.instanceId);
             const ib = fb.findIndex(c => c.instanceId === target.instanceId);
             if (ia === -1 || ib === -1) return false;
+            // Se ve el viaje ANTES de tocar el estado: cada una vuela al hueco de la otra. Y se
+            // ESPERA, que es lo que faltaba para que el turno no se acabara encima del cambio.
+            if (typeof animateSwapPositions === 'function') await animateSwapPositions(sourceCard.instanceId, target.instanceId);
             fa.splice(ia, 1, target);
             fb.splice(ib, 1, sourceCard);
             const zA = sourceCard.location;

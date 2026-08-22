@@ -736,9 +736,23 @@
         // marca DÓNDE está cada punto del turno; qué corre ahí lo decide cada carta con su
         // `{ trigger: "PERIODICO", fase, momento, deQuien }`. Si el DSL no estuviera cargado, esto
         // no hace nada y el turno sigue igual.
+        // UNA FASE NO DA PASO A LA SIGUIENTE HASTA QUE TERMINA LO SUYO (Toto, 22-ago-2026).
+        // Los efectos ya se esperaban -cada op aguarda su animación y `correrPeriodicos` los
+        // recorre con await-, pero el último fotograma se comía el cartel de la fase siguiente,
+        // que sale acto seguido. Aquí se cierra: si de verdad ha corrido algo, se espera a que
+        // los flotantes se vacíen y se da un respiro antes de devolver el control.
+        // Va en el despachador y no en cada punto de llamada: son siete fases por tres momentos,
+        // y parchearlos uno a uno es justo cómo se cuelan los olvidos. Si no corre nada, no se
+        // espera nada: una fase vacía sigue siendo instantánea.
         async function _periodicos(game, fase, momento) {
-            if (typeof DSL === 'undefined' || typeof DSL.correrPeriodicos !== 'function') return;
-            try { await DSL.correrPeriodicos(game, fase, momento); } catch (err) { console.error(err); }
+            if (typeof DSL === 'undefined' || typeof DSL.correrPeriodicos !== 'function') return false;
+            let algo = false;
+            try { algo = !!await DSL.correrPeriodicos(game, fase, momento); } catch (err) { console.error(err); }
+            if (algo) {
+                if (typeof game.esperarFlotantes === 'function') await game.esperarFlotantes();
+                if (typeof game.sleep === 'function') await game.sleep(280);
+            }
+            return algo;
         }
 
         function getAnimEl(cardId) {
@@ -969,6 +983,29 @@
             attackerEl.style.transition = "";
             attackerEl.style.transform = "";
             attackerEl.style.zIndex = "";
+        }
+
+        // INTERCAMBIO DE POSICION (Toto, 22-ago-2026). Dos cartas del mismo jugador se cambian el
+        // sitio: cada una viaja al hueco de la otra, la que se adelanta por encima. Sin esto el
+        // cambio era un salto instantaneo -y el turno se acababa encima, porque no habia nada que
+        // esperar: clicabas y ya salia el cartel del rival-.
+        //
+        // NO se limpian los transform al terminar a proposito: quien llama repinta justo despues
+        // y el render reconstruye las filas enteras, asi que los elementos con estilo en linea se
+        // van con el repintado. Limpiarlos aqui daria un fotograma con las cartas de vuelta en su
+        // sitio viejo antes del salto bueno.
+        async function animateSwapPositions(idA, idB) {
+            const a = getAnimEl(idA), b = getAnimEl(idB);
+            if (!a || !b) return;
+            const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
+            const dx = rb.left - ra.left, dy = rb.top - ra.top;
+            if (!dx && !dy) return;
+            a.style.zIndex = 1200; b.style.zIndex = 1199;   // la que va delante pasa por encima
+            a.style.transition = 'transform 0.45s cubic-bezier(0.4, 0, 0.2, 1)';
+            b.style.transition = 'transform 0.45s cubic-bezier(0.4, 0, 0.2, 1)';
+            a.style.transform = `translate(${dx}px, ${dy}px) scale(1.04)`;
+            b.style.transform = `translate(${-dx}px, ${-dy}px) scale(0.96)`;
+            await game.sleep(500);
         }
 
         // ENLACE MENTAL (Toto, 22-ago-2026). Sexto lenguaje, y el primero que no va de pegar:
