@@ -9117,19 +9117,16 @@ const DSL = {
             const ia = fa.findIndex(c => c.instanceId === sourceCard.instanceId);
             const ib = fb.findIndex(c => c.instanceId === target.instanceId);
             if (ia === -1 || ib === -1) return false;
-            // EL MOVIMIENTO, con el DESLIZAMIENTO DE FILA de siempre (la técnica FLIP de
-            // `_fotoFila`/`_deslizarFila`, la misma con la que las cartas se apartan cuando entra
-            // una nueva). Se fotografía DÓNDE ESTÁN, se cambia el estado, se repinta, y a cada
-            // carta se le aplica la transformación que la devuelve ópticamente a su sitio viejo
-            // para quitarla con transición: se desliza sola del hueco viejo al nuevo.
+            // EL MOVIMIENTO es el intercambio de siempre -mismos números, misma curva, misma
+            // inclinación: los comparten las dos formas de animarlo (Game.SWAP)- pero en el ORDEN
+            // SEGURO. Se fotografía dónde están, se cambia el estado, se repinta, y SOLO ENTONCES
+            // se anima, devolviendo cada carta ópticamente a su hueco viejo para soltarla.
             //
-            // NO se usa `animateSwap` (la retirada normal) aunque el gesto sea el mismo, y esto
-            // es lo que costó una pasada de betasteo: esa está hecha para "animar y DESPUÉS
-            // mutar", así que termina devolviendo las cartas a su sitio original y deja que el
-            // repintado las coloque. En la retirada no se nota porque no hay nada más repintando;
-            // aquí, en mitad de un efecto de fase, sí -las cartas volvían atrás y el salto se veía
-            // otra vez, distinto-. El FLIP no puede tener ese problema: cuando la animación
-            // empieza, el DOM YA está en su estado final.
+            // `animateSwap` a secas (la de la retirada) anima y DESPUÉS deja que quien la llama
+            // mute y repinte, y eso costó una pasada de betasteo: en la retirada no se nota
+            // porque no hay nada más repintando alrededor, pero en mitad de un efecto de fase las
+            // cartas volvían a su sitio viejo y el salto bueno se veía otra vez. Con el FLIP no
+            // puede pasar: cuando la animación empieza, el DOM YA está en su estado final.
             // La foto va COMBINADA (las dos filas en un solo mapa) porque estas dos cartas
             // cambian DE FILA: `_deslizarFila` busca por id, y con la foto de una sola fila no
             // encontraría de dónde viene la que llega de la otra.
@@ -9149,11 +9146,20 @@ const DSL = {
             // no en el siguiente repaso que toque.
             if (typeof game.updatePassives === 'function') game.updatePassives();
             if (typeof game.render === 'function') game.render();
-            if (_foto && typeof _deslizarFila === 'function') {
-                _deslizarFila(_selA, _foto, null);
-                _deslizarFila(_selB, _foto, null);
-                const _ms = (typeof DESLIZA_MS === 'number' ? DESLIZA_MS : 400) + 40;
-                if (typeof game.sleep === 'function') await game.sleep(_ms);
+            if (_foto) {
+                // Las dos que se cruzan, con la animación del intercambio de siempre; y las
+                // vecinas de las dos filas se acomodan deslizándose, como cuando entra una carta.
+                // OJO al id que se excluye de cada fila: es el de la carta que ACABA DE LLEGAR
+                // a ella, no el que se fue. En `_selA` (la fila de la que sale la fuente) el
+                // recién llegado es el objetivo, y al revés. Esas dos las anima el intercambio;
+                // el deslizamiento es solo para las vecinas.
+                if (typeof _deslizarFila === 'function') {
+                    _deslizarFila(_selA, _foto, target.instanceId);
+                    _deslizarFila(_selB, _foto, sourceCard.instanceId);
+                }
+                if (typeof game.animateSwapDeslizando === 'function') {
+                    await game.animateSwapDeslizando(sourceCard.instanceId, target.instanceId, _foto);
+                }
             }
             return true;
         }

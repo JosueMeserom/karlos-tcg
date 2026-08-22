@@ -9985,28 +9985,34 @@
                 pil.style.transformOrigin = '';
             }
 
+            // LOS NÚMEROS DEL INTERCAMBIO, en un solo sitio: los comparten las DOS formas de
+            // animarlo (ver animateSwapDeslizando justo debajo), para que se vea exactamente
+            // igual venga de una retirada o de un efecto de carta. Tocar aquí las mueve las dos.
+            static get SWAP() { return { MS: 500, EASE: 'cubic-bezier(0.68, -0.55, 0.27, 1.55)', ROT: 5 }; }
+
             async animateSwap(id1, id2) {
                 const el1 = document.querySelector(`.card[data-id="${id1}"]`);
                 const el2 = document.querySelector(`.card[data-id="${id2}"]`);
                 if (!el1 || !el2) return;
 
+                const S = Game.SWAP;
                 const rect1 = el1.getBoundingClientRect();
                 const rect2 = el2.getBoundingClientRect();
                 
                 const deltaX = rect2.left - rect1.left;
                 const deltaY = rect2.top - rect1.top;
 
-                el1.style.transition = 'transform 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55)'; 
-                el2.style.transition = 'transform 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55)';
+                el1.style.transition = `transform ${S.MS}ms ${S.EASE}`; 
+                el2.style.transition = `transform ${S.MS}ms ${S.EASE}`;
                 el1.style.zIndex = '1000';
                 el2.style.zIndex = '999';
 
                 void el1.offsetWidth;
 
-                el1.style.transform = `translate(${deltaX}px, ${deltaY}px) rotate(5deg)`;
-                el2.style.transform = `translate(${-deltaX}px, ${-deltaY}px) rotate(-5deg)`;
+                el1.style.transform = `translate(${deltaX}px, ${deltaY}px) rotate(${S.ROT}deg)`;
+                el2.style.transform = `translate(${-deltaX}px, ${-deltaY}px) rotate(${-S.ROT}deg)`;
 
-                await this.sleep(500);
+                await this.sleep(S.MS);
 
                 el1.style.transition = 'none';
                 el2.style.transition = 'none';
@@ -10014,6 +10020,50 @@
                 el2.style.transform = '';
                 el1.style.zIndex = '';
                 el2.style.zIndex = '';
+            }
+
+            // EL MISMO INTERCAMBIO, EN EL ORDEN SEGURO (Toto, 22-ago-2026). Mismos números que
+            // animateSwap -salen los dos de Game.SWAP-, así que se ve igual: mismo recorrido,
+            // misma curva, misma inclinación. Lo que cambia es CUÁNDO:
+            //   · animateSwap anima y DESPUÉS se muta el estado. Al terminar devuelve las cartas
+            //     a su sitio original y confía en que el repintado de quien la llamó las coloque.
+            //     Vale para la retirada, donde no hay nada más repintando alrededor.
+            //   · esta se llama con el estado YA cambiado y la mesa YA repintada: recibe la foto
+            //     de dónde estaban (FLIP), devuelve cada carta ópticamente a su hueco viejo y la
+            //     suelta. Cuando la animación empieza, el DOM ya está en su estado final, así que
+            //     ningún repintado de en medio puede hacer que el movimiento se vea dos veces.
+            // La foto es un Map id -> rect, el mismo que produce _fotoFila.
+            async animateSwapDeslizando(id1, id2, foto) {
+                const el1 = document.querySelector(`.card[data-id="${id1}"]`);
+                const el2 = document.querySelector(`.card[data-id="${id2}"]`);
+                const a1 = foto && foto.get(id1), a2 = foto && foto.get(id2);
+                if (!el1 || !el2 || !a1 || !a2) return;
+
+                const S = Game.SWAP;
+                const n1 = el1.getBoundingClientRect(), n2 = el2.getBoundingClientRect();
+                // Invertir: dónde estaba MENOS dónde está ahora.
+                const d1x = a1.left - n1.left, d1y = a1.top - n1.top;
+                const d2x = a2.left - n2.left, d2y = a2.top - n2.top;
+
+                el1.style.transition = 'none';
+                el2.style.transition = 'none';
+                el1.style.zIndex = '1000';
+                el2.style.zIndex = '999';
+                // Arrancan inclinadas en el mismo sentido en el que la otra forma acaba, así que
+                // el giro que se ve durante el viaje es el mismo.
+                el1.style.transform = `translate(${d1x}px, ${d1y}px) rotate(${S.ROT}deg)`;
+                el2.style.transform = `translate(${d2x}px, ${d2y}px) rotate(${-S.ROT}deg)`;
+
+                void el1.offsetWidth;
+
+                el1.style.transition = `transform ${S.MS}ms ${S.EASE}`;
+                el2.style.transition = `transform ${S.MS}ms ${S.EASE}`;
+                el1.style.transform = '';
+                el2.style.transform = '';
+
+                await this.sleep(S.MS);
+
+                [el1, el2].forEach(el => { el.style.transition = ''; el.style.zIndex = ''; });
             }
 
             // --- LEY UNIVERSAL DE DESEQUIPAMIENTO ---
