@@ -10005,8 +10005,18 @@
                 const rect1 = el1.getBoundingClientRect();
                 const rect2 = el2.getBoundingClientRect();
                 
-                const deltaX = rect2.left - rect1.left;
-                const deltaY = rect2.top - rect1.top;
+                // DE CENTRO A CENTRO, no de esquina a esquina (Toto, 23-ago-2026). En la retirada
+                // normal la carta que se retira está SELECCIONADA, y `.card.selected` la agranda
+                // con un `transform: scale(...)`: su rect es más grande, así que su esquina está
+                // más arriba y a la izquierda de donde estaría sin escalar. Restando esquinas, la
+                // carta aterrizaba desviada -un poco más arriba- y el repintado la bajaba de
+                // golpe al final. Los CENTROS no se mueven al escalar, así que el trayecto sale
+                // exacto esté la carta escalada o no. En la retirada forzada de K.I.N.O. no se
+                // notaba porque ahí no hay ninguna carta seleccionada.
+                const cx1 = rect1.left + rect1.width / 2, cy1 = rect1.top + rect1.height / 2;
+                const cx2 = rect2.left + rect2.width / 2, cy2 = rect2.top + rect2.height / 2;
+                const deltaX = cx2 - cx1;
+                const deltaY = cy2 - cy1;
 
                 el1.style.transition = `transform ${S.MS}ms ${S.EASE}`; 
                 el2.style.transition = `transform ${S.MS}ms ${S.EASE}`;
