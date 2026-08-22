@@ -9117,9 +9117,11 @@ const DSL = {
             const ia = fa.findIndex(c => c.instanceId === sourceCard.instanceId);
             const ib = fb.findIndex(c => c.instanceId === target.instanceId);
             if (ia === -1 || ib === -1) return false;
-            // Se ve el viaje ANTES de tocar el estado: cada una vuela al hueco de la otra. Y se
-            // ESPERA, que es lo que faltaba para que el turno no se acabara encima del cambio.
-            if (typeof animateSwapPositions === 'function') await animateSwapPositions(sourceCard.instanceId, target.instanceId);
+            // El viaje se ve ANTES de tocar el estado, con la MISMA animación que la retirada
+            // normal (`animateSwap`, la de toda la vida): es el mismo gesto -dos aliados que se
+            // cambian el sitio- y no hay razón para que se vea distinto según quién lo provoque.
+            // Y se ESPERA, que es lo que faltaba para que el turno no se acabara encima.
+            if (typeof game.animateSwap === 'function') await game.animateSwap(sourceCard.instanceId, target.instanceId);
             fa.splice(ia, 1, target);
             fb.splice(ib, 1, sourceCard);
             const zA = sourceCard.location;

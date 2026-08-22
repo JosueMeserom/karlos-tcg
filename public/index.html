@@ -985,29 +985,6 @@
             attackerEl.style.zIndex = "";
         }
 
-        // INTERCAMBIO DE POSICION (Toto, 22-ago-2026). Dos cartas del mismo jugador se cambian el
-        // sitio: cada una viaja al hueco de la otra, la que se adelanta por encima. Sin esto el
-        // cambio era un salto instantaneo -y el turno se acababa encima, porque no habia nada que
-        // esperar: clicabas y ya salia el cartel del rival-.
-        //
-        // NO se limpian los transform al terminar a proposito: quien llama repinta justo despues
-        // y el render reconstruye las filas enteras, asi que los elementos con estilo en linea se
-        // van con el repintado. Limpiarlos aqui daria un fotograma con las cartas de vuelta en su
-        // sitio viejo antes del salto bueno.
-        async function animateSwapPositions(idA, idB) {
-            const a = getAnimEl(idA), b = getAnimEl(idB);
-            if (!a || !b) return;
-            const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
-            const dx = rb.left - ra.left, dy = rb.top - ra.top;
-            if (!dx && !dy) return;
-            a.style.zIndex = 1200; b.style.zIndex = 1199;   // la que va delante pasa por encima
-            a.style.transition = 'transform 0.45s cubic-bezier(0.4, 0, 0.2, 1)';
-            b.style.transition = 'transform 0.45s cubic-bezier(0.4, 0, 0.2, 1)';
-            a.style.transform = `translate(${dx}px, ${dy}px) scale(1.04)`;
-            b.style.transform = `translate(${-dx}px, ${-dy}px) scale(0.96)`;
-            await game.sleep(500);
-        }
-
         // ENLACE MENTAL (Toto, 22-ago-2026). Sexto lenguaje, y el primero que no va de pegar:
         // sirve para ver DE QUIEN esta copiando algo una carta (RÉPLICA de NoName). Ondas que
         // salen de la carta escaneada y viajan hasta quien copia, que canaliza mientras las
