@@ -68,6 +68,16 @@ const escenarios = [
         p1: { vanguardia: [{ carta: 'NoName', furor: 4 }] },
         p2: { vanguardia: [{ carta: 'Unmei', furor: 4 }] },
         ...NOMBRE,
+        // El segundo flotante decía "RÉPLICA" otra vez, en vez de decir QUÉ ha copiado: el
+        // anuncio de una Activa salía de `card.activeName`, que es el campo de la INSTANCIA y
+        // por tanto el de NoName. Ahora sale del nombre de la habilidad que de verdad corre.
+        // Es el único flotante de toda la batería que cambia con ese arreglo.
+        flotantesIntencionados: [
+            // El PRIMERO ("RÉPLICA" al escanear) sigue igual y tiene que seguir saliendo: por eso
+            // se declara la ocurrencia y no el texto a secas.
+            { de: 'RÉPLICA · ft-ability', a: 'MULTIPLICACIÓN DE CUERPO · ft-ability', ocurrencia: 2,
+              motivo: 'el anuncio dice la Habilidad que se está usando, no el nombre de la Activa propia de quien la usa' },
+        ],
         pasos: [
             { habilidad: 'NoName' },
             { confirmar: true },

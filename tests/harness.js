@@ -827,6 +827,23 @@ function compararCapturas(esc, vieja, nueva) {
     // que el escenario declara "la vieja decía X y la nueva dice Y, y es a propósito".
     for (const regla of (esc.flotantesIntencionados || [])) {
         if (!regla.motivo) throw new Error(`escenario "${esc.nombre}": flotantesIntencionados sin "motivo" documentado`);
+        // `ocurrencia: N` reescribe SOLO el N-ésimo flotante que case (1 = el primero), en vez de
+        // todos (22-ago-2026). Hace falta cuando el mismo texto sale dos veces y solo una cambia:
+        // NoName pinta "RÉPLICA" al escanear -eso sigue igual- y luego el nombre de la Habilidad
+        // que ha copiado, que antes también decía "RÉPLICA". Sin esto había que elegir entre
+        // tapar el legítimo o no declarar el arreglo.
+        if (typeof regla.ocurrencia === 'number') {
+            let visto = 0, hecho = false;
+            flotantesViejos = flotantesViejos.map(l => {
+                if (!l.includes(regla.de)) return l;
+                visto++;
+                if (visto !== regla.ocurrencia) return l;
+                hecho = true;
+                return l.split(regla.de).join(regla.a);
+            });
+            if (!hecho) diffs.push(`flotantesIntencionados: no hay un flotante nº ${regla.ocurrencia} que contenga "${regla.de}" en la salida vieja`);
+            continue;
+        }
         flotantesViejos = flotantesViejos.map(l => l.split(regla.de).join(regla.a));
     }
     for (const regla of (esc.flotantesSoloVieja || [])) {

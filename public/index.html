@@ -971,6 +971,55 @@
             attackerEl.style.zIndex = "";
         }
 
+        // ENLACE MENTAL (Toto, 22-ago-2026). Sexto lenguaje, y el primero que no va de pegar:
+        // sirve para ver DE QUIEN esta copiando algo una carta (RÉPLICA de NoName). Ondas que
+        // salen de la carta escaneada y viajan hasta quien copia, que canaliza mientras las
+        // recibe -misma canalizacion que cualquier Habilidad, `casting`-.
+        //
+        // Sin `hardShake` ni rojo por ninguna parte: aqui nadie recibe dano. El color es violeta
+        // (lo mental/psiquico), distinto del ambar/verde del aura de Habilidad y del
+        // blanco/magenta del dano verdadero.
+        //
+        // Cada onda es un ARCO orientado hacia el destino: se rota el elemento hacia el objetivo
+        // y se le empuja por su propio eje X, asi que viaja recto por la linea que une las dos
+        // cartas sin tener que calcular puntos intermedios.
+        async function animateMindLink(fuenteId, destinoId) {
+            const fuenteEl = getAnimEl(fuenteId);
+            const destinoEl = getAnimEl(destinoId);
+            if (!fuenteEl || !destinoEl) return;
+            const rf = fuenteEl.getBoundingClientRect();
+            const rd = destinoEl.getBoundingClientRect();
+            const x0 = rf.left + rf.width / 2, y0 = rf.top + rf.height / 2;
+            const x1 = rd.left + rd.width / 2, y1 = rd.top + rd.height / 2;
+            const ang = Math.atan2(y1 - y0, x1 - x0) * 180 / Math.PI;
+            // La ultima onda muere a las puertas de la carta que copia, no en su centro.
+            const dist = Math.max(0, Math.hypot(x1 - x0, y1 - y0) - Math.min(rd.width, rd.height) / 2);
+
+            const capa = document.createElement('div');
+            capa.style.cssText = 'position:fixed; inset:0; pointer-events:none; z-index:1500;';
+            document.body.appendChild(capa);
+
+            const fuenteCard = document.querySelector(`.card[data-id="${fuenteId}"]`);
+            if (fuenteCard) fuenteCard.classList.add('mind-source');
+            destinoEl.classList.add('casting');
+
+            for (let i = 0; i < 4; i++) {
+                const onda = document.createElement('div');
+                onda.className = 'mind-wave';
+                onda.style.left = x0 + 'px';
+                onda.style.top = y0 + 'px';
+                onda.style.setProperty('--ang', ang + 'deg');
+                onda.style.setProperty('--dist', dist + 'px');
+                capa.appendChild(onda);
+                await game.sleep(130);
+            }
+            await game.sleep(450);
+
+            capa.remove();
+            if (fuenteCard) fuenteCard.classList.remove('mind-source');
+            destinoEl.classList.remove('casting');
+        }
+
         // INTERCEPCION (Toto, 22-ago-2026). Cuando alguien muere EN LUGAR de otro
         // (Guardaespaldas), hasta ahora no se veia nada: el motor anula el golpe antes de llamar
         // a animateAttack, asi que la carta se partia en dos de la nada. Aqui no se intercepta el

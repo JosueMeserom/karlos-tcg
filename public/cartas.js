@@ -5528,8 +5528,12 @@ const CARD_DB = [
 
             game.logMsg(`¡NoName escanea y replica [${mimicTemplate.activeName}] de ${game.getCardNameWithOwner(target)}!`, 'ability');
             showFloatingText(card.instanceId, "RÉPLICA", "ft-ability", -40);
-            
-            await game.sleep(500);
+
+            // ENLACE MENTAL (Toto, 22-ago-2026): se ve DE QUIÉN está copiando. Ondas que salen
+            // del escaneado y viajan hasta NoName, que canaliza mientras las recibe. Sustituye a
+            // la pausa muda de medio segundo que había aquí.
+            if (typeof animateMindLink === 'function') await animateMindLink(target.instanceId, card.instanceId);
+            else await game.sleep(500);
             
             // Re-enrutamos la matriz de ejecución hacia la carta original haciéndole creer que somos ella
             if (typeof mimicTemplate.onExecuteAbility === 'function') {
@@ -10661,7 +10665,12 @@ const DSL = {
                     // existía cuando diferir significaba "al final de todo" y el nombre habría
                     // salido tras los efectos; entonces había que apagarlo y declararlo a mano
                     // carta por carta. Ya no: el automático funciona en ambos caminos.
-                    showFloatingText(card.instanceId, card.activeName, 'ft-ability', -30);
+                    // EL NOMBRE DE LA HABILIDAD QUE SE ESTÁ USANDO, no el de la carta que la
+                    // usa (Toto, 22-ago-2026). `card.activeName` es el campo de la INSTANCIA, y
+                    // cuando NoName replica la Activa de otro sigue siendo el suyo: el flotante
+                    // anunciaba "RÉPLICA" dos veces en vez de decir qué había copiado. `activa`
+                    // y `tmpl` son los de la habilidad que de verdad corre.
+                    showFloatingText(card.instanceId, activa.nombre || tmpl.activeName || card.activeName, 'ft-ability', -30);
                     (activa.floatingExtra || []).forEach(fe => showFloatingText(card.instanceId, fe.texto, fe.estilo || 'ft-green', fe.offset !== undefined ? fe.offset : -10));
                 }
                 if (activa.log) game.logMsg(DSL._fill(activa.log, { carta: card.name }), activa.logTipo || 'ability');
