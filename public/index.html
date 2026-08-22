@@ -1916,10 +1916,15 @@
             });
             return foto;
         }
-        function _deslizarFila(sel, foto, exceptoId) {
+        // `saltar` (Set de ids, opcional): cartas cuyo viaje YA se ha enseñado con su propia
+        // animación, así que el FLIP no debe repetirlo. Lo usa animateSwap (Toto, 22-ago-2026):
+        // el intercambio se veía DOS veces -la animación buena y, acto seguido, el deslizamiento
+        // del repintado, que es otro movimiento distinto del mismo trayecto-.
+        function _deslizarFila(sel, foto, exceptoId, saltar) {
             _cartasDeFila(sel).forEach(el => {
                 const id = el.getAttribute('data-id');
                 if (id === exceptoId) return;              // la que entra viaja por su cuenta
+                if (saltar && saltar.has(id)) return;      // ya se ha animado por su cuenta
                 // Con un transform inline ya puesto, la carta está en mitad de SU animación
                 // (embestida, muerte, aterrizaje): el FLIP se la pisaría. Se deja en paz.
                 if (el.style.transform) return;
@@ -9985,9 +9990,7 @@
                 pil.style.transformOrigin = '';
             }
 
-            // LOS NÚMEROS DEL INTERCAMBIO, en un solo sitio: los comparten las DOS formas de
-            // animarlo (ver animateSwapDeslizando justo debajo), para que se vea exactamente
-            // igual venga de una retirada o de un efecto de carta. Tocar aquí las mueve las dos.
+            // LOS NÚMEROS DEL INTERCAMBIO, en un solo sitio: recorrido, curva e inclinación.
             static get SWAP() { return { MS: 500, EASE: 'cubic-bezier(0.68, -0.55, 0.27, 1.55)', ROT: 5 }; }
 
             async animateSwap(id1, id2) {
@@ -10020,51 +10023,13 @@
                 el2.style.transform = '';
                 el1.style.zIndex = '';
                 el2.style.zIndex = '';
+                // El viaje YA se ha visto: que el deslizamiento del siguiente repintado no lo
+                // vuelva a contar. Sin esto, el intercambio se veía dos veces seguidas -la buena
+                // y el FLIP-, y le pasaba a los TRES sitios que animan un intercambio (la
+                // retirada, la Motocicleta y la Pasiva de K.I.N.O.).
+                this._sinFlip = new Set([id1, id2]);
             }
 
-            // EL MISMO INTERCAMBIO, EN EL ORDEN SEGURO (Toto, 22-ago-2026). Mismos números que
-            // animateSwap -salen los dos de Game.SWAP-, así que se ve igual: mismo recorrido,
-            // misma curva, misma inclinación. Lo que cambia es CUÁNDO:
-            //   · animateSwap anima y DESPUÉS se muta el estado. Al terminar devuelve las cartas
-            //     a su sitio original y confía en que el repintado de quien la llamó las coloque.
-            //     Vale para la retirada, donde no hay nada más repintando alrededor.
-            //   · esta se llama con el estado YA cambiado y la mesa YA repintada: recibe la foto
-            //     de dónde estaban (FLIP), devuelve cada carta ópticamente a su hueco viejo y la
-            //     suelta. Cuando la animación empieza, el DOM ya está en su estado final, así que
-            //     ningún repintado de en medio puede hacer que el movimiento se vea dos veces.
-            // La foto es un Map id -> rect, el mismo que produce _fotoFila.
-            async animateSwapDeslizando(id1, id2, foto) {
-                const el1 = document.querySelector(`.card[data-id="${id1}"]`);
-                const el2 = document.querySelector(`.card[data-id="${id2}"]`);
-                const a1 = foto && foto.get(id1), a2 = foto && foto.get(id2);
-                if (!el1 || !el2 || !a1 || !a2) return;
-
-                const S = Game.SWAP;
-                const n1 = el1.getBoundingClientRect(), n2 = el2.getBoundingClientRect();
-                // Invertir: dónde estaba MENOS dónde está ahora.
-                const d1x = a1.left - n1.left, d1y = a1.top - n1.top;
-                const d2x = a2.left - n2.left, d2y = a2.top - n2.top;
-
-                el1.style.transition = 'none';
-                el2.style.transition = 'none';
-                el1.style.zIndex = '1000';
-                el2.style.zIndex = '999';
-                // Arrancan inclinadas en el mismo sentido en el que la otra forma acaba, así que
-                // el giro que se ve durante el viaje es el mismo.
-                el1.style.transform = `translate(${d1x}px, ${d1y}px) rotate(${S.ROT}deg)`;
-                el2.style.transform = `translate(${d2x}px, ${d2y}px) rotate(${-S.ROT}deg)`;
-
-                void el1.offsetWidth;
-
-                el1.style.transition = `transform ${S.MS}ms ${S.EASE}`;
-                el2.style.transition = `transform ${S.MS}ms ${S.EASE}`;
-                el1.style.transform = '';
-                el2.style.transform = '';
-
-                await this.sleep(S.MS);
-
-                [el1, el2].forEach(el => { el.style.transition = ''; el.style.zIndex = ''; });
-            }
 
             // --- LEY UNIVERSAL DE DESEQUIPAMIENTO ---
             unequipAll(card) {
@@ -10785,8 +10750,11 @@
                 const _filas = ['#p1-vanguard', '#p1-rearguard', '#p2-vanguard', '#p2-rearguard'];
                 const _foto = new Map();
                 _filas.forEach(sel => _fotoFila(sel).forEach((r, id) => _foto.set(id, r)));
+                // Cartas que acaban de moverse CON SU PROPIA animación: el FLIP no las repite.
+                // Se consume aquí (un solo repintado), lo pone quien las animó.
+                const _yaAnimadas = this._sinFlip; this._sinFlip = null;
                 this._renderInterno();
-                if (!this.isSkippingAnim) _filas.forEach(sel => _deslizarFila(sel, _foto, null));
+                if (!this.isSkippingAnim) _filas.forEach(sel => _deslizarFila(sel, _foto, null, _yaAnimadas));
                 // Las entradas del rectángulo dependen de lo que hay EN LA MESA, no solo de la fase:
                 // un Evento que expira este turno, un aliado que acaba de entrar. Se repintan aquí.
                 this.pintarReposoFase();

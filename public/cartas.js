@@ -9117,23 +9117,12 @@ const DSL = {
             const ia = fa.findIndex(c => c.instanceId === sourceCard.instanceId);
             const ib = fb.findIndex(c => c.instanceId === target.instanceId);
             if (ia === -1 || ib === -1) return false;
-            // EL MOVIMIENTO es el intercambio de siempre -mismos números, misma curva, misma
-            // inclinación: los comparten las dos formas de animarlo (Game.SWAP)- pero en el ORDEN
-            // SEGURO. Se fotografía dónde están, se cambia el estado, se repinta, y SOLO ENTONCES
-            // se anima, devolviendo cada carta ópticamente a su hueco viejo para soltarla.
-            //
-            // `animateSwap` a secas (la de la retirada) anima y DESPUÉS deja que quien la llama
-            // mute y repinte, y eso costó una pasada de betasteo: en la retirada no se nota
-            // porque no hay nada más repintando alrededor, pero en mitad de un efecto de fase las
-            // cartas volvían a su sitio viejo y el salto bueno se veía otra vez. Con el FLIP no
-            // puede pasar: cuando la animación empieza, el DOM YA está en su estado final.
-            // La foto va COMBINADA (las dos filas en un solo mapa) porque estas dos cartas
-            // cambian DE FILA: `_deslizarFila` busca por id, y con la foto de una sola fila no
-            // encontraría de dónde viene la que llega de la otra.
-            const _selA = `#${sourceCard.owner}-${sourceCard.location}`;
-            const _selB = `#${sourceCard.owner}-${target.location}`;
-            const _foto = (typeof _fotoFila === 'function')
-                ? new Map([..._fotoFila(_selA), ..._fotoFila(_selB)]) : null;
+            // El viaje se ve ANTES de tocar el estado, con la MISMA animación que la retirada
+            // normal: es el mismo gesto -dos aliados que se cambian el sitio- y no hay razón
+            // para que se vea distinto según quién lo provoque. `animateSwap` avisa al siguiente
+            // repintado de que estas dos ya se han movido, para que el deslizamiento de fila no
+            // repita el trayecto (era eso lo que hacía que el intercambio se viera dos veces).
+            if (typeof game.animateSwap === 'function') await game.animateSwap(sourceCard.instanceId, target.instanceId);
 
             fa.splice(ia, 1, target);
             fb.splice(ib, 1, sourceCard);
@@ -9146,21 +9135,6 @@ const DSL = {
             // no en el siguiente repaso que toque.
             if (typeof game.updatePassives === 'function') game.updatePassives();
             if (typeof game.render === 'function') game.render();
-            if (_foto) {
-                // Las dos que se cruzan, con la animación del intercambio de siempre; y las
-                // vecinas de las dos filas se acomodan deslizándose, como cuando entra una carta.
-                // OJO al id que se excluye de cada fila: es el de la carta que ACABA DE LLEGAR
-                // a ella, no el que se fue. En `_selA` (la fila de la que sale la fuente) el
-                // recién llegado es el objetivo, y al revés. Esas dos las anima el intercambio;
-                // el deslizamiento es solo para las vecinas.
-                if (typeof _deslizarFila === 'function') {
-                    _deslizarFila(_selA, _foto, target.instanceId);
-                    _deslizarFila(_selB, _foto, sourceCard.instanceId);
-                }
-                if (typeof game.animateSwapDeslizando === 'function') {
-                    await game.animateSwapDeslizando(sourceCard.instanceId, target.instanceId, _foto);
-                }
-            }
             return true;
         }
         if (e.op === 'VOLVER_A_MANO') {
