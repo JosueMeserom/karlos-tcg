@@ -851,39 +851,61 @@ const CARD_DB = [
         text: "P: CAMUFLAJE ÓPTICO: Si no ataca, gana Oculto durante el turno rival. El daño lo revela. A: MOTOCICLETA (3F): Cambia a Mill y 1 aliado de vanguardia por 2 de retaguardia.", 
         passiveName: "CAMUFLAJE ÓPTICO", activeName: "MOTOCICLETA", activeCost: 3, series: 1,
 
-        // CAMUFLAJE ÓPTICO migrado a DSL (23-ago-2026). Se apoya en el estado `oculto` -con su
-        // chapa, su cuenta y sus líneas de "Afectado por:"/"Efectos actuales:" automáticas- en vez
-        // del booleano `stealth` a pelo, que no se veía en el detalle salvo con un
-        // onGetPreviewEffects escrito a mano. El reseteo de `hasAttackedThisTurn` que hacía el
-        // hook viejo sobraba: el motor lo hace para TODAS las cartas al empezar el turno.
+        // CAMUFLAJE ÓPTICO migrado a DSL (23-ago-2026), con el patrón de Simon: se AVISA primero
+        // y se aplica cuando toca. El aviso es una marca con chapa propia que Mill se pone a sí
+        // mismo mientras no haya atacado, y el Oculto de verdad llega nada más empezar el turno
+        // del rival, que es el único turno en el que significa algo.
+        //
+        // Antes esto encendía el booleano `stealth` a pelo: sin chapa, sin cuenta y sin líneas en
+        // el detalle salvo un onGetPreviewEffects escrito a mano. Como estado sale todo solo, y la
+        // atribución ("por CAMUFLAJE ÓPTICO") viaja en la marca porque cada ability declara su
+        // `nombre`.
         //
         // MOTOCICLETA se queda imperativa a propósito: su tercer objetivo solo es válido según
         // los dos anteriores (el límite de 2 Personajes en vanguardia se calcula sobre el campo
         // que QUEDARÍA), y eso no es un filtro por campo sino una cuenta condicional. Declararlo
         // hoy sería inventar sintaxis para una sola carta.
+        tempEffectText: "Camuflaje listo: estará {genero?Oculto|Oculta} durante el turno del rival",
         abilities: [
-            // Se gana al final del turno propio, DESPUÉS de que los estados descuenten (por eso
-            // es un PERIODICO explícito y no un FIN_TURNO, que corre antes): así el turno que
-            // dura es el del rival y la cuenta que se ve es la de verdad.
-            { trigger: "PERIODICO", fase: "EFECTOS FINALES", momento: "DESPUES", deQuien: "PROPIO",
-              nombre: "CAMUFLAJE ÓPTICO",
-              if: [ { campo: "hasAttackedThisTurn", op: "falsy" },
-                    { campo: "currentHp", op: ">", valor: 0 } ],
-              efectos: [
-                { op: "APLICAR_ESTADO", estado: "oculto", duracion: 1, target: { quien: "SELF" },
-                  floating: "OCULTO", floatingStyle: "ft-gray", offsetFloating: -30,
-                  log: "¡CAMUFLAJE ÓPTICO de {objetivo} se activa! (Oculto)" } ] }
+            // EL AVISO, en cuanto pisa el campo. Icono y color propios, distintos del escudo gris
+            // de Simon: aquello es "te cubre otro", esto es "me camuflo yo".
+            { trigger: "AL_CAMBIAR_DE_ZONA", nombre: "CAMUFLAJE ÓPTICO",
+              zonas: {
+                vanguard:  { efectos: [ { op: "MARCAR_TEMPORAL", badge: { icono: "🫥", color: "#4f46e5" } } ] },
+                rearguard: { efectos: [ { op: "MARCAR_TEMPORAL", badge: { icono: "🫥", color: "#4f46e5" } } ] },
+              } },
 
-,
-
-            // Y se apaga al empezar el suyo: el camuflaje es para el turno del rival, y las
-            // cuentas de los estados solo bajan en el turno de su dueño -así que este, puesto al
-            // final del turno propio, llegaría vivo al siguiente si no se retirara aquí-.
+            // Y se repone cada turno propio: el aviso se consume al aplicarse (abajo), y al
+            // empezar de nuevo su turno Mill vuelve a no haber atacado. Se quita antes de ponerlo
+            // para no acumular dos si algo lo dejó puesto.
             { trigger: "INICIO_TURNO", nombre: "CAMUFLAJE ÓPTICO",
-              si: { campo: "status.oculto.duration", op: "truthy" },
               efectos: [
-                { op: "LIMPIAR_ESTADOS", estados: ["oculto"], soloObjetivo: true, target: { quien: "SELF" },
-                  log: "{objetivo} apaga su Camuflaje Óptico.", logTipo: "system" } ] }
+                { op: "QUITAR_MARCA", target: { quien: "SELF" } },
+                { op: "MARCAR_TEMPORAL", badge: { icono: "🫥", color: "#4f46e5" } } ] },
+
+            // Atacar lo delata: se acabó el camuflaje de este turno.
+            { trigger: "TRAS_ATACAR", nombre: "CAMUFLAJE ÓPTICO",
+              efectos: [ { op: "QUITAR_MARCA", target: { quien: "SELF" } } ] },
+
+            // AQUÍ se convierte en Oculto de verdad, nada más empezar el turno del rival y antes
+            // de su Robo. `conMarcaTemporalPropia` es lo que comprueba "no atacó": si atacó, la
+            // marca ya no está y esto no encuentra a nadie.
+            { trigger: "PERIODICO", fase: "INICIO DEL TURNO", momento: "NORMAL", deQuien: "RIVAL",
+              nombre: "CAMUFLAJE ÓPTICO",
+              efectos: [
+                { op: "APLICAR_ESTADO", estado: "oculto", duracion: 1,
+                  target: { quien: "ALIADO", conMarcaTemporalPropia: true } },
+                // Y el aviso se retira: ya no anuncia nada, ha pasado.
+                { op: "QUITAR_MARCA", target: { quien: "ALIADO", conMarcaTemporalPropia: true } } ] },
+
+            // Y se va cuando ese turno acaba. Hace falta decirlo, como en Simon: la cuenta atrás
+            // de los estados corre al final del turno de SU DUEÑO, así que un `duracion: 1` puesto
+            // en el turno del rival no se gastaría hasta el final del turno de Mill.
+            { trigger: "PERIODICO", fase: "EFECTOS FINALES", momento: "DESPUES", deQuien: "RIVAL",
+              nombre: "CAMUFLAJE ÓPTICO",
+              efectos: [
+                { op: "LIMPIAR_ESTADOS", estados: ["oculto"], soloObjetivo: true,
+                  target: { quien: "ALIADO", conEstadoDeSelf: "oculto" } } ] }
         ],
 
         // HOOK 3: Validar Coste y número de aliados (Mínimo 2 en Van y 2 en Rear)
@@ -7975,7 +7997,16 @@ const DSL = {
             if (e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
             return true;
         }
-        console.error('[DSL] AL_ENTRAR solo admite efectos síncronos (MODIFICAR_STAT, APLICAR_ESTADO, MODIFICAR_CONTADORES):', e.op);
+        // MARCAR_TEMPORAL entra en la lista blanca (23-ago-2026): su rama en `_doEffect` no tiene
+        // un solo `await` -solo construye la marca y la empuja-, así que termina en este mismo
+        // tick y se comporta como síncrona. Es lo que permite que una carta se marque a sí misma
+        // al ENTRAR en el campo (el aviso de Mill), que es un momento que solo ve updatePassives.
+        // Ojo: nada de `actualizaPasivas` aquí dentro, que esto YA corre dentro de una pasada.
+        if (e.op === 'MARCAR_TEMPORAL' && !e.actualizaPasivas) {
+            DSL._doEffect(e, sourceCard, target, game, ownerId, habilidad);
+            return true;
+        }
+        console.error('[DSL] este trigger solo admite efectos síncronos (MODIFICAR_STAT, APLICAR_ESTADO, MODIFICAR_CONTADORES, MARCAR_TEMPORAL):', e.op);
         return false;
     },
 

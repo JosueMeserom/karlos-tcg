@@ -266,7 +266,16 @@ for (const c of CARTAS) {
         'reacción', 'reaccion', 'en su lugar', 'en todo momento', 'echan una moneda al',
         'solo puedes atacar', 'sus ataques', 'deben ir dirigidos', 'declare un ataque',
     ].join('|'), 'i');
-    if (tiene(T_REACTIVO) && !diceReactivo.test(tl)) {
+    // EXENTO: un trigger reactivo cuyo único efecto es RETIRAR SU PROPIO AVISO (Mill, que se
+    // quita la marca de "voy a camuflarme" al atacar). No añade una regla que el texto tenga que
+    // contar -es el reverso de lo que el texto ya dice ("si no ataca")- y lo que el jugador ve es
+    // la chapa desapareciendo, que se explica sola. Se acota a eso: solo QUITAR_MARCA, y sobre sí
+    // mismo; cualquier otro efecto en un trigger reactivo sigue teniendo que anunciarse.
+    const _soloSeDesmarca = (c.abilities || [])
+        .filter(a => T_REACTIVO.includes(a.trigger))
+        .every(a => (a.efectos || []).length > 0 && (a.efectos || []).every(e =>
+            e.op === 'QUITAR_MARCA' && (!e.target || e.target.quien === 'SELF')));
+    if (tiene(T_REACTIVO) && !_soloSeDesmarca && !diceReactivo.test(tl)) {
         add('REACTIVO-MUDO', c, `tiene ${triggers.filter(x => T_REACTIVO.includes(x)).join('/') || hooks.join('/')} pero el texto no dice cuándo se dispara`);
     }
 

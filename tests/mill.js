@@ -43,18 +43,25 @@ const MESA = {
     p2: { vanguardia: [{ carta: 'Oso con armadura', vida: 9 }] },
 };
 const oculto = (c) => !!(c.status && c.status.oculto && c.status.oculto.duration > 0);
+// El AVISO: la marca que Mill se pone a sí mismo mientras no haya atacado.
+const aviso = (c) => (c.tempEffects || []).find(e => e.sourceInstanceId === c.instanceId && e.badge);
 
 (async () => {
     console.log('--- No ataca: se camufla para el turno del rival ---');
     {
-        const { g, paso, logs } = await mesa(MESA);
+        const { g, paso } = await mesa(MESA);
         const mill = g.players.p1.vanguard[0];
+        // De entrada, solo el AVISO: el Oculto todavía no, que es el turno de Mill.
+        check('en su turno lleva el aviso, no el Oculto', !!aviso(mill) && !oculto(mill),
+            JSON.stringify(mill.tempEffects) + ' / ' + JSON.stringify(mill.status));
+        check('...y el aviso dice de qué Habilidad viene',
+            (aviso(mill) || {}).habilidad === 'CAMUFLAJE ÓPTICO', JSON.stringify(aviso(mill)));
         await paso({ finTurno: true });
-        check('gana el estado Oculto', oculto(mill), JSON.stringify(mill.status));
+        check('al empezar el turno del rival, gana el estado Oculto', oculto(mill), JSON.stringify(mill.status));
         check('...con una cuenta de 1 turno (el del rival)', mill.status.oculto.duration === 1,
             mill.status.oculto && String(mill.status.oculto.duration));
         check('...y el motor lo ve como Oculto (stealth derivado)', mill.stealth === true);
-        check('...anunciándolo', logs().some(m => m.includes('CAMUFLAJE ÓPTICO') && m.includes('(Oculto)')));
+        check('...y el aviso se retira: ya no anuncia nada', !aviso(mill), JSON.stringify(mill.tempEffects));
     }
 
     console.log('--- Ataca: no hay camuflaje ---');
@@ -62,21 +69,22 @@ const oculto = (c) => !!(c.status && c.status.oculto && c.status.oculto.duration
         const { g, paso } = await mesa(MESA);
         const mill = g.players.p1.vanguard[0];
         await paso({ atacar: 'Mill', objetivo: 'Oso con armadura' });
+        check('atacar le quita el aviso', !aviso(mill), JSON.stringify(mill.tempEffects));
         await paso({ finTurno: true });
-        check('no gana el Oculto', !oculto(mill));
+        check('...así que no gana el Oculto', !oculto(mill));
         check('...ni queda con stealth', !mill.stealth);
     }
 
     console.log('--- Al empezar SU turno, el camuflaje se apaga ---');
     {
-        const { g, paso, logs } = await mesa(MESA);
+        const { g, paso } = await mesa(MESA);
         const mill = g.players.p1.vanguard[0];
         await paso({ finTurno: true });   // p1 -> p2: se camufla
         check('sigue Oculto durante todo el turno del rival', oculto(mill));
         await paso({ finTurno: true });   // p2 -> p1: empieza el turno de Mill
         check('al empezar el suyo, ya no está Oculto', !oculto(mill), JSON.stringify(mill.status));
         check('...ni le queda el stealth derivado', !mill.stealth);
-        check('...y se dice', logs().some(m => m.includes('apaga su Camuflaje Óptico')));
+        check('...y el aviso vuelve a estar puesto para el turno siguiente', !!aviso(mill));
     }
 
     console.log('--- El daño lo revela: el estado se va, no solo el booleano ---');
