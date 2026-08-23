@@ -17,14 +17,15 @@ existe 'Diosa').
 
 ---
 
-## 2. Migración al DSL: 6 imperativas puras + 2 híbridas
+## 2. Migración al DSL: 5 imperativas puras + 3 híbridas
 
-Quedan (entre paréntesis, sus hooks a mano). En total, 157 hooks escritos a mano en el fichero.
+Quedan (entre paréntesis, sus hooks a mano). En total, 155 hooks escritos a mano en el fichero.
 
 | Carta | Qué le falta al DSL |
 |---|---|
 | **NoName** (9) | **corrección del 22-ago-2026**: esos 9 hooks NO son el clon, son **RÉPLICA**, que copia la Activa de un enemigo delegando `canActivateAbility`/`onExecuteAbility`/`onValidateTarget`/`onTargetsReady`/… al template ajeno. Candidata a irreducible: es *meta* sobre la interfaz de hooks, y funciona igual con cartas ya migradas (regresion68 lo fija) |
-| **Erasmo** (5), **Silhouette** (7), **Sadame** (7), **Xanadu** (6), **Arthas** (8) | sin leer a fondo todavía: cada una pide su propio análisis |
+| **Erasmo** (5), **Silhouette** (7), **Sadame** (7), **Arthas** (8) | sin leer a fondo todavía: cada una pide su propio análisis |
+| **Xanadu** (4, ya híbrida) | REPULSIÓN ABSOLUTA ya es declarativa; **ESTORNUDO DEVASTADOR** se queda por lo mismo que MOTOCICLETA: el enemigo que entra depende del que sale (límite de 2 Personajes sobre la vanguardia que QUEDARÍA) |
 | **Mill** (4, ya híbrida) | su Pasiva ya es declarativa; **MOTOCICLETA** se queda: su tercer objetivo solo es válido según los dos anteriores (el límite de 2 Personajes se calcula sobre el campo que QUEDARÍA), y eso no es un filtro por campo sino una cuenta condicional |
 
 Aparte, **Tengu orgulloso** (ya mixta) necesita "contar caras de moneda" para migrar su Activa.

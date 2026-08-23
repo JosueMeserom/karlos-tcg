@@ -16,6 +16,28 @@ const { correrSuite } = require('./harness');
 
 const escenarios = [
     {
+        // LA RAMA QUE FALTABA (23-ago-2026, al migrar la Pasiva al DSL): aceptar y repeler.
+        // Hasta hoy la suite solo declinaba, así que el camino bueno -pagar el Furor, esquivar
+        // el golpe y salir ileso- no lo comprobaba nadie.
+        // Ataque normal PLANO (sin Activa): es el único que las DOS bases ofrecen repeler, así
+        // que es el que sirve para comparar el camino bueno de punta a punta.
+        nombre: 'Xanadu acepta: paga 1 Furor, repele el ataque y no recibe daño',
+        turno: 2, turnoDe: 'p1', empieza: 'p2',
+        p1: { vanguardia: [{ carta: 'Mini-tigre' }] },
+        p2: { vanguardia: [{ carta: 'Xanadu', furor: 2 }] },
+        // La base congelada nombraba las dos cartas a secas; la norma es nombrarlas con su dueño
+        // (getCardNameWithOwner), que es lo que rellenan {defensor} y {objetivo} en el DSL. Mismo
+        // texto palabra por palabra.
+        logsIntencionados: [
+            { de: '! Xanadu repele el ataque de Mini-tigre.', a: '! Xanadu de J2 (Jugador 2) repele el ataque de Mini-tigre [1] de J1 (Jugador 1).',
+              motivo: 'norma del proyecto: una carta nombrada en el log lleva su dueño' },
+        ],
+        pasos: [
+            { atacar: 'Mini-tigre', objetivo: 'Xanadu' },
+            { opcion: 'SÍ' },
+        ],
+    },
+    {
         // BUG real corregido, no replicado: un ataque NORMAL con nombre de Habilidad
         // (BOMBAZO) no activaba la repulsión en la vieja porque `abilityName` venía
         // truthy y la condición era `!abilityName`. La nueva sí la ofrece (y aquí se

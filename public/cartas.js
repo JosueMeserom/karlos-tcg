@@ -2316,43 +2316,33 @@ const CARD_DB = [
             return true;
         },
         
-        // isSpecial (29-jul-2026): mismo bug hermano que tenía Águila (corregido 28-jul-2026) —
-        // el texto dice "Al recibir ataque normal" pero la heurística vieja (`!abilityName`) usaba
-        // si el ataque traía NOMBRE DE HABILIDAD como proxy de "es normal", lo cual falla en los
-        // dos sentidos: un ataque normal CON nombre (BOMBAZO, CABREO, SANGRE MALDITA, PUÑO DE
-        // NEUTRONES...) no activaba REPULSIÓN ABSOLUTA aunque debía, y cualquier ataque especial
-        // SIN nombre la activaría igual aunque no debía. El 5º parámetro ya lo pasan los 9 puntos
-        // del motor desde el fix de Águila. De paso, la misma exención de Aniceto (uncounterable,
-        // "sus ataques y Habilidades son imparables") que ya tiene Águila — Xanadu no la tenía.
-        onBeforeDefend: async function(defender, attacker, game, abilityName, isSpecial) {
-            if (isSpecial) return false; // REPULSIÓN ABSOLUTA solo repele ataques normales
-            const attackerTemplate = getCardTemplate(attacker.id);
-            if (attackerTemplate.uncounterable) {
-                game.logMsg(`${game.getCardNameWithOwner(attacker)} ignora las defensas evasivas gracias a su pasiva.`, 'system');
-                return false;
-            }
-            if (defender.furor >= 1) {
-                const pName = defender.owner === 'p1' ? 'JUGADOR 1' : 'JUGADOR 2';
-                const used = await new Promise(resolve => {
-                    // Bug real corregido (29-jul-2026, betasteo de Toto): sin chooserId explícito,
-                    // openChoiceModal usaba this.activePlayerId como respondedor por defecto — o sea
-                    // el ATACANTE, no el dueño de Xanadu, que es quien de verdad decide si gasta su
-                    // Furor. defender.owner es quien debe responder, gane o pierda el turno.
-                    game.openChoiceModal(`REPULSIÓN ABSOLUTA (${pName})\n\n¿Gastar 1 Furor para repeler el ataque de ${attacker.name}?`, [
-                        { label: 'SÍ (-1 FUROR)', action: () => resolve(true) },
-                        { label: 'NO', action: () => resolve(false) }
-                    ], defender.owner);
-                });
-                if (used) {
-                    game.modifyStat(defender, 'furor', -1);
-                    game.logMsg(`¡${defender.passiveName}! ${game.getCardNameWithOwner(defender)} repele el ataque de ${game.getCardNameWithOwner(attacker)}.`, 'ability');
-                    showFloatingText(defender.instanceId, "REPELIDO", "ft-ability", -30);
-                    try { await animateRepel(attacker.instanceId, defender.instanceId); } catch(e){}
-                    return true;
-                }
-            }
-            return false;
-        },
+        // REPULSIÓN ABSOLUTA migrada a DSL (23-ago-2026) con el trigger ANTES_DE_DEFENDER, que
+        // es exactamente para esto: una esquiva REAL, decidida ANTES del daño. Estrena dos
+        // piezas, las dos genéricas: `prompt` en el trigger (la esquiva cuesta Furor, así que se
+        // pregunta, y se le pregunta a QUIEN DEFIENDE) y `animacion: "REPELER"` en el op
+        // ESQUIVAR, para el rechazo frontal en vez del quiebro lateral.
+        //
+        // Los dos gates que la vieja hacía a mano ya eran campos del trigger desde Águila:
+        // `soloAtaqueNormal` (el texto dice "ataque normal") y `salvoIncontrarrestable` (Aniceto
+        // la atraviesa con SAPIENCIA MÁGICA).
+        //
+        // ESTORNUDO DEVASTADOR se queda imperativo, por lo mismo que MOTOCICLETA: el enemigo de
+        // retaguardia que se puede meter depende del que se saque (el límite de 2 Personajes se
+        // calcula sobre la vanguardia que QUEDARÍA), y eso es una cuenta condicional, no un
+        // filtro por campo.
+        abilities: [
+            { trigger: "ANTES_DE_DEFENDER", nombre: "REPULSIÓN ABSOLUTA",
+              soloAtaqueNormal: true, salvoIncontrarrestable: true,
+              logIncontrarrestable: "{objetivo} ignora las defensas evasivas gracias a su pasiva.",
+              si: [ { campo: "furor", op: ">=", valor: 1 } ],
+              prompt: "REPULSIÓN ABSOLUTA\n\n¿Gastar 1 Furor para repeler el ataque de {objetivo}?",
+              opciones: { si: "SÍ (-1 FUROR)", no: "NO" },
+              efectos: [
+                { op: "MODIFICAR_STAT", target: { quien: "SELF" }, stat: "furor", delta: -1 },
+                { op: "FLOTANTE", target: { quien: "SELF" }, texto: "REPELIDO", estilo: "ft-ability", offset: -30 },
+                { op: "ESQUIVAR", animacion: "REPELER",
+                  log: "¡REPULSIÓN ABSOLUTA! {defensor} repele el ataque de {objetivo}.", logTipo: "ability" } ] }
+        ],
 
         canActivateAbility: function(card, game) {
             if (card.furor < 2) { game.logMsg("Falta Furor (2).", 'system'); return false; }
@@ -8988,7 +8978,11 @@ const DSL = {
             game._dslEsquiva = true;
             // sinAnimacion (Neo, 31-jul-2026): PARED FALSA no esquiva, se desvanece — el quiebro
             // lateral de animateDodge contaba otra cosa. El efecto de reglas es idéntico.
-            if (!e.sinAnimacion && typeof animateDodge === 'function') { try { await animateDodge(target.instanceId, sourceCard.instanceId); } catch (err) {} }
+            // `animacion: 'REPELER'` (Xanadu): no es un quiebro lateral, es un rechazo frontal.
+            // Mismo efecto de reglas; lo que cambia es lo que se cuenta.
+            if (!e.sinAnimacion && e.animacion === 'REPELER' && typeof animateRepel === 'function') {
+                try { await animateRepel(target.instanceId, sourceCard.instanceId); } catch (err) {}
+            } else if (!e.sinAnimacion && typeof animateDodge === 'function') { try { await animateDodge(target.instanceId, sourceCard.instanceId); } catch (err) {} }
             if (e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), defensor: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target) }), e.logTipo || 'combat');
             return true;
         }
@@ -11071,6 +11065,20 @@ const DSL = {
                 // si (31-jul-2026): mismo campo que ya soportan los otros tres triggers
                 // hermanos (ANTES_DE_ATACAR/TRAS_ATACAR/TRAS_DEFENDER); faltaba aquí también.
                 if (antesDefender.si && !DSL._cond(defender, game, antesDefender.si)) return false;
+                // `prompt` (Xanadu, 23-ago-2026): la esquiva CUESTA algo, así que se pregunta —y
+                // se pregunta a QUIEN DEFIENDE, que es de quien sale el Furor, no al jugador
+                // activo (el atacante), que es lo que openChoiceModal supone por defecto. Si dice
+                // que no, no se ha gastado nada y el golpe sigue su curso.
+                if (antesDefender.prompt) {
+                    const _op = antesDefender.opciones || {};
+                    const _quiere = await new Promise(resolve => {
+                        game.openChoiceModal(DSL._fill(antesDefender.prompt, _fillD), [
+                            { label: DSL._fill(_op.si || 'SÍ', _fillD), action: () => resolve(true) },
+                            { label: DSL._fill(_op.no || 'NO', _fillD), action: () => resolve(false) },
+                        ], defender.owner, { reaccion: { atacante: attacker, defensor: defender, mano: defender } });
+                    });
+                    if (!_quiere) return false;
+                }
                 if (antesDefender.log) game.logMsg(DSL._fill(antesDefender.log, _fillD), antesDefender.logTipo || 'ability');
                 game._dslEsquiva = false; // lo levanta el op ESQUIVAR si llega a correr
                 await DSL._runEffectList(antesDefender.efectos || [], defender, game, defender.owner, [attacker], antesDefender.nombre || tmpl.passiveName || null);
