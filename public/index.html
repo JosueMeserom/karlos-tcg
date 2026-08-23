@@ -11747,6 +11747,12 @@
                 });
             }
 
+            // ¿Se pinta como Oculta? El booleano (fuentes permanentes) o el estado con duración
+            // (lo que ponen las cartas). Uno solo no basta: ver la nota de la chapa del ojo.
+            _estaOculta(card) {
+                return !!(card.stealth || (card.status && card.status.oculto && card.status.oculto.duration > 0));
+            }
+
             createCardEl(card, inHand = false, isVisualOnly = false) {
               try {
                 const el = document.createElement('div');
@@ -12090,10 +12096,13 @@
                     if (card.isSilenced && (!card.status || !card.status.silencio || card.status.silencio.duration <= 0)) el.appendChild(createBadge('🤐', '∞', '#6b7280', 'silencio'));
                 }
 
-                // La chapa del ojo la pinta `stealth`, que desde hoy se DERIVA del estado 'oculto'
-                // (ver updatePassives). Las fuentes permanentes -Berry, Súcubo- lo siguen poniendo
-                // a mano en su pasiva, que corre después del recálculo.
-                if (card.stealth) {
+                // La chapa del ojo mira el ESTADO además del booleano (Toto, 23-ago-2026).
+                // `stealth` se DERIVA del estado en cada pasada de pasivas, y un efecto de fase
+                // repinta pero NO recalcula -a propósito: recalcular ahí reemite los flotantes de
+                // estado-, así que mirando solo el booleano el ojo no aparecía hasta la siguiente
+                // pasada, un par de fases más tarde. Las fuentes permanentes (Berry, Súcubo, Zoe)
+                // siguen poniendo `stealth` a mano y entran por la otra mitad del `or`.
+                if (this._estaOculta(card)) {
                     const stealthBadge = document.createElement('div');
                     stealthBadge.className = 'stealth-badge';
                     stealthBadge.dataset.badge = 'oculto';
@@ -12178,12 +12187,17 @@
                     let hasStatus = false;
                     if (card.status) {
                         for (const key in card.status) {
+                            // 'oculto' NO cuenta aquí (Toto, 23-ago-2026): su chapa es el OJO, que
+                            // reserva su sitio en la línea de abajo. Contándolo dos veces, la carta
+                            // se apartaba un hueco de chapa que nadie llegaba a pintar -se veía el
+                            // reajuste de la fila sin ver ninguna chapa nueva-.
+                            if (key === 'oculto') continue;
                             if (card.status[key] && card.status[key].duration > 0) hasStatus = true;
                         }
                     }
                     if (card.isSilenced) hasStatus = true; // badge de silencio por aura (∞): también sobresale a la izquierda
                     if (hasStatus) marginLeft = Math.max(marginLeft, getCssOffset('.status-dot', 'left') + 4); 
-                    if (card.stealth) marginLeft = Math.max(marginLeft, getCssOffset('.stealth-badge', 'left') + 4); 
+                    if (this._estaOculta(card)) marginLeft = Math.max(marginLeft, getCssOffset('.stealth-badge', 'left') + 4); 
 
                     if (card.type === 'Personaje' || card.type === 'Esbirro') {
                         marginRight = Math.max(marginRight, getCssOffset('.furor-container', 'right') + 4); 
