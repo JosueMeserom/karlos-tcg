@@ -3,7 +3,7 @@
 Lo que queda por hacer, con su porqué. Se actualiza al cerrar cada cosa: lo que Toto no rebate
 después de hacerlo se da por bueno y se quita de aquí.
 
-> Última revisión: 22-ago-2026 · 167 cartas en CARD_DB · 105 suites en verde
+> Última revisión: 22-ago-2026 · 167 cartas en CARD_DB · 106 suites en verde
 
 ---
 
@@ -17,14 +17,15 @@ existe 'Diosa').
 
 ---
 
-## 2. Migración al DSL: 7 imperativas puras
+## 2. Migración al DSL: 6 imperativas puras + 2 híbridas
 
-Quedan (entre paréntesis, sus hooks a mano). En total, 160 hooks escritos a mano en el fichero.
+Quedan (entre paréntesis, sus hooks a mano). En total, 157 hooks escritos a mano en el fichero.
 
 | Carta | Qué le falta al DSL |
 |---|---|
 | **NoName** (9) | **corrección del 22-ago-2026**: esos 9 hooks NO son el clon, son **RÉPLICA**, que copia la Activa de un enemigo delegando `canActivateAbility`/`onExecuteAbility`/`onValidateTarget`/`onTargetsReady`/… al template ajeno. Candidata a irreducible: es *meta* sobre la interfaz de hooks, y funciona igual con cartas ya migradas (regresion68 lo fija) |
-| **Erasmo** (5), **Silhouette** (7), **Sadame** (7), **Mill** (7), **Xanadu** (6), **Arthas** (8) | sin leer a fondo todavía: cada una pide su propio análisis |
+| **Erasmo** (5), **Silhouette** (7), **Sadame** (7), **Xanadu** (6), **Arthas** (8) | sin leer a fondo todavía: cada una pide su propio análisis |
+| **Mill** (4, ya híbrida) | su Pasiva ya es declarativa; **MOTOCICLETA** se queda: su tercer objetivo solo es válido según los dos anteriores (el límite de 2 Personajes se calcula sobre el campo que QUEDARÍA), y eso no es un filtro por campo sino una cuenta condicional |
 
 Aparte, **Tengu orgulloso** (ya mixta) necesita "contar caras de moneda" para migrar su Activa.
 
@@ -91,6 +92,11 @@ Norma a partir de ahora: cada pieza nueva del DSL entra también en el editor.
   `AL_CAMBIAR_DE_ZONA` compara y actualiza `lastLocation` él solo, y la carta solo declara qué
   pasa en cada fila. Y un `INTERCAMBIAR_POSICION` refresca las Pasivas al momento: cambiar de
   fila es cambiar de condiciones.
+- **El Oculto se pone como ESTADO, nunca tocando `stealth`** (23-ago-2026): `stealth` es la vista
+  rápida que el motor DERIVA del estado en cada pasada de pasivas. Ponerlo a mano deja la carta
+  oculta sin chapa, sin cuenta y sin líneas en el detalle; y quitarlo a mano no revela nada,
+  porque la pasada siguiente lo vuelve a encender desde el estado (era el caso de "el daño lo
+  revela", roto para Simon y Mill hasta hoy).
 - **Una ficha se resuelve por NOMBRE, no por id** (22-ago-2026): `CREAR_CLON` busca
   `"Clon de " + quien usa la Habilidad`. Es lo que hace que NoName, al REPLICAR la Activa de
   Unmei, saque su propio clon sin que el op sepa nada de NoName (la vieja lo resolvía con un

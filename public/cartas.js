@@ -850,26 +850,40 @@ const CARD_DB = [
         text: "P: CAMUFLAJE ÓPTICO: Si no ataca, gana Oculto durante el turno rival. El daño lo revela. A: MOTOCICLETA (3F): Cambia a Mill y 1 aliado de vanguardia por 2 de retaguardia.", 
         passiveName: "CAMUFLAJE ÓPTICO", activeName: "MOTOCICLETA", activeCost: 3, series: 1,
 
-        // HOOK 1: Resetear tracker y limpiar su propio sigilo
-        onStartTurn: function(card, game) {
-            card.hasAttackedThisTurn = false;
-            // El sigilo dura durante el turno del rival. Al empezar mi turno, se desvanece.
-            if (card.owner === game.activePlayerId && card.stealth) {
-                card.stealth = false;
-                game.logMsg(`${game.getCardNameWithOwner(card)} apaga su Camuflaje Óptico.`, 'system');
-            }
-        },
+        // CAMUFLAJE ÓPTICO migrado a DSL (23-ago-2026). Se apoya en el estado `oculto` -con su
+        // chapa, su cuenta y sus líneas de "Afectado por:"/"Efectos actuales:" automáticas- en vez
+        // del booleano `stealth` a pelo, que no se veía en el detalle salvo con un
+        // onGetPreviewEffects escrito a mano. El reseteo de `hasAttackedThisTurn` que hacía el
+        // hook viejo sobraba: el motor lo hace para TODAS las cartas al empezar el turno.
+        //
+        // MOTOCICLETA se queda imperativa a propósito: su tercer objetivo solo es válido según
+        // los dos anteriores (el límite de 2 Personajes en vanguardia se calcula sobre el campo
+        // que QUEDARÍA), y eso no es un filtro por campo sino una cuenta condicional. Declararlo
+        // hoy sería inventar sintaxis para una sola carta.
+        abilities: [
+            // Se gana al final del turno propio, DESPUÉS de que los estados descuenten (por eso
+            // es un PERIODICO explícito y no un FIN_TURNO, que corre antes): así el turno que
+            // dura es el del rival y la cuenta que se ve es la de verdad.
+            { trigger: "PERIODICO", fase: "EFECTOS FINALES", momento: "DESPUES", deQuien: "PROPIO",
+              nombre: "CAMUFLAJE ÓPTICO",
+              if: [ { campo: "hasAttackedThisTurn", op: "falsy" },
+                    { campo: "currentHp", op: ">", valor: 0 } ],
+              efectos: [
+                { op: "APLICAR_ESTADO", estado: "oculto", duracion: 1, target: { quien: "SELF" },
+                  floating: "OCULTO", floatingStyle: "ft-gray", offsetFloating: -30,
+                  log: "¡CAMUFLAJE ÓPTICO de {objetivo} se activa! (Oculto)" } ] }
 
-        // HOOK 2: Ganar Sigilo si fue pacífico
-        onEndTurn: function(card, game) {
-            if (card.owner === game.activePlayerId && card.currentHp > 0) {
-                if (!card.hasAttackedThisTurn) {
-                    card.stealth = true;
-                    game.logMsg(`¡${card.passiveName} de ${game.getCardNameWithOwner(card)} se activa! (Oculto)`, 'ability');
-                    showFloatingText(card.instanceId, "OCULTO", "ft-gray", -30);
-                }
-            }
-        },
+,
+
+            // Y se apaga al empezar el suyo: el camuflaje es para el turno del rival, y las
+            // cuentas de los estados solo bajan en el turno de su dueño -así que este, puesto al
+            // final del turno propio, llegaría vivo al siguiente si no se retirara aquí-.
+            { trigger: "INICIO_TURNO", nombre: "CAMUFLAJE ÓPTICO",
+              si: { campo: "status.oculto.duration", op: "truthy" },
+              efectos: [
+                { op: "LIMPIAR_ESTADOS", estados: ["oculto"], soloObjetivo: true, target: { quien: "SELF" },
+                  log: "{objetivo} apaga su Camuflaje Óptico.", logTipo: "system" } ] }
+        ],
 
         // HOOK 3: Validar Coste y número de aliados (Mínimo 2 en Van y 2 en Rear)
         canActivateAbility: function(card, game) {
@@ -1010,12 +1024,6 @@ const CARD_DB = [
             game.render();
         },
 
-        onGetPreviewEffects: function(card, game) {
-            if (card.stealth) {
-                return [`${game.generoTexto(card, 'Oculto', 'Oculta')}: inmune a ataques normales por ${card.passiveName}, fuente: esta carta`];
-            }
-            return [];
-        }
     },
     { 
         id: 10, name: "Hawke", hp: 4, def: 4, atk: 6, type: "Personaje", subtype: "Ser vivo", tags: ['Poder heredado'], gender: 'M', rarity: "A", 
@@ -9593,6 +9601,9 @@ const DSL = {
                     if (ally.status[k]) { delete ally.status[k]; limpiado = true; }
                 }
                 if (limpiado && e.floating && typeof showFloatingText === 'function') showFloatingText(ally.instanceId, e.floating, e.floatingStyle || 'ft-green', e.offsetFloating !== undefined ? e.offsetFloating : -20);
+                // El log iba por carta LIMPIADA, no por efecto: le faltaba, a diferencia de casi
+                // todos los demás ops (Mill lo pide para anunciar que apaga su camuflaje).
+                if (limpiado && e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, ally) }), e.logTipo || 'ability');
             });
             return true;
         }

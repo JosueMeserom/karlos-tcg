@@ -3807,6 +3807,13 @@
                     color = amount > 0 ? "ft-green" : "ft-red";
                     if (amount < 0 && card.stealth) {
                         card.stealth = false;
+                        // Y EL ESTADO TAMBIÉN (Toto, 23-ago-2026). Desde que el Oculto es un
+                        // estado con duración, `stealth` es solo la vista rápida que se DERIVA de
+                        // él en cada pasada de pasivas: apagar el booleano sin quitar el estado no
+                        // revelaba nada, porque la pasada siguiente lo volvía a encender. Le
+                        // pasaba a todo Oculto puesto como estado (Simon, y ahora Mill).
+                        if (card.status && card.status.oculto) delete card.status.oculto;
+                        delete card._ocultoPorEstado;
                         this.logMsg(`${this.getCardNameWithOwner(card)} pierde su estado de Oculto al recibir daño.`, 'system');
                         setTimeout(() => showFloatingText(card.instanceId, "REVELADO", "ft-gray", 20), 400);
                     }
