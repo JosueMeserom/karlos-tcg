@@ -3813,7 +3813,7 @@
                         // revelaba nada, porque la pasada siguiente lo volvía a encender. Le
                         // pasaba a todo Oculto puesto como estado (Simon, y ahora Mill).
                         if (card.status && card.status.oculto) delete card.status.oculto;
-                        delete card._ocultoPorEstado;
+                        this._derivarOculto(card);
                         this.logMsg(`${this.getCardNameWithOwner(card)} pierde su estado de Oculto al recibir daño.`, 'system');
                         setTimeout(() => showFloatingText(card.instanceId, "REVELADO", "ft-gray", 20), 400);
                     }
@@ -7351,7 +7351,7 @@
                         // en la siguiente pasada de pasivas, porque se deriva de aquí.
                         if (card.status.oculto && card.status.oculto.duration > 0) {
                             card.status.oculto.duration--;
-                            if (card.status.oculto.duration <= 0) delete card.status.oculto;
+                            if (card.status.oculto.duration <= 0) { delete card.status.oculto; this._derivarOculto(card); }
                         }
                     }
 
@@ -7447,11 +7447,7 @@
                 // `stealth` puesto por otra vía -una pasiva permanente, un escenario de pruebas,
                 // la base congelada- no se toca, porque aquí no hay forma de saber quién lo puso
                 // y borrarlo sería peor que dejarlo (Toto, 21-ago-2026).
-                _mesa().forEach(c => {
-                    const _est = !!(c.status && c.status.oculto && c.status.oculto.duration > 0);
-                    if (_est) { c.stealth = true; c._ocultoPorEstado = true; }
-                    else if (c._ocultoPorEstado) { c.stealth = false; delete c._ocultoPorEstado; }
-                });
+                _mesa().forEach(c => this._derivarOculto(c));
                 const _foto = () => { const m = {}; _mesa().forEach(c => m[c.instanceId] = [c.currentAtk, c.currentDef, !!c.stealth, !!c.isSilenced]); return m; };
                 // `habilidad` (nombre de la Pasiva/Activa) y `ref` (referencia estándar a la carta
                 // origen) se guardan POR SEPARADO, no fusionados en un texto: el panel de detalle
@@ -11749,6 +11745,20 @@
 
             // ¿Se pinta como Oculta? El booleano (fuentes permanentes) o el estado con duración
             // (lo que ponen las cartas). Uno solo no basta: ver la nota de la chapa del ojo.
+            // `stealth` SE DERIVA del estado 'oculto', y esta es la única cuenta que lo hace
+            // (Toto, 23-ago-2026). Antes vivía suelta dentro de updatePassives, así que quitar el
+            // estado no apagaba el booleano hasta la siguiente pasada de pasivas: el ojo seguía
+            // pintado un par de fases de más -justo lo que se veía al empezar el turno de Mill-.
+            // Ahora la llama también quien toca el estado (LIMPIAR_ESTADOS, la cuenta atrás de
+            // los estados, el daño que revela), así que la chapa y el estado van siempre juntos.
+            // Solo gestiona el Oculto que puso un ESTADO: un `stealth` de fuente permanente
+            // (Berry, Súcubo, Zoe) no se toca, que aquí no hay forma de saber quién lo puso.
+            _derivarOculto(card) {
+                const _est = !!(card.status && card.status.oculto && card.status.oculto.duration > 0);
+                if (_est) { card.stealth = true; card._ocultoPorEstado = true; }
+                else if (card._ocultoPorEstado) { card.stealth = false; delete card._ocultoPorEstado; }
+            }
+
             _estaOculta(card) {
                 return !!(card.stealth || (card.status && card.status.oculto && card.status.oculto.duration > 0));
             }

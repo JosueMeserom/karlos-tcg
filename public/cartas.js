@@ -882,8 +882,9 @@ const CARD_DB = [
             { trigger: "PERIODICO", fase: "INICIO DEL TURNO", momento: "NORMAL", deQuien: "PROPIO",
               nombre: "CAMUFLAJE ÓPTICO",
               efectos: [
-                { op: "LIMPIAR_ESTADOS", estados: ["oculto"], soloObjetivo: true,
-                  target: { quien: "ALIADO", conEstadoDeSelf: "oculto" } },
+                // El Oculto se va. `quien: SELF` y no un filtro por fuente: el Oculto de Mill
+                // siempre es suyo, y así el efecto no depende de que el pool resuelva.
+                { op: "LIMPIAR_ESTADOS", estados: ["oculto"], soloObjetivo: true, target: { quien: "SELF" } },
                 // Y el aviso vuelve: empieza su turno, así que aún no ha atacado. Se quita antes
                 // de ponerlo para no acumular dos si algo lo dejó puesto.
                 { op: "QUITAR_MARCA", target: { quien: "SELF" } },
@@ -9635,6 +9636,10 @@ const DSL = {
                 } else for (const k of (e.estados || [])) {
                     if (ally.status[k]) { delete ally.status[k]; limpiado = true; }
                 }
+                // El Oculto tiene una vista rápida (`stealth`) que se deriva del estado: si no se
+                // recalcula aquí, la chapa del ojo sigue pintada hasta la siguiente pasada de
+                // pasivas, un par de fases más tarde.
+                if (limpiado && typeof game._derivarOculto === 'function') game._derivarOculto(ally);
                 if (limpiado && e.floating && typeof showFloatingText === 'function') showFloatingText(ally.instanceId, e.floating, e.floatingStyle || 'ft-green', e.offsetFloating !== undefined ? e.offsetFloating : -20);
                 // El log iba por carta LIMPIADA, no por efecto: le faltaba, a diferencia de casi
                 // todos los demás ops (Mill lo pide para anunciar que apaga su camuflaje).

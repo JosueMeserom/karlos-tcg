@@ -99,10 +99,14 @@ const aviso = (c) => (c.tempEffects || []).find(e => e.sourceInstanceId === c.in
         check('durante el turno del rival, Oculto y sin aviso', oculto(mill) && !aviso(mill));
         const fotos = [];
         const _upd = g.updatePhaseDisplay.bind(g);
-        g.updatePhaseDisplay = function (fase) { fotos.push({ fase, oculto: oculto(mill), aviso: !!aviso(mill) }); return _upd(fase); };
+        g.updatePhaseDisplay = function (fase) { fotos.push({ fase, oculto: oculto(mill), stealth: !!mill.stealth, aviso: !!aviso(mill) }); return _upd(fase); };
         await paso({ finTurno: true });          // vuelve el turno de Mill
         const robo = fotos.find(f => f.fase === 'ROBO');
         check('en la primera fase de su turno ya NO está Oculto', !!robo && !robo.oculto,
+            JSON.stringify(fotos.slice(0, 3)));
+        // Y el booleano DERIVADO también: es lo que pinta la chapa del ojo, y se apagaba una
+        // pasada de pasivas más tarde -o sea, el jugador veía el ojo y el aviso a la vez-.
+        check('...ni le queda el stealth (la chapa del ojo)', !!robo && !robo.stealth,
             JSON.stringify(fotos.slice(0, 3)));
         check('...y el aviso ya está puesto', !!robo && robo.aviso, JSON.stringify(fotos.slice(0, 3)));
     }
