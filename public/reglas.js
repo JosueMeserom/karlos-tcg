@@ -121,7 +121,7 @@ const TEXTO_REGLAS = `
             <div>🌫️ <b>Ceguera:</b> Lanza moneda al atacar normal. Cara = Ataca. Cruz = Falla el ataque.</div>
             <div>💤 <b>Sueño:</b> Lanza moneda al atacar o usar Habilidad. Cara = Actúa normalmente y elimina el estado. Cruz = No ocurre nada.</div>
             <div>🤐 <b>Silenciado:</b> No puede usar sus Habilidades activas.</div>
-            <div style="margin-top: 10px; border-top: 1px dashed #475569; padding-top: 5px;">👁️ <b>Oculto:</b> No puede ser objetivo de ataques normales. El daño de cualquier fuente lo revela.</div>
+            <div style="margin-top: 10px; border-top: 1px dashed #475569; padding-top: 5px;">👁️ <b>Oculto:</b> No puede ser objetivo DIRECTO de ataques normales; un ataque que alcance a toda una fila sin elegir objetivo sí le llega. El daño de cualquier fuente lo revela.</div>
         </div>
     </div>
 </div>

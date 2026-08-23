@@ -49,7 +49,7 @@ const CARD_DB = [
                 return false;
             }
             if (target.stealth) {
-                if (!isSilent) game.logError(`¡${target.name} está Oculto y no puede ser objetivo de ataques normales!`);
+                if (!isSilent) game.logError(`¡${target.name} está Oculto y no puede ser objetivo directo de ataques normales!`);
                 return false;
             }
             if (game.abilityContext.targets.some(t => t.instanceId === target.instanceId)) {
@@ -349,7 +349,7 @@ const CARD_DB = [
                 return false;
             }
             if (target.stealth) {
-                if (!isSilent) game.logError(`¡${target.name} está Oculto y no puede ser objetivo de ataques normales!`);
+                if (!isSilent) game.logError(`¡${target.name} está Oculto y no puede ser objetivo directo de ataques normales!`);
                 return false;
             }
             return true;
@@ -5201,7 +5201,7 @@ const CARD_DB = [
         name: "Época de estudio", type: "Evento", rarity: "C", cost: 1, duration: 3, series: 2,
         // Requisito visible: a quién señala la flecha lima al presentarse (§14.bis).
         requisitoVisible: [ { quien: "ALIADO", algunFiltro: [ { campo: "tags", op: "includesCI", valor: "estudioso" }, { campo: "tags", op: "includesCI", valor: "estudiosa" } ], uno: true } ],
-        text: "3 turnos. Requiere un aliado con etiqueta 'Estudioso' en el campo. Mientras esté en juego, los aliados con etiqueta 'Estudioso' no ganan Furor al inicio del turno y quedan Ocultos (inmunes a ataques normales). Al expirar, robas 2 cartas por cada aliado afectado.",
+        text: "3 turnos. Requiere un aliado con etiqueta 'Estudioso' en el campo. Mientras esté en juego, los aliados con etiqueta 'Estudioso' no ganan Furor al inicio del turno y quedan Ocultos (no pueden ser objetivo directo de ataques normales). Al expirar, robas 2 cartas por cada aliado afectado.",
         abilities: [
             // Un solo PREVIEW_GLOBAL: el compilador coge el PRIMERO (`abs.find`), así que el
             // segundo que había aquí era código muerto -y decía lo mismo, peor y sin género-.
