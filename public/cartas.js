@@ -1003,19 +1003,24 @@ const CARD_DB = [
                 game.animateSwap(vanAlly.instanceId, r2.instanceId)
             ]);
 
-            // Actualizamos los arrays de posición filtrando los que salen
-            p.vanguard = p.vanguard.filter(c => c.instanceId !== card.instanceId && c.instanceId !== vanAlly.instanceId);
-            p.rearguard = p.rearguard.filter(c => c.instanceId !== r1.instanceId && c.instanceId !== r2.instanceId);
+            // CADA UNA EN EL SITIO DE LA OTRA (Toto, 23-ago-2026). Antes se filtraban las cuatro
+            // y se empujaban al final de su fila nueva, así que un intercambio reordenaba la mesa
+            // entera: quien se quedaba se corría a la izquierda y los que llegaban aparecían los
+            // últimos, sin relación con el hueco que venían a ocupar. Se emparejan como los
+            // emparejó la animación -Mill con r1 y su compañero con r2- y cada uno ocupa el
+            // ÍNDICE del otro, que es el orden que se ve en la mesa.
+            const iMill = p.vanguard.findIndex(c => c.instanceId === card.instanceId);
+            const iVan  = p.vanguard.findIndex(c => c.instanceId === vanAlly.instanceId);
+            const iR1   = p.rearguard.findIndex(c => c.instanceId === r1.instanceId);
+            const iR2   = p.rearguard.findIndex(c => c.instanceId === r2.instanceId);
+            p.vanguard[iMill] = r1;   p.vanguard[iVan] = r2;
+            p.rearguard[iR1] = card;  p.rearguard[iR2] = vanAlly;
 
             // Cambiamos sus etiquetas
             card.location = 'rearguard';
             vanAlly.location = 'rearguard';
             r1.location = 'vanguard';
             r2.location = 'vanguard';
-
-            // Los introducimos en su nueva zona
-            p.rearguard.push(card, vanAlly);
-            p.vanguard.push(r1, r2);
 
             card.exhausted = true;
             game.isActionLocked = false;

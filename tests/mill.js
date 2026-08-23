@@ -96,6 +96,36 @@ const oculto = (c) => !!(c.status && c.status.oculto && c.status.oculto.duration
         check('...y no vuelve en la siguiente pasada de pasivas', !mill.stealth);
     }
 
+    console.log('--- MOTOCICLETA: cada uno ocupa el sitio del otro ---');
+    {
+        // La Activa sigue siendo imperativa, pero su colocación estaba mal: filtraba a las cuatro
+        // cartas y las empujaba al FINAL de su fila nueva, así que un intercambio reordenaba la
+        // mesa entera. Se emparejan como los empareja la animación -Mill con el primero de
+        // retaguardia y su compañero con el segundo- y cada uno entra en el índice del otro.
+        const { g, paso } = await mesa({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: {
+                vanguardia: [{ carta: 'Mill', furor: 3 }, 'Mini-tigre'],
+                retaguardia: ['Oso con armadura', 'Robot de seguridad SP', 'Hechicero'],
+            },
+            p2: { vanguardia: [{ carta: 'Oso con armadura', vida: 9 }] },
+        });
+        await paso({ habilidad: 'Mill' });
+        await paso({ confirmar: true });
+        await paso({ seleccionar: 'Mini-tigre' });              // compañero de vanguardia
+        await paso({ seleccionar: 'Robot de seguridad SP' });   // 1º de retaguardia -> va con Mill
+        await paso({ seleccionar: 'Hechicero' });               // 2º de retaguardia
+        check('la vanguardia queda en el orden de los huecos ocupados',
+            g.players.p1.vanguard.map(c => c.name).join(',') === 'Robot de seguridad SP,Hechicero',
+            g.players.p1.vanguard.map(c => c.name).join(','));
+        check('...y la retaguardia también, sin recolocar al que no se movió',
+            g.players.p1.rearguard.map(c => c.name).join(',') === 'Oso con armadura,Mill,Mini-tigre',
+            g.players.p1.rearguard.map(c => c.name).join(','));
+        check('...con sus zonas bien puestas',
+            g.players.p1.vanguard.every(c => c.location === 'vanguard')
+            && g.players.p1.rearguard.every(c => c.location === 'rearguard'));
+    }
+
     console.log('');
     if (fallos) { console.log(`SUITE mill: ${fallos} FALLOS de ${comprobaciones} comprobaciones`); process.exit(1); }
     console.log(`SUITE mill: ${comprobaciones}/${comprobaciones} comprobaciones — CAMUFLAJE ÓPTICO EN VERDE`);
