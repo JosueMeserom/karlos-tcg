@@ -10050,7 +10050,14 @@
                 const _r1 = el1.getBoundingClientRect(), _r2 = el2.getBoundingClientRect();
                 _r1.__ow = el1.offsetWidth; _r1.__oh = el1.offsetHeight;
                 _r2.__ow = el2.offsetWidth; _r2.__oh = el2.offsetHeight;
-                this._flipDesde = new Map([[id1, _r1], [id2, _r2]]);
+                // SE ACUMULA, no se sustituye (Toto, 23-ago-2026): MOTOCICLETA lanza DOS
+                // intercambios a la vez con un Promise.all, y el segundo en terminar borraba lo
+                // que había apuntado el primero -así que esa pareja se quedaba sin su "ya me he
+                // movido" y el repintado le repetía el viaje entero-. El render lo consume y lo
+                // vacía, así que juntar lo de varias animaciones simultáneas es justo lo suyo.
+                this._flipDesde = this._flipDesde || new Map();
+                this._flipDesde.set(id1, _r1);
+                this._flipDesde.set(id2, _r2);
 
                 el1.style.transition = 'none';
                 el2.style.transition = 'none';
