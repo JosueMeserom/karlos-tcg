@@ -92,6 +92,9 @@ Norma a partir de ahora: cada pieza nueva del DSL entra también en el editor.
   `AL_CAMBIAR_DE_ZONA` compara y actualiza `lastLocation` él solo, y la carta solo declara qué
   pasa en cada fila. Y un `INTERCAMBIAR_POSICION` refresca las Pasivas al momento: cambiar de
   fila es cambiar de condiciones.
+- **«Durante el turno del rival» empieza y acaba CON ese turno** (23-ago-2026): nada más empezar y
+  nada más terminar, no en las fases de Efectos Iniciales/Finales. Se declara con un `PERIODICO`
+  en la fase `INICIO DEL TURNO`, no con `INICIO_TURNO` (que cae en Efectos Iniciales). Rúbrica §20.
 - **El Oculto se pone como ESTADO, nunca tocando `stealth`** (23-ago-2026): `stealth` es la vista
   rápida que el motor DERIVA del estado en cada pasada de pasivas. Ponerlo a mano deja la carta
   oculta sin chapa, sin cuenta y sin líneas en el detalle; y quitarlo a mano no revela nada,

@@ -865,7 +865,7 @@ const CARD_DB = [
         // los dos anteriores (el límite de 2 Personajes en vanguardia se calcula sobre el campo
         // que QUEDARÍA), y eso no es un filtro por campo sino una cuenta condicional. Declararlo
         // hoy sería inventar sintaxis para una sola carta.
-        tempEffectText: "Camuflaje listo: estará {genero?Oculto|Oculta} durante el turno del rival",
+        tempEffectText: "Camuflaje listo: estará {genero?Oculto|Oculta} durante el próximo turno del rival",
         abilities: [
             // EL AVISO, en cuanto pisa el campo. Icono y color propios, distintos del escudo gris
             // de Simon: aquello es "te cubre otro", esto es "me camuflo yo".
@@ -875,11 +875,17 @@ const CARD_DB = [
                 rearguard: { efectos: [ { op: "MARCAR_TEMPORAL", badge: { icono: "🫥", color: "#4f46e5" } } ] },
               } },
 
-            // Y se repone cada turno propio: el aviso se consume al aplicarse (abajo), y al
-            // empezar de nuevo su turno Mill vuelve a no haber atacado. Se quita antes de ponerlo
-            // para no acumular dos si algo lo dejó puesto.
-            { trigger: "INICIO_TURNO", nombre: "CAMUFLAJE ÓPTICO",
+            // EL RELEVO DE CHAPAS, en un solo instante: NADA MÁS EMPEZAR su turno se va el Oculto
+            // y vuelve el aviso. Va en la fase `INICIO DEL TURNO` -la subfase que existe para
+            // esto- y no en un `INICIO_TURNO` a secas, que cae en Efectos Iniciales: "durante el
+            // turno del rival" termina cuando ese turno termina, no dos fases después.
+            { trigger: "PERIODICO", fase: "INICIO DEL TURNO", momento: "NORMAL", deQuien: "PROPIO",
+              nombre: "CAMUFLAJE ÓPTICO",
               efectos: [
+                { op: "LIMPIAR_ESTADOS", estados: ["oculto"], soloObjetivo: true,
+                  target: { quien: "ALIADO", conEstadoDeSelf: "oculto" } },
+                // Y el aviso vuelve: empieza su turno, así que aún no ha atacado. Se quita antes
+                // de ponerlo para no acumular dos si algo lo dejó puesto.
                 { op: "QUITAR_MARCA", target: { quien: "SELF" } },
                 { op: "MARCAR_TEMPORAL", badge: { icono: "🫥", color: "#4f46e5" } } ] },
 
@@ -896,16 +902,7 @@ const CARD_DB = [
                 { op: "APLICAR_ESTADO", estado: "oculto", duracion: 1,
                   target: { quien: "ALIADO", conMarcaTemporalPropia: true } },
                 // Y el aviso se retira: ya no anuncia nada, ha pasado.
-                { op: "QUITAR_MARCA", target: { quien: "ALIADO", conMarcaTemporalPropia: true } } ] },
-
-            // Y se va cuando ese turno acaba. Hace falta decirlo, como en Simon: la cuenta atrás
-            // de los estados corre al final del turno de SU DUEÑO, así que un `duracion: 1` puesto
-            // en el turno del rival no se gastaría hasta el final del turno de Mill.
-            { trigger: "PERIODICO", fase: "EFECTOS FINALES", momento: "DESPUES", deQuien: "RIVAL",
-              nombre: "CAMUFLAJE ÓPTICO",
-              efectos: [
-                { op: "LIMPIAR_ESTADOS", estados: ["oculto"], soloObjetivo: true,
-                  target: { quien: "ALIADO", conEstadoDeSelf: "oculto" } } ] }
+                { op: "QUITAR_MARCA", target: { quien: "ALIADO", conMarcaTemporalPropia: true } } ] }
         ],
 
         // HOOK 3: Validar Coste y número de aliados (Mínimo 2 en Van y 2 en Rear)
@@ -3293,11 +3290,12 @@ const CARD_DB = [
                   target: { quien: "ALIADO", zona: "VANGUARDIA", excludeSelf: true,
                             conMarcaTemporalPropia: true } } ] },
 
-            // Y se va cuando ese turno acaba. Hace falta decirlo: la cuenta atrás de los estados
-            // corre al final del turno de SU DUEÑO, y estas cartas son mías, así que un
-            // `duracion: 1` puesto en el turno del rival no se gastaría hasta el final del MÍO -o
-            // sea, un turno de más-. Con la fase declarada se dice exactamente cuándo termina.
-            { trigger: "PERIODICO", fase: "EFECTOS FINALES", momento: "DESPUES", deQuien: "RIVAL",
+            // Y se va NADA MÁS EMPEZAR mi turno, que es cuando el turno del rival termina de
+            // verdad (Toto, 23-ago-2026). Hace falta decirlo: la cuenta atrás de los estados corre
+            // al final del turno de SU DUEÑO, y estas cartas son mías, así que un `duracion: 1`
+            // puesto en el turno del rival no se gastaría hasta el final del MÍO -o sea, un turno
+            // de más-. Con la fase declarada se dice exactamente cuándo termina.
+            { trigger: "PERIODICO", fase: "INICIO DEL TURNO", momento: "NORMAL", deQuien: "PROPIO",
               nombre: "ÚLTIMA RESISTENCIA",
               efectos: [
                 { op: "LIMPIAR_ESTADOS", estados: ["oculto"], soloObjetivo: true,

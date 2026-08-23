@@ -795,3 +795,34 @@ Si el `ELEGIR` solo **señala** a quién afectará la carta y ese aliado no pier
 flecha lima **«Req. cumplido»** en la presentación. Eso les dice a los dos jugadores *cuál* de los
 aliados va a quedar afectado, que antes solo se sabía abriendo el detalle. El texto se redacta
 `Requiere elegir un aliado de tu vanguardia.`, no `Al colocarla, elige…`.
+
+---
+
+## §20. «Durante el turno del rival» empieza y acaba CON ese turno (Toto, 23-ago-2026)
+
+Un texto que dice **«durante el turno del rival»**, **«durante tu próximo turno»** o cualquier
+variante que nombre **un turno entero** empieza a valer **nada más empezar ese turno** y deja de
+valer **nada más terminar**, en el mismo instante en el que sale el cartel de turno a pantalla
+completa. No se retrasa a la fase de Efectos Iniciales ni se adelanta a la de Efectos Finales:
+esas dos son **fases concretas**, y un texto solo cae ahí si dice explícitamente «al inicio del
+turno» o «al final del turno».
+
+**Cómo se declara.** No con `INICIO_TURNO`/`FIN_TURNO`, que se compilan a la fase de Efectos
+Iniciales/Finales — que es donde el motor los llamaba históricamente, no una decisión de diseño:
+
+```js
+{ trigger: "PERIODICO", fase: "INICIO DEL TURNO", momento: "NORMAL", deQuien: "PROPIO", … }
+```
+
+`INICIO DEL TURNO` es la subfase que existe justamente para esto (ver TODO, decisiones cerradas:
+«`ANTES` es antes de lo que la FASE hace, no antes de su cartel»).
+
+**Y el relevo se hace de una vez.** Si una carta cambia una marca por un estado —el aviso «voy a
+camuflarme» que se convierte en el Oculto de verdad— las dos cosas van **en la misma ability**, en
+esa misma fase: así el jugador ve la chapa cambiar en un solo instante y no una fase antes que la
+otra. Lo hacen CAMUFLAJE ÓPTICO (Mill) y ÚLTIMA RESISTENCIA (Simon), y `tests/mill.js` lo fija
+espiando el cartel de fase: **para cuando se anuncia el ROBO, el relevo ya está hecho**.
+
+**Redacción.** Desde el turno en el que se pone la marca, el turno del rival es el **próximo**:
+se escribe «durante el **próximo** turno del rival» en las dos cartas, no «durante el turno del
+rival» en una y con «próximo» en la otra.

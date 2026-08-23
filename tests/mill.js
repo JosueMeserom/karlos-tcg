@@ -87,6 +87,26 @@ const aviso = (c) => (c.tempEffects || []).find(e => e.sourceInstanceId === c.in
         check('...y el aviso vuelve a estar puesto para el turno siguiente', !!aviso(mill));
     }
 
+    console.log('--- El relevo de chapas ocurre NADA MÁS empezar el turno, no en Efectos Iniciales ---');
+    {
+        // "Durante el turno del rival" termina cuando ese turno termina, no dos fases después:
+        // para cuando se anuncia la primera fase del turno de Mill (ROBO), el Oculto ya se ha ido
+        // y el aviso ya está puesto. Se mira espiando el cartel de fase, que es lo que el jugador
+        // ve: si el relevo se retrasara a EFECTOS INICIALES, aquí se vería.
+        const { ctx, g, paso } = await mesa(MESA);
+        const mill = g.players.p1.vanguard[0];
+        await paso({ finTurno: true });          // turno del rival: Mill se oculta
+        check('durante el turno del rival, Oculto y sin aviso', oculto(mill) && !aviso(mill));
+        const fotos = [];
+        const _upd = g.updatePhaseDisplay.bind(g);
+        g.updatePhaseDisplay = function (fase) { fotos.push({ fase, oculto: oculto(mill), aviso: !!aviso(mill) }); return _upd(fase); };
+        await paso({ finTurno: true });          // vuelve el turno de Mill
+        const robo = fotos.find(f => f.fase === 'ROBO');
+        check('en la primera fase de su turno ya NO está Oculto', !!robo && !robo.oculto,
+            JSON.stringify(fotos.slice(0, 3)));
+        check('...y el aviso ya está puesto', !!robo && robo.aviso, JSON.stringify(fotos.slice(0, 3)));
+    }
+
     console.log('--- El daño lo revela: el estado se va, no solo el booleano ---');
     {
         // El arreglo del 23-ago-2026. Antes se apagaba `stealth` y el estado se quedaba, así que
