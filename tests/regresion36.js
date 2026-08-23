@@ -25,8 +25,9 @@ const { correrSuite } = require('./harness');
 
 const LOG_ACTIVA_VIEJA = { linea: 'activa FUEGO A DISCRECIÓN.',
     motivo: 'la vieja anunciaba la activación con un log propio antes de la moneda; la nueva se apoya solo en el floater del nombre de la Activa (mismo criterio que Aniceto/Investigador demente)' };
-const LOGS_SISTEMA_VIEJA = { linea: 'Objetivos listos. ¡Ejecutando habilidad!',
-    motivo: 'aviso genérico de handleAbilityTargetSelection (mecanismo abilityContext.targets de la vieja, un único objetivo); la nueva resuelve el objetivo con ELEGIR/pickBoardTargets, que no pasa por ahí' };
+// El aviso genérico de "Objetivos listos" ya no entra en el historial compartido (23-ago-2026):
+// es una instrucción para quien elige, así que va por el canal privado (logError) y no hay nada
+// que declarar en ninguna de las dos bases.
 
 const escenarios = [
     {
@@ -39,7 +40,7 @@ const escenarios = [
             { confirmar: true },
             { elegir: ['Mini-tigre'] },
         ],
-        logsSoloVieja: [ LOG_ACTIVA_VIEJA, LOGS_SISTEMA_VIEJA ],
+        logsSoloVieja: [ LOG_ACTIVA_VIEJA ],
     },
     {
         nombre: 'FUEGO A DISCRECIÓN: cruz — falla sin pedir objetivo',
@@ -68,7 +69,7 @@ const escenarios = [
             { confirmar: true },
             { elegir: ['Mini-tigre'] },
         ],
-        logsSoloVieja: [ LOG_ACTIVA_VIEJA, LOGS_SISTEMA_VIEJA ],
+        logsSoloVieja: [ LOG_ACTIVA_VIEJA ],
     },
 ];
 

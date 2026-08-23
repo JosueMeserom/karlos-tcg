@@ -43,8 +43,6 @@ const escenarios = [
             { soloEn: 'vieja', elegir: ['Robot de seguridad SP'] },
         ],
         logsSoloVieja: [
-            { linea: 'Objetivos listos. ¡Ejecutando habilidad!',
-              motivo: 'igual que en r7: el 2º objetivo de PEM en la vieja usa el flujo antiguo SELECT_ABILITY_TARGETS' },
             { linea: '¡El PEM fríe los circuitos de Robot de seguridad SP! Se saltará su próximo turno.',
               motivo: 'la vieja no deja cancelar y remata la carta; la nueva se ha cancelado y no paraliza a nadie' },
         ],

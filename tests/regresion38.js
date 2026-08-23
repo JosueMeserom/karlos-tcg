@@ -20,10 +20,6 @@
 const { correrSuite } = require('./harness');
 
 const LOGS_SISTEMA_VIEJA = [
-    { linea: 'Objetivo 1 fijado. Elige al siguiente objetivo.',
-      motivo: 'aviso genérico de handleAbilityTargetSelection (mecanismo abilityContext.targets de la vieja); la nueva resuelve los 2 objetivos con ELEGIR/pickBoardTargets, que no pasa por ahí' },
-    { linea: 'Objetivos listos. ¡Ejecutando habilidad!',
-      motivo: 'mismo mecanismo que la anterior: aviso genérico al completar el cupo de objetivos' },
 ];
 
 const escenarios = [

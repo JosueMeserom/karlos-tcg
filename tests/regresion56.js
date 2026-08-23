@@ -32,10 +32,9 @@ const { correrSuite } = require('./harness');
 // Espada V nueva lleva 'Equipable' en su plantilla (18-ago-2026), las dos coinciden.
 const ESPADA_MELE = { carta: 'Espada V', campos: { tags: ['Equipable', 'melé'] } };
 
-const AVISO_RAW_VIEJA = {
-    linea: 'Objetivos listos. ¡Ejecutando habilidad!',
-    motivo: 'aviso genérico de handleAbilityTargetSelection (camino RAW de abilityContext de la vieja); la nueva elige el enemigo con ELEGIR/pickBoardTargets, que no pasa por ahí',
-};
+// El aviso genérico de "Objetivos listos" ya no entra en el historial compartido (23-ago-2026):
+// es una instrucción para quien elige, así que va por el canal privado (logError) y no hay nada
+// que declarar en ninguna de las dos bases.
 
 // costeDiferido cobra el Furor al FINAL (para que cancelar el modal no cueste nada), así que el
 // "-1 FUR" pasa del principio al final. Mismo texto en ambas bases: se retira como PAR.
@@ -66,7 +65,6 @@ const escenarios = [
             { busqueda: ['Espada V'], soloEn: 'vieja' },   // la nueva coge la única arma sin modal
             { elegir: ['Mini-tigre'] },
         ],
-        logsSoloVieja: [ AVISO_RAW_VIEJA ],
         logsIntencionados: [
             { de: '[ability] ¡Honsow', a: '[ability] ¡Honsow de J1 (Jugador 1)', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado. Mismo mensaje, nombre completo' },
             { de: 'se equipa con Espada V ignorando', a: 'se equipa con Espada V de J1 (Jugador 1) ignorando',
@@ -88,7 +86,6 @@ const escenarios = [
             { elegir: ['Espada V'] },   // vieja: modal de búsqueda · nueva: visor del mazo
             { elegir: ['Mini-tigre'] },
         ],
-        logsSoloVieja: [ AVISO_RAW_VIEJA ],
         logsIntencionados: [
             { de: '[ability] ¡Honsow', a: '[ability] ¡Honsow de J1 (Jugador 1)', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado. Mismo mensaje, nombre completo' },
             { de: 'se equipa con Espada V ignorando', a: 'se equipa con Espada V de J1 (Jugador 1) ignorando',

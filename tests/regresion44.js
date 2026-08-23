@@ -66,8 +66,6 @@ const escenarios = [
         logsSoloVieja: [
             { linea: 'Selecciona un aliado activo para gastar su acción.',
               motivo: 'prompt público de la vieja al entrar en su inputState a medida; el título del ELEGIR lo muestra pickBoardTargets por logError (privado, skipHistory), mismo criterio ya aplicado a Aniceto/Gólem de tierra/Raiju' },
-            { linea: 'Aliado seleccionado. Elige enemigo objetivo.',
-              motivo: 'segundo aviso de sistema del mismo mecanismo a medida (SELECT_ATOM_ALLY -> SELECT_ATOM_ENEMY); el ELEGIR anidado no pasa por ahí' },
         ],
         flotantesSoloNueva: FLOTANTE_NUEVO,
         diferenciasEsperadas: COPYID_CONSUMIBLE,
@@ -85,7 +83,6 @@ const escenarios = [
         ],
         logsSoloVieja: [
             { linea: 'Selecciona un aliado activo para gastar su acción.', motivo: 'ver escenario anterior' },
-            { linea: 'Aliado seleccionado. Elige enemigo objetivo.', motivo: 'ver escenario anterior' },
             // Reordenamiento, no desaparición: la vieja anunciaba la vuelta a la mano ANTES de
             // checkDeath; en la nueva el aviso vive en siMuere, que corre DESPUÉS. La línea
             // existe en ambas, en distinta posición — se declara como par solo-vieja/solo-nueva
@@ -130,7 +127,6 @@ const escenarios = [
         ],
         logsSoloVieja: [
             { linea: 'Selecciona un aliado activo para gastar su acción.', motivo: 'ver primer escenario' },
-            { linea: 'Aliado seleccionado. Elige enemigo objetivo.', motivo: 'ver primer escenario' },
         ],
         flotantesSoloNueva: FLOTANTE_NUEVO,
         diferenciasEsperadas: COPYID_CONSUMIBLE,

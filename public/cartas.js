@@ -38,7 +38,7 @@ const CARD_DB = [
             game.inputState = 'SELECT_ABILITY_TARGETS';
             // AÑADIDO: isNormalAttack: true (Para que interactúe bien con escudos o pasivas defensivas)
             game.abilityContext = { targets: [], maxTargets: 2, name: 'BI-CHOQUE', targetType: 'enemy', isNormalAttack: true };
-            game.logMsg("Elige al PRIMER enemigo.", 'system');
+            game.logError("Elige al PRIMER enemigo.");
             game.render();
         },
 
@@ -255,7 +255,8 @@ const CARD_DB = [
                 game.render();
                 return;
             }
-            game.logMsg("Moneda: CARA - ¡ataque debilitado! Elige objetivo.", 'ability');
+            game.logMsg("Moneda: CARA - ¡ataque debilitado!", 'ability');
+            game.logError("Elige objetivo.");
             const objSel = await game.pickBoardTargets(objetivos, 1, 'SISAR: elige a quién atacar', card, card.owner, false);
             if (!objSel || !objSel[0]) { // no debería ocurrir (cancelable:false), pero no se deja colgado
                 card.exhausted = true; game.isActionLocked = false; game.cancelAction(); game.render(); return;
@@ -513,7 +514,7 @@ const CARD_DB = [
             game.logMsg(`Hay ${count} cartas de tipo ${type} en la mano rival.`, 'ability');
             
            if (count > 0) {
-                game.logMsg("Selecciona un enemigo para quitarle Furor.", 'system');
+                game.logError("Selecciona un enemigo para quitarle Furor.");
                 game.inputState = 'SELECT_ABILITY_TARGETS'; 
                 game.abilityContext.targets = [];
                 game.abilityContext.maxTargets = 1;
@@ -922,7 +923,7 @@ const CARD_DB = [
             game.selectedCard = card;
             game.inputState = 'SELECT_ABILITY_TARGETS';
             game.abilityContext = { targets: [], maxTargets: 3, name: 'MOTOCICLETA', targetType: 'ally' };
-            game.logMsg("MOTOCICLETA: Elige al OTRO aliado de la vanguardia que se retirará con Mill.", 'system');
+            game.logError("MOTOCICLETA: Elige al OTRO aliado de la vanguardia que se retirará con Mill.");
             game.render();
         },
 
@@ -2372,7 +2373,7 @@ const CARD_DB = [
             game.selectedCard = card;
             game.inputState = 'SELECT_ABILITY_TARGETS';
             game.abilityContext = { targets: [], maxTargets: maxT, name: 'ESTORNUDO DEVASTADOR', targetType: 'enemy' };
-            game.logMsg(maxT === 1 ? "ESTORNUDO: Elige un enemigo de la vanguardia para devolverlo a la mano." : "ESTORNUDO: Elige al enemigo de la vanguardia.", 'system');
+            game.logError(maxT === 1 ? "ESTORNUDO: Elige un enemigo de la vanguardia para devolverlo a la mano." : "ESTORNUDO: Elige al enemigo de la vanguardia.");
             game.render();
         },
 
@@ -4771,7 +4772,7 @@ const CARD_DB = [
             game.selectedCard = card;
             game.inputState = 'SELECT_ABILITY_TARGETS';
             game.abilityContext = { targets: [], maxTargets: 2, name: 'ULTRA-CHOQUE', targetType: 'enemy', isNormalAttack: true };
-            game.logMsg("Elige al primer objetivo del ultra-choque.", 'system');
+            game.logError("Elige al primer objetivo del ultra-choque.");
             game.render();
         },
         onValidateTarget: function(card, target, game, isSilent) {
@@ -5358,7 +5359,7 @@ const CARD_DB = [
                     action: () => {
                         game.selectedCard = card;
                         game.inputState = 'SELECT_AYUDA_TARGET';
-                        game.logMsg("Elige a un aliado para que empuñe a Arthas.", 'system');
+                        game.logError("Elige a un aliado para que empuñe a Arthas.");
                         game.render();
                     }
                 }];

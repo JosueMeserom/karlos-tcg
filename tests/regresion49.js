@@ -193,8 +193,6 @@ const escenarios = [
         // Todo lo que la nueva hace y la vieja ni empieza. Se declara entero, que es la forma de
         // dejar por escrito que la divergencia es la que se buscaba y no un descuido.
         logsSoloNueva: [
-            { linea: 'Objetivo 1 fijado. Elige al siguiente objetivo.', motivo: 'la nueva entra en la selección de objetivos; la vieja rechaza la Habilidad antes' },
-            { linea: 'Objetivos listos. ¡Ejecutando habilidad!', motivo: 'y la completa al elegir al segundo, porque ya no quedan más enemigos válidos (cierre automático de `hastaCantidad`)' },
             { linea: '¡Serafín imparte su CASTIGO divino!', motivo: 'ídem: la vieja no llega a lanzarla' },
             { linea: 'Mini-tigre [1] de J2 (Jugador 2) recibe 5 daño (9 Vida -> 4).', motivo: 'el ataque especial al primer enemigo' },
             { linea: 'Robot de seguridad SP [1] de J2 (Jugador 2) recibe 7 daño (9 Vida -> 2).', motivo: 'y al segundo' },

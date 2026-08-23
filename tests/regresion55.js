@@ -75,8 +75,6 @@ const escenarios = [
             { elegir: ['Espada V'] }, { elegir: ['Mini-tigre'] },
         ],
         logsSoloVieja: [
-            { linea: 'Objetivos listos. ¡Ejecutando habilidad!',
-              motivo: 'aviso genérico de handleAbilityTargetSelection (camino RAW de abilityContext de la vieja); la nueva elige el enemigo con ELEGIR/pickBoardTargets, que no pasa por ahí' },
         ],
         logsIntencionados: [
             { de: '[ability] ¡Karlitos', a: '[ability] ¡Karlitos de J1 (Jugador 1)', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado. Mismo mensaje, nombre completo' },
@@ -103,7 +101,6 @@ const escenarios = [
             { elegir: ['Shichishito'] }, { elegir: ['Mini-tigre'] },
         ],
         logsSoloVieja: [
-            { linea: 'Objetivos listos. ¡Ejecutando habilidad!', motivo: 'ver escenario anterior' },
         ],
         logsIntencionados: [
             { de: '[ability] ¡Karlitos', a: '[ability] ¡Karlitos de J1 (Jugador 1)', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado. Mismo mensaje, nombre completo' },

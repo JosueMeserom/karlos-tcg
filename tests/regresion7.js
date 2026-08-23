@@ -99,8 +99,6 @@ const escenarios = [
               motivo: 'norma del proyecto (logs en 3ª persona con dueño): la vieja usaba target.name a secas; la nueva rellena {objetivo} con DSL._nombre' },
         ],
         logsSoloVieja: [
-            { linea: 'Objetivos listos. ¡Ejecutando habilidad!',
-              motivo: 'mensaje genérico del motor viejo emitido solo por el flujo SELECT_ABILITY_TARGETS/handleAbilityTargetSelection (habilidades antiguas con abilityContext); el flujo DSL de selección en tablero (_dslPickClick/pickBoardTargets) es un mecanismo distinto que nunca lo emite. Estructural, no específico de esta carta.' },
         ],
     },
     {

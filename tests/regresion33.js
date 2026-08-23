@@ -27,10 +27,6 @@ const { correrSuite } = require('./harness');
 const LOGS_SISTEMA_VIEJA = [
     { linea: 'Elige al primer objetivo del Seísmo.',
       motivo: 'la vieja logueaba el prompt de selección con logMsg (tipo system, entra en logHistory); la nueva usa el título del ELEGIR, que pickBoardTargets muestra vía logError (privado, skipHistory) y no entra en el historial comparado' },
-    { linea: 'Objetivo 1 fijado. Elige al siguiente objetivo.',
-      motivo: 'aviso genérico de handleAbilityTargetSelection (mecanismo abilityContext.targets de la vieja); la nueva resuelve los 2 objetivos con ELEGIR/pickBoardTargets, que no pasa por ahí' },
-    { linea: 'Objetivos listos. ¡Ejecutando habilidad!',
-      motivo: 'mismo mecanismo que la anterior: aviso genérico de handleAbilityTargetSelection al completar el cupo de objetivos' },
 ];
 
 const escenarios = [

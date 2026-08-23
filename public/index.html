@@ -7930,7 +7930,7 @@
                             if (card.type === 'Personaje' && vanguardChars < 2) {
                                 this.pendingPlayCard = card;
                                 this.inputState = 'SELECT_ESBIRRO_TO_SWAP';
-                                this.logMsg("Vanguardia llena. Selecciona un Esbirro de la vanguardia para retirarlo sin coste y hacer hueco.", 'system');
+                                this.logError("Vanguardia llena. Selecciona un Esbirro de la vanguardia para retirarlo sin coste y hacer hueco.");
                                 this.render();
                                 return true;
                             }
@@ -8279,7 +8279,7 @@
                             syncAction(); // <--- JUGADA LEGAL: EMITIMOS
                             this.atomizationAlly = card;
                             this.inputState = 'SELECT_ATOM_ENEMY';
-                            this.logMsg("Aliado seleccionado. Elige enemigo objetivo.", 'system');
+                            this.logError("Aliado seleccionado. Elige enemigo objetivo.");
                             this.render();
                         } else {
                             if (!isRemote) this.logError("Ese aliado ya actuó.");
@@ -9006,7 +9006,7 @@
                 }
                 
                 if (current >= max || noMoreTargets) {
-                    this.logMsg("Objetivos listos. ¡Ejecutando habilidad!", 'system');
+                    this.logError("Objetivos listos. ¡Ejecutando habilidad!");
                     this.isActionLocked = true;
                     this.inputState = 'EXECUTING';
                     this.render();
@@ -9019,7 +9019,7 @@
                     // consume el flag para que no dispare en una elección posterior).
                     this._reSyncTrasEleccionSiHaceFalta();
                 } else {
-                    this.logMsg(`Objetivo ${current} fijado. Elige al siguiente objetivo.`, 'system');
+                    this.logError(`Objetivo ${current} fijado. Elige al siguiente objetivo.`);
                     this.render();
                 }
             }
@@ -9416,7 +9416,7 @@
                         const _b = document.getElementById('action-banner');
                         if (_b) { _b.innerText = `Esperando a que ${this.getDisplayName(chooserId)} elija...`; _b.style.display = 'block'; }
                     } else {
-                        this.logMsg('Vanguardia llena. Selecciona un Esbirro de la vanguardia para retirarlo sin coste y hacer hueco.', 'system');
+                        this.logError('Vanguardia llena. Selecciona un Esbirro de la vanguardia para retirarlo sin coste y hacer hueco.');
                     }
                     this.render();
                 });

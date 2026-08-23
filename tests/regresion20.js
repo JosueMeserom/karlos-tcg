@@ -38,10 +38,6 @@ const escenarios = [
               motivo: 'norma del proyecto (3ª persona con dueño): la vieja usaba t1.name/t2.name a secas; la nueva rellena {elegidos} con DSL._nombre (nombre + copyId + dueño)' },
         ],
         logsSoloVieja: [
-            { linea: 'Objetivo 1 fijado. Elige al siguiente objetivo.',
-              motivo: 'mensaje genérico del flujo viejo SELECT_ABILITY_TARGETS (como en r7/r17); la nueva elige con ELEGIR/tablero, que no lo emite' },
-            { linea: 'Objetivos listos. ¡Ejecutando habilidad!',
-              motivo: 'igual: mensaje genérico del motor viejo al completar la selección de objetivos' },
         ],
     },
     {
@@ -63,10 +59,6 @@ const escenarios = [
             { linea: '¡Giro de guion! ¡El tablero cambia drásticamente!', motivo: 'REORDENAMIENTO INTENCIONADO (Toto, 13-ago-2026): Giro de guion dice "Antes de colocarla" y su codigo lo hacia DESPUES (destruia el Evento rival en AL_JUGAR). Movido a ANTES_DE_JUGAR, su anuncio y las destrucciones van ahora ANTES del "juega el Evento". Mismas lineas, otro orden: se retiran como par completo' },
             { linea: 'ha sido destruido prematuramente', motivo: 'REORDENAMIENTO INTENCIONADO (Toto, 13-ago-2026): Giro de guion dice "Antes de colocarla" y su codigo lo hacia DESPUES (destruia el Evento rival en AL_JUGAR). Movido a ANTES_DE_JUGAR, su anuncio y las destrucciones van ahora ANTES del "juega el Evento". Mismas lineas, otro orden: se retiran como par completo' },
             { linea: 'juega el Evento: Giro de guion', motivo: 'REORDENAMIENTO INTENCIONADO (Toto, 13-ago-2026): Giro de guion dice "Antes de colocarla" y su codigo lo hacia DESPUES (destruia el Evento rival en AL_JUGAR). Movido a ANTES_DE_JUGAR, su anuncio y las destrucciones van ahora ANTES del "juega el Evento". Mismas lineas, otro orden: se retiran como par completo' },
-            { linea: 'Objetivo 1 fijado. Elige al siguiente objetivo.',
-              motivo: 'mensaje genérico del flujo viejo SELECT_ABILITY_TARGETS' },
-            { linea: 'Objetivos listos. ¡Ejecutando habilidad!',
-              motivo: 'igual: mensaje genérico del motor viejo' },
         ],
         logsSoloNueva: [
             { linea: '¡Giro de guion! ¡El tablero cambia drásticamente!', motivo: 'REORDENAMIENTO INTENCIONADO (Toto, 13-ago-2026): Giro de guion dice "Antes de colocarla" y su codigo lo hacia DESPUES (destruia el Evento rival en AL_JUGAR). Movido a ANTES_DE_JUGAR, su anuncio y las destrucciones van ahora ANTES del "juega el Evento". Mismas lineas, otro orden: se retiran como par completo' },

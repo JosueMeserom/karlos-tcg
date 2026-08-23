@@ -31,11 +31,6 @@ const ZOE_C = { carta: 'Zoe (calcinante)', furor: 4 };
 // La vieja usaba el camino crudo (abilityContext + clics sueltos) y la nueva usa ELEGIR; el paso
 // {elegir} del arnés es polimórfico y responde a los dos.
 const AVISO_RAW_VIEJA = [
-    { linea: 'Objetivo 1 fijado. Elige al siguiente objetivo.',
-      motivo: 'aviso genérico de handleAbilityTargetSelection (camino RAW de la vieja); ELEGIR/pickBoardTargets no pasa por ahí' },
-    { linea: 'Objetivo 2 fijado. Elige al siguiente objetivo.', motivo: 'ídem' },
-    { linea: 'Objetivo 3 fijado. Elige al siguiente objetivo.', motivo: 'ídem' },
-    { linea: 'Objetivos listos. ¡Ejecutando habilidad!', motivo: 'ídem' },
 ];
 
 // La vieja nombraba a WOLFGANG en el log de cada golpe: un copia-pega del código de otra carta
@@ -109,7 +104,6 @@ const escenarios = [
             { pararEleccion: true },   // quedan 3 objetivos libres y aun así se planta
         ],
         logsSoloVieja: [
-            { linea: 'Objetivo 1 fijado. Elige al siguiente objetivo.', motivo: 'aviso genérico del camino RAW de la vieja' },
             { linea: 'Selección de objetivos terminada anticipadamente.', motivo: 'aviso del botón OK del camino RAW; el del DSL resuelve por VISUAL_SEARCH_CONFIRM, sin línea propia' },
             { linea: '¡Wolfgang ataca (Golpe 1)!', motivo: 'copia-pega de otra carta en la imperativa (ver arriba)' },
         ],

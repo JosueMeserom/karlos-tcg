@@ -36,10 +36,9 @@ const { correrSuite } = require('./harness');
 // (regresion33) y Gladiador/Kazuo (ANEXAR). Con maxTargets:1 en la vieja, el propio clic
 // completa el cupo de inmediato: solo aparece el aviso final, sin el intermedio "Objetivo 1
 // fijado" (ese solo sale cuando falta más de un objetivo por elegir).
-const AVISO_SISTEMA_VIEJA = {
-    linea: 'Objetivos listos. ¡Ejecutando habilidad!',
-    motivo: 'aviso genérico de handleAbilityTargetSelection (mecanismo abilityContext.targets de la vieja); la nueva resuelve el objetivo con ELEGIR/pickBoardTargets, que no pasa por ahí',
-};
+// El aviso genérico de "Objetivos listos" ya no entra en el historial compartido (23-ago-2026):
+// es una instrucción para quien elige, así que va por el canal privado (logError) y no hay nada
+// que declarar en ninguna de las dos bases.
 
 const FUR_DUPLICADO = {
     flotantesSoloVieja: [ { linea: '-2 FUR', motivo: 'la vieja lo emite dos veces al drenar (automático de modifyStat + a mano)' } ],
@@ -57,7 +56,6 @@ const escenarios = [
             { finTurno: true },
             { atacar: 'Mini-tigre', objetivo: 'Karlos' },
         ],
-        logsSoloVieja: [ AVISO_SISTEMA_VIEJA ],
         logsIntencionados: [
             { de: 'fan número 1 de Agah y', a: 'fan número 1 de Agah de J1 (Jugador 1) y', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es. La vieja usaba el nombre pelado' },
                     { de: 'fan número 1 de Karlos y', a: 'fan número 1 de Karlos de J1 (Jugador 1) y', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado' },
@@ -88,7 +86,6 @@ const escenarios = [
             { finTurno: true }, { finTurno: true },
             { habilidad: 'Frikazo' }, { confirmar: true }, { elegir: ['Agah'] },
         ],
-        logsSoloVieja: [ AVISO_SISTEMA_VIEJA ],
         logsIntencionados: [
             { de: 'fan número 1 de Karlos y', a: 'fan número 1 de Karlos de J1 (Jugador 1) y', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado' },
             { de: '[ability] ¡Frikazo', a: '[ability] ¡Frikazo [1] de J1 (Jugador 1)', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado. Mismo mensaje, nombre completo' },

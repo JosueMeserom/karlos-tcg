@@ -84,8 +84,6 @@ const escenarios = [
         ],
         logsSoloVieja: [
             PROMPT_VIEJO,
-            { linea: 'Objetivos listos. ¡Ejecutando habilidad!',
-              motivo: 'la vieja acepta el objetivo inválido y llega a ejecutar; la nueva ni lo admite' },
             { linea: 'Limo artificial [1] de J1 (Jugador 1) ya tiene la Vida completa.',
               motivo: 'la vieja lo descubre DESPUÉS de haber gastado el Furor y la acción; la nueva no le deja elegirlo' },
         ],

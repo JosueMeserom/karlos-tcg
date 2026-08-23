@@ -118,12 +118,10 @@ const escenarios = [
         // verdad demuestra que la nueva no ejecutó CABREO son los flotantes y el estado de más
         // abajo (Furor sin gastar, acción sin consumir), que sí son inequívocos.
         logsSoloVieja: [
-            { linea: 'Objetivos listos', motivo: 'ver comentario: aparece 2x en la vieja, 1x en la nueva' },
             { linea: 'PESANTEZ MUTUA! Hiposaurio',
               motivo: 'idem al escenario anterior: el aviso pasa a logError privado al intentar activar la Habilidad' },
         ],
         logsSoloNueva: [
-            { linea: 'Objetivos listos', motivo: 'idem: se filtra también aquí para que la comparación no se desalinee' },
         ],
         flotantesSoloVieja: [
             { linea: '-3 FUR · ft-red-stat', motivo: 'la vieja cobraba el coste de CABREO antes de descubrir que el ataque estaba vetado' },

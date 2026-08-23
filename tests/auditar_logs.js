@@ -54,6 +54,26 @@ lineas.forEach((l, i) => {
     }
 });
 
+// TERCERA REGLA (23-ago-2026): una INSTRUCCIÓN para quien está eligiendo no va por el historial
+// compartido. El rival veía en su log "MOTOCICLETA: Elige al OTRO aliado...", "Objetivo 1 fijado.
+// Elige al siguiente objetivo." y demás: mensajes de interfaz dirigidos a una sola persona, que
+// además le cuentan lo que está pasando antes de que pase. El canal privado es `logError`
+// (logMsg con el flag de privado), que no entra en logHistory.
+// Se mira en LOS DOS ficheros: el aviso genérico de la selección de objetivos vive en el motor.
+{
+    const IMPERATIVO = /["'`]\s*(?:¡)?(?:[A-ZÁÉÍÓÚÑ][^"'`]{0,40}?:\s*)?(?:Elige|Selecciona|Escoge|Pulsa|Haz clic|Vuelve a elegir)\b/;
+    for (const rel of ['public/cartas.js', 'public/index.html']) {
+        const lns = fs.readFileSync(path.join(RAIZ, rel), 'utf8').split('\n');
+        lns.forEach((l, i) => {
+            if (/^\s*\/\//.test(l) || /logError/.test(l)) return;
+            if (!/logMsg\(/.test(l) || !IMPERATIVO.test(l)) return;
+            const m = l.match(/logMsg\(\s*[`'"]([^`'"]*)[`'"]/);
+            hallazgos.push({ carta: rel === 'public/cartas.js' ? cartaDe(i) : '(motor)', linea: i + 1,
+                tipo: 'instrucción al que elige, en el log compartido', texto: (m ? m[1] : l.trim()).slice(0, 90) });
+        });
+    }
+}
+
 // SEGUNDA REGLA (22-ago-2026): el `log` de una ACTIVA no puede llevar el nombre de su propia
 // carta A PELO. Se rellena con {carta}, que es QUIEN ESTÁ USANDO la Habilidad, y esa no siempre es
 // la dueña: NoName copia Activas ajenas con RÉPLICA, así que un "¡Nethuns arrastra...!" escrito a

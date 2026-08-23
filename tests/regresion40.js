@@ -29,8 +29,6 @@ const escenarios = [
         // aparece cuando faltan más objetivos por elegir, ver Garret/Raiju). La nueva
         // resuelve el objetivo con ELEGIR/pickBoardTargets, que no pasa por ahí.
         logsSoloVieja: [
-            { linea: 'Objetivos listos. ¡Ejecutando habilidad!',
-              motivo: 'aviso genérico de handleAbilityTargetSelection (mecanismo abilityContext.targets de la vieja); con cupo 1 no hay "Objetivo 1 fijado" previo' },
         ],
         logsIntencionados: [
             { de: '¡BZZZZT! El Cañón de positrones impacta de lleno en Mini-tigre.',
