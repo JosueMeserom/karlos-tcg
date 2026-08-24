@@ -2273,7 +2273,12 @@ const CARD_DB = [
                     // ataques son especiales y sí ve a los Ocultos- sin que esto se entere de
                     // nada (Toto, 23-ago-2026). Lo que SÍ cambia respecto a un ataque normal es
                     // la zona: DOMINIO alcanza todo el campo, incluidos tus propios aliados.
-                    { op: "ELEGIR", de: "TODOS", cantidad: 1, cancelable: false,
+                    // CANCELABLE, que elegir marioneta no ha cambiado nada todavía: mientras
+                    // no se ordene el ataque, el jugador se arrepiente gratis y no se cobra el
+                    // Furor ni se gasta la acción. (Lo tuve `cancelable: false` un rato por
+                    // razonar "ya se ha comprometido"; el compromiso lo marca el ESTADO, no la
+                    // narración. Lo vigila `auditar_costes` desde el 23-ago-2026.)
+                    { op: "ELEGIR", de: "TODOS", cantidad: 1,
                       atacablePor: { selfLista: "dominioMarioneta" },
                       titulo: "DOMINIO: ¿a quién le ordenas atacar?",
                       efectos: [
@@ -10866,6 +10871,10 @@ const DSL = {
                 // cobro y anuncio caen en su sitio SOLOS, sin que ninguna carta declare nada.
                 if (_diferir) DSL._cobroPendiente = { id: card.instanceId, fn: () => _cobrarActiva(card, game) };
                 const _res = await DSL._runEffectList(activa.efectos, card, game, card.owner, targets, activa.nombre || tmpl.activeName || null);
+                // El andamio de la jugada se limpia SIEMPRE, también si se canceló a mitad: si no,
+                // una Habilidad abortada dejaba en la carta a quién habías señalado (ver
+                // _anotacionesDe). Va antes del `return` de la cancelación, por eso.
+                DSL._anotacionesDe(activa).forEach(k => { delete card[k]; });
                 // ¿Sigue sin cobrarse? Entonces no llegó a pasar nada irreversible.
                 const _sinCobrar = !!(DSL._cobroPendiente && DSL._cobroPendiente.id === card.instanceId);
                 if (_diferir && _res && _res.ok === false && _sinCobrar) {
@@ -10882,7 +10891,6 @@ const DSL = {
                 if (DSL._cobroPendiente && DSL._cobroPendiente.id === card.instanceId) {
                     const _cp = DSL._cobroPendiente; DSL._cobroPendiente = null; _cp.fn();
                 }
-                DSL._anotacionesDe(activa).forEach(k => { delete card[k]; });
                 if (!card.exhausted) {
                     // sinAgotar (Achmay, PÉGAME PERRA, 31-jul-2026): "Esta habilidad no gasta
                     // la acción de Achmay" — cierra la acción igual (candado, sync, render)

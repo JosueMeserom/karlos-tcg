@@ -96,7 +96,51 @@ function DSL_VAL(c) {
     return !malo;
 }
 
-const malas = [], declaradas = [], bien = [];
+const malas = [], declaradas = [], bien = [], candados = [];
+
+// SEGUNDA REGLA (23-ago-2026, con Erasmo delante): un `cancelable: false` en una elección
+// ANIDADA, cuando hasta ahí no ha pasado nada irreversible.
+//
+// La primera versión de esta auditoría solo miraba el PRIMER efecto, porque la heurística del
+// compilador solo mira ese. Pero una Habilidad puede encadenar dos elecciones -DOMINIO elige
+// marioneta y luego víctima- y ahí el flag de la SEGUNDA es igual de mentira: elegir la primera
+// no ha cambiado nada en el tablero, así que el jugador tiene que poder arrepentirse gratis.
+// Y sí: lo escribí yo mismo "porque ya se había comprometido", que es razonar desde la narración
+// en vez de desde el estado. La regla es objetiva: ¿ha mutado algo? Si no, es cancelable.
+//
+// Qué cuenta como irreversible antes de la elección: cualquier op que no sea ELEGIR... y un
+// BUSCAR en el MAZO, que abrir su visor ES el punto de compromiso (§12.bis).
+const _mutaAlgo = (e) => {
+    if (e.op === 'ELEGIR') return false;
+    if (e.op === 'BUSCAR') {
+        const zonas = Array.isArray(e.en) ? e.en : [e.en || 'DESCARTES'];
+        return zonas.includes('MAZO');
+    }
+    return true;
+};
+// `saltarPrimero`: el primer efecto de la habilidad ya lo vigila la regla de arriba (es el que
+// mira la heurística del compilador), así que aquí no se reporta -pero sí se MIRA, porque lo que
+// haga por dentro decide si lo de después ya está comprometido.
+function _buscarCandados(carta, hab, lista, yaHubo, ruta, saltarPrimero) {
+    let hubo = yaHubo;
+    (lista || []).forEach((e, i) => {
+        const esEleccion = e.op === 'ELEGIR' || e.op === 'BUSCAR';
+        if (esEleccion && e.cancelable === false && !hubo && !(saltarPrimero && i === 0)) {
+            candados.push({ carta: carta.name, hab: hab || '(sin nombre)', ruta: ruta + ' > ' + e.op,
+                            titulo: e.titulo || '' });
+        }
+        if (esEleccion) _buscarCandados(carta, hab, e.efectos, hubo, ruta + ' > ' + e.op, false);
+        // Una elección "muta" si lo que cuelga de ella muta: equipar el arma elegida (Karlitos)
+        // es irreversible, así que la elección SIGUIENTE sí puede estar bloqueada con razón.
+        if (_mutaAlgo(e) || (esEleccion && (e.efectos || []).some(_mutaAlgo))) hubo = true;
+    });
+}
+for (const c of CARD_DB) {
+    for (const a of (Array.isArray(c.abilities) ? c.abilities : [])) {
+        if (!['ACTIVA', 'AL_CONSUMIR', 'AL_USAR_AYUDA', 'AL_JUGAR', 'ANTES_DE_JUGAR'].includes(a.trigger)) continue;
+        _buscarCandados(c, a.nombre, a.efectos, false, a.trigger, true);
+    }
+}
 
 for (const c of CARD_DB) {
     for (const a of (Array.isArray(c.abilities) ? c.abilities : [])) {
@@ -163,7 +207,15 @@ console.log('   Declaradas aquí arriba con su motivo. No son un despiste, son u
 declaradas.forEach(f => console.log(`   · ${f.carta} [${f.hab}], ${f.coste} de Furor — ${f.causa}`
     + (detalle ? `\n       ${f.motivo}` : '')));
 
-if (!malas.length) {
+if (candados.length) {
+    console.log(`\n## ELECCIONES ANIDADAS BLOQUEADAS SIN MOTIVO (${candados.length})`);
+    console.log('   Un `cancelable: false` cuando todavía no ha pasado nada irreversible: el');
+    console.log('   jugador se queda encerrado a mitad de una cadena que aún no le ha costado');
+    console.log('   nada. Quitar el flag suele ser todo el arreglo.');
+    candados.forEach(f => console.log(`   · ${f.carta} [${f.hab}] — ${f.ruta}${f.titulo ? ' ("' + f.titulo + '")' : ''}`));
+}
+
+if (!malas.length && !candados.length) {
     console.log('\n## SIN DECLARAR (0)');
     console.log('   Ninguna Habilidad cobra el Furor antes de que el jugador pueda arrepentirse.\n');
     console.log('TOTAL: 0 cartas cobran por adelantado sin declararlo');

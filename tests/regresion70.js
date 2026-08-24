@@ -93,6 +93,25 @@ const escenarios = [
         ],
     },
     {
+        // CANCELAR a mitad no cuesta NADA: elegir marioneta todavía no ha cambiado el tablero.
+        // (La vieja tampoco cobraba aquí, así que las dos bases coinciden.)
+        nombre: 'DOMINIO: cancelar tras elegir marioneta no cuesta Furor ni la acción',
+        turno: 2, turnoDe: 'p1', empieza: 'p2',
+        p1: { vanguardia: [{ carta: 'Erasmo', furor: 2 }] },
+        p2: { vanguardia: [{ carta: 'Oso con armadura' }] },
+        pasos: [
+            { habilidad: 'Erasmo' }, { confirmar: true },
+            { elegir: ['Oso con armadura'] },
+            // La vieja no tiene aquí una elección "cancelable" del DSL: se queda en su propia
+            // selección de objetivos, así que el paso es solo para la nueva. Lo que importa es
+            // el estado final, y ahí las dos coinciden: nadie ha pagado nada.
+            { soloEn: 'nueva', cancelar: true },
+        ],
+        diferenciasEsperadas: [
+            { contiene: 'pendingAbilityTarget', motivo: 'la vieja se queda con su selección de objetivos abierta; la nueva la ha cancelado' },
+        ],
+    },
+    {
         // Sin enemigos en el campo no hay a quién controlar: se rechaza al pulsar.
         nombre: 'DOMINIO rechazado: no hay enemigos controlables',
         turno: 2, turnoDe: 'p1', empieza: 'p2',
