@@ -1374,7 +1374,11 @@
             // rebote se queda en la mitad de lejos y con más tiempo para frenar. Mismo gesto,
             // solo que no da la sensación de tirón.
             attackerEl.style.transition = "transform 0.22s cubic-bezier(0.4, 0, 0.7, 1)";
-            attackerEl.style.transform = `translate(${deltaX * 0.5}px, ${deltaY * 0.5}px) scale(1.1)`;
+            // Y LLEGA MÁS LEJOS (0.7 del camino, antes 0.5): media distancia hacía que el
+            // atacante ni rozara a quien le repele, y eso era lo que de verdad se leía como
+            // brusco -no había viaje que frenar, solo un tirón-. La embestida normal llega a
+            // 0.6 y sigue avanzando; aquí se para en seco, así que puede acercarse más.
+            attackerEl.style.transform = `translate(${deltaX * 0.7}px, ${deltaY * 0.7}px) scale(1.1)`;
             attackerEl.style.zIndex = 1000;
 
             if (window.game) await window.game.sleep(220);
