@@ -58,7 +58,10 @@ const NORMAS = [
       re: /openVisualSearchModal\s*\(/,
       filtro: (linea, idx) => {
           const ventana = LINEAS.slice(Math.max(0, idx - 14), idx + 2).join('\n');
-          if (esSoloLectura(linea)) return false;
+          // OJO: aquí NO vale la exención de "solo lectura" (Toto, 23-ago-2026). Mirar una pila
+          // es mirar una pila, se coja carta o no: el visor sabe enseñarla con lo que no toca
+          // ver de dorso (`soloVisibles`) y con quién mira distinto de su dueño (`mirador`).
+          // Por esa exención se coló durante meses el "MIRAR MAZO RIVAL" de Erasmo.
           return /\.(deck|discard)\b/.test(ventana);
       },
       msg: 'busca en mazo/descartes con el modal genérico; debe usar el visor de pila' },

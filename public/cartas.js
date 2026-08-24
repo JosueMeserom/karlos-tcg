@@ -2222,10 +2222,16 @@ const CARD_DB = [
                         const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
                         const enemyDeck = game.players[enemyId].deck;
                         if (enemyDeck.length > 0) {
-                            const topCard = enemyDeck[enemyDeck.length - 1]; // La última carta del array es la de "arriba"
-                            game.logMsg(`Erasmo escruta el futuro...`, 'ability');
-                            // Usamos el modal de visualización en modo "Solo Lectura"
-                            game.openVisualSearchModal('CARTA SUPERIOR DEL MAZO RIVAL', [topCard], 0, true, card.owner);
+                            const topCard = enemyDeck[enemyDeck.length - 1]; // La última del array es la de "arriba"
+                            game.logMsg(`${game.getCardNameWithOwner(card)} escruta el futuro...`, 'ability');
+                            // EL VISOR DE LA PILA, no el modal genérico (Toto, 23-ago-2026): mirar
+                            // un mazo es mirar un mazo, se coja carta o no. Se enseña el mazo del
+                            // RIVAL entero -su tamaño es información legítima- con todo de dorso
+                            // menos la de arriba, que es lo único que SEGUIMIENTO deja leer.
+                            // `elegibles: []` -> no se puede clicar nada; se cierra con el fondo.
+                            game.openDeckSearchViewer(enemyId, [], 'CIMA DEL MAZO DE ' + game.getDisplayName(enemyId).toUpperCase(),
+                                'SEGUIMIENTO: solo puedes ver la carta de arriba.', 1, 'deck', null, false,
+                                { mirador: card.owner, soloVisibles: [topCard.instanceId] });
                         } else {
                             game.logError("El mazo del rival está vacío.");
                         }

@@ -857,3 +857,22 @@ lo que limita es el **reparto entre filas** (hasta 3 delante y hasta 1 detrás),
 falla si se contradicen: una Habilidad con `hastaCantidad` cuyo texto no dice «hasta N», o una de
 cupo fijo cuyo texto sí lo dice. Es la clase de desajuste que nadie nota leyendo, porque las dos
 frases suenan bien.
+
+---
+
+## §22. Mirar una pila también usa SU visor (Toto, 23-ago-2026)
+
+La norma de §12.bis («buscar en una pila usa su visor completo») vale igual cuando **solo se
+mira**, y cuando la pila **es del rival**. No hay excepción de «solo lectura»: mirar un mazo es
+mirar un mazo, se coja carta o no.
+
+El visor tiene las dos piezas que antes empujaban al modal genérico:
+
+- **`opts.soloVisibles: [ids]`** — las demás cartas de la pila se pintan **de dorso**. Así se
+  enseña la pila entera (su tamaño es información legítima) sin desvelar lo que no toca.
+- **`opts.mirador`** — quién mira, cuando no es el dueño de la pila. Sin esto, en online el que
+  mira se lleva el cartel de «esperando» y no ve nada.
+
+Lo estrenó SEGUIMIENTO (Erasmo), que enseñaba la cima del mazo rival con el modal genérico:
+`tests/auditar_imperativas.js` no lo cazaba porque su exención de «solo lectura» tapaba también
+las pilas. Ya no.

@@ -6345,7 +6345,15 @@
             // AUTOMÁTICO de abajo. Nace de que abrir el visor con la pila sin nada elegible y sin
             // una palabra que lo explique se coló en Igniz y en Meca EBA, mientras Zoe (calcinante)
             // y el op BUSCAR sí avisaban -cada una con su texto escrito a mano- (Toto, 18-ago-2026).
-            openDeckSearchViewer(playerId, elegibles, titulo = null, aviso = null, maxCount = 1, zona = 'deck', buscado = null, barajaDespues = false) {
+            // `opts` (Toto, 23-ago-2026, con Erasmo delante): dos cosas que hasta hoy obligaban a
+            // usar el modal genérico para mirar una pila, que es justo lo que la norma prohíbe.
+            //   · `mirador`: QUIÉN mira, que no siempre es el dueño de la pila. Hasta ahora el
+            //     visor daba por hecho que buscas en la TUYA; SEGUIMIENTO (Erasmo) mira el mazo
+            //     del RIVAL, y sin esto el que mira se habría llevado el cartel de "esperando".
+            //   · `soloVisibles`: los ids que se ven de CARA; el resto de la pila se pinta de
+            //     DORSO. Así se enseña la pila entera -que es la norma- sin desvelar lo que no
+            //     toca (el mazo del rival no se lee, se ve que está ahí).
+            openDeckSearchViewer(playerId, elegibles, titulo = null, aviso = null, maxCount = 1, zona = 'deck', buscado = null, barajaDespues = false, opts = {}) {
                 // GARANTÍA: nunca se abre un visor vacío mudo. Si nadie pasó aviso y no hay nada
                 // elegible, lo redacta el propio visor, con los nombres si se los han dicho. Así no
                 // depende de que cada carta se acuerde: es imposible olvidarlo.
@@ -6356,6 +6364,8 @@
                 }
                 const multi = maxCount > 1;
                 const _esDescartes = zona === 'discard';
+                const _mirador = opts.mirador || playerId;
+                const _soloVis = opts.soloVisibles ? new Set(opts.soloVisibles) : null;
                 return new Promise(resolveRaw => {
                     this.currentVisualResolve = (cards) => {
                         this._deckSearchActivo = false;
@@ -6364,11 +6374,11 @@
                     };
 
                     this._deckSearchZona = zona;        // 'deck' | 'discard': deciden cosas distintas
-                    this._interaccionChooser = playerId; // quién busca (para la recuperación por reconexión)
+                    this._interaccionChooser = _mirador; // quién busca (para la recuperación por reconexión)
                     // Descriptor serializable (reanudar-perfecto): si el buscador reconecta, se re-monta el visor.
-                    this.pendingInteraction = { tipo: 'deckViewer', chooserId: playerId, playerId, elegiblesIds: (elegibles || []).map(c => c.instanceId), titulo: titulo || null, aviso: aviso || null, maxCount, zona };
+                    this.pendingInteraction = { tipo: 'deckViewer', chooserId: _mirador, playerId, mirador: _mirador, soloVisibles: opts.soloVisibles || null, elegiblesIds: (elegibles || []).map(c => c.instanceId), titulo: titulo || null, aviso: aviso || null, maxCount, zona };
 
-                    if (this.gameMode === 'online' && this.activePlayerId !== 'setup' && this.myPlayerId !== playerId) {
+                    if (this.gameMode === 'online' && this.activePlayerId !== 'setup' && this.myPlayerId !== _mirador) {
                         // No-elector: si le debo el estado al otro (reconectó, en espejo o mientras
                         // yo elegía), le empujo la interacción para que re-monte el visor de su
                         // mazo. Mismo softlock que el pick de tablero si no se hace.
@@ -6383,7 +6393,7 @@
                         const _cadenaEnMarcha = (playerId !== this.activePlayerId) || this.isActionLocked;
                         if (_cadenaEnMarcha && this.activePlayerId !== 'setup') {
                             const banner = document.getElementById('action-banner');
-                            banner.innerText = `Esperando a que ${this.getDisplayName(playerId)} busque en ${_esDescartes ? 'su pila de descartes' : 'su mazo'}...`;
+                            banner.innerText = `Esperando a que ${this.getDisplayName(_mirador)} busque en ${_esDescartes ? 'su pila de descartes' : 'su mazo'}...`;
                             banner.style.display = 'block';
                         }
                         return; // sin visor local: lo resuelve el replay remoto
@@ -6468,6 +6478,14 @@
                         content.innerHTML = '<div style="color:white;">Vacío.</div>';
                     } else {
                         deckCopy.forEach(carta => {
+                            // Las que no toca ver van de DORSO: se ve la pila entera, con su
+                            // tamaño real, sin leer lo que no se puede leer.
+                            if (_soloVis && !_soloVis.has(carta.instanceId)) {
+                                const dorso = document.createElement('div');
+                                dorso.className = 'card card-back';
+                                content.appendChild(dorso);
+                                return;
+                            }
                             const el = this.createCardEl(carta, false, true);
                             el.onmouseenter = () => this.startPreview(carta);
                             el.onmouseleave = () => this.stopPreview();
@@ -12713,7 +12731,8 @@
                     const elegibles = (pi.elegiblesIds || []).map(id => this.findCard(id)).filter(Boolean);
                     // openDeckSearchViewer, con playerId === yo, monta el visor real; sus clics
                     // ya emiten VISUAL_SEARCH_CONFIRM. La Promise que crea queda huérfana (inocua).
-                    this.openDeckSearchViewer(pi.playerId, elegibles, pi.titulo, pi.aviso, pi.maxCount || 1, pi.zona || 'deck');
+                    this.openDeckSearchViewer(pi.playerId, elegibles, pi.titulo, pi.aviso, pi.maxCount || 1, pi.zona || 'deck',
+                        null, false, { mirador: pi.mirador || pi.playerId, soloVisibles: pi.soloVisibles || null });
                 } else if (pi.tipo === 'choice') {
                     // Re-monto el modal con las MISMAS etiquetas y en el mismo orden. Los
                     // `action` no viajan (son funciones), y no hacen falta: el clic emite
