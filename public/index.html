@@ -3493,12 +3493,15 @@
                     return; // Abortamos para que no te salga el modal en tu pantalla
                 }
 
-                // Si es online y no soy yo quien tiene que confirmar, oculto el modal y muestro el banner
+                // Si es online y no soy yo quien tiene que confirmar, el modal no se me enseña.
+                // Y NADA MÁS: sin cartel de espera (Toto, 23-ago-2026). Confirmar una Habilidad
+                // es todavía cancelable y no ha cambiado nada en la mesa, así que anunciarlo
+                // rompe la misma norma que ya se aplicó al visor de pila y al picker de tablero:
+                // al rival no se le cuenta nada mientras el otro pueda arrepentirse sin coste.
+                // Encima le adelanta que va a pasar algo. El cartel se queda para las esperas
+                // que sí lo son -las de una cadena ya comprometida-.
                 if (this.gameMode === 'online' && this.myPlayerId !== intendedPlayer) {
                     document.getElementById('confirmation-overlay').style.display = 'none';
-                    const banner = document.getElementById('action-banner');
-                    banner.innerText = `Esperando a que ${this.getDisplayName(intendedPlayer)} confirme...`;
-                    banner.style.display = 'block';
                 } else {
                     document.getElementById('confirmation-overlay').style.display = 'flex';
                 }
