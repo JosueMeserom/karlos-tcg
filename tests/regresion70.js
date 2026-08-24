@@ -56,6 +56,43 @@ const escenarios = [
         ],
     },
     {
+        // La marioneta hereda LO SUYO: con Infusión de maná sus ataques normales cuentan como
+        // especiales, así que sí puede señalar a una Oculta. Los objetivos se piden al mismo
+        // sitio que decide eso en un ataque normal, no a una copia de sus reglas.
+        // La VIEJA también lo permitía, pero por el motivo equivocado: no miraba el Oculto de
+        // los ALIADOS del que ordena, y Edrielle aquí es enemiga suya... así que la vieja la
+        // bloqueaba. Divergencia declarada abajo.
+        nombre: 'DOMINIO: la marioneta con ataques especiales sí puede pegar a una Oculta',
+        turno: 2, turnoDe: 'p1', empieza: 'p2',
+        p1: { vanguardia: [{ carta: 'Erasmo', furor: 2 }] },
+        p2: { vanguardia: [
+            { carta: 'Mini-tigre', campos: { treatAttacksAsSpecial: true } },
+            { carta: 'Edrielle', vida: 9 },
+        ] },
+        pasos: [
+            { soloEn: 'nueva', habilidad: 'Erasmo' },
+            { soloEn: 'nueva', confirmar: true },
+            { soloEn: 'nueva', elegir: ['Mini-tigre'] },
+            { soloEn: 'nueva', elegir: ['Edrielle'] },
+        ],
+        logsSoloNueva: [
+            { linea: 'toma el control de Mini-tigre', motivo: 'la vieja no deja señalar a una Oculta ni aunque el atacante convierta sus ataques en especiales: solo miraba la bandera canAttackStealth de la plantilla' },
+            { linea: 'recibe 0.5 daño', motivo: 'y por tanto tampoco llega el golpe (0.5: Esbirro contra Personaje, mínimo del motor)' },
+        ],
+        flotantesSoloNueva: [
+            { linea: '-2 FUR', motivo: 'la nueva sí usa la Habilidad y paga su coste' },
+            { linea: 'DOMINIO', motivo: 'y la anuncia' },
+            { linea: '-0.5 VIDA', motivo: 'el golpe que la vieja no llega a dar' },
+        ],
+        diferenciasEsperadas: [
+            { contiene: 'p1.vanguard.0.furor', motivo: 'la vieja se queda a medias: deja elegir marioneta pero no víctima, así que nunca se compromete' },
+            { contiene: 'p1.vanguard.0.exhausted', motivo: 'ídem: no gasta la acción' },
+            { contiene: 'p2.vanguard.1.currentHp', motivo: 'Edrielle recibe el ataque especial que la vieja no permite ordenar' },
+            { contiene: 'p2.vanguard.0.hasAttackedThisTurn', motivo: 'la marioneta ataca de verdad' },
+            { contiene: 'p2.vanguard.0.exhausted', motivo: 'ídem: la marioneta gasta su acción al atacar' },
+        ],
+    },
+    {
         // Sin enemigos en el campo no hay a quién controlar: se rechaza al pulsar.
         nombre: 'DOMINIO rechazado: no hay enemigos controlables',
         turno: 2, turnoDe: 'p1', empieza: 'p2',

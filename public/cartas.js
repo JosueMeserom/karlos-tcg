@@ -2267,11 +2267,14 @@ const CARD_DB = [
                   efectos: [
                     // Ya comprometido: la marioneta está elegida y el Furor se cobra aquí, así
                     // que esta segunda elección no se puede cancelar.
-                    // Un Oculto es un Oculto, sea de quien sea (Toto, 23-ago-2026): no se le
-                    // puede ordenar un ataque normal ni contra los tuyos. La vieja sí dejaba
-                    // señalar a un aliado propio Oculto; era un descuido, no una regla.
+                    // Los objetivos son los que LA MARIONETA podría atacar por su cuenta, y se
+                    // le pregunta al mismo sitio que decide eso en un ataque normal en vez de
+                    // repetir aquí sus reglas: así hereda lo suyo -si lleva Infusión de maná sus
+                    // ataques son especiales y sí ve a los Ocultos- sin que esto se entere de
+                    // nada (Toto, 23-ago-2026). Lo que SÍ cambia respecto a un ataque normal es
+                    // la zona: DOMINIO alcanza todo el campo, incluidos tus propios aliados.
                     { op: "ELEGIR", de: "TODOS", cantidad: 1, cancelable: false,
-                      filtros: [ { campo: "stealth", op: "falsy" } ],
+                      atacablePor: { selfLista: "dominioMarioneta" },
                       titulo: "DOMINIO: ¿a quién le ordenas atacar?",
                       efectos: [
                         { op: "ORDENAR_ATAQUE", atacante: { selfLista: "dominioMarioneta" },
@@ -9366,6 +9369,16 @@ const DSL = {
             pool = pool.filter(x => (e.filtros || []).every(f => DSL._match(x, f)) &&
                                     (!e.algunFiltro || e.algunFiltro.some(f => DSL._match(x, f))));
             pool = pool.filter(x => !((getCardTemplate(x.id) || {}).isAvatar)); // Kami: intocable
+            // `atacablePor`: deja solo a quien ESE atacante podría señalar en un ataque normal.
+            // No copia las reglas -Provocando, Oculto, Avatar-: pregunta al mismo sitio que las
+            // aplica cuando atacas tú (`motivoNoAtacable`). Así una Habilidad que ORDENA un
+            // ataque hereda lo que el atacante pueda hacer, incluido lo que le den sus equipos
+            // (Infusión de maná convierte sus normales en especiales, así que sí ve a los
+            // Ocultos). La ZONA no entra: eso lo decide la carta (DOMINIO llega a todo el campo).
+            if (e.atacablePor && typeof game.motivoNoAtacable === 'function') {
+                const _atac = DSL._pool(ownerId, game, e.atacablePor, sourceCard)[0];
+                if (_atac) pool = pool.filter(x => !game.motivoNoAtacable(_atac, x));
+            }
             // UN EQUIPO POR TIPO. Estaba puesto en DSL._pool y NO SERVIA DE NADA: el ELEGIR se
             // construye su pool a mano, aqui mismo, y nunca pasa por _pool (Toto lo vio jugando:
             // la Espada V seguia elegible sobre un Karlos que ya llevaba la Shichishito).

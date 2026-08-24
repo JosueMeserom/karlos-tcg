@@ -8430,16 +8430,8 @@
                 }
 
                 if (this.inputState === 'SELECT_TARGET' && card.owner !== this.activePlayerId && card.location === 'vanguard') {
-                    const hasTaunt = this.players[card.owner].vanguard.some(c => getCardTemplate(c.id).isTaunt);
-                    if (hasTaunt && !getCardTemplate(card.id).isTaunt) {
-                        if (!isRemote) this.logError(`¡Debes dirigir tus ataques normales al objetivo que está Provocando!`); return;
-                    }
-                    if (card.stealth && !this._puedeAtacarOculto(this.selectedCard)) {
-                        if (!isRemote) this.logError(`¡No puedes atacar a ${this.getCardNameWithOwner(card)} porque está Oculto!`); return;
-                    }
-                    if (getCardTemplate(card.id).isAvatar) {
-                        if (!isRemote) this.logError(`${card.name} es un AVATAR y no puede ser objetivo de nada.`); return;
-                    }
+                    const _noAtacable = this.motivoNoAtacable(this.selectedCard, card);
+                    if (_noAtacable) { if (!isRemote) this.logError(_noAtacable); return; }
 
                     // Reimposición del veto de inicio (§11b): la carta pudo seleccionarse
                     // por su opción de retirada; atacar sigue vetado.
@@ -11808,6 +11800,25 @@
                 return !!(t.canAttackStealth || t.treatAttacksAsSpecial || atacante.treatAttacksAsSpecial);
             }
 
+            // ¿POR QUÉ no se puede atacar normalmente a esta carta? Devuelve el motivo (para
+            // enseñárselo a quien lo intenta) o null si sí se puede. UN SOLO SITIO con las tres
+            // reglas -Provocando, Oculto y Avatar-, que antes vivían copiadas en la validación
+            // del clic y a medias en el resaltado del tablero. Lo usa también el DSL, para que
+            // una Habilidad que ORDENA un ataque (DOMINIO) ofrezca exactamente los objetivos que
+            // ese atacante podría elegir por su cuenta, en vez de una copia de los checks que se
+            // queda vieja (Toto, 23-ago-2026).
+            // NO incluye la ZONA: un ataque normal solo llega a la vanguardia, pero DOMINIO
+            // alcanza todo el campo. Eso lo decide cada quien.
+            motivoNoAtacable(atacante, objetivo) {
+                if (!objetivo) return 'No hay objetivo.';
+                const t = getCardTemplate(objetivo.id) || {};
+                const hayProvocando = this.players[objetivo.owner].vanguard.some(c => getCardTemplate(c.id).isTaunt);
+                if (hayProvocando && !t.isTaunt) return '¡Debes dirigir tus ataques normales al objetivo que está Provocando!';
+                if (objetivo.stealth && !this._puedeAtacarOculto(atacante)) return `¡No puedes atacar a ${this.getCardNameWithOwner(objetivo)} porque está Oculto!`;
+                if (t.isAvatar) return `${objetivo.name} es un AVATAR y no puede ser objetivo de nada.`;
+                return null;
+            }
+
             _estaOculta(card) {
                 return !!(card.stealth || (card.status && card.status.oculto && card.status.oculto.duration > 0));
             }
@@ -11883,12 +11894,9 @@
                         let isTargetable = false;
                         
                         if (this.inputState === 'SELECT_TARGET' && card.location === 'vanguard') {
-                            const hasTaunt = this.players[card.owner].vanguard.some(c => getCardTemplate(c.id).isTaunt);
-                            if (hasTaunt) {
-                                if (getCardTemplate(card.id).isTaunt) isTargetable = true;
-                            } else {
-                                if (!card.stealth || this._puedeAtacarOculto(this.selectedCard)) isTargetable = true;
-                            }
+                            // El mismo predicado que la validación del clic: el reborde verde y
+                            // lo que de verdad se puede clicar no pueden decir cosas distintas.
+                            isTargetable = !this.motivoNoAtacable(this.selectedCard, card);
                         } else if (this.inputState === 'SELECT_ABILITY_TARGETS') {
                             let isTargetableAbility = false;
 
