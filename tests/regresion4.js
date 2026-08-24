@@ -54,7 +54,6 @@ const escenarios = [
     {
         nombre: 'Granada de maná: elige 2 enemigos, daño verdadero y una muerte',
         diferenciasEsperadas: [
-            { contiene: 'discard.0.granadaObjetivos', motivo: 'efecto lateral de mover el cobro DETRÁS de la elección (20-ago-2026): los elegidos se guardan en la carta para que el coste y el daño puedan apuntarles después, y ese campo viaja con ella al descarte. La vieja no lo necesitaba porque cobraba antes de elegir' },
         ],
         p1: { vanguardia: [{ carta: 'Oso con armadura', furor: 2 }], mano: ['Granada de maná'] },
         p2: { vanguardia: [{ carta: 'Mini-tigre', vida: 1 }, 'Droide antidisturbios'] },

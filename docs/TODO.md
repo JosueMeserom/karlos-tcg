@@ -3,7 +3,7 @@
 Lo que queda por hacer, con su porqué. Se actualiza al cerrar cada cosa: lo que Toto no rebate
 después de hacerlo se da por bueno y se quita de aquí.
 
-> Última revisión: 22-ago-2026 · 167 cartas en CARD_DB · 106 suites en verde
+> Última revisión: 22-ago-2026 · 167 cartas en CARD_DB · 107 suites en verde
 
 ---
 
@@ -17,14 +17,15 @@ existe 'Diosa').
 
 ---
 
-## 2. Migración al DSL: 5 imperativas puras + 3 híbridas
+## 2. Migración al DSL: 4 imperativas puras + 4 híbridas
 
-Quedan (entre paréntesis, sus hooks a mano). En total, 155 hooks escritos a mano en el fichero.
+Quedan (entre paréntesis, sus hooks a mano). En total, 151 hooks escritos a mano en el fichero.
 
 | Carta | Qué le falta al DSL |
 |---|---|
 | **NoName** (9) | **corrección del 22-ago-2026**: esos 9 hooks NO son el clon, son **RÉPLICA**, que copia la Activa de un enemigo delegando `canActivateAbility`/`onExecuteAbility`/`onValidateTarget`/`onTargetsReady`/… al template ajeno. Candidata a irreducible: es *meta* sobre la interfaz de hooks, y funciona igual con cartas ya migradas (regresion68 lo fija) |
-| **Erasmo** (5), **Silhouette** (7), **Sadame** (7), **Arthas** (8) | sin leer a fondo todavía: cada una pide su propio análisis |
+| **Silhouette** (7), **Sadame** (7), **Arthas** (8) | sin leer a fondo todavía: cada una pide su propio análisis |
+| **Erasmo** (2, ya híbrida) | DOMINIO ya es declarativa; **SEGUIMIENTO** se queda: una línea que expone la mano rival en cada pasada de pasivas y un BOTÓN propio para mirar el mazo (haría falta un trigger de acción personalizada para una sola carta) |
 | **Xanadu** (4, ya híbrida) | REPULSIÓN ABSOLUTA ya es declarativa; **ESTORNUDO DEVASTADOR** se queda por lo mismo que MOTOCICLETA: el enemigo que entra depende del que sale (límite de 2 Personajes sobre la vanguardia que QUEDARÍA) |
 | **Mill** (4, ya híbrida) | su Pasiva ya es declarativa; **MOTOCICLETA** se queda: su tercer objetivo solo es válido según los dos anteriores (el límite de 2 Personajes se calcula sobre el campo que QUEDARÍA), y eso no es un filtro por campo sino una cuenta condicional |
 
@@ -48,7 +49,7 @@ del lenguaje.
 
 - **23 de los 37 triggers** no existen ahí: `REACCION`, `AL_MORIR`, `AL_EQUIPAR`, los
   interceptores, `COSTE_COLOCACION`, `PERIODICO`, `INTERCEPTOR_LETAL`…
-- **36 de las 45 ops** tampoco: `ELEGIR`, `EQUIPAR`, `MARCAR_TEMPORAL`, `DESCARTAR`, `COLOCARSE`, `CREAR_CLON`, `INTERCAMBIAR_POSICION`, `LOG`…
+- **38 de las 47 ops** tampoco: `ELEGIR`, `EQUIPAR`, `MARCAR_TEMPORAL`, `DESCARTAR`, `COLOCARSE`, `CREAR_CLON`, `INTERCAMBIAR_POSICION`, `LOG`, `ORDENAR_ATAQUE`…
 
 Cuando se retome, además de ponerlo al día, Toto quiere:
 - un **"detalle" que se renderice igual que en partida**, con los datos que estés metiendo;

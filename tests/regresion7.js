@@ -84,7 +84,6 @@ const escenarios = [
     {
         nombre: 'PEM: paga 1 Furor y paraliza a la única Máquina enemiga',
         diferenciasEsperadas: [
-            { contiene: 'discard.0.pemPagador', motivo: 'efecto lateral de mover el cobro DETRÁS de la elección (20-ago-2026): el pagador elegido se guarda en la carta para que el coste pueda apuntarle después, y ese campo viaja con ella al descarte. La vieja no lo necesitaba porque cobraba antes de elegir' },
             { contiene: 'tempEffects.0.pierdeSuTurno', motivo: 'la marca ahora LLEVA ESCRITO lo que antes hacía un hook a mano de la carta: el motor ya tenía handlers genéricos para `pierdeSuTurno`, así que la carta solo tiene que declararlo' },
         ],
         p1: { vanguardia: [{ carta: 'Oso con armadura', furor: 1 }], mano: ['PEM'] },

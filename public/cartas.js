@@ -2235,68 +2235,38 @@ const CARD_DB = [
             return [];
         },
         
-        // 3. Dominio (Control Mental)
-        canActivateAbility: function(card, game) {
-            if (card.furor < 2) { game.logError("Falta Furor (2)."); return false; }
-            const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
-            const validPuppets = [...game.players[enemyId].vanguard, ...game.players[enemyId].rearguard].filter(c => !getCardTemplate(c.id).isAvatar);
-            if (validPuppets.length === 0) { game.logError("No hay enemigos controlables."); return false; }
-            return true;
-        },
-        onExecuteAbility: function(card, game) {
-            game.selectedCard = card;
-            game.inputState = 'SELECT_ABILITY_TARGETS';
-            game.abilityContext = { targets: [], maxTargets: 2, name: 'DOMINIO', targetType: 'any_field' };
-            game.logError("DOMINIO: Paso 1 - Elige a la Marioneta enemiga.");
-            game.render();
-        },
-        onValidateTarget: function(card, target, game, isSilent) {
-            const ctx = game.abilityContext;
-            
-            // Primer click: Elegir a la Marioneta (Debe ser enemigo, no Avatar)
-            if (ctx.targets.length === 0) {
-                if (target.owner === card.owner) {
-                    if (!isSilent) game.logError("Debes elegir a un ENEMIGO como marioneta.");
-                    return false;
-                }
-                if (getCardTemplate(target.id).isAvatar) return false;
-                return true;
-            }
-            
-            // Segundo click: Elegir a la Víctima (Cualquiera en Vanguardia o Retaguardia)
-            if (ctx.targets.length === 1) {
-                if (target.location !== 'vanguard' && target.location !== 'rearguard') return false;
-                if (target.stealth && target.owner !== card.owner) {
-                    if (!isSilent) game.logError("No puedes ordenar atacar a un objetivo Oculto.");
-                    return false;
-                }
-                if (getCardTemplate(target.id).isAvatar) return false;
-                return true;
-            }
-            return false;
-        },
-        onTargetsReady: async function(card, game) {
-            const puppet = game.abilityContext.targets[0];
-            const victim = game.abilityContext.targets[1];
-            
-            game.modifyStat(card, 'furor', -2);
-            showFloatingText(card.instanceId, "DOMINIO", "ft-ability", -30);
-            
-            game.logMsg(`¡${game.getCardNameWithOwner(card)} toma el control de ${game.getCardNameWithOwner(puppet)} y le obliga a atacar a ${game.getCardNameWithOwner(victim)}!`, 'ability');
-            
-            game.inputState = 'EXECUTING';
-            game.isActionLocked = true;
-            game.render();
-            await game.sleep(800);
-            
-            // Hacemos que la marioneta ejecute el ataque normal
-            await game.performAttack(puppet, victim);
-            
-            card.exhausted = true;
-            game.isActionLocked = false;
-            game.cancelAction();
-            game.render();
-        }
+        // DOMINIO migrado a DSL (23-ago-2026). Estrena el op ORDENAR_ATAQUE -"obliga a esta
+        // carta a atacar a esta otra"-, que es la versión inmediata de lo que Achmay ya hacía en
+        // diferido con una marca. Los dos objetivos se piden con ELEGIR anidados en vez de con la
+        // selección de la Habilidad, porque el segundo no se valida como el primero: la marioneta
+        // es un ENEMIGO y la víctima puede ser cualquiera de las dos mesas. Con `target` de
+        // ability solo hay UN validador para todos los objetivos, y aquí son dos reglas distintas.
+        //
+        // SEGUIMIENTO se queda imperativo, y es de las de §6: una línea que expone la mano rival
+        // en cada pasada de pasivas (el motor la limpia y la repone en cada una, así que no es un
+        // efecto que se "aplique" una vez) y un BOTÓN propio para mirar el mazo. Un trigger de
+        // acción personalizada para una sola carta es justo lo que la lista de irreducibles
+        // existe para no inventar.
+        abilities: [
+            { trigger: "ACTIVA", nombre: "DOMINIO", coste: { furor: 2 }, sinObjetivo: true,
+              // Los Avatares ya quedan fuera de cualquier pool por defecto, que es lo que la
+              // vieja comprobaba a mano con isAvatar.
+              requisitos: [
+                { count: { quien: "ENEMIGO" }, op: ">=", valor: 1,
+                  msg: "No hay enemigos controlables." } ],
+              efectos: [
+                { op: "ELEGIR", de: "ENEMIGOS", cantidad: 1,
+                  titulo: "DOMINIO: elige a la marioneta enemiga",
+                  guardaIdsEnSelf: "dominioMarioneta",
+                  efectos: [
+                    // Ya comprometido: la marioneta está elegida y el Furor se cobra aquí, así
+                    // que esta segunda elección no se puede cancelar.
+                    { op: "ELEGIR", de: "TODOS", cantidad: 1, cancelable: false, sinOcultosEnemigos: true,
+                      titulo: "DOMINIO: ¿a quién le ordenas atacar?",
+                      efectos: [
+                        { op: "ORDENAR_ATAQUE", atacante: { selfLista: "dominioMarioneta" },
+                          log: "¡{carta} toma el control de {atacante} y le obliga a atacar a {objetivo}!" } ] } ] } ] }
+        ]
     },
     {
         name: "Xanadu", hp: 6, def: 4, atk: 7, type: "Personaje", subtype: "Ser vivo", tags: ["Poder heredado"], gender: "M", rarity: "S", series: 1,
@@ -7457,7 +7427,7 @@ const DSL = {
     // DSL._runReaccion, no _doEffect): controlan el resultado que la reacción
     // devuelve al motor de combate (redirigir el ataque, cancelarlo, drenar Furor
     // tras él, fijar el daño, autoataque del atacante).
-    OPS_EFECTO: ['MODIFICAR_STAT', 'CURAR', 'DAÑO', 'APLICAR_ESTADO', 'MODIFICAR_CONTADORES', 'ATACAR', 'MONEDA', 'ROBAR', 'BUSCAR', 'MARCAR', 'VER_MANO', 'LIMPIAR_ESTADOS', 'ELEGIR', 'DESTRUIR_EVENTO', 'MARCAR_TEMPORAL', 'DESCARTAR', 'EQUIPAR', 'MARCAR_JUGADOR', 'FLOTANTE', 'FIJAR_STAT', 'REDIRIGIR', 'CANCELAR_ATAQUE', 'MARCAR_DRENAJE', 'FIJAR_DAÑO', 'ATACANTE_SE_AUTOATACA', 'VOLVER_A_MANO', 'RETRIBUCION', 'SUELO_STAT', 'TECHO_STAT', 'NO_CONSUMIR', 'BONO_ATAQUE', 'MARCAR_PARTIDA', 'ESQUIVAR', 'DESEQUIPAR', 'DAÑO_ATAQUE', 'REDIRIGIR_ATAQUE', 'SECUESTRAR_STAT', 'DEVOLVER_STAT', 'CUENTA_ATRAS', 'QUITAR_MARCA', 'COLOCARSE', 'CREAR_CLON', 'INTERCAMBIAR_POSICION', 'LOG'],
+    OPS_EFECTO: ['MODIFICAR_STAT', 'CURAR', 'DAÑO', 'APLICAR_ESTADO', 'MODIFICAR_CONTADORES', 'ATACAR', 'MONEDA', 'ROBAR', 'BUSCAR', 'MARCAR', 'VER_MANO', 'LIMPIAR_ESTADOS', 'ELEGIR', 'DESTRUIR_EVENTO', 'MARCAR_TEMPORAL', 'DESCARTAR', 'EQUIPAR', 'MARCAR_JUGADOR', 'FLOTANTE', 'FIJAR_STAT', 'REDIRIGIR', 'CANCELAR_ATAQUE', 'MARCAR_DRENAJE', 'FIJAR_DAÑO', 'ATACANTE_SE_AUTOATACA', 'VOLVER_A_MANO', 'RETRIBUCION', 'SUELO_STAT', 'TECHO_STAT', 'NO_CONSUMIR', 'BONO_ATAQUE', 'MARCAR_PARTIDA', 'ESQUIVAR', 'DESEQUIPAR', 'DAÑO_ATAQUE', 'REDIRIGIR_ATAQUE', 'SECUESTRAR_STAT', 'DEVOLVER_STAT', 'CUENTA_ATRAS', 'QUITAR_MARCA', 'COLOCARSE', 'CREAR_CLON', 'INTERCAMBIAR_POSICION', 'LOG', 'ORDENAR_ATAQUE'],
     OPS_CMP: ['==', '!=', '<=', '>=', '<', '>', 'includes', 'contieneTexto', 'includesCI', 'truthy', 'falsy'],
     QUIEN: ['SELF', 'ALIADO', 'ENEMIGO', 'TODOS', 'ATACANTE', 'DEFENSOR', 'PORTADOR', 'PAGADOR'], // ATACANTE/DEFENSOR: solo en GLOBAL_TRAS_ATAQUE y REACCION
 
@@ -8258,6 +8228,21 @@ const DSL = {
         // `rect` es solo la red de seguridad para cuando no hay hueco que enseñar (una muerte en
         // retaguardia, que no se congela): entonces vale el sitio donde estaba la carta.
         game._costesPresenta.push({ zonaSel: sel || undefined, rect, tipo, etiqueta, zona: 'zona' });
+    },
+
+    // Los nombres que una habilidad usa como ANDAMIO (`guardaIdsEnSelf`: a quién elegiste, quién
+    // paga). Son de ESA jugada: no deben sobrevivir a la habilidad ni salir en exportGameState.
+    // Se leen de la propia declaración en vez de mantener una lista a mano en el compilador, que
+    // es lo que había y se quedaba corta en cuanto una carta nueva estrenaba un nombre.
+    _anotacionesDe(ab) {
+        const out = [];
+        const rec = (arr) => (arr || []).forEach(e => {
+            if (!e) return;
+            if (e.guardaIdsEnSelf) out.push(e.guardaIdsEnSelf);
+            ['efectos', 'siExito', 'cara', 'cruz', 'siMuere', 'then', 'else'].forEach(k => rec(e[k]));
+        });
+        rec(ab && ab.efectos);
+        return out;
     },
 
     _marcarCoste(game, cartas, tipo, etiqueta) {
@@ -9177,6 +9162,24 @@ const DSL = {
             if (typeof game.render === 'function') game.render();
             return true;
         }
+        // ORDENAR_ATAQUE (Erasmo, DOMINIO, 23-ago-2026): obliga a OTRA carta a hacer un ataque
+        // normal contra el objetivo. La marioneta la resuelve `atacante` con la misma gramática
+        // de pools que todo lo demás (Erasmo la guarda en su primer ELEGIR con `guardaIdsEnSelf`).
+        // Es la versión INMEDIATA del primo que ya existía en marca: `provocaAtaque` de Achmay
+        // obliga a atacarle a él en el turno siguiente; esto ordena el golpe aquí y ahora.
+        if (e.op === 'ORDENAR_ATAQUE') {
+            const _mar = DSL._pool(ownerId, game, e.atacante || {}, sourceCard)[0];
+            if (!_mar || !target) return false;
+            if (e.log) game.logMsg(DSL._fill(e.log, {
+                carta: DSL._nombre(game, sourceCard), atacante: DSL._nombre(game, _mar),
+                objetivo: DSL._nombre(game, target),
+            }), e.logTipo || 'ability');
+            // Un respiro antes del golpe: el jugador acaba de elegir a los dos y conviene que
+            // vea QUIÉN va a pegar a QUIÉN antes de que la carta salga disparada.
+            if (typeof game.sleep === 'function') await game.sleep(e.pausa !== undefined ? e.pausa : 800);
+            if (typeof game.performAttack === 'function') await game.performAttack(_mar, target);
+            return true;
+        }
         if (e.op === 'VOLVER_A_MANO') {
             // Devuelve la carta del campo a la mano (Incluso En El KG al morir). Replica
             // EXACTAMENTE la vieja: solo resetea currentHp; furor/estado no se tocan.
@@ -9338,12 +9341,20 @@ const DSL = {
             // Selección visual sobre mesa/mano; si el jugador no completa la elección, ABORTA (no consume la carta)
             const p = game.players[ownerId];
             const rivalP = game.players[ownerId === 'p1' ? 'p2' : 'p1'];
+            // `TODOS` = las dos mesas (Erasmo, DOMINIO: la marioneta puede pegarle a cualquiera).
+            // Hasta el 23-ago-2026 no existía y caía en el `else` de ALIADOS EN SILENCIO: la
+            // elección salía con medio tablero de menos y nadie se enteraba. Por eso `validate`
+            // rechaza ahora cualquier `de` que no sea de esta lista.
             let pool = e.de === 'ENEMIGOS' ? [...rivalP.vanguard, ...rivalP.rearguard]
+                     : e.de === 'TODOS' ? [...p.vanguard, ...p.rearguard, ...rivalP.vanguard, ...rivalP.rearguard]
                      : e.de === 'MANO' ? p.hand.filter(x => x.instanceId !== sourceCard.instanceId)
                      : [...p.vanguard, ...p.rearguard];
             pool = pool.filter(x => (e.filtros || []).every(f => DSL._match(x, f)) &&
                                     (!e.algunFiltro || e.algunFiltro.some(f => DSL._match(x, f))));
             pool = pool.filter(x => !((getCardTemplate(x.id) || {}).isAvatar)); // Kami: intocable
+            // `sinOcultosEnemigos`: a los Ocultos TUYOS los ves y puedes señalarlos; a los del
+            // rival, no. No es lo mismo que filtrar `stealth` a secas.
+            if (e.sinOcultosEnemigos) pool = pool.filter(x => !(x.stealth && x.owner !== ownerId));
             // UN EQUIPO POR TIPO. Estaba puesto en DSL._pool y NO SERVIA DE NADA: el ELEGIR se
             // construye su pool a mano, aqui mismo, y nunca pasa por _pool (Toto lo vio jugando:
             // la Espada V seguia elegible sobre un Karlos que ya llevaba la Shichishito).
@@ -10040,6 +10051,12 @@ const DSL = {
             effs.forEach((e, j) => {
                 if (e.if) return;
                 if (!DSL.OPS_EFECTO.includes(e.op)) errs.push(`abilities[${i}] efecto[${j}]: op desconocida '${e.op}'`);
+                // `de` de un ELEGIR: sin esto, un valor no contemplado caía en el pool de ALIADOS
+                // sin decir nada (le pasó a 'TODOS' hasta el 23-ago-2026). Una carta que no valida
+                // se queda MUDA -no se le instala ningún hook-, así que el fallo se ve enseguida.
+                if (e.op === 'ELEGIR' && e.de !== undefined && !['ALIADOS', 'ENEMIGOS', 'TODOS', 'MANO'].includes(e.de)) {
+                    errs.push(`abilities[${i}] efecto[${j}]: ELEGIR con 'de' desconocido '${e.de}'`);
+                }
                 if (e.target && typeof e.target === 'object' && e.target.quien !== undefined && !DSL.QUIEN.includes(e.target.quien)) errs.push(`abilities[${i}] efecto[${j}]: target.quien inválido`);
             });
             effs.forEach((e, j) => {
@@ -10516,6 +10533,9 @@ const DSL = {
                 // descarte ocurre en el punto de compromiso y los efectos posteriores (el cobro
                 // al pagador anotado) todavía las necesitan.
                 Object.keys(card).forEach(k => { if (/^(pagoPagador|rezoPagadores|necroLector|kamiSacrificio|chosenAllies)$/.test(k)) delete card[k]; });
+                // Y las que declare la propia habilidad, que es lo que evita tener que ampliar
+                // esa lista a mano cada vez que una carta estrena un nombre.
+                DSL._anotacionesDe(consumir).forEach(k => { delete card[k]; });
                 if (_vc.__noConsumir) await _volverAMano();
                 delete _vc.__noConsumir;
                 game.cancelAction();
@@ -10728,6 +10748,8 @@ const DSL = {
                 _vp.pagador = DSL._nombre(game, target);
                 _vp.pagadorG = target.gender;
                 const res = await DSL._runEffectList(usar.efectos, card, game, card.owner, [target]);
+                // El andamio de la jugada no viaja al descarte con la carta (ver _anotacionesDe).
+                DSL._anotacionesDe(usar).forEach(k => { delete card[k]; });
                 return res.ok;
             };
         }
@@ -10836,6 +10858,7 @@ const DSL = {
                 if (DSL._cobroPendiente && DSL._cobroPendiente.id === card.instanceId) {
                     const _cp = DSL._cobroPendiente; DSL._cobroPendiente = null; _cp.fn();
                 }
+                DSL._anotacionesDe(activa).forEach(k => { delete card[k]; });
                 if (!card.exhausted) {
                     // sinAgotar (Achmay, PÉGAME PERRA, 31-jul-2026): "Esta habilidad no gasta
                     // la acción de Achmay" — cierra la acción igual (candado, sync, render)
