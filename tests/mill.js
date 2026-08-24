@@ -153,6 +153,26 @@ const aviso = (c) => (c.tempEffects || []).find(e => e.sourceInstanceId === c.in
         check('...porque sigue Oculta', edrielle.stealth === true);
     }
 
+    console.log('--- Quien ataca como ESPECIAL sí puede señalar a un Oculto ---');
+    {
+        // El Oculto solo protege de los ataques NORMALES, así que un portador de Infusión de maná
+        // -que convierte los suyos en especiales- debe poder señalar a Edrielle. Se comprobaba
+        // solo la bandera `canAttackStealth` de la plantilla (Simon), así que el equipo cambiaba
+        // el tipo de ataque pero no a quién podías atacar (Toto, 23-ago-2026).
+        const { g } = await mesa({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: ['Mini-tigre'] },
+            p2: { vanguardia: [{ carta: 'Edrielle', vida: 9 }] },
+        });
+        const tigre = g.players.p1.vanguard[0];
+        const edrielle = g.players.p2.vanguard[0];
+        g.updatePassives();
+        check('de partida, el tigre NO puede atacar a la Oculta',
+            edrielle.stealth === true && !g._puedeAtacarOculto(tigre));
+        tigre.treatAttacksAsSpecial = true;   // lo que deja puesto Infusión de maná
+        check('...y con sus ataques convertidos en especiales, sí', g._puedeAtacarOculto(tigre));
+    }
+
     console.log('--- MOTOCICLETA: cada uno ocupa el sitio del otro ---');
     {
         // La Activa sigue siendo imperativa, pero su colocación estaba mal: filtraba a las cuatro

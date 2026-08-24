@@ -8434,7 +8434,7 @@
                     if (hasTaunt && !getCardTemplate(card.id).isTaunt) {
                         if (!isRemote) this.logError(`¡Debes dirigir tus ataques normales al objetivo que está Provocando!`); return;
                     }
-                    if (card.stealth && !getCardTemplate(this.selectedCard.id).canAttackStealth) {
+                    if (card.stealth && !this._puedeAtacarOculto(this.selectedCard)) {
                         if (!isRemote) this.logError(`¡No puedes atacar a ${this.getCardNameWithOwner(card)} porque está Oculto!`); return;
                     }
                     if (getCardTemplate(card.id).isAvatar) {
@@ -8492,7 +8492,7 @@
                             if (hasTaunt && !getCardTemplate(card.id).isTaunt) {
                                 if (!isRemote) this.logError(`¡Debes dirigir este ataque al objetivo que está Provocando!`); return;
                             }
-                            if (card.stealth && !getCardTemplate(this.selectedCard.id).canAttackStealth) {
+                            if (card.stealth && !this._puedeAtacarOculto(this.selectedCard)) {
                                 if (!isRemote) this.logError(`¡No puedes atacar a ${this.getCardNameWithOwner(card)} porque está Oculto!`); return;
                             }
                         }
@@ -11795,6 +11795,19 @@
                 else if (card._ocultoPorEstado) { card.stealth = false; delete card._ocultoPorEstado; }
             }
 
+            // ¿Puede ESTE atacante señalar a una carta Oculta? El Oculto solo protege de los
+            // ataques NORMALES (rúbrica: "no puede ser objetivo directo de ataques normales"), así
+            // que además de la bandera de siempre -Simon, OJO BIÓNICO- entra aquí quien tenga sus
+            // ataques normales convertidos en especiales, venga de su plantilla o de un EQUIPO
+            // (Infusión de maná lo pone en la instancia). Toto, 23-ago-2026: se comprobaba solo
+            // `canAttackStealth`, así que el equipo cambiaba el tipo de ataque pero no a quién
+            // se podía atacar.
+            _puedeAtacarOculto(atacante) {
+                if (!atacante) return false;
+                const t = getCardTemplate(atacante.id) || {};
+                return !!(t.canAttackStealth || t.treatAttacksAsSpecial || atacante.treatAttacksAsSpecial);
+            }
+
             _estaOculta(card) {
                 return !!(card.stealth || (card.status && card.status.oculto && card.status.oculto.duration > 0));
             }
@@ -11874,7 +11887,7 @@
                             if (hasTaunt) {
                                 if (getCardTemplate(card.id).isTaunt) isTargetable = true;
                             } else {
-                                if (!card.stealth || (templateSelected && templateSelected.canAttackStealth)) isTargetable = true;
+                                if (!card.stealth || this._puedeAtacarOculto(this.selectedCard)) isTargetable = true;
                             }
                         } else if (this.inputState === 'SELECT_ABILITY_TARGETS') {
                             let isTargetableAbility = false;
@@ -11893,7 +11906,7 @@
                                     if (hasTaunt && !getCardTemplate(card.id).isTaunt) {
                                         isTargetableAbility = false;
                                     }
-                                    if (card.stealth && !(templateSelected && templateSelected.canAttackStealth)) {
+                                    if (card.stealth && !this._puedeAtacarOculto(this.selectedCard)) {
                                         isTargetableAbility = false;
                                     }
                                 }

@@ -3319,6 +3319,10 @@ const CARD_DB = [
     {
         name: "Infusión de maná", type: "Ayuda", subtype: "Técnica", tags: ["Equipable"], cost: 1, rarity: "B", series: 1,
         text: "Coste: 2 de Furor. Anéxasela al aliado que tributó: todos sus ataques normales cuentan como especiales mientras la lleve.",
+        // Su efecto no son números, así que no sale solo por `_statMods`: sin esta línea el
+        // portador no explicaba en el detalle por qué sus ataques son especiales (Toto,
+        // 23-ago-2026). Mismo campo que ya usaba Milkor MGL.
+        efectoEquipadoTexto: "Sus ataques normales cuentan como especiales",
         abilities: [
             { trigger: "JUGAR", requisitos: [
                 { count: { filtros: [ { campo: "furor", op: ">=", valor: 2 } ] }, op: ">=", valor: 1, msg: "No tienes ningún aliado con 2 o más de Furor para pagar el coste." } ] },
