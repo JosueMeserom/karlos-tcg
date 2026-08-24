@@ -1368,15 +1368,20 @@
             const deltaX = defRect.left - attRect.left;
             const deltaY = defRect.top - attRect.top;
 
-            attackerEl.style.transition = "transform 0.15s cubic-bezier(0.4, 0, 1, 1)";
+            // SUAVIZADO (Toto, 23-ago-2026): la ida era un acelerón de 150 ms y el rechazo lo
+            // mandaba un 20% MÁS ATRÁS de donde salió, que se leía como un latigazo. Se alarga
+            // un pelo la embestida, se le quita el tramo final de aceleración a su curva, y el
+            // rebote se queda en la mitad de lejos y con más tiempo para frenar. Mismo gesto,
+            // solo que no da la sensación de tirón.
+            attackerEl.style.transition = "transform 0.22s cubic-bezier(0.4, 0, 0.7, 1)";
             attackerEl.style.transform = `translate(${deltaX * 0.5}px, ${deltaY * 0.5}px) scale(1.1)`;
             attackerEl.style.zIndex = 1000;
 
-            if (window.game) await window.game.sleep(150);
-            else await new Promise(r => setTimeout(r, 150));
+            if (window.game) await window.game.sleep(220);
+            else await new Promise(r => setTimeout(r, 220));
 
-            attackerEl.style.transition = "transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
-            attackerEl.style.transform = `translate(${deltaX * -0.2}px, ${deltaY * -0.2}px) scale(0.9)`;
+            attackerEl.style.transition = "transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.1)";
+            attackerEl.style.transform = `translate(${deltaX * -0.1}px, ${deltaY * -0.1}px) scale(0.94)`;
             
             if (attackerCard) attackerCard.style.filter = "brightness(1.5) sepia(1) hue-rotate(-50deg) saturate(3)"; 
 
@@ -1389,10 +1394,10 @@
                 defenderCard.style.boxShadow = "0 0 25px #38bdf8, 0 0 10px white"; 
             }
 
-            if (window.game) await window.game.sleep(250);
-            else await new Promise(r => setTimeout(r, 250));
+            if (window.game) await window.game.sleep(300);
+            else await new Promise(r => setTimeout(r, 300));
 
-            attackerEl.style.transition = "transform 0.3s ease-out";
+            attackerEl.style.transition = "transform 0.35s ease-out";
             // Se LIMPIA el transform en vez de fijarlo a scale(1): un scale(1) en línea pisa
             // el scale(1.2) que da `.selected`, así que un atacante que sigue resaltado
             // encogía al acabar la embestida y volvía a crecer de golpe en el siguiente
