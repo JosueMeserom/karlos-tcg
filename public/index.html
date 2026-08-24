@@ -3814,7 +3814,13 @@
                     card.currentHp += amount;
                     text = amount > 0 ? `+${amount} VIDA` : `${amount} VIDA`;
                     color = amount > 0 ? "ft-green" : "ft-red";
-                    if (amount < 0 && card.stealth) {
+                    // SOLO el Oculto que viene de un ESTADO se revela con el daño (Toto,
+                    // 23-ago-2026). Las fuentes PERMANENTES -Edrielle por Pasiva, Súcubo desde su
+                    // Activa- lo reimponen en la siguiente pasada de pasivas, así que anunciar
+                    // "REVELADO" era mentira: la carta seguía Oculta y el flotante decía lo
+                    // contrario. `_ocultoPorEstado` es justo la marca de "esto lo puso un estado
+                    // con duración, y nadie lo va a reponer".
+                    if (amount < 0 && card.stealth && card._ocultoPorEstado) {
                         card.stealth = false;
                         // Y EL ESTADO TAMBIÉN (Toto, 23-ago-2026). Desde que el Oculto es un
                         // estado con duración, `stealth` es solo la vista rápida que se DERIVA de

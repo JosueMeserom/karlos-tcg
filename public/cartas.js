@@ -2267,7 +2267,11 @@ const CARD_DB = [
                   efectos: [
                     // Ya comprometido: la marioneta está elegida y el Furor se cobra aquí, así
                     // que esta segunda elección no se puede cancelar.
-                    { op: "ELEGIR", de: "TODOS", cantidad: 1, cancelable: false, sinOcultosEnemigos: true,
+                    // Un Oculto es un Oculto, sea de quien sea (Toto, 23-ago-2026): no se le
+                    // puede ordenar un ataque normal ni contra los tuyos. La vieja sí dejaba
+                    // señalar a un aliado propio Oculto; era un descuido, no una regla.
+                    { op: "ELEGIR", de: "TODOS", cantidad: 1, cancelable: false,
+                      filtros: [ { campo: "stealth", op: "falsy" } ],
                       titulo: "DOMINIO: ¿a quién le ordenas atacar?",
                       efectos: [
                         { op: "ORDENAR_ATAQUE", atacante: { selfLista: "dominioMarioneta" },
@@ -9358,9 +9362,6 @@ const DSL = {
             pool = pool.filter(x => (e.filtros || []).every(f => DSL._match(x, f)) &&
                                     (!e.algunFiltro || e.algunFiltro.some(f => DSL._match(x, f))));
             pool = pool.filter(x => !((getCardTemplate(x.id) || {}).isAvatar)); // Kami: intocable
-            // `sinOcultosEnemigos`: a los Ocultos TUYOS los ves y puedes señalarlos; a los del
-            // rival, no. No es lo mismo que filtrar `stealth` a secas.
-            if (e.sinOcultosEnemigos) pool = pool.filter(x => !(x.stealth && x.owner !== ownerId));
             // UN EQUIPO POR TIPO. Estaba puesto en DSL._pool y NO SERVIA DE NADA: el ELEGIR se
             // construye su pool a mano, aqui mismo, y nunca pasa por _pool (Toto lo vio jugando:
             // la Espada V seguia elegible sobre un Karlos que ya llevaba la Shichishito).

@@ -5,6 +5,10 @@
 // ordenar a un enemigo que ataque a un aliado tuyo, ordenarle que ataque a OTRO enemigo (que es
 // lo jugoso de la carta), y el rechazo cuando no hay marioneta posible.
 //
+// UNA REGLA CAMBIA A PROPÓSITO (Toto, 23-ago-2026): la vieja dejaba ordenar un ataque contra un
+// aliado PROPIO que estuviera Oculto -solo bloqueaba a los Ocultos enemigos-. Un Oculto es un
+// Oculto: ahora no se puede señalar a ninguno. Era un descuido de la vieja, no una regla.
+//
 // SEGUIMIENTO no entra aquí: sigue siendo imperativo (expone la mano rival en cada pasada de
 // pasivas y saca un botón para mirar el mazo), y esta suite cubre lo migrado.
 'use strict';

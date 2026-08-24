@@ -128,6 +128,31 @@ const aviso = (c) => (c.tempEffects || []).find(e => e.sourceInstanceId === c.in
         check('...y no vuelve en la siguiente pasada de pasivas', !mill.stealth);
     }
 
+    console.log('--- El REVELADO es solo para el Oculto de estado ---');
+    {
+        // Edrielle está Oculta PERMANENTEMENTE por su Pasiva, que se la repone en cada pasada de
+        // pasivas: anunciar "REVELADO" al golpearla era mentir, porque un instante después seguía
+        // Oculta. El aviso es solo para el Oculto que pone un ESTADO, que es el único que nadie
+        // repone (Toto, 23-ago-2026).
+        const { ctx, g } = await mesa({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: ['Mill', 'Mini-tigre'] },
+            p2: { vanguardia: [{ carta: 'Edrielle', vida: 9 }] },
+        });
+        const edrielle = g.players.p2.vanguard[0];
+        g.updatePassives();
+        check('Edrielle está Oculta por su Pasiva', edrielle.stealth === true);
+        const antes = ctx.flotantes.length;
+        g.modifyStat(edrielle, 'currentHp', -1);
+        g.updatePassives();
+        // El REVELADO sale con 400 ms de retraso (setTimeout en modifyStat), así que hay que
+        // dejar correr los temporizadores antes de mirar los flotantes.
+        await asentar(ctx);
+        const nuevos = ctx.flotantes.slice(antes).map(f => f.texto);
+        check('...y al recibir daño NO se anuncia REVELADO', !nuevos.includes('REVELADO'), nuevos.join(' · '));
+        check('...porque sigue Oculta', edrielle.stealth === true);
+    }
+
     console.log('--- MOTOCICLETA: cada uno ocupa el sitio del otro ---');
     {
         // La Activa sigue siendo imperativa, pero su colocación estaba mal: filtraba a las cuatro
