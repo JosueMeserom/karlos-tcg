@@ -1727,7 +1727,7 @@ const CARD_DB = [
         // si fuera parte de la Pasiva; con el prefijo Requisito: sale en su propia caja del
         // detalle, como el resto de cartas condicionadas (Toto, 5-ago-2026). No es un Coste: no
         // pierdes nada al colocarla, es el Evento el que la trae.
-        text: "Requisito: Completar 'Entrenamiento arduo'. P: JUSTICIERA ABRASADORA: El Daño por tiempo la cura y le da +2 de Def. Aplica Daño por tiempo (2 turnos) a sí misma y al rival tras combatir. A: AL-FÉNIX (4F): Ataca a un máximo de 3 en vanguardia y 1 en retaguardia.",
+        text: "Requisito: Completar 'Entrenamiento arduo'. P: JUSTICIERA ABRASADORA: El Daño por tiempo la cura y le da +2 de Def. Aplica Daño por tiempo (2 turnos) a sí misma y al rival tras combatir. A: AL-FÉNIX (4F): Ataca a hasta 3 enemigos de la vanguardia y hasta 1 de la retaguardia.",
         passiveName: "JUSTICIERA ABRASADORA", activeName: "AL-FÉNIX", activeCost: 4, series: 2,
         
         onBeforePlayAsync: async function(card, game, p) {
@@ -3567,7 +3567,7 @@ const CARD_DB = [
     },
     {
         name: "Granada de maná", type: "Ayuda", subtype: "Mágico", rarity: "C", cost: 1, series: 1,
-        text: "Coste: 2 de Furor o bien 1 de Furor si paga Eris. Consumible, a distancia. Quita 1 de Vida a dos enemigos de la vanguardia, independientemente de su Def.",
+        text: "Coste: 2 de Furor o bien 1 de Furor si paga Eris. Consumible, a distancia. Quita 1 de Vida a hasta dos enemigos de la vanguardia, independientemente de su Def.",
         abilities: [
             { trigger: "JUGAR", requisitos: [
                 { count: { filtros: [ { o: [ [ { campo: "furor", op: ">=", valor: 2 } ], [ { campo: "name", op: "contieneTexto", valor: "Eris" }, { campo: "furor", op: ">=", valor: 1 } ] ] } ] }, op: ">=", valor: 1, msg: "No tienes aliados con suficiente Furor." } ] },
@@ -3688,7 +3688,7 @@ const CARD_DB = [
         // la Pasiva se queda solo para lo que el Requisito no puede cubrir: que lleguen dos por
         // otra vía (una resurrección, un clon). Ahí se destruyen los MÁS ANTIGUOS hasta que quede
         // uno, que es la regla general y no un caso particular del que acaba de entrar.
-        text: "Requisito: Ningún otro Serafín en tu campo. Coste: 4 de Furor. P: MARAVILLA: Si llega a haber dos o más Serafines en tu campo, se destruyen los más antiguos hasta que quede uno. Al colocar: cura 2 de Vida a tu vanguardia. A: CASTIGO (4F): Ataque especial a hasta 3 enemigos de la vanguardia.",
+        text: "Requisito: Ningún otro Serafín en tu campo. Coste: 4 de Furor. P: MARAVILLA: Si llega a haber dos o más Serafines en tu campo, se destruyen los más antiguos hasta que quede uno. Al colocar: cura 2 de Vida a tu vanguardia. A: CASTIGO (4F): Ataque especial a 3 enemigos de la vanguardia.",
         passiveName: "MARAVILLA", activeName: "CASTIGO", activeCost: 4,
         abilities: [
             // El tributo, declarativo. Antes era un onBeforePlayAsync escrito a mano.
@@ -3728,17 +3728,19 @@ const CARD_DB = [
                   log: "¡MARAVILLA! No puede haber dos Serafines: {objetivo} se desvanece." } ] },
 
             { trigger: "ACTIVA", nombre: "CASTIGO", coste: { furor: 4 },
-              // HASTA 3, no 3 exactos (Toto, 21-ago-2026): con el cupo fijo la Habilidad quedaba
-              // muerta salvo con la vanguardia rival medio llena, y así la carta es más jugosa.
-              // Mismo mecanismo que AL-FÉNIX: el cupo se ajusta a los enemigos que hay, se puede
-              // parar antes con el botón, y al elegir al último que queda arranca solo.
-              target: { quien: "ENEMIGO", cantidad: 3, hastaCantidad: true, permitirParar: true },
+              // TRES EXACTOS, y es una decisión de EQUILIBRIO, no una limitación técnica (Toto,
+              // 23-ago-2026, revirtiendo el "hasta 3" del 21-ago): la carta ya es fuerte de
+              // sobra, y exigir la vanguardia rival medio llena es justo lo que la frena. Zoe
+              // (calcinante) sí se queda con su "hasta", que ahí el tope es el reparto entre
+              // filas. Ver §21 de la rúbrica: el texto lo dice sin "hasta", y eso significa que
+              // hacen falta los tres o la Habilidad no arranca.
+              target: { quien: "ENEMIGO", cantidad: 3 },
               // El texto dice "de la vanguardia": sin esto, el "¿quedan objetivos?" contaría
               // también la retaguardia y la elección no se cerraría sola.
               validarObjetivo: [ { campo: "location", op: "==", valor: "vanguard", msg: "Debe ser de vanguardia." } ],
               requisitos: [
-                { count: { quien: "ENEMIGO", zona: "vanguardia" }, op: ">=", valor: 1,
-                  msg: "No hay enemigos en la vanguardia del rival para CASTIGO." } ],
+                { count: { quien: "ENEMIGO", zona: "vanguardia" }, op: ">=", valor: 3,
+                  msg: "CASTIGO necesita 3 enemigos en la vanguardia del rival." } ],
               log: "¡{carta} imparte su CASTIGO divino!",
               efectos: [ { op: "ATACAR", especial: true } ] }
         ],

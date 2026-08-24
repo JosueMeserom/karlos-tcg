@@ -174,40 +174,21 @@ const escenarios = [
         pasos: [ { habilidad: 'Serafín' } ],
     },
     {
-        // REESCRITO (Toto, 21-ago-2026): CASTIGO pasa de "3 exactos" a "HASTA 3". Con el cupo fijo
-        // la Habilidad quedaba muerta salvo con la vanguardia rival medio llena; así la carta es
-        // más jugosa. Este escenario fijaba justo lo contrario -que con dos enemigos se
-        // rechazara- y ahora fija que SÍ se puede, golpeando a los dos que hay.
-        // La vieja no puede: su CASTIGO exige tres y ni arranca, así que la divergencia es total.
-        nombre: 'CASTIGO con solo 2 enemigos: ya NO se rechaza, golpea a los dos (la vieja exigía 3)',
+        // REVERTIDO (Toto, 23-ago-2026): CASTIGO vuelve a exigir TRES exactos. El "hasta 3" del
+        // 21-ago se probó y hacía la carta demasiado fuerte -es un Arcángel, y la familia ya
+        // gana sola-, así que el cupo fijo vuelve a ser lo que la frena. Zoe (calcinante) se
+        // queda con su "hasta": ahí el tope es el reparto entre filas, no la potencia.
+        // Con dos enemigos, la Habilidad no arranca: las dos bases coinciden otra vez.
+        // La NUEVA lo rechaza al pulsar la Habilidad (requisito de 3 enemigos); la VIEJA llega a
+        // abrir el modal de confirmación y se planta después, así que ese paso va `soloEn: vieja`.
+        nombre: 'CASTIGO con solo 2 enemigos: se rechaza (hacen falta 3)',
         turno: 2, turnoDe: 'p1', empieza: 'p2',
         p1: { vanguardia: [{ carta: 'Serafín', furor: 4 }] },
         p2: { vanguardia: [{ carta: 'Mini-tigre', vida: 9 }, { carta: 'Robot de seguridad SP', vida: 9 }] },
-        pasos: [
-            { soloEn: 'nueva', habilidad: 'Serafín' },
-            { soloEn: 'nueva', confirmar: true },
-            // Al elegir al último enemigo que queda se alcanza el cupo y los ataques arrancan
-            // solos, sin pulsar OK: mismo comportamiento que AL-FÉNIX.
-            { soloEn: 'nueva', elegir: ['Mini-tigre', 'Robot de seguridad SP'] },
-        ],
-        // Todo lo que la nueva hace y la vieja ni empieza. Se declara entero, que es la forma de
-        // dejar por escrito que la divergencia es la que se buscaba y no un descuido.
-        logsSoloNueva: [
-            { linea: '¡Serafín imparte su CASTIGO divino!', motivo: 'ídem: la vieja no llega a lanzarla' },
-            { linea: 'Mini-tigre [1] de J2 (Jugador 2) recibe 5 daño (9 Vida -> 4).', motivo: 'el ataque especial al primer enemigo' },
-            { linea: 'Robot de seguridad SP [1] de J2 (Jugador 2) recibe 7 daño (9 Vida -> 2).', motivo: 'y al segundo' },
-        ],
-        flotantesSoloNueva: [
-            { linea: '-4 FUR', motivo: 'la nueva paga el coste porque sí usa la Habilidad' },
-            { linea: 'CASTIGO', motivo: 'y anuncia la Activa' },
-            { linea: '-5 VIDA', motivo: 'el daño al primer enemigo' },
-            { linea: '-7 VIDA', motivo: 'y al segundo' },
-        ],
+        pasos: [ { habilidad: 'Serafín' }, { soloEn: 'vieja', confirmar: true } ],
         diferenciasEsperadas: [
-            { contiene: 'p1.vanguard.0.furor', motivo: 'la nueva SÍ usa la Habilidad y paga sus 4 de Furor; la vieja la rechaza por no haber 3 enemigos' },
-            { contiene: 'p1.vanguard.0.exhausted', motivo: 'ídem: la nueva gasta la acción del turno' },
-            { contiene: 'p2.vanguard.0.currentHp', motivo: 'el primer enemigo recibe el ataque especial, que en la vieja no llega a ocurrir' },
-            { contiene: 'p2.vanguard.1.currentHp', motivo: 'y el segundo' },
+            { contiene: 'pendingAbilityTarget',
+              motivo: 'la vieja te deja empezar a elegir objetivos y se queda esperando unos que no existen; la nueva lo rechaza al pulsar la Habilidad, que es la norma: no se arranca lo que no puede terminar' },
         ],
     },
     {

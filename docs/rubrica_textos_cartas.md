@@ -826,3 +826,34 @@ espiando el cartel de fase: **para cuando se anuncia el ROBO, el relevo ya está
 **Redacción.** Desde el turno en el que se pone la marca, el turno del rival es el **próximo**:
 se escribe «durante el **próximo** turno del rival» en las dos cartas, no «durante el turno del
 rival» en una y con «próximo» en la otra.
+
+---
+
+## §21. «A N» es N EXACTOS; «a hasta N» se adapta (Toto, 23-ago-2026)
+
+Una Habilidad que golpea o afecta a varios objetivos se escribe de **una de estas dos formas, y
+no hay tercera**. La forma elegida no es un matiz de redacción: **es la regla**.
+
+| Texto | Qué significa | Cómo se declara |
+|---|---|---|
+| `a 3 enemigos` | **Tres exactos.** Si no hay tres objetivos válidos, la Habilidad **no arranca** y lo dice al pulsarla | `target: { cantidad: 3 }` + un `requisito` de `>= 3` |
+| `a hasta 3 enemigos` | **De uno a tres.** El cupo se ajusta a los que haya y se puede parar antes con el botón | `hastaCantidad: true` + `permitirParar: true` + un `requisito` de `>= 1` |
+
+**El cupo fijo es una herramienta de equilibrio, no una limitación técnica.** CASTIGO (Serafín)
+pide tres exactos a propósito: la familia de los ángeles ya gana sola, y exigir la vanguardia
+rival medio llena es justo lo que la frena. AL-FÉNIX (Zoe calcinante) sí es «hasta», porque ahí
+lo que limita es el **reparto entre filas** (hasta 3 delante y hasta 1 detrás), no la potencia.
+
+**Reglas de escritura:**
+- La fórmula es **«hasta N»**, siempre. Nada de «un máximo de N», «hasta un total de N» ni
+  «N o menos»: una sola forma para que no haya que interpretar.
+- Con cupo fijo, **el número va a secas** (`a 2 enemigos`), sin «hasta» ni «máximo» en ninguna
+  parte de esa frase.
+- Si los objetivos tienen que ser **distintos**, se dice: `a 2 enemigos distintos`.
+- El mensaje de rechazo dice **cuántos hacen falta**, no solo que no se puede
+  («CASTIGO necesita 3 enemigos en la vanguardia del rival»).
+
+**Lo comprueba la máquina.** `node tests/auditar_textos.js` compara el texto con la declaración y
+falla si se contradicen: una Habilidad con `hastaCantidad` cuyo texto no dice «hasta N», o una de
+cupo fijo cuyo texto sí lo dice. Es la clase de desajuste que nadie nota leyendo, porque las dos
+frases suenan bien.

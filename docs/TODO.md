@@ -69,7 +69,12 @@ Norma a partir de ahora: cada pieza nueva del DSL entra también en el editor.
 
 ## 6. Decisiones cerradas (para no volver a preguntarlas)
 
-- **DERRENGAR y CASTIGO son "HASTA 3"**, no 3 exactos: con el cupo fijo quedaban muertas salvo con la vanguardia rival medio llena, y así son más jugosas. Con el botón de parar y cierre automático al no quedar objetivos, como AL-FÉNIX.
+- **«A N» es N EXACTOS; «a hasta N» se adapta** (23-ago-2026, rúbrica §21). La forma de escribirlo
+  ES la regla, y el cupo fijo es una herramienta de EQUILIBRIO: **CASTIGO (Serafín) vuelve a pedir
+  3 exactos** -se probó como "hasta 3" el 21-ago y deja la carta demasiado fuerte-, mientras que
+  **AL-FÉNIX (Zoe calcinante) se queda con "hasta"**, porque ahí lo que limita es el reparto entre
+  filas. `DERRENGAR` (Nethuns) sigue como "hasta 3": no es un Arcángel y no se tocó. Lo vigila
+  `auditar_textos` comparando el texto con la declaración.
 - **'Tecnología' es un SUBTIPO**, no una etiqueta. Estaba bien así.
 - **La gramática del requisito depende del TIPO**: un Evento escribe `Requiere X.` y una carta
   normal `Requisito: X.`, y no son intercambiables — la equivocada se queda como prosa suelta, sin

@@ -279,6 +279,28 @@ for (const c of CARTAS) {
         add('REACTIVO-MUDO', c, `tiene ${triggers.filter(x => T_REACTIVO.includes(x)).join('/') || hooks.join('/')} pero el texto no dice cuándo se dispara`);
     }
 
+    // --- §21: "a N" es N exactos; "a hasta N" se adapta ---
+    // La forma de escribirlo ES la regla, así que el texto y la declaración tienen que decir lo
+    // mismo. Es un desajuste que nadie ve leyendo -las dos frases suenan bien- y que cambia por
+    // completo cuándo se puede usar la Habilidad.
+    for (const ab of (c.abilities || [])) {
+        const _t = ab.target || {};
+        const _elegir = (ab.efectos || []).find(e => e.op === 'ELEGIR') || {};
+        const n = _t.cantidad || _elegir.cantidad;
+        if (!n || n < 2) continue;
+        const flexible = !!(_t.hastaCantidad || _t.permitirParar || _elegir.hastaCantidad || _elegir.permitirParar);
+        // "hasta 3" o "hasta tres": las dos valen, que los textos del juego mezclan cifra y
+        // palabra según lo que se lea mejor en la caja.
+        const diceHasta = /hasta\s+(\d+|dos|tres|cuatro|cinco)\b/i.test(tl);
+        const diceMaximo = /(un\s+m[áa]ximo\s+de|o\s+menos)/i.test(tl);
+        if (flexible && !diceHasta) {
+            add('CUPO-MUDO', c, `elige HASTA ${n} objetivos pero el texto no dice "hasta ${n}" (§21)`);
+        }
+        if (!flexible && (diceHasta || diceMaximo)) {
+            add('CUPO-MUDO', c, `pide ${n} objetivos EXACTOS pero el texto dice "hasta"/"máximo" (§21)`);
+        }
+    }
+
     // --- Banderas de plantilla que el texto calla ---
     for (const [bandera, palabras] of Object.entries(BANDERAS)) {
         if (c[bandera] !== true) continue;
