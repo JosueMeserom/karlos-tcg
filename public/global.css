@@ -1206,3 +1206,99 @@ button.game-btn:disabled { background: #64748b; cursor: not-allowed; opacity: 0.
     box-shadow: 0 0 22px rgba(167, 139, 250, 0.95), 0 0 10px rgba(167, 139, 250, 0.7) inset;
     transition: box-shadow 0.2s ease, border-color 0.2s ease;
 }
+
+/* ==========================================================================
+   ATADURA (Toto, 26-ago-2026): la animación de ANEXAR, común a todas las
+   Habilidades que unen una carta a otra (ZOMBIFICAR, Kazuo, Gladiador...).
+   Gama propia -turquesa/cian, "hilo de energía"-: el rojo es daño, el verde
+   bonos, el violeta lo mental y el ámbar/esmeralda las auras, así que un
+   vínculo necesitaba color propio. Dos gestos hermanos:
+     · UNIR:    el hilo CRECE de una carta a la otra y ata (eslabones que
+                viajan por él y un aro que se cierra sobre el anexado).
+     · ROMPER:  el hilo ya está puesto, se TENSA y se PARTE por la mitad;
+                los dos cabos se recogen hacia sus cartas y sueltan chispas.
+   Los dos números (--ang, --dist) los pone quien anima, como en mind-wave.
+   ========================================================================== */
+@keyframes ataduraCrece {
+    0%   { transform: translate(0, -50%) rotate(var(--ang, 0deg)) scaleX(0); opacity: 0; }
+    15%  { opacity: 1; }
+    100% { transform: translate(0, -50%) rotate(var(--ang, 0deg)) scaleX(1); opacity: 0.95; }
+}
+@keyframes ataduraSeVa {
+    0%   { opacity: 0.95; }
+    100% { opacity: 0; }
+}
+.annex-cord {
+    position: fixed; height: 4px; margin: 0;
+    transform-origin: 0 50%;
+    border-radius: 2px;
+    background: linear-gradient(90deg, rgba(34, 211, 238, 0.25) 0%, #67e8f9 45%, #a5f3fc 100%);
+    filter: drop-shadow(0 0 8px rgba(34, 211, 238, 0.95));
+    animation: ataduraCrece 0.42s cubic-bezier(0.22, 0.9, 0.3, 1) forwards;
+}
+.annex-cord.se-va { animation: ataduraSeVa 0.3s ease-out forwards; }
+
+/* Eslabones que recorren el hilo, como en mind-wave pero cuadrados: se leen
+   como piezas de una cadena, no como ondas. */
+@keyframes eslabonViaja {
+    0%   { transform: translate(-50%, -50%) rotate(var(--ang, 0deg)) translateX(0) scale(0.5); opacity: 0; }
+    20%  { opacity: 1; }
+    100% { transform: translate(-50%, -50%) rotate(var(--ang, 0deg)) translateX(var(--dist, 0px)) scale(1); opacity: 0; }
+}
+.annex-link {
+    position: fixed; width: 16px; height: 16px; margin: 0;
+    border: 3px solid #a5f3fc; border-radius: 5px;
+    filter: drop-shadow(0 0 7px rgba(34, 211, 238, 0.9));
+    animation: eslabonViaja 0.5s ease-out forwards;
+}
+
+/* El aro que se cierra sobre la carta que queda atada. */
+@keyframes ataduraCierra {
+    0%   { transform: translate(-50%, -50%) scale(1.5) rotate(0deg); opacity: 0; }
+    35%  { opacity: 0.95; }
+    100% { transform: translate(-50%, -50%) scale(0.82) rotate(90deg); opacity: 0; }
+}
+.annex-ring {
+    position: fixed; width: 74px; height: 74px; margin: 0;
+    border: 4px solid #22d3ee; border-radius: 14px;
+    box-shadow: 0 0 16px rgba(34, 211, 238, 0.9), inset 0 0 12px rgba(103, 232, 249, 0.75);
+    animation: ataduraCierra 0.5s ease-out forwards;
+}
+
+/* RUPTURA: el hilo se tensa un instante y se parte. Cada cabo se recoge hacia
+   su carta (scaleX a 0 desde su propio extremo) y pierde el color: el cian se
+   apaga a gris con un latigazo. */
+@keyframes cabo1 {
+    0%   { transform: translate(0, -50%) rotate(var(--ang, 0deg)) scaleX(1); opacity: 0.95; }
+    22%  { transform: translate(0, -50%) rotate(var(--ang, 0deg)) scaleX(1.06); opacity: 1; }
+    100% { transform: translate(0, -50%) rotate(var(--ang, 0deg)) scaleX(0); opacity: 0; }
+}
+@keyframes cabo2 {
+    0%   { transform: translate(0, -50%) rotate(var(--ang, 0deg)) scaleX(-1); opacity: 0.95; }
+    22%  { transform: translate(0, -50%) rotate(var(--ang, 0deg)) scaleX(-1.06); opacity: 1; }
+    100% { transform: translate(0, -50%) rotate(var(--ang, 0deg)) scaleX(0); opacity: 0; }
+}
+.annex-cord.roto-1 { animation: cabo1 0.42s cubic-bezier(0.5, -0.4, 0.7, 1) forwards; }
+.annex-cord.roto-2 { animation: cabo2 0.42s cubic-bezier(0.5, -0.4, 0.7, 1) forwards; }
+.annex-cord.roto-1, .annex-cord.roto-2 {
+    background: linear-gradient(90deg, rgba(148, 163, 184, 0.2) 0%, #cbd5e1 60%, #f1f5f9 100%);
+    filter: drop-shadow(0 0 7px rgba(148, 163, 184, 0.85));
+}
+/* El chasquido del punto de ruptura. */
+@keyframes chasquido {
+    0%   { transform: translate(-50%, -50%) scale(0.3); opacity: 0; }
+    30%  { opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(1.9); opacity: 0; }
+}
+.annex-snap {
+    position: fixed; width: 40px; height: 40px; margin: 0;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.95) 0%, rgba(203, 213, 225, 0.6) 45%, rgba(148, 163, 184, 0) 72%);
+    animation: chasquido 0.4s ease-out forwards;
+}
+/* Y la carta que se suelta parpadea al quedarse libre. */
+@keyframes seSuelta {
+    0%, 100% { box-shadow: none; }
+    45%      { box-shadow: 0 0 20px rgba(203, 213, 225, 0.9), 0 0 10px rgba(203, 213, 225, 0.6) inset; }
+}
+.card.annex-free { animation: seSuelta 0.45s ease-out; }

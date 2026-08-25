@@ -4,14 +4,20 @@
 // fichero: ocho hooks, ninguno comprobado. Los caminos que tiene:
 //   · RAÍCES NINJA, sus dos mitades: +1 de Furor cuando el Furor viene de una CARTA (no de la
 //     fase) y la expansión de Vida máxima al curarse de más CON UNA AYUDA (hasta 6).
-//   · ZOMBIFICAR anexando y ZOMBIFICAR soltando: son el mismo señalamiento (`alterna`).
+//   · ZOMBIFICAR anexando y ZOMBIFICAR soltando: la Habilidad pregunta cuál de las dos SOLO si
+//     ya hay zombis en pie, y soltar admite "hasta todos" (el patrón de AL-FÉNIX).
 //   · La regeneración de 2 al zombi al final de su turno.
 //
-// LA HABILIDAD CAMBIA A PROPÓSITO (Toto, 25-ago-2026), al reescribir su texto: "si se vuelve a
-// usar esta habilidad en un zombi, se deshace el anexo". Antes abría un modal de dos botones y
-// el de deshacer soltaba TODOS los anexos de golpe; ahora lo decide a quién señalas, y suelta
-// solo a ese. Los dos escenarios de la segunda activación comparan justo eso, con la vieja
-// parada en su modal. Con el cambio se van también ese modal y su aviso de confirmación.
+// LA HABILIDAD CAMBIA A PROPÓSITO (Toto, 26-ago-2026), al reescribir su texto. Frente a la base
+// congelada, que abría un modal de dos botones SIEMPRE que hubiera anexos y cuyo botón de
+// deshacer los soltaba TODOS de golpe:
+//   · sin zombis en pie no hay nada que preguntar y va directa a elegir a quién zombificar;
+//   · con zombis pregunta, y el modal lleva CANCELAR (norma del coste: hasta que no se toca un
+//     anexo no se ha gastado nada);
+//   · soltar es una elección "hasta N" sobre el tablero, con reborde verde y botón de parar,
+//     igual que AL-FÉNIX: sueltas los que quieras, uno o todos.
+// Los escenarios de la segunda activación comparan justo eso, con la vieja parada en su modal.
+// De paso desaparece su aviso de confirmación (getAbilityWarning): ya no hay nada que avisar.
 'use strict';
 const { correrSuite } = require('./harness');
 
@@ -163,6 +169,7 @@ const escenarios = [
             { finTurno: true }, { finTurno: true },
             { soloEn: 'nueva', habilidad: 'Sadame' },
             { soloEn: 'nueva', confirmar: true },
+            { soloEn: 'nueva', opcion: 'ZOMBIFICAR A UN ALIADO' },
             { soloEn: 'nueva', elegir: ['Kyle'] },
         ],
     },
@@ -193,6 +200,77 @@ const escenarios = [
         pasos: [
             { jugar: 'Longaniza' },
             { elegir: ['Sadame'] },
+        ],
+    },
+    {
+        // SOLTAR VARIOS. Aquí las dos bases van EN PARALELO, cada una por su camino: la vieja
+        // con sus botones ('ANEXAR NUEVO ALIADO' / 'DESHACER TODOS LOS ANEXOS') y la nueva con
+        // los suyos, eligiendo a los zombis en el tablero. Acaban en el mismo sitio -los dos
+        // zombis puestos y luego los dos sueltos-, así que lo que compara el escenario es
+        // justamente eso: mismo resultado, distinto camino.
+        nombre: 'ZOMBIFICAR suelta a varios zombis de una vez',
+        turno: 2, turnoDe: 'p1', empieza: 'p2',
+        // Dos Esbirros pelados como zombis (Mini-tigre, sin Pasiva ni texto) y con 1 de Vida:
+        // así las dos regeneraciones curan lo mismo en las dos bases y el diff no se llena de
+        // ruido ajeno a Sadame.
+        p1: { vanguardia: [ { carta: 'Sadame', furor: 4 }, { carta: 'Mini-tigre', vida: 1 }, { carta: 'Oso con armadura', vida: 1 } ] },
+        p2: { vanguardia: ['Robot de seguridad SP'] },
+        ...NOMBRE, ...REGEN,
+        logsSoloVieja: [
+            { linea: 'deshace todos sus anexos', motivo: 'la vieja los soltaba TODOS de un botón; la nueva suelta los que elijas, uno por uno' },
+        ],
+        flotantesSoloNueva: [
+            // El último cartel de la Habilidad: la nueva anuncia ZOMBIFICAR también al soltar,
+            // la vieja solo lo sacaba al anexar. Los cuatro anteriores (dos anexos y dos
+            // regeneraciones) salen en las dos bases.
+            { linea: 'ZOMBIFICAR · ft-ability', ocurrencia: 5,
+              motivo: 'el compilador de ACTIVA anuncia la Habilidad también en la rama de soltar' },
+        ],
+        logsSoloNueva: [
+            { linea: 'deshace el anexo de Mini-tigre', motivo: 'ídem: un log por zombi soltado' },
+            { linea: 'deshace el anexo de Oso con armadura', motivo: 'ídem' },
+        ],
+        pasos: [
+            { habilidad: 'Sadame' }, { confirmar: true },
+            { elegir: ['Mini-tigre'] },
+            { finTurno: true }, { finTurno: true },
+            { habilidad: 'Sadame' }, { confirmar: true },
+            { soloEn: 'vieja', opcion: 'ANEXAR NUEVO ALIADO' },
+            { soloEn: 'nueva', opcion: 'ZOMBIFICAR A UN ALIADO' },
+            { elegir: ['Oso con armadura'] },
+            { finTurno: true }, { finTurno: true },
+            { habilidad: 'Sadame' }, { confirmar: true },
+            // Ya no queda ningún 'Ser vivo' libre: NINGUNA de las dos pregunta ya -la vieja
+            // porque se va derecha a deshacerlos todos, la nueva porque solo le queda una rama-.
+            // La nueva sí pide a quién suelta; y al señalarlos a los dos
+            // elegir a quién suelta, y al señalarlos a los dos (el cupo) arranca sola.
+            { soloEn: 'nueva', elegir: ['Mini-tigre', 'Oso con armadura'] },
+        ],
+    },
+    {
+        // CANCELAR EL MODAL no cuesta nada: no se ha tocado ningún anexo todavía.
+        nombre: 'ZOMBIFICAR: cancelar el modal no cuesta Furor ni la acción',
+        turno: 2, turnoDe: 'p1', empieza: 'p2',
+        p1: { vanguardia: [ { carta: 'Sadame', furor: 3 }, { carta: 'Karlos', vida: 3 }, { carta: 'Kyle', vida: 2 } ] },
+        p2: { vanguardia: ['Mini-tigre'] },
+        ...NOMBRE, ...ZOMBI, ...REGEN,
+        // Las dos abren su modal en la segunda activación; la vieja no tiene botón de cancelar,
+        // así que ahí se queda -por eso su paso es distinto- y el estado final es el mismo:
+        // nadie ha pagado nada.
+        diferenciasEsperadas: [
+            { contiene: 'pendingAbilityTarget', motivo: 'la vieja se queda con su selección de objetivos abierta; la nueva ha cancelado del todo' },
+            { contiene: 'p1.vanguard.1.esZombi', motivo: 'campo posterior a la base congelada (ver ZOMBI arriba); el zombi del primer uso sigue puesto' },
+        ],
+        pasos: [
+            { habilidad: 'Sadame' }, { confirmar: true },
+            { elegir: ['Karlos'] },
+            { finTurno: true }, { finTurno: true },
+            { habilidad: 'Sadame' }, { confirmar: true },
+            // La vieja no tiene botón de cancelar: lo más parecido es entrar en 'anexar' y no
+            // llegar a elegir a nadie. Acaba igual -sin cobrar y sin gastar la acción-, con su
+            // selección de objetivos abierta.
+            { soloEn: 'vieja', opcion: 'ANEXAR NUEVO ALIADO' },
+            { soloEn: 'nueva', opcion: 'CANCELAR' },
         ],
     },
 ];

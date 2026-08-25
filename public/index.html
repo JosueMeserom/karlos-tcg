@@ -1034,6 +1034,85 @@
             destinoEl.classList.remove('casting');
         }
 
+        // ATADURA (Toto, 26-ago-2026): la animacion COMUN de anexar una carta a otra. Nace con
+        // ZOMBIFICAR, pero no es suya: cualquier Habilidad que ate dos cartas (Kazuo, Gladiador,
+        // Frikazo) pasa por el mismo op ANEXAR y por tanto por aqui, para que "anexar" se lea
+        // igual siempre. Gama propia -turquesa/cian, hilo de energia-, porque el rojo ya es dano,
+        // el verde bonos, el violeta lo mental y el ambar/esmeralda las auras.
+        //   · unir:   el hilo CRECE de quien ata a quien queda atado, con eslabones viajando por
+        //             el, y un aro se cierra sobre el anexado.
+        //   · romper: el hilo ya esta puesto, se tensa, se parte por la mitad (chasquido) y cada
+        //             cabo se recoge hacia su carta, ya sin color.
+        // Las dos mitades comparten geometria a proposito: es el mismo gesto al derecho y al reves.
+        async function animateAnnex(origenId, destinoId, romper = false) {
+            const oEl = getAnimEl(origenId);
+            const dEl = getAnimEl(destinoId);
+            if (!oEl || !dEl) return;
+            const ro = oEl.getBoundingClientRect();
+            const rd = dEl.getBoundingClientRect();
+            const x0 = ro.left + ro.width / 2, y0 = ro.top + ro.height / 2;
+            const x1 = rd.left + rd.width / 2, y1 = rd.top + rd.height / 2;
+            const ang = Math.atan2(y1 - y0, x1 - x0) * 180 / Math.PI;
+            const dist = Math.hypot(x1 - x0, y1 - y0);
+            if (!dist) return;
+
+            const capa = document.createElement('div');
+            capa.style.cssText = 'position:fixed; inset:0; pointer-events:none; z-index:1500;';
+            document.body.appendChild(capa);
+            const _hilo = (clase, desdeX, desdeY, largo) => {
+                const h = document.createElement('div');
+                h.className = 'annex-cord' + (clase ? ' ' + clase : '');
+                h.style.left = desdeX + 'px';
+                h.style.top = desdeY + 'px';
+                h.style.width = largo + 'px';
+                h.style.setProperty('--ang', ang + 'deg');
+                capa.appendChild(h);
+                return h;
+            };
+
+            if (romper) {
+                // Los dos cabos nacen en el punto de ruptura, cada uno mirando a su carta.
+                const mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
+                _hilo('roto-2', mx, my, dist / 2);   // el que se recoge hacia el origen
+                _hilo('roto-1', mx, my, dist / 2);   // y el que se recoge hacia el destino
+                const chispa = document.createElement('div');
+                chispa.className = 'annex-snap';
+                chispa.style.left = mx + 'px';
+                chispa.style.top = my + 'px';
+                capa.appendChild(chispa);
+                const libre = document.querySelector(`.card[data-id="${destinoId}"]`);
+                if (libre) libre.classList.add('annex-free');
+                await game.sleep(460);
+                if (libre) libre.classList.remove('annex-free');
+                capa.remove();
+                return;
+            }
+
+            _hilo('', x0, y0, dist);
+            // Los eslabones salen escalonados MIENTRAS el hilo crece: la cadena se forma sola.
+            for (let i = 0; i < 3; i++) {
+                const eslabon = document.createElement('div');
+                eslabon.className = 'annex-link';
+                eslabon.style.left = x0 + 'px';
+                eslabon.style.top = y0 + 'px';
+                eslabon.style.setProperty('--ang', ang + 'deg');
+                eslabon.style.setProperty('--dist', dist + 'px');
+                capa.appendChild(eslabon);
+                await game.sleep(110);
+            }
+            await game.sleep(180);
+            const aro = document.createElement('div');
+            aro.className = 'annex-ring';
+            aro.style.left = x1 + 'px';
+            aro.style.top = y1 + 'px';
+            capa.appendChild(aro);
+            await game.sleep(260);
+            // El hilo se apaga DESPUES del aro: primero se ve que ata, luego se disuelve.
+            capa.querySelectorAll('.annex-cord').forEach(h => h.classList.add('se-va'));
+            await game.sleep(300);
+            capa.remove();
+        }
+
         // INTERCEPCION (Toto, 22-ago-2026). Cuando alguien muere EN LUGAR de otro
         // (Guardaespaldas), hasta ahora no se veia nada: el motor anula el golpe antes de llamar
         // a animateAttack, asi que la carta se partia en dos de la nada. Aqui no se intercepta el

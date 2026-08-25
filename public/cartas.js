@@ -551,7 +551,7 @@ const CARD_DB = [
     },
     { 
         id: 6, name: "Sadame", hp: 2, def: 4, atk: 5, type: "Personaje", subtype: 'No-muerto', tags: ["Ninja", "Usuaria de magia"], gender: 'F', rarity: "A", 
-        text: "P: RAÍCES NINJA: Al curarse de más, su VIDA máxima sube hasta un tope de 6. Gana +1 de Furor extra de las cartas. A: ZOMBIFICAR (1F): Anexa un aliado 'Ser vivo', que mientras siga anexado, se regenera 2 de VIDA al final del turno y no puede recibir Ayudas de curación de VIDA. Si se vuelve a usar esta habilidad en un zombi, se deshace el anexo.", 
+        text: "P: RAÍCES NINJA: Al curarse de más, su VIDA máxima sube hasta un tope de 6. Gana +1 de Furor extra de las cartas. A: ZOMBIFICAR (1F): Anexa un aliado 'Ser vivo' y lo vuelve un zombi: mientras lo sea, regenera 2 de VIDA al final de tu turno y no puede recibir Ayudas que curen VIDA. Si ya tienes zombis, elige entre zombificar a otro aliado o deshacer los anexos de hasta todos tus zombis.", 
         passiveName: "RAÍCES NINJA", activeName: "ZOMBIFICAR", activeCost: 1, series: 1,
         uncopyable: true, // Zombificar usa arrays exclusivos de anexo
         // El vínculo lo crea su ACTIVA, no la Pasiva: sin este campo, el detalle lo atribuiría
@@ -579,21 +579,42 @@ const CARD_DB = [
                 { si: { fuente: "CARTAS" }, accion: { sumar: 1 },
                   log: { msg: "¡{pasiva} otorga +1 Furor extra a {carta}!", tipo: "ability" } } ] },
             { trigger: "ACTIVA", nombre: "ZOMBIFICAR", coste: { furor: 1 }, sinObjetivo: true,
+              // Puede zombificar a alguien O soltar a los que ya tiene: con que valga UNA de las
+              // dos, la Habilidad se puede usar.
               requisitos: [
-                { count: { quien: "ALIADO", excludeSelf: true,
-                           filtros: [ { campo: "subtype", op: "==", valor: "Ser vivo" } ] }, op: ">=", valor: 1,
-                  msg: "No hay aliados 'Ser vivo' en el campo para Zombificar." } ],
+                { o: [
+                    { count: { quien: "ALIADO", anexadoASelf: false,
+                               filtros: [ { campo: "subtype", op: "==", valor: "Ser vivo" } ] }, op: ">=", valor: 1 },
+                    { campo: "attachments.length", op: ">=", valor: 1 } ],
+                  msg: "No hay aliados 'Ser vivo' a los que zombificar, ni zombis que soltar." } ],
               efectos: [
-                // Un solo señalamiento decide las dos cosas: si eliges a un aliado sano lo
-                // zombificas, y si eliges a un zombi tuyo lo sueltas (`alterna`). Los zombis
-                // SIGUEN en el pool a propósito: son la mitad de la Habilidad.
-                { op: "ELEGIR", de: "ALIADOS", cantidad: 1, excluirSelf: true,
-                  filtros: [ { campo: "subtype", op: "==", valor: "Ser vivo" } ],
-                  titulo: "ZOMBIFICAR: elige un aliado 'Ser vivo' (o a un zombi tuyo, para soltarlo)",
-                  efectos: [
-                    { op: "ANEXAR", alterna: true, reverseArrowEnObjetivo: true, marcar: ["esZombi"],
-                      log: "{carta} anexa a {objetivo}.",
-                      logDesanexa: "{carta} deshace el anexo de {objetivo}." } ] } ] },
+                // Sin zombis en pie solo hay un camino, así que el modal NO se abre y va directa
+                // a elegir a quién zombificar. Con zombis, pregunta. Todo cancelable hasta que
+                // el primer ANEXAR toca el tablero: ahí es cuando se cobra el Furor.
+                { op: "OPCIONES", titulo: "ZOMBIFICAR",
+                  opciones: [
+                    { label: "ZOMBIFICAR A UN ALIADO",
+                      si: { count: { quien: "ALIADO", anexadoASelf: false,
+                                     filtros: [ { campo: "subtype", op: "==", valor: "Ser vivo" } ] }, op: ">=", valor: 1 },
+                      efectos: [
+                        { op: "ELEGIR", de: "ALIADOS", cantidad: 1, excluirSelf: true, anexadoASelf: false,
+                          filtros: [ { campo: "subtype", op: "==", valor: "Ser vivo" } ],
+                          titulo: "ZOMBIFICAR: elige un aliado 'Ser vivo'",
+                          efectos: [
+                            { op: "ANEXAR", reverseArrowEnObjetivo: true, marcar: ["esZombi"],
+                              log: "{carta} anexa a {objetivo}." } ] } ] },
+                    // Soltar: mismo patrón que AL-FÉNIX ("hasta N"). El cupo se ajusta solo al
+                    // número de zombis (`hastaCantidad`) y el botón de parar deja soltar solo a
+                    // unos cuantos; si los eliges a todos, arranca sin tener que pulsarlo.
+                    { label: "DESHACER ANEXOS",
+                      si: { campo: "attachments.length", op: ">=", valor: 1 },
+                      efectos: [
+                        { op: "ELEGIR", de: "ALIADOS", cantidad: 8, anexadoASelf: true,
+                          hastaCantidad: true, permitirParar: true,
+                          titulo: "ZOMBIFICAR: elige a qué zombis sueltas (pulsa OK al terminar)",
+                          efectos: [
+                            { op: "ANEXAR", alterna: true, marcar: ["esZombi"],
+                              logDesanexa: "{carta} deshace el anexo de {objetivo}." } ] } ] } ] } ] },
             // La regeneración del zombi, al final del turno de Sadame.
             { trigger: "FIN_TURNO", nombre: "ZOMBIFICAR", efectos: [
                 { op: "CURAR", target: { selfLista: "attachments" }, valor: 2,
@@ -7269,7 +7290,7 @@ const DSL = {
     // DSL._runReaccion, no _doEffect): controlan el resultado que la reacción
     // devuelve al motor de combate (redirigir el ataque, cancelarlo, drenar Furor
     // tras él, fijar el daño, autoataque del atacante).
-    OPS_EFECTO: ['MODIFICAR_STAT', 'CURAR', 'DAÑO', 'APLICAR_ESTADO', 'MODIFICAR_CONTADORES', 'ATACAR', 'MONEDA', 'ROBAR', 'BUSCAR', 'MARCAR', 'VER_MANO', 'LIMPIAR_ESTADOS', 'ELEGIR', 'DESTRUIR_EVENTO', 'MARCAR_TEMPORAL', 'DESCARTAR', 'EQUIPAR', 'MARCAR_JUGADOR', 'FLOTANTE', 'FIJAR_STAT', 'REDIRIGIR', 'CANCELAR_ATAQUE', 'MARCAR_DRENAJE', 'FIJAR_DAÑO', 'ATACANTE_SE_AUTOATACA', 'VOLVER_A_MANO', 'RETRIBUCION', 'SUELO_STAT', 'TECHO_STAT', 'NO_CONSUMIR', 'BONO_ATAQUE', 'MARCAR_PARTIDA', 'ESQUIVAR', 'DESEQUIPAR', 'DAÑO_ATAQUE', 'REDIRIGIR_ATAQUE', 'SECUESTRAR_STAT', 'DEVOLVER_STAT', 'CUENTA_ATRAS', 'QUITAR_MARCA', 'COLOCARSE', 'CREAR_CLON', 'INTERCAMBIAR_POSICION', 'LOG', 'ORDENAR_ATAQUE'],
+    OPS_EFECTO: ['MODIFICAR_STAT', 'CURAR', 'DAÑO', 'APLICAR_ESTADO', 'MODIFICAR_CONTADORES', 'ATACAR', 'MONEDA', 'ROBAR', 'BUSCAR', 'MARCAR', 'VER_MANO', 'LIMPIAR_ESTADOS', 'ELEGIR', 'DESTRUIR_EVENTO', 'MARCAR_TEMPORAL', 'DESCARTAR', 'EQUIPAR', 'MARCAR_JUGADOR', 'FLOTANTE', 'FIJAR_STAT', 'REDIRIGIR', 'CANCELAR_ATAQUE', 'MARCAR_DRENAJE', 'FIJAR_DAÑO', 'ATACANTE_SE_AUTOATACA', 'VOLVER_A_MANO', 'RETRIBUCION', 'SUELO_STAT', 'TECHO_STAT', 'NO_CONSUMIR', 'BONO_ATAQUE', 'MARCAR_PARTIDA', 'ESQUIVAR', 'DESEQUIPAR', 'DAÑO_ATAQUE', 'REDIRIGIR_ATAQUE', 'SECUESTRAR_STAT', 'DEVOLVER_STAT', 'CUENTA_ATRAS', 'QUITAR_MARCA', 'COLOCARSE', 'CREAR_CLON', 'INTERCAMBIAR_POSICION', 'LOG', 'ORDENAR_ATAQUE', 'OPCIONES'],
     OPS_CMP: ['==', '!=', '<=', '>=', '<', '>', 'includes', 'contieneTexto', 'includesCI', 'truthy', 'falsy'],
     QUIEN: ['SELF', 'ALIADO', 'ENEMIGO', 'TODOS', 'ATACANTE', 'DEFENSOR', 'PORTADOR', 'PAGADOR'], // ATACANTE/DEFENSOR: solo en GLOBAL_TRAS_ATAQUE y REACCION
 
@@ -7397,6 +7418,14 @@ const DSL = {
                 && x.status[spec.conEstadoDeSelf].sourceInstanceId === selfCard.instanceId;
             const _b = DSL._pool(ownerId, game, Object.assign({}, spec, { conEstadoDeSelf: null }), selfCard);
             return _b.filter(_mio);
+        }
+        // anexadoASelf (Sadame, 26-ago-2026): true = solo los que YA llevo anexados; false =
+        // solo los que no. Hermano de conMarcaTemporalPropia: una relación con self que un
+        // `filtro` no puede expresar, porque _match no ve la carta fuente.
+        if (spec.anexadoASelf !== undefined && selfCard) {
+            const _b = DSL._pool(ownerId, game, Object.assign({}, spec, { anexadoASelf: undefined }), selfCard);
+            return _b.filter(x => x.instanceId !== selfCard.instanceId
+                                  && (x.attachedTo === selfCard.instanceId) === !!spec.anexadoASelf);
         }
         if (spec.conMarcaTemporalPropia && selfCard) {
             const _dentro = (x) => x.tempEffects && x.tempEffects.some(t => t.sourceInstanceId === selfCard.instanceId);
@@ -9185,6 +9214,7 @@ const DSL = {
                 delete target.reverseArrow;
                 (e.marcar || []).forEach(k => { delete target[k]; });
                 if (e.logDesanexa) game.logMsg(DSL._fill(e.logDesanexa, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
+                if (typeof animateAnnex === 'function') { try { await animateAnnex(sourceCard.instanceId, target.instanceId, true); } catch (err) {} }
                 return true;
             }
             if (e.reverse) {
@@ -9207,6 +9237,40 @@ const DSL = {
             if (e.reverseArrowEnObjetivo) target.reverseArrow = true;
             if (e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
             if (e.floating && typeof showFloatingText === 'function') showFloatingText(sourceCard.instanceId, e.floating.texto, e.floating.estilo || 'ft-green', e.floating.offset !== undefined ? e.floating.offset : -30);
+            // La ATADURA es del OP, no de la carta: así cualquier Habilidad que anexe se lee
+            // igual (Toto, 26-ago-2026). `sinAnimacion` para quien no la quiera.
+            if (!e.sinAnimacion && typeof animateAnnex === 'function') { try { await animateAnnex(sourceCard.instanceId, target.instanceId, false); } catch (err) {} }
+            return true;
+        }
+        if (e.op === 'OPCIONES') {
+            // MODAL DE RAMAS (Sadame, 26-ago-2026): "¿zombificar a otro, o deshacer anexos?".
+            //   opciones: [ { label, si?, efectos: [...] }, ... ]
+            // Una opción cuyo `si` no se cumple NO se ofrece, y si solo queda una se ejecuta
+            // DIRECTAMENTE, sin preguntar: la pregunta solo aparece cuando de verdad hay dos
+            // caminos. Sin ninguna, la Habilidad se aborta (no cobra ni agota).
+            // Siempre lleva CANCELAR, salvo `sinCancelar: true`: hasta que no corre el primer
+            // efecto de la rama no ha cambiado nada, así que el jugador tiene que poder salirse
+            // gratis (norma del coste). Por lo mismo NO es punto de compromiso: de eso ya se
+            // encarga el primer efecto de la rama elegida (ver _runEffectList).
+            // Otras cinco cartas siguen abriendo su openChoiceModal a mano (Spencer, Wolfgang,
+            // Meca EBA, Arthas, Limo crecido): son las candidatas naturales de este op.
+            const _F = (t) => DSL._fill(t, Object.assign({}, ctx.vars, { carta: DSL._nombre(game, sourceCard) }));
+            const _ops = (e.opciones || []).filter(o => !o.si || DSL._cond(sourceCard, game, o.si));
+            if (!_ops.length) {
+                if (e.logSiNinguna) game.logError(_F(e.logSiNinguna));
+                return false;
+            }
+            let _elegida = _ops[0];
+            if (_ops.length > 1) {
+                _elegida = await new Promise(resolve => {
+                    const botones = _ops.map(o => ({ label: _F(o.label), action: () => resolve(o) }));
+                    if (!e.sinCancelar) botones.push({ label: e.etiquetaCancelar || 'CANCELAR', action: () => resolve(null) });
+                    game.openChoiceModal(_F(e.titulo || ''), botones, sourceCard.owner);
+                });
+                if (!_elegida) return false;   // cancelado: la Habilidad no llega a hacer nada
+            }
+            const _r = await DSL._runEffectList(_elegida.efectos || [], sourceCard, game, ownerId, [target].filter(Boolean), habilidad, opts);
+            if (_r && _r.ok === false) return false;   // cancelado dentro de la rama: aborta igual
             return true;
         }
         if (e.op === 'ELEGIR') {
@@ -9252,6 +9316,9 @@ const DSL = {
             // excluirSelf: la propia carta fuente ya está en el campo cuando ELEGIR corre en
             // AL_JUGAR (Kazuo/Gladiador eligiendo a quién anexar), así que el pool de ALIADOS
             // la incluiría por defecto si no se filtra explícitamente (Toto, 27-jul-2026).
+            // anexadoASelf: mismo filtro que en _pool (zombificar solo a quien no lo está,
+            // soltar solo a quien sí). ELEGIR se construye su propio pool, así que va aquí también.
+            if (e.anexadoASelf !== undefined) pool = pool.filter(x => (x.attachedTo === sourceCard.instanceId) === !!e.anexadoASelf);
             if (e.excluirSelf) pool = pool.filter(x => x.instanceId !== sourceCard.instanceId);
             if (e.sinMarcaTemporalPropia) pool = pool.filter(x => !(x.tempEffects && x.tempEffects.some(t => t.sourceId === sourceCard.id)));
             if (e.zona === 'VANGUARDIA') pool = pool.filter(x => x.location === 'vanguard');
@@ -9665,7 +9732,7 @@ const DSL = {
             // había pasado nada- y la carta se presentaba después. §14: primero se presenta, y
             // recién entonces empieza el efecto, animación incluida.
             // Cualquier efecto que NO sea una elección ya cambia algo: punto de compromiso.
-            if (e.op !== 'ELEGIR' && e.op !== 'BUSCAR') await DSL._comprometer(sourceCard, game);
+            if (e.op !== 'ELEGIR' && e.op !== 'BUSCAR' && e.op !== 'OPCIONES') await DSL._comprometer(sourceCard, game);
             if (DSL._ANIMS[e.animacion] && targets.length && !(opts && opts.sinAnimacion)) {
                 await DSL._ANIMS[e.animacion](DSL._lanzador(sourceCard), targets.map(t => t.instanceId));
             }
@@ -10656,9 +10723,17 @@ const DSL = {
             if (typeof tmpl.canActivateAbility !== 'function') {
                 tmpl.canActivateAbility = function (card, game) {
                     if (costeFuror > 0 && card.furor < costeFuror) { game.logError(`Falta Furor (${costeFuror}).`); return false; }
-                    for (const r of (activa.requisitos || [])) {
+                    // `o: [req, req]`: basta con que se cumpla UNO (Sadame puede zombificar a
+                    // alguien O deshacer anexos que ya tiene). Mismo nombre y misma idea que el
+                    // `o` de los filtros; los requisitos sueltos siguen siendo AND entre ellos.
+                    const _cumple = (r) => {
                         const val = r.count ? DSL._count(card.owner, game, r.count, card) : DSL._field(card, r.campo);
-                        if (!DSL._cmp(val, r.op, r.valor)) { if (r.msg) game.logError(DSL._fill(r.msg, { carta: card.name })); return false; }
+                        return DSL._cmp(val, r.op, r.valor);
+                    };
+                    for (const r of (activa.requisitos || [])) {
+                        if (r.o ? r.o.some(_cumple) : _cumple(r)) continue;
+                        if (r.msg) game.logError(DSL._fill(r.msg, { carta: card.name }));
+                        return false;
                     }
                     return true;
                 };
@@ -10692,7 +10767,7 @@ const DSL = {
             // adelantado, sin tocarlas una a una. El flag sigue existiendo como override
             // explícito para el caso raro que la heurística no vea.
             const _p0 = (activa.efectos || [])[0];
-            const _hayVentanaCancelable = !!_p0 && (_p0.op === 'ELEGIR' || _p0.op === 'BUSCAR') && _p0.cancelable !== false;
+            const _hayVentanaCancelable = !!_p0 && (_p0.op === 'ELEGIR' || _p0.op === 'BUSCAR' || _p0.op === 'OPCIONES') && _p0.cancelable !== false;
             const _diferir = activa.costeDiferido !== undefined ? !!activa.costeDiferido : _hayVentanaCancelable;
             const _cobrarActiva = (card, game) => {
                 // source 'avatar_passive': un Avatar (Kami) es inmune a TODA resta de stats en

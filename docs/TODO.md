@@ -34,12 +34,12 @@ ocho salieron con `soloDe` en SOBRECURACION, el trigger **FUROR_PROPIO** (que de
 hooks de Furor de **Garret** y **Meca EBA**) y `alterna` en el op **ANEXAR** — señalar a un zombi
 tuyo deshace su anexo, que es lo que dice el texto que Toto reescribió ese mismo día.
 
-Nota de esa reescritura: la Activa **cambió de mecánica**. Antes abría un modal de dos botones y
-el de deshacer soltaba TODOS los anexos; ahora lo decide a quién señalas. Llegué a escribir para
-el modal un op `OPCIONES` (ramas declarativas, con `si` por rama) y un `DESANEXAR`, y los quité al
-quedarse sin ninguna carta que los usara — están en el commit de Sadame por si vuelven a hacer
-falta: **Spencer, Wolfgang, Meca EBA, Arthas y Limo crecido** siguen abriendo su `openChoiceModal`
-a mano y son justo lo que OPCIONES resolvería.
+Su Activa **cambió de mecánica dos veces en un día**, con las dos reescrituras del texto de Toto.
+Como quedó (26-ago-2026): sin zombis en pie va directa a elegir a quién zombificar; con zombis
+pregunta (op **OPCIONES**, ramas declarativas con `si` por rama y botón de CANCELAR), y soltar es
+una elección "hasta N" en el tablero con botón de parar, igual que AL-FÉNIX. **Spencer, Wolfgang,
+Meca EBA, Arthas y Limo crecido** siguen abriendo su `openChoiceModal` a mano: son los siguientes
+usuarios naturales de OPCIONES.
 
 **Silhouette, cerrada el 25-ago-2026** (suite `tests/regresion71.js`): sus siete hooks salieron con
 cuatro piezas nuevas, todas genéricas - `eventoEnJuego` como requisito de colocación (lo compartían
