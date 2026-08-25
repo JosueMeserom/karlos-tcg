@@ -29,11 +29,17 @@ Quedan (entre paréntesis, sus hooks a mano). En total, 128 hooks escritos a man
 | **Xanadu** (4, ya híbrida) | REPULSIÓN ABSOLUTA ya es declarativa; **ESTORNUDO DEVASTADOR** se queda por lo mismo que MOTOCICLETA: el enemigo que entra depende del que sale (límite de 2 Personajes sobre la vanguardia que QUEDARÍA) |
 | **Mill** (4, ya híbrida) | su Pasiva ya es declarativa; **MOTOCICLETA** se queda: su tercer objetivo solo es válido según los dos anteriores (el límite de 2 Personajes se calcula sobre el campo que QUEDARÍA), y eso no es un filtro por campo sino una cuenta condicional |
 
-**Sadame, cerrada el 25-ago-2026** (suite `tests/regresion72.js`): sus ocho hooks salieron con
-cuatro piezas nuevas - `soloDe` en SOBRECURACION, el trigger **FUROR_PROPIO** (que de paso se
-llevó los hooks de Furor de **Garret** y **Meca EBA**), y los ops **OPCIONES** (el modal de ramas,
-que aún pueden usar Spencer, Wolfgang, Meca EBA, Arthas y Limo crecido) y **DESANEXAR**. Se le
-queda `getAbilityWarning` a mano: es el único aviso de ese tipo del juego.
+**Sadame, cerrada el 25-ago-2026** (suite `tests/regresion72.js`), sin un solo hook a mano: sus
+ocho salieron con `soloDe` en SOBRECURACION, el trigger **FUROR_PROPIO** (que de paso se llevó los
+hooks de Furor de **Garret** y **Meca EBA**) y `alterna` en el op **ANEXAR** — señalar a un zombi
+tuyo deshace su anexo, que es lo que dice el texto que Toto reescribió ese mismo día.
+
+Nota de esa reescritura: la Activa **cambió de mecánica**. Antes abría un modal de dos botones y
+el de deshacer soltaba TODOS los anexos; ahora lo decide a quién señalas. Llegué a escribir para
+el modal un op `OPCIONES` (ramas declarativas, con `si` por rama) y un `DESANEXAR`, y los quité al
+quedarse sin ninguna carta que los usara — están en el commit de Sadame por si vuelven a hacer
+falta: **Spencer, Wolfgang, Meca EBA, Arthas y Limo crecido** siguen abriendo su `openChoiceModal`
+a mano y son justo lo que OPCIONES resolvería.
 
 **Silhouette, cerrada el 25-ago-2026** (suite `tests/regresion71.js`): sus siete hooks salieron con
 cuatro piezas nuevas, todas genéricas - `eventoEnJuego` como requisito de colocación (lo compartían

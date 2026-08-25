@@ -4,12 +4,14 @@
 // fichero: ocho hooks, ninguno comprobado. Los caminos que tiene:
 //   · RAÍCES NINJA, sus dos mitades: +1 de Furor cuando el Furor viene de una CARTA (no de la
 //     fase) y la expansión de Vida máxima al curarse de más CON UNA AYUDA (hasta 6).
-//   · ZOMBIFICAR anexando, ZOMBIFICAR deshaciendo, y el modal que pregunta cuál de las dos
-//     cuando las dos son posibles.
+//   · ZOMBIFICAR anexando y ZOMBIFICAR soltando: son el mismo señalamiento (`alterna`).
 //   · La regeneración de 2 al zombi al final de su turno.
 //
-// LO QUE NO ENTRA: `getAbilityWarning` (el aviso del diálogo de confirmación) — sigue siendo un
-// hook a mano idéntico al de la base congelada, así que no hay nada que comparar.
+// LA HABILIDAD CAMBIA A PROPÓSITO (Toto, 25-ago-2026), al reescribir su texto: "si se vuelve a
+// usar esta habilidad en un zombi, se deshace el anexo". Antes abría un modal de dos botones y
+// el de deshacer soltaba TODOS los anexos de golpe; ahora lo decide a quién señalas, y suelta
+// solo a ese. Los dos escenarios de la segunda activación comparan justo eso, con la vieja
+// parada en su modal. Con el cambio se van también ese modal y su aviso de confirmación.
 'use strict';
 const { correrSuite } = require('./harness');
 
@@ -56,19 +58,6 @@ const ZOMBI = {
     ],
 };
 
-// Al deshacer los anexos, la nueva anuncia la Habilidad como cualquier otra Activa del DSL; la
-// vieja solo sacaba ese cartel al anexar.
-const DESHACE = {
-    flotantesSoloNueva: [
-        // Los tres carteles de estos escenarios, en orden: el del anexo (sobre Sadame), el de
-        // la regeneración del zombi (sobre él) y el de deshacer. Los dos primeros salen en las
-        // dos bases; el tercero es el que añade el compilador de ACTIVA al anunciar la Habilidad
-        // también en la rama de deshacer, que la vieja no anunciaba.
-        { linea: 'ZOMBIFICAR · ft-ability', ocurrencia: 3,
-          motivo: 'el compilador de ACTIVA anuncia la Habilidad también al deshacer los anexos' },
-    ],
-};
-
 const escenarios = [
     {
         // Un solo aliado apto y ningún anexo: no hay nada que preguntar, va directo a anexar.
@@ -112,48 +101,69 @@ const escenarios = [
         ],
     },
     {
-        // Sin nadie más a quien zombificar y con un anexo puesto, deshace sin preguntar.
-        nombre: 'ZOMBIFICAR deshace los anexos cuando no queda a quién zombificar',
+        // EL TOGGLE: señalar al zombi lo suelta. La vieja, en su lugar, abre su modal de ramas
+        // (o deshace directamente si no queda nadie más), así que a partir de la segunda
+        // activación los caminos se separan y solo corre la nueva.
+        nombre: 'ZOMBIFICAR sobre el propio zombi deshace su anexo',
         turno: 2, turnoDe: 'p1', empieza: 'p2',
         p1: { vanguardia: [ { carta: 'Sadame', furor: 2 }, { carta: 'Karlos', vida: 3 } ] },
         p2: { vanguardia: ['Mini-tigre'] },
-        ...NOMBRE, ...DESHACE, ...REGEN,
-        pasos: [
-            { habilidad: 'Sadame' }, { confirmar: true },
-            { elegir: ['Karlos'] },     // Karlos queda zombificado
-            { finTurno: true }, { finTurno: true },
-            { habilidad: 'Sadame' }, { confirmar: true },   // ya no hay otro Ser vivo: deshace
+        ...NOMBRE, ...REGEN,
+        logsSoloNueva: [
+            { linea: 'deshace el anexo de Karlos', motivo: 'regla nueva de Toto (25-ago-2026): se suelta al zombi que señalas; la vieja se queda en su modal de dos botones' },
         ],
-    },
-    {
-        // Con las dos cosas posibles, pregunta. Aquí se elige DESHACER.
-        nombre: 'ZOMBIFICAR pregunta cuando puede anexar y deshacer',
-        turno: 2, turnoDe: 'p1', empieza: 'p2',
-        p1: { vanguardia: [ { carta: 'Sadame', furor: 3 }, { carta: 'Karlos', vida: 3 }, { carta: 'Kyle', vida: 2 } ] },
-        p2: { vanguardia: ['Mini-tigre'] },
-        ...NOMBRE, ...DESHACE, ...REGEN,
+        flotantesSoloNueva: [
+            { linea: 'ZOMBIFICAR · ft-ability', ocurrencia: 3,
+              motivo: 'la segunda activación (la que suelta) solo ocurre en la nueva; los dos primeros carteles -anexo y regeneración- salen en las dos' },
+            { linea: '-1 FUR', ocurrencia: 2, motivo: 'ídem: el Furor de esa segunda activación' },
+        ],
+        diferenciasEsperadas: [
+            { contiene: 'p1.vanguard.0.furor', motivo: 'la vieja no llega a resolver la segunda activación: se queda con el modal abierto' },
+            { contiene: 'p1.vanguard.0.exhausted', motivo: 'ídem' },
+            { contiene: 'p1.vanguard.0.attachments', motivo: 'la nueva ha soltado a Karlos' },
+            { contiene: 'p1.vanguard.1.attachedTo', motivo: 'ídem, por el otro lado del vínculo' },
+            { contiene: 'p1.vanguard.1.reverseArrow', motivo: 'ídem con la flecha' },
+        ],
         pasos: [
             { habilidad: 'Sadame' }, { confirmar: true },
             { elegir: ['Karlos'] },
             { finTurno: true }, { finTurno: true },
-            { habilidad: 'Sadame' }, { confirmar: true },
-            { opcion: 'DESHACER' },
+            { soloEn: 'nueva', habilidad: 'Sadame' },
+            { soloEn: 'nueva', confirmar: true },
+            { soloEn: 'nueva', elegir: ['Karlos'] },     // el mismo: lo suelta
         ],
     },
     {
-        // ...y aquí se elige ANEXAR al segundo.
-        nombre: 'ZOMBIFICAR pregunta y se anexa a un segundo aliado',
+        // Y con otro aliado sano al lado, señalarlo a ÉL lo zombifica también: dos zombis a la
+        // vez. La vieja pregunta primero con su modal, así que la segunda activación es de la nueva.
+        nombre: 'ZOMBIFICAR: un segundo zombi a la vez',
         turno: 2, turnoDe: 'p1', empieza: 'p2',
         p1: { vanguardia: [ { carta: 'Sadame', furor: 3 }, { carta: 'Karlos', vida: 3 }, { carta: 'Kyle', vida: 2 } ] },
         p2: { vanguardia: ['Mini-tigre'] },
         ...NOMBRE, ...ZOMBI, ...REGEN,
+        logsSoloNueva: [
+            { linea: 'anexa a Kyle', motivo: 'la vieja se para en su modal de dos botones antes de dejar elegir' },
+        ],
+        flotantesSoloNueva: [
+            { linea: 'ZOMBIFICAR · ft-ability', ocurrencia: 3, motivo: 'la segunda activación solo ocurre en la nueva' },
+            { linea: '-1 FUR', ocurrencia: 2, motivo: 'ídem: su Furor' },
+        ],
+        diferenciasEsperadas: [
+            { contiene: 'p1.vanguard.0.furor', motivo: 'la vieja no resuelve la segunda activación' },
+            { contiene: 'p1.vanguard.0.exhausted', motivo: 'ídem' },
+            { contiene: 'p1.vanguard.0.attachments', motivo: 'la nueva acaba con dos zombis' },
+            { contiene: 'p1.vanguard.2.attachedTo', motivo: 'ídem, por el lado de Kyle' },
+            { contiene: 'p1.vanguard.2.reverseArrow', motivo: 'ídem con su flecha' },
+            { contiene: 'p1.vanguard.1.esZombi', motivo: 'el primer zombi (ZOMBI declara el genérico, aquí hacen falta los dos)' },
+            { contiene: 'p1.vanguard.2.esZombi', motivo: 'y el segundo' },
+        ],
         pasos: [
             { habilidad: 'Sadame' }, { confirmar: true },
             { elegir: ['Karlos'] },
             { finTurno: true }, { finTurno: true },
-            { habilidad: 'Sadame' }, { confirmar: true },
-            { opcion: 'ANEXAR' },
-            { elegir: ['Kyle'] },
+            { soloEn: 'nueva', habilidad: 'Sadame' },
+            { soloEn: 'nueva', confirmar: true },
+            { soloEn: 'nueva', elegir: ['Kyle'] },
         ],
     },
     {

@@ -7,7 +7,7 @@
 //
 // El motor ya lo hace solo. El compilador de ACTIVA (cartas.js) lo DEDUCE:
 //
-//     const _hayVentanaCancelable = !!_p0 && (_p0.op === 'ELEGIR' || _p0.op === 'BUSCAR' || _p0.op === 'OPCIONES')
+//     const _hayVentanaCancelable = !!_p0 && (_p0.op === 'ELEGIR' || _p0.op === 'BUSCAR')
 //                                        && _p0.cancelable !== false;
 //     const _diferir = activa.costeDiferido !== undefined ? !!activa.costeDiferido : _hayVentanaCancelable;
 //
@@ -54,7 +54,7 @@ const CARD_DB = vm.runInContext('CARD_DB', sandbox);
 // La deducción se lee del FUENTE, no se copia aquí: si alguien cambia la heurística del
 // compilador y no toca esto, la auditoría estaría midiendo una regla que ya no existe.
 const SRC = fs.readFileSync(path.join(RAIZ, 'public/cartas.js'), 'utf8');
-if (!/_hayVentanaCancelable\s*=\s*!!_p0 && \(_p0\.op === 'ELEGIR' \|\| _p0\.op === 'BUSCAR' \|\| _p0\.op === 'OPCIONES'\)\s*&& _p0\.cancelable !== false/.test(SRC)) {
+if (!/_hayVentanaCancelable\s*=\s*!!_p0 && \(_p0\.op === 'ELEGIR' \|\| _p0\.op === 'BUSCAR'\)\s*&& _p0\.cancelable !== false/.test(SRC)) {
     console.log('LA HEURÍSTICA DEL COMPILADOR HA CAMBIADO: revisar esta auditoría antes de fiarse.');
     process.exit(1);
 }
@@ -110,12 +110,8 @@ const malas = [], declaradas = [], bien = [], candados = [];
 //
 // Qué cuenta como irreversible antes de la elección: cualquier op que no sea ELEGIR... y un
 // BUSCAR en el MAZO, que abrir su visor ES el punto de compromiso (§12.bis).
-const _ramas = (e) => (e.opciones || []).reduce((acc, o) => acc.concat(o.efectos || []), []);
 const _mutaAlgo = (e) => {
     if (e.op === 'ELEGIR') return false;
-    // OPCIONES es un punto de decisión, no una mutación: preguntar qué rama quieres no cambia
-    // nada. Muta si lo hace alguna de sus ramas (25-ago-2026, con Sadame).
-    if (e.op === 'OPCIONES') return _ramas(e).some(_mutaAlgo);
     if (e.op === 'BUSCAR') {
         const zonas = Array.isArray(e.en) ? e.en : [e.en || 'DESCARTES'];
         return zonas.includes('MAZO');
@@ -129,7 +125,6 @@ function _buscarCandados(carta, hab, lista, yaHubo, ruta, saltarPrimero) {
     let hubo = yaHubo;
     (lista || []).forEach((e, i) => {
         const esEleccion = e.op === 'ELEGIR' || e.op === 'BUSCAR';
-        if (e.op === 'OPCIONES') _ramas(e).length && _buscarCandados(carta, hab, _ramas(e), hubo, ruta + ' > OPCIONES', false);
         if (esEleccion && e.cancelable === false && !hubo && !(saltarPrimero && i === 0)) {
             candados.push({ carta: carta.name, hab: hab || '(sin nombre)', ruta: ruta + ' > ' + e.op,
                             titulo: e.titulo || '' });
@@ -155,7 +150,7 @@ for (const c of CARD_DB) {
             if (!coste) continue;                       // sin coste no hay nada que cobrar antes
             const p0 = (a.efectos || [])[0];
             if (!p0) continue;
-            const esEleccion = p0.op === 'ELEGIR' || p0.op === 'BUSCAR' || p0.op === 'OPCIONES';
+            const esEleccion = p0.op === 'ELEGIR' || p0.op === 'BUSCAR';
             if (!esEleccion) { bien.push({ carta: c.name, hab: a.nombre, por: `su primer efecto (${p0.op}) ya es irreversible: se cobra al instante, como debe` }); continue; }
 
             const clave = `${c.name}|${a.nombre}`;
