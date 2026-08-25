@@ -5089,13 +5089,19 @@ const CARD_DB = [
         text: "Requisito: Karolina no está en tu vanguardia; si entra, Arthas se autodestruye. P: HERRERO LEGENDARIO: Carta dual. Como Personaje: equípalo gratis a un aliado en tu turno, dejando su hueco; si el portador cae, vuelve al campo, o a descartes si no hay sitio. Como Ayuda: anexa a un aliado sin etiqueta 'Animal salvaje' ni 'Cosa', ni sea Karolina, y le da +3 de ATQ.",
         passiveName: "HERRERO LEGENDARIO",
         
-        canPlayCard: function(card, game, p) {
-            if (p.vanguard.some(c => c.name === 'Karolina')) {
-                game.logError("Arthas se niega a actuar si Karolina lidera la vanguardia.");
-                return false;
-            }
-            return true;
-        },
+        // LO ÚNICO DECLARATIVO QUE ADMITE, de momento (25-ago-2026): el veto de Karolina al
+        // colocarla y el +3 de ATQ mientras la empuñan. El resto de Arthas es la maquinaria de
+        // carta DUAL -el modal de "¿cómo la juegas?", el botón morado propio, su onExecuteAyuda
+        // (que puede salir de la MANO o del CAMPO) y la vuelta al campo al caer su portador-, y
+        // eso no lo cubre ningún trigger ni compensa inventarlo para una sola carta: ver la
+        // suite tests/regresion73.js, escrita antes de tocar nada.
+        abilities: [
+            { trigger: "JUGAR", requisitos: [
+                { count: { quien: "ALIADO", zona: "vanguardia",
+                           filtros: [ { campo: "name", op: "==", valor: "Karolina" } ] }, op: "==", valor: 0,
+                  msg: "Arthas se niega a actuar si Karolina lidera la vanguardia." } ] },
+            { trigger: "AL_EQUIPAR", mientrasEquipado: { atk: 3 } },
+        ],
 
         // Límite de colocación alcanzado: saltamos el modal y vamos directos al modo Arma legendaria
         onDualLimitFallback: async function(card, game) {
@@ -5214,10 +5220,6 @@ const CARD_DB = [
                     }
                 }
             }
-        },
-
-        onEquipUpdate: function(equipCard, target, game) {
-            target.currentAtk += 3;
         },
 
         onUnequip: function(equipCard, hostCard, game) {
@@ -10265,15 +10267,20 @@ const DSL = {
                     if (r.count) {
                         const _rival = game.players[card.owner === 'p1' ? 'p2' : 'p1'];
                         let pool = r.count.de === 'ENEMIGOS' ? [..._rival.vanguard, ..._rival.rearguard] : [...p.vanguard, ...p.rearguard];
-                        if (r.count.zona === 'VANGUARDIA') pool = [...p.vanguard];
-                        else if (r.count.zona === 'RETAGUARDIA') pool = [...p.rearguard];
-                        else if (r.count.zona === 'DESCARTES') pool = [...p.discard];
+                        // La zona, en cualquier caja: el resto del DSL acepta 'vanguardia' y
+                        // 'VANGUARDIA' (ver _zone), y aquí solo valía en mayúsculas — una
+                        // minúscula colaba el requisito al pool por defecto SIN avisar, contando
+                        // de más (visto con Arthas el 25-ago-2026).
+                        const _z = String(r.count.zona || '').toUpperCase();
+                        if (_z === 'VANGUARDIA') pool = [...p.vanguard];
+                        else if (_z === 'RETAGUARDIA') pool = [...p.rearguard];
+                        else if (_z === 'DESCARTES') pool = [...p.discard];
                         if (r.count.plantillaSin) pool = pool.filter(x => { const t = getCardTemplate(x.id); return t && !r.count.plantillaSin.some(hk => typeof t[hk] === 'function'); });
                         if (r.count.conAlgunEstado) pool = pool.filter(c => c.status && Object.keys(c.status).length > 0);
                         (r.count.filtros || []).forEach(f => { pool = pool.filter(c => DSL._match(c, f)); });
                         if (r.count.algunFiltro) pool = pool.filter(c => r.count.algunFiltro.some(f => DSL._match(c, f)));
                         if (r.count.algunEstado) pool = pool.filter(c => c.status && r.count.algunEstado.some(k => c.status[k]));
-                        if (!r.count.permitirAvatar && r.count.zona !== 'DESCARTES') pool = pool.filter(x => !((getCardTemplate(x.id) || {}).isAvatar));
+                        if (!r.count.permitirAvatar && _z !== 'DESCARTES') pool = pool.filter(x => !((getCardTemplate(x.id) || {}).isAvatar));
                         if (r.count.sinMarcaTemporalPropia) pool = pool.filter(x => !(x.tempEffects && x.tempEffects.some(t => t.sourceId === card.id)));
                         val = pool.length;
                     } else if (r.eventoActivo !== undefined) {

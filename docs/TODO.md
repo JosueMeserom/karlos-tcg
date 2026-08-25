@@ -3,7 +3,7 @@
 Lo que queda por hacer, con su porqué. Se actualiza al cerrar cada cosa: lo que Toto no rebate
 después de hacerlo se da por bueno y se quita de aquí.
 
-> Última revisión: 25-ago-2026 · 167 cartas en CARD_DB · 110 suites en verde
+> Última revisión: 25-ago-2026 · 167 cartas en CARD_DB · 111 suites en verde
 
 ---
 
@@ -17,14 +17,14 @@ existe 'Diosa').
 
 ---
 
-## 2. Migración al DSL: 2 imperativas puras + 4 híbridas
+## 2. Migración al DSL: 1 irreducible + 1 candidata + 4 híbridas
 
 Quedan (entre paréntesis, sus hooks a mano). En total, 128 hooks escritos a mano en el fichero.
 
 | Carta | Qué le falta al DSL |
 |---|---|
 | **NoName** (9) | **corrección del 22-ago-2026**: esos 9 hooks NO son el clon, son **RÉPLICA**, que copia la Activa de un enemigo delegando `canActivateAbility`/`onExecuteAbility`/`onValidateTarget`/`onTargetsReady`/… al template ajeno. Candidata a irreducible: es *meta* sobre la interfaz de hooks, y funciona igual con cartas ya migradas (regresion68 lo fija) |
-| **Arthas** (8) | sin leer a fondo todavía; pide su propio análisis |
+| **Arthas** (7, ya híbrida) | **IRREDUCIBLE, leída a fondo el 25-ago-2026.** Ya son declarativos el veto de Karolina al colocarla y el +3 de ATQ del arma. Lo demás es la maquinaria de carta DUAL, que no comparte con NADIE: el modal de "¿cómo la juegas?" (que además cambia el tipo de carta a mitad de jugada), `onDualLimitFallback`, su botón morado propio (`getCustomActions`, como el de Erasmo), un `onExecuteAyuda` que puede sacarla de la MANO o del CAMPO, la autodestrucción si Karolina llega después, y la vuelta al campo al caer su portador eligiendo fila por cupo. Cubierta por `tests/regresion73.js` (7 escenarios), escrita ANTES de tocarla |
 | **Erasmo** (2, ya híbrida) | DOMINIO ya es declarativa; **SEGUIMIENTO** se queda: una línea que expone la mano rival en cada pasada de pasivas y un BOTÓN propio para mirar el mazo (haría falta un trigger de acción personalizada para una sola carta) |
 | **Xanadu** (4, ya híbrida) | REPULSIÓN ABSOLUTA ya es declarativa; **ESTORNUDO DEVASTADOR** se queda por lo mismo que MOTOCICLETA: el enemigo que entra depende del que sale (límite de 2 Personajes sobre la vanguardia que QUEDARÍA) |
 | **Mill** (4, ya híbrida) | su Pasiva ya es declarativa; **MOTOCICLETA** se queda: su tercer objetivo solo es válido según los dos anteriores (el límite de 2 Personajes se calcula sobre el campo que QUEDARÍA), y eso no es un filtro por campo sino una cuenta condicional |
