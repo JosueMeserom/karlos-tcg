@@ -331,7 +331,13 @@ for (const c of CARTAS) {
     // --- §5 Características y zonas ---
     // Se excluye lo que caiga DENTRO de un nombre de Habilidad (va en mayúsculas por diseño).
     const sinNombres = t.replace(/(?:^|\s)[PA]:\s*[^:(]+/g, ' ');
-    const caps = [[/\bATQ\b/, 'ATQ -> Atq'], [/\bDEF\b/, 'DEF -> Def'], [/\bVIDA\b/, 'VIDA -> Vida'],
+    // MAYÚSCULAS desde el 23-ago-2026 (Toto): las tres características se escriben como en la
+    // CARA DE LA CARTA -VIDA · DEF · ATQ- y como ya las escribe el motor en el detalle y en los
+    // flotantes ("+2 ATQ", "VIDA MÁX."). Antes la norma era justo la contraria y el texto de la
+    // carta hablaba un idioma distinto del de su propio detalle. `Furor` NO entra: no está en la
+    // cara de la carta. Y los LOGS tampoco: ahí son prosa ("cura 2 de Vida a X") y las mayúsculas
+    // gritarían a mitad de frase.
+    const caps = [[/\bAtq\b/, 'Atq -> ATQ'], [/\bDef\b/, 'Def -> DEF'], [/\bVida\b/, 'Vida -> VIDA'],
         [/\bVanguardia\b/, 'Vanguardia -> vanguardia'], [/\bRetaguardia\b/, 'Retaguardia -> retaguardia']];
     for (const [re, msg] of caps) if (re.test(sinNombres)) add('VOCABULARIO', c, `§5: ${msg}`);
 

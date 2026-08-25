@@ -8,3 +8,6 @@ public/_preview_*.html
 # Vive en disco para consultarlo, pero NUNCA se versiona ni sale del servidor.
 *.csv
 docs/Cartas KG.csv
+# El Excel original de Toto y sus ficheros de bloqueo: misma razon que el CSV.
+docs/Cartas KG.xlsx
+docs/~$*

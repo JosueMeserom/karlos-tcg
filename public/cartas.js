@@ -3,7 +3,7 @@
 const CARD_DB = [
     { 
         id: 1, name: "Karlos", hp: 6, def: 6, atk: 5, type: "Personaje", subtype: "Ser vivo", tags: ['Mercenario', 'Usuario de VP'], gender: 'M', rarity: "A",
-        text: "P: MEGADRENALINA: Si su Vida es 3 o menos, +2 de Atq. A: BI-CHOQUE (1F): Ataca a 2 enemigos con Atq-1.",
+        text: "P: MEGADRENALINA: Si su VIDA es 3 o menos, +2 de ATQ. A: BI-CHOQUE (1F): Ataca a 2 enemigos con ATQ-1.",
         passiveName: "MEGADRENALINA", activeName: "BI-CHOQUE", activeCost: 1, series: 1,
         abilities: [
             { trigger: "PASIVA_CONTINUA", nombre: "MEGADRENALINA",
@@ -137,7 +137,7 @@ const CARD_DB = [
     },
     {
         id: 2, name: "Zoe", hp: 2, def: 2, atk: 7, type: "Personaje", subtype: "Ser vivo", tags: ['Usuaria de VP'], gender: 'F', rarity: "A",
-        text: "P: JUSTICIERA ARDIENTE: El Daño por tiempo la cura en vez de dañarla, y mientras lo sufra gana +2 de Def. A: SISAR (1F): Tu rival descarta una Ayuda de su mano, la que él elija. Moneda - Cara: si hay enemigos, ataca a uno con -3 de Atq y sin su Pasiva.",
+        text: "P: JUSTICIERA ARDIENTE: El Daño por tiempo la cura en vez de dañarla, y mientras lo sufra gana +2 de DEF. A: SISAR (1F): Tu rival descarta una Ayuda de su mano, la que él elija. Moneda - Cara: si hay enemigos, ataca a uno con -3 de ATQ y sin su Pasiva.",
         passiveName: "JUSTICIERA ARDIENTE", activeName: "SISAR", activeCost: 1, series: 1,
         abilities: [
             { trigger: "PASIVA_CONTINUA", nombre: "JUSTICIERA ARDIENTE",
@@ -358,7 +358,7 @@ const CARD_DB = [
     },
     { 
         id: 3, name: "Kyle", hp: 4, def: 4, atk: 3, type: "Personaje", subtype: "Ser vivo", tags: ['Usuario de VP', 'estudioso'], gender: 'M', rarity: "A",
-        text: "P: ENTEREZA DEL INGENUO: Mientras tenga 4 o más de Vida, su Def y su Atq aumentan en 2. A: REPARACIÓN MOLECULAR (1F): Cura 2 de Vida a un aliado.", 
+        text: "P: ENTEREZA DEL INGENUO: Mientras tenga 4 o más de VIDA, su DEF y su ATQ aumentan en 2. A: REPARACIÓN MOLECULAR (1F): Cura 2 de VIDA a un aliado.", 
         passiveName: "ENTEREZA DEL INGENUO", activeName: "REPARACIÓN MOLECULAR", activeCost: 1, series: 1,
 
         // ACTIVA migrada al DSL (20-ago-2026). Era de las últimas imperativas de una sola pieza:
@@ -409,7 +409,7 @@ const CARD_DB = [
     },
     { 
         id: 4, name: "Eris", hp: 4, def: 3, atk: 5, type: "Personaje", subtype: "Ser vivo", tags: ['Policía', 'Usuaria de magia'], gender: 'F', rarity: "A", 
-        text: "P: VIGOR DE INVENCIÓN: Inmune a los Eventos y a las Ayudas enemigos. A: TIRO FINAL (2F): Ataque que ignora la Def del objetivo.", 
+        text: "P: VIGOR DE INVENCIÓN: Inmune a los Eventos y a las Ayudas enemigos. A: TIRO FINAL (2F): Ataque que ignora la DEF del objetivo.", 
         activeName: "TIRO FINAL", activeCost: 2, passiveName: "VIGOR DE INVENCIÓN", series: 1,
         immuneToEnemyEvents: true,
         immuneToEnemyAids: true,
@@ -551,14 +551,14 @@ const CARD_DB = [
     },
     { 
         id: 6, name: "Sadame", hp: 2, def: 4, atk: 5, type: "Personaje", subtype: 'No-muerto', tags: ["Ninja", "Usuaria de magia"], gender: 'F', rarity: "A", 
-        text: "P: RAÍCES NINJA: Al curarse de más, su Vida máxima sube hasta un tope de 6. Gana +1 de Furor extra de las cartas. A: ZOMBIFICAR (1F): Anexa un aliado 'Ser vivo'. Regenera 2 de Vida al final del turno y no puede recibir Ayudas de curación. Puede deshacer anexos.", 
+        text: "P: RAÍCES NINJA: Al curarse de más, su VIDA máxima sube hasta un tope de 6. Gana +1 de Furor extra de las cartas. A: ZOMBIFICAR (1F): Anexa un aliado 'Ser vivo'. Regenera 2 de VIDA al final del turno y no puede recibir Ayudas de curación. Puede deshacer anexos.", 
         passiveName: "RAÍCES NINJA", activeName: "ZOMBIFICAR", activeCost: 1, series: 1,
         uncopyable: true, // Zombificar usa arrays exclusivos de anexo
         // El vínculo lo crea su ACTIVA, no la Pasiva: sin este campo, el detalle lo atribuiría
         // a RAÍCES NINJA (mismo tipo de error que se corrigió en Karolina/Xidachane).
         annexHabilidad: "ZOMBIFICAR",
         // annexEffectText = lo que la unión provoca EN EL ANEXADO (aquí sí lo hay: el zombi).
-        annexEffectText: "Zombificado: regenera 2 de Vida al final del turno y no puede recibir Ayudas de curación",
+        annexEffectText: "Zombificado: regenera 2 de VIDA al final del turno y no puede recibir Ayudas de curación",
 
         onBeforeHealed: function(card, amount, source, game) {
             if (source && source.type === 'Ayuda') {
@@ -728,7 +728,7 @@ const CARD_DB = [
     },
     { 
         id: 8, name: "Spencer", hp: 4, def: 4, atk: 4, type: "Personaje", subtype: "Máquina", tags: ['Con conciencia'], gender: 'M', rarity: "A",
-        text: "P: BATERÍA AUTÓNOMA: Al final de tu turno, si su Vida es 3 o menos, se cura 1. Puede usar su Activa aunque haya atacado. A: CAMBIO DE PAJARITA (1F): +3 a una característica (Vida, Def o Atq) y -1 a las otras. Su Vida no baja de 1 por esto. No gasta acción.",
+        text: "P: BATERÍA AUTÓNOMA: Al final de tu turno, si su VIDA es 3 o menos, se cura 1. Puede usar su Activa aunque haya atacado. A: CAMBIO DE PAJARITA (1F): +3 a una característica (VIDA, DEF o ATQ) y -1 a las otras. Su VIDA no baja de 1 por esto. No gasta acción.",
         passiveName: "BATERÍA AUTÓNOMA", activeName: "CAMBIO DE PAJARITA", activeCost: 1, series: 1,
         // combinaStatsPropios: su propia pasiva toca Vida MÁX., Def y Atq a la vez; se combinan
         // en UNA línea en onGetPreviewEffects (única vía que puede incluir VIDA MÁX., que el
@@ -1053,7 +1053,7 @@ const CARD_DB = [
     },
     { 
         id: 10, name: "Hawke", hp: 4, def: 4, atk: 6, type: "Personaje", subtype: "Ser vivo", tags: ['Poder heredado'], gender: 'M', rarity: "A", 
-        text: "P: RADIACIÓN: En vanguardia, al final de tu turno puedes aplicar Daño por tiempo (1 turno) a 1 enemigo de vanguardia. A: PUÑO DE NEUTRONES (1F): Ataque normal con +2 de Atq durante el golpe.", 
+        text: "P: RADIACIÓN: En vanguardia, al final de tu turno puedes aplicar Daño por tiempo (1 turno) a 1 enemigo de vanguardia. A: PUÑO DE NEUTRONES (1F): Ataque normal con +2 de ATQ durante el golpe.", 
         passiveName: "RADIACIÓN", activeName: "PUÑO DE NEUTRONES", activeCost: 1, series: 1,
 
         // HOOK 1: Pasiva interactiva de Final de Turno
@@ -1185,7 +1185,7 @@ const CARD_DB = [
         },
     },
     { 
-        id: 12, name: "Manzanahoria", type: "Ayuda", subtype: "Ingerible", tags: ["Consumible"], rarity: "C", text: "Cura 2 de Vida a un aliado.", cost: 0,
+        id: 12, name: "Manzanahoria", type: "Ayuda", subtype: "Ingerible", tags: ["Consumible"], rarity: "C", text: "Cura 2 de VIDA a un aliado.", cost: 0,
         abilities: [
             { trigger: "JUGAR", requisitos: [ { count: { quien: "ALIADO" }, op: ">=", valor: 1, msg: "No tienes aliados en mesa para usar {carta}." } ] },
             { trigger: "AL_USAR_AYUDA",
@@ -1223,7 +1223,7 @@ const CARD_DB = [
     },
     { 
         id: 17, name: "Gólem multielemental", hp: 4, def: 4, atk: 3, type: "Esbirro", subtype: "Ser mágico", tags: ['Invocación', 'Gólem'], rarity: "B", 
-        text: "Coste: 1 de Furor. P: CAMBIO DE COLOR: Su Def aumenta en +1 permanente al ser atacado (máx 3).", 
+        text: "Coste: 1 de Furor. P: CAMBIO DE COLOR: Su DEF aumenta en +1 permanente al ser atacado (máx 3).", 
         passiveName: "CAMBIO DE COLOR", cost: 0, series: 1,
 
         onBeforePlayAsync: async function(card, game, p) {
@@ -1291,7 +1291,7 @@ const CARD_DB = [
     },
     { 
         id: 20, name: "Guardia", hp: 2, def: 3, atk: 3, type: "Esbirro", subtype: "Ser vivo", tags: ["Traje protector"], gender: 'M', rarity: "C",
-        text: "A: FUEGO A DISCRECIÓN (1F). 50% +2 Atq / 50% Fallo.", activeName: "FUEGO A DISCRECIÓN", series: 1, activeCost: 1,
+        text: "A: FUEGO A DISCRECIÓN (1F). 50% +2 ATQ / 50% Fallo.", activeName: "FUEGO A DISCRECIÓN", series: 1, activeCost: 1,
         // Migrada (30-jul-2026): MONEDA envolviendo un ELEGIR+ATACAR, mismo esqueleto que
         // Investigador demente. La vieja tenía el mismo bug latente que Hiposaurio/Hawke
         // ("card.currentAtk += 2; performAttack; card.currentAtk -= 2") — performAttack ya
@@ -1373,7 +1373,7 @@ const CARD_DB = [
         ]
     },
     { 
-        id: 22, name: "Té helado", type: "Ayuda", subtype: "Ingerible", tags: ["Consumible"], rarity: "B", text: "Coste: 1 de Furor. Cura 4 de Vida al aliado que tributó.", cost: 0,
+        id: 22, name: "Té helado", type: "Ayuda", subtype: "Ingerible", tags: ["Consumible"], rarity: "B", text: "Coste: 1 de Furor. Cura 4 de VIDA al aliado que tributó.", cost: 0,
         abilities: [
             { trigger: "JUGAR", requisitos: [
                 { count: {}, op: ">=", valor: 1, msg: "No tienes aliados en mesa para usar Té helado." },
@@ -1483,7 +1483,7 @@ const CARD_DB = [
         avisoNoJugable: "El Escudo mágico es una carta de reacción. Déjala en tu mano.",
     },
     { 
-        id: 27, name: "Atomización", type: "Ayuda", subtype: "Técnica", tags: ["Consumible"], rarity: "B", text: "Elige un aliado no agotado. Gasta su acción para quitar 2 de Vida a un enemigo (ignora Def). Si lo mata, vuelve a la mano.", cost: 0,
+        id: 27, name: "Atomización", type: "Ayuda", subtype: "Técnica", tags: ["Consumible"], rarity: "B", text: "Elige un aliado no agotado. Gasta su acción para quitar 2 de VIDA a un enemigo (ignora DEF). Si lo mata, vuelve a la mano.", cost: 0,
         // Migrada (31-jul-2026). Se creía irreducible por sus dos inputState propios del motor
         // (SELECT_ATOM_ALLY / SELECT_ATOM_ENEMY); leyéndola de cerca resultó ser el patrón de
         // Granada de maná -pagador + objetivo- más un "si lo mata". Los dos estados a medida
@@ -1727,7 +1727,7 @@ const CARD_DB = [
         // si fuera parte de la Pasiva; con el prefijo Requisito: sale en su propia caja del
         // detalle, como el resto de cartas condicionadas (Toto, 5-ago-2026). No es un Coste: no
         // pierdes nada al colocarla, es el Evento el que la trae.
-        text: "Requisito: Completar 'Entrenamiento arduo'. P: JUSTICIERA ABRASADORA: El Daño por tiempo la cura y le da +2 de Def. Aplica Daño por tiempo (2 turnos) a sí misma y al rival tras combatir. A: AL-FÉNIX (4F): Ataca a hasta 3 enemigos de la vanguardia y hasta 1 de la retaguardia.",
+        text: "Requisito: Completar 'Entrenamiento arduo'. P: JUSTICIERA ABRASADORA: El Daño por tiempo la cura y le da +2 de DEF. Aplica Daño por tiempo (2 turnos) a sí misma y al rival tras combatir. A: AL-FÉNIX (4F): Ataca a hasta 3 enemigos de la vanguardia y hasta 1 de la retaguardia.",
         passiveName: "JUSTICIERA ABRASADORA", activeName: "AL-FÉNIX", activeCost: 4, series: 2,
         
         onBeforePlayAsync: async function(card, game, p) {
@@ -1855,7 +1855,7 @@ const CARD_DB = [
     },
     {
         name: "Wolfgang", hp: 5, def: 3, atk: 3, type: "Personaje", subtype: "Ser mágico", tags: ["Invocación", "Bestia animal"], gender: "F", rarity: "B",
-        text: "Requisito: Aniceto en tu campo o bien Coste: Manzanahoria de tu mano. P: SABIDURÍA: Al colocar, +1 Def y Atq a vanguardia aliada. A: TENTAR A LA SUERTE (1F): 3 monedas. Ataca 1 vez por cada Cara.",
+        text: "Requisito: Aniceto en tu campo o bien Coste: Manzanahoria de tu mano. P: SABIDURÍA: Al colocar, +1 DEF y ATQ a vanguardia aliada. A: TENTAR A LA SUERTE (1F): 3 monedas. Ataca 1 vez por cada Cara.",
         passiveName: "SABIDURÍA", activeName: "TENTAR A LA SUERTE", activeCost: 1, series: 1,
         
         canPlayCard: function(card, game, p) {
@@ -2022,7 +2022,7 @@ const CARD_DB = [
     },
     {
         name: "Limo primario", hp: 4, def: 4, atk: 3, type: "Esbirro", subtype: "Ser vivo", tags: ["Animal salvaje"], rarity: "A",
-        text: "P: CRECIMIENTO IMPARABLE: Puede rebasar su Vida máxima al curarse (hasta 9).",
+        text: "P: CRECIMIENTO IMPARABLE: Puede rebasar su VIDA máxima al curarse (hasta 9).",
         passiveName: "CRECIMIENTO IMPARABLE", series: 1,
         abilities: [
             { trigger: "SOBRECURACION", max: 9, log: "¡{pasiva}! El {carta} expande su Vida a {max}." }
@@ -2032,7 +2032,7 @@ const CARD_DB = [
         name: "Sadame (retornada)", hp: 4, def: 4, atk: 7, type: "Personaje", subtype: "No-muerto", tags: ["Usuaria de magia"], gender: "F", rarity: "S",
         // Requisito visible: a quién señala la flecha lima al presentarse (§14.bis).
         requisitoVisible: [ { quien: "ALIADO", filtros: [ { campo: "name", op: "==", valor: "Sadame" } ], uno: true }, { quien: "TODOS", filtros: [ { campo: "name", op: "==", valor: "Erasmo" } ], uno: true } ],
-        text: "Requisito: Sadame en tu campo y Erasmo en cualquier campo. P: ÚLTIMA MISIÓN: Destruye a Sadame y ocupa su lugar, conservando sus bonos. Sus stats no bajan de las de base y restablece su Vida al colocarse. A: VUELVE A LA VIDA (3F): Revive 2 Personajes/Esbirros, dando igual sus condiciones o costes.",
+        text: "Requisito: Sadame en tu campo y Erasmo en cualquier campo. P: ÚLTIMA MISIÓN: Destruye a Sadame y ocupa su lugar, conservando sus bonos. Sus stats no bajan de las de base y restablece su VIDA al colocarse. A: VUELVE A LA VIDA (3F): Revive 2 Personajes/Esbirros, dando igual sus condiciones o costes.",
         passiveName: "ÚLTIMA MISIÓN", activeName: "VUELVE A LA VIDA", activeCost: 3, series: 1,
         isEvolution: true,
         
@@ -2101,7 +2101,7 @@ const CARD_DB = [
             // silencioso: la vieja nunca anunciaba esta parte de la pasiva.
             { trigger: "PASIVA_CONTINUA", nombre: "ÚLTIMA MISIÓN", silencioso: true,
               then: [ { op: "SUELO_STAT", stat: "def" }, { op: "SUELO_STAT", stat: "atk" } ] },
-            { trigger: "INICIO_TURNO", resumenFase: "Restaura toda su Vida", porHabilidad: "ÚLTIMA MISIÓN", soloTurnoPropio: true,
+            { trigger: "INICIO_TURNO", resumenFase: "Restaura toda su VIDA", porHabilidad: "ÚLTIMA MISIÓN", soloTurnoPropio: true,
               efectos: [
                 { op: "CURAR", completa: true, log: "¡ÚLTIMA MISIÓN! {carta} restaura toda su Vida.", floating: "RESTAURADA", floatingStyle: "ft-green", offsetFloating: -30,
                   target: { quien: "SELF" } } ] }
@@ -2541,7 +2541,7 @@ const CARD_DB = [
         name: "Silhouette", hp: 7, def: 1, atk: 1, type: "Personaje", subtype: "Ser vivo", tags: ["Draconiana", "otaku", "usuaria de VP"], gender: "F", rarity: "S", series: 1,
         // Requisito visible: a quién señala la flecha lima al presentarse (§14.bis).
         requisitoVisible: [ { quien: "TODOS", zona: "evento", filtros: [ { campo: "name", op: "==", valor: "Una buena razón" } ], uno: true } ],
-        text: "Requisito: 'Una buena razón' activo en cualquier campo. P: REINA DEL COSPLAY: Al inicio de tu turno, cura 2 Vida. A: PONTE TRAJE (1F): Elige cualquier aliado o enemigo en el campo. Copias sus stats base (Atq y Def).",
+        text: "Requisito: 'Una buena razón' activo en cualquier campo. P: REINA DEL COSPLAY: Al inicio de tu turno, cura 2 VIDA. A: PONTE TRAJE (1F): Elige cualquier aliado o enemigo en el campo. Copias sus stats base (ATQ y DEF).",
         passiveName: "REINA DEL COSPLAY", activeName: "PONTE TRAJE", activeCost: 1,
         
         onBeforePlayAsync: async function(card, game, p) {
@@ -2662,7 +2662,7 @@ const CARD_DB = [
     },
     {
         name: "Furia berserker", type: "Ayuda", subtype: "Técnica", tags: ["Equipable"], rarity: "B", series: 1, cost: 0,
-        text: "Coste: 2 de Furor de un aliado 'Draconiano/a'. Anéxala al aliado que tributó el coste: +3 Atq mientras esté equipada.",
+        text: "Coste: 2 de Furor de un aliado 'Draconiano/a'. Anéxala al aliado que tributó el coste: +3 ATQ mientras esté equipada.",
         abilities: [
             { trigger: "JUGAR", requisitos: [
                 { count: { filtros: [ { o: [ [ { campo: "tags", op: "includes", valor: "Draconiana" } ], [ { campo: "tags", op: "includes", valor: "Draconiano" } ] ] }, { campo: "furor", op: ">=", valor: 2 } ] }, op: ">=", valor: 1, msg: "Necesitas un aliado Draconiano/a con al menos 2 de Furor." } ] },
@@ -2862,7 +2862,7 @@ const CARD_DB = [
     {
         tempEffectExpiraLog: "El Overclock de {objetivo} se ha apagado.",
         name: "Overclock", type: "Ayuda", subtype: "Tecnología", tags: ["Consumible"], rarity: "C", cost: 0, series: 1,
-        text: "Elige un aliado 'Máquina'. Aumenta su Def y Atq en 2 hasta el inicio de tu próximo turno.",
+        text: "Elige un aliado 'Máquina'. Aumenta su DEF y ATQ en 2 hasta el inicio de tu próximo turno.",
         abilities: [
             { trigger: "JUGAR", requisitos: [
                 { count: { filtros: [ { campo: "subtype", op: "==", valor: "Máquina" } ] }, op: ">=", valor: 1, msg: "No tienes 'Máquinas'." } ] },
@@ -2888,7 +2888,7 @@ const CARD_DB = [
         requisitoVisible: [ { quien: "ALIADO", uno: true,
             filtros: [ { no: true, campo: "tags", op: "includes", valor: "Animal salvaje" },
                        { no: true, campo: "tags", op: "includes", valor: "Cosa" } ] } ],
-        text: "Requisito: un aliado sin la etiqueta 'Animal salvaje' ni 'Cosa'. Anéxasela a ese aliado: +1 de Atq, +2 en sus ataques especiales, y 1 de Furor más al inicio de cada turno mientras lo lleve.",
+        text: "Requisito: un aliado sin la etiqueta 'Animal salvaje' ni 'Cosa'. Anéxasela a ese aliado: +1 de ATQ, +2 en sus ataques especiales, y 1 de Furor más al inicio de cada turno mientras lo lleve.",
         // Solo lo que NO son números: el +1 de ATQ permanente ya sale automático (§18).
         efectoEquipadoTexto: "Sus ataques especiales golpean con 1 de ATQ extra, y gana 1 de Furor más al inicio de cada turno",
         abilities: [
@@ -2920,7 +2920,7 @@ const CARD_DB = [
         requisitoVisible: [ { quien: "ALIADO", uno: true,
             algunFiltro: [ { campo: "tags", op: "includes", valor: "Policía" },
                            { campo: "tags", op: "includes", valor: "Guardia Real" } ] } ],
-        text: "Requisito: un aliado con etiqueta 'Policía' o con etiqueta 'Guardia Real'. Anéxasela a ese aliado: 1 de Furor más al inicio de cada turno mientras lo lleve. Si tiene etiqueta 'Policía', además +1 de Atq y +1 de Def; si tiene etiqueta 'Guardia Real', al equiparla busca en tu mazo una Ayuda con etiqueta 'Tecnología', añádela a tu mano y baraja.",
+        text: "Requisito: un aliado con etiqueta 'Policía' o con etiqueta 'Guardia Real'. Anéxasela a ese aliado: 1 de Furor más al inicio de cada turno mientras lo lleve. Si tiene etiqueta 'Policía', además +1 de ATQ y +1 de DEF; si tiene etiqueta 'Guardia Real', al equiparla busca en tu mazo una Ayuda con etiqueta 'Tecnología', añádela a tu mano y baraja.",
         // El +1/+1 de los "Policía" ya sale automático; esto es lo que no cuenta nadie.
         efectoEquipadoTexto: "Gana 1 de Furor más al inicio de cada turno",
         abilities: [
@@ -2964,7 +2964,7 @@ const CARD_DB = [
     },
     {
         id: 2005, name: "Alabanza", type: "Ayuda", subtype: "Técnica", tags: ["Equipable"], rarity: "B", cost: 0, series: 1,
-        text: "Requisito: Un aliado con la etiqueta 'Dios/a' o con etiqueta 'Genio'. Coste: 2 de Furor de cada aliado de tu vanguardia que pueda pagarlo. Anéxasela a ese aliado: gana +1 de Vida, Def y Atq por cada aliado que tributó, mientras la lleve.",
+        text: "Requisito: Un aliado con la etiqueta 'Dios/a' o con etiqueta 'Genio'. Coste: 2 de Furor de cada aliado de tu vanguardia que pueda pagarlo. Anéxasela a ese aliado: gana +1 de VIDA, DEF y ATQ por cada aliado que tributó, mientras la lleve.",
         abilities: [
             { trigger: "JUGAR", requisitos: [
                 { count: { algunFiltro: [ { campo: "tags", op: "includes", valor: "Dios" },
@@ -3008,7 +3008,7 @@ const CARD_DB = [
         // Lo leí del CSV como una condición y es un pago, que es la diferencia que separa las
         // dos cajas del detalle. Mismo trato que Té helado, y por eso no lleva requisitoVisible:
         // la flecha la pone sola el `esCoste` del tributo, en rojo y con su "Tributa 1 FUR".
-        text: "Coste: 1 de Furor. Anéxasela al aliado que tributó y cúrale 2 de Vida: +1 de Def e inmune a los estados alterados mientras la lleve. Al equiparla, se le eliminan los estados alterados que tuviera.",
+        text: "Coste: 1 de Furor. Anéxasela al aliado que tributó y cúrale 2 de VIDA: +1 de DEF e inmune a los estados alterados mientras la lleve. Al equiparla, se le eliminan los estados alterados que tuviera.",
         // El +1 de DEF sale solo; la inmunidad no la dice nadie.
         efectoEquipadoTexto: "Es inmune a los estados alterados",
         abilities: [
@@ -3040,11 +3040,11 @@ const CARD_DB = [
     },
     {
         id: 2002, name: "Guantes sedientos", type: "Ayuda", subtype: "Arma", tags: ["Equipable", "melé"], rarity: "B", cost: 0, series: 1,
-        text: "Anéxasela a un aliado: cada vez que haga daño con un ataque normal, se cura esa cantidad de Vida, hasta 1. Al cabo de 3 turnos deja de curarle y pasa a darle +2 de Atq.",
+        text: "Anéxasela a un aliado: cada vez que haga daño con un ataque normal, se cura esa cantidad de VIDA, hasta 1. Al cabo de 3 turnos deja de curarle y pasa a darle +2 de ATQ.",
         // Anclado a los Contadores, que es lo que el jugador ve en la chapa: cuando se
         // acaban, la línea deja de valer justo cuando la chapa desaparece y llega el +2 de ATQ,
         // que ya sale automático.
-        efectoEquipadoTexto: "Mientras le queden Contadores, cada vez que hace daño con un ataque normal se cura esa cantidad de Vida (hasta 1)",
+        efectoEquipadoTexto: "Mientras le queden Contadores, cada vez que hace daño con un ataque normal se cura esa cantidad de VIDA (hasta 1)",
         abilities: [
             { trigger: "AL_EQUIPAR",
               efectos: [
@@ -3090,7 +3090,7 @@ const CARD_DB = [
         name: "Shichishito", type: "Ayuda", subtype: "Arma legendaria", tags: ["Equipable", "melé"], rarity: "A", cost: 0, series: 1,
         // Requisito visible: a quién señala la flecha lima al presentarse (§14.bis).
         requisitoVisible: [ { quien: "ALIADO", zona: "vanguardia", filtros: [ { campo: "name", op: "contieneTexto", valor: "Karlos" }, { campo: "type", op: "==", valor: "Personaje" } ], uno: true } ],
-        text: "Requisito: un Personaje aliado 'Karlos' en tu vanguardia. Anéxasela a ese aliado: +2 de Atq y +2 de Def mientras la lleve. Sólo puedes usar esta carta una vez por partida.",
+        text: "Requisito: un Personaje aliado 'Karlos' en tu vanguardia. Anéxasela a ese aliado: +2 de ATQ y +2 de DEF mientras la lleve. Sólo puedes usar esta carta una vez por partida.",
         abilities: [
             { trigger: "JUGAR", requisitos: [
                 { de: "JUGADOR", campo: "hasUsedShichishito", op: "falsy", msg: "Ya has empuñado la Shichishito en esta partida." },
@@ -3110,7 +3110,7 @@ const CARD_DB = [
     {
         name: "Kami", hp: 3, def: 9, atk: 9, type: "Personaje", subtype: "Ser vivo", tags: ["Usuaria de VP"], gender: "F", rarity: "S", cost: 0, series: 1,
         isAvatar: true, 
-        text: "P: AVATAR: Inmune a TODO. No puede ser objetivo. Fin de tu turno: pierde 1 Vida. A: SACRIFICIO EQUIVALENTE (1F): Requiere otro aliado en vanguardia. Destruye un aliado de vanguardia y un enemigo.",
+        text: "P: AVATAR: Inmune a TODO. No puede ser objetivo. Fin de tu turno: pierde 1 VIDA. A: SACRIFICIO EQUIVALENTE (1F): Requiere otro aliado en vanguardia. Destruye un aliado de vanguardia y un enemigo.",
         passiveName: "AVATAR", activeName: "SACRIFICIO EQUIVALENTE", activeCost: 1,
         onEndTurn: async function(card, game) {
             if (card.owner === game.activePlayerId) {
@@ -3295,7 +3295,7 @@ const CARD_DB = [
     },
     {
         name: "Cogorza", type: "Evento", cost: 1, rarity: "C", series: 1,
-        text: "2 turnos. Al colocarla, aumenta en 2 la Def de cada aliado de tu vanguardia actual mientras dure, y echa una moneda por cada uno: con cruz, ese aliado queda Confuso 2 turnos. Al expirar, cura 1 de Vida a cada aliado de tu vanguardia afectado por esta carta.",
+        text: "2 turnos. Al colocarla, aumenta en 2 la DEF de cada aliado de tu vanguardia actual mientras dure, y echa una moneda por cada uno: con cruz, ese aliado queda Confuso 2 turnos. Al expirar, cura 1 de VIDA a cada aliado de tu vanguardia afectado por esta carta.",
         duration: 2,
         // Migrada (31-jul-2026). La auditoría la había marcado como "necesita pieza nueva" por
         // creer que el DSL no sabía lanzar UNA MONEDA POR MIEMBRO de un grupo. Falso: al leer
@@ -3326,7 +3326,7 @@ const CARD_DB = [
                   // quedaba null y refCarta() nunca llegaba a construir la línea.
                   cruz: [ { op: "APLICAR_ESTADO", estado: "confusion", duracion: 2 } ] } ] },
             { trigger: "AURA", quien: "ALIADO", soloSelfLista: "affectedAllies", stats: { def: 2 } },
-            { trigger: "AL_CADUCAR", resumenFase: "Al expirar, cura 1 de Vida a cada aliado de su vanguardia", 
+            { trigger: "AL_CADUCAR", resumenFase: "Al expirar, cura 1 de VIDA a cada aliado de su vanguardia", 
               efectos: [
                 { op: "MODIFICAR_STAT", stat: "currentHp", delta: 1, offsetY: -20, fuente: "Cogorza",
                   target: { selfLista: "affectedAllies" },
@@ -3389,7 +3389,7 @@ const CARD_DB = [
         // campos iguales a la plantilla; está explicado entero en el motivo de esa suite).
         // Requisito visible: a quién señala la flecha lima al presentarse (§14.bis).
         requisitoVisible: [ { quien: "ALIADO", filtros: [ { campo: "type", op: "==", valor: "Personaje" } ], algunFiltro: [ { campo: "name", op: "contieneTexto", valor: "Karlos" }, { campo: "name", op: "==", valor: "Agah" } ], uno: true } ],
-        text: "Requisito: un Personaje aliado 'Karlos' o 'Agah'. Anéxasela a ese aliado: +2 de Atq mientras la lleve. Sólo puedes usar esta carta una vez por partida.",
+        text: "Requisito: un Personaje aliado 'Karlos' o 'Agah'. Anéxasela a ese aliado: +2 de ATQ mientras la lleve. Sólo puedes usar esta carta una vez por partida.",
         abilities: [
             { trigger: "JUGAR", requisitos: [
                 { de: "JUGADOR", campo: "espadaV_Used", op: "falsy", msg: "Ya has empuñado la Espada V en esta partida." },
@@ -3415,7 +3415,7 @@ const CARD_DB = [
     },
     {
         name: "Kazuo", hp: 3, def: 5, atk: 5, type: "Personaje", subtype: "Ser vivo", tags: ["Samurái"], gender: "M", rarity: "A", cost: 4, series: 1,
-        text: "P: BÚSQUEDA DE MAESTRO: Sólo colocable si tienes otro aliado en campo. Al colocar: anéxale un aliado del campo (+2 Atq mientras dure la unión). A: TSUBAMEGAESHI (2F): Realiza 3 ataques normales (máx 2 al mismo objetivo). No puedes atacar directo con los sobrantes.",
+        text: "P: BÚSQUEDA DE MAESTRO: Sólo colocable si tienes otro aliado en campo. Al colocar: anéxale un aliado del campo (+2 ATQ mientras dure la unión). A: TSUBAMEGAESHI (2F): Realiza 3 ataques normales (máx 2 al mismo objetivo). No puedes atacar directo con los sobrantes.",
         passiveName: "BÚSQUEDA DE MAESTRO", activeName: "TSUBAMEGAESHI", activeCost: 2,
         // Sin annexEffectText (Toto, 27-jul-2026): ese campo es para lo que la unión provoca en
         // el ANEXADO (el zombi de Sadame). El +2 Atq lo recibe Kazuo, y su propia línea de stats
@@ -3524,7 +3524,7 @@ const CARD_DB = [
     },
     {
         name: "Unmei", hp: 5, def: 7, atk: 4, type: "Personaje", subtype: "Ser vivo", tags: ["Ninja"], gender: "M", rarity: "B", cost: 1, series: 1,
-        text: "A: MULTIPLICACIÓN DE CUERPO (4F): Crea un 'Clon de Unmei' en el campo: copia su Atq y Def en todo momento, tiene Vida propia y no gana Furor. Si Unmei muere, el clon se desvanece sin dar Retribución.",
+        text: "A: MULTIPLICACIÓN DE CUERPO (4F): Crea un 'Clon de Unmei' en el campo: copia su ATQ y DEF en todo momento, tiene VIDA propia y no gana Furor. Si Unmei muere, el clon se desvanece sin dar Retribución.",
         activeName: "MULTIPLICACIÓN DE CUERPO", activeCost: 4,
         // Migrada a DSL (op CREAR_CLON, 22-ago-2026). El clon en sí ya era declarativo desde el
         // 21-jul-2026 (trigger ESPEJO); lo que faltaba era CREARLO. La ficha se resuelve por
@@ -3544,7 +3544,7 @@ const CARD_DB = [
         id: 900, name: "Clon de Unmei", hp: 5, def: 7, atk: 4, type: "Esbirro", subtype: "Ser vivo", tags: ["Ninja"], gender: "M", rarity: "B", cost: 0, series: 1,
         isToken: true, // Etiqueta clave para el motor
         reverseArrow: true, // <--- Hace que la flecha vaya del Clon hacia Unmei
-        text: "Copia el Atq y Def de Unmei en todo momento. Tiene Vida propia, no gana Furor y no puede usar Habilidades. Si Unmei deja el campo, se desvanece.",
+        text: "Copia el ATQ y DEF de Unmei en todo momento. Tiene VIDA propia, no gana Furor y no puede usar Habilidades. Si Unmei deja el campo, se desvanece.",
         // Migrado a DSL (trigger ESPEJO, 21-jul-2026). Unmei sigue creando el clon de
         // forma imperativa (MULTIPLICACIÓN DE CUERPO) y le fija parentId; el clon en sí
         // ya es declarativo.
@@ -3569,7 +3569,7 @@ const CARD_DB = [
     },
     {
         name: "Granada de maná", type: "Ayuda", subtype: "Mágico", rarity: "C", cost: 1, series: 1,
-        text: "Coste: 2 de Furor o bien 1 de Furor si paga Eris. Consumible, a distancia. Quita 1 de Vida a hasta dos enemigos de la vanguardia, independientemente de su Def.",
+        text: "Coste: 2 de Furor o bien 1 de Furor si paga Eris. Consumible, a distancia. Quita 1 de VIDA a hasta dos enemigos de la vanguardia, independientemente de su DEF.",
         abilities: [
             { trigger: "JUGAR", requisitos: [
                 { count: { filtros: [ { o: [ [ { campo: "furor", op: ">=", valor: 2 } ], [ { campo: "name", op: "contieneTexto", valor: "Eris" }, { campo: "furor", op: ">=", valor: 1 } ] ] } ] }, op: ">=", valor: 1, msg: "No tienes aliados con suficiente Furor." } ] },
@@ -3630,7 +3630,7 @@ const CARD_DB = [
     },
     {
         name: "Valafar", hp: 4, def: 5, atk: 8, type: "Personaje", subtype: "Ser vivo", tags: ["Belfegor"], gender: "M", rarity: "S", cost: 1, series: 1,
-        text: "Coste: 4 de Furor. P: CHUPAALMAS: Se cura 1 de Vida al hacer un ataque normal con éxito que quite >= 1 Vida. A: COMA (4F): Ataque especial a 2 enemigos de vanguardia. Les infunde Sueño 2 turnos.",
+        text: "Coste: 4 de Furor. P: CHUPAALMAS: Se cura 1 de VIDA al hacer un ataque normal con éxito que quite >= 1 VIDA. A: COMA (4F): Ataque especial a 2 enemigos de vanguardia. Les infunde Sueño 2 turnos.",
         passiveName: "CHUPAALMAS", activeName: "COMA", activeCost: 4,
         onBeforePlayAsync: async function(card, game, p) {
             const validAllies = [...p.vanguard, ...p.rearguard].filter(c => c.furor >= 4 && !getCardTemplate(c.id).isAvatar);
@@ -3690,7 +3690,7 @@ const CARD_DB = [
         // la Pasiva se queda solo para lo que el Requisito no puede cubrir: que lleguen dos por
         // otra vía (una resurrección, un clon). Ahí se destruyen los MÁS ANTIGUOS hasta que quede
         // uno, que es la regla general y no un caso particular del que acaba de entrar.
-        text: "Requisito: Ningún otro Serafín en tu campo. Coste: 4 de Furor. P: MARAVILLA: Si llega a haber dos o más Serafines en tu campo, se destruyen los más antiguos hasta que quede uno. Al colocar: cura 2 de Vida a tu vanguardia. A: CASTIGO (4F): Ataque especial a 3 enemigos de la vanguardia.",
+        text: "Requisito: Ningún otro Serafín en tu campo. Coste: 4 de Furor. P: MARAVILLA: Si llega a haber dos o más Serafines en tu campo, se destruyen los más antiguos hasta que quede uno. Al colocar: cura 2 de VIDA a tu vanguardia. A: CASTIGO (4F): Ataque especial a 3 enemigos de la vanguardia.",
         passiveName: "MARAVILLA", activeName: "CASTIGO", activeCost: 4,
         abilities: [
             // El tributo, declarativo. Antes era un onBeforePlayAsync escrito a mano.
@@ -3749,7 +3749,7 @@ const CARD_DB = [
     },
     {
         name: "Edrielle", hp: 3, def: 3, atk: 5, type: "Personaje", subtype: "Ser mágico", tags: ["Invocación", "diosa"], gender: "F", rarity: "B", cost: 1, series: 1,
-        text: "Coste: 4 de Furor. P: BELLEZA INCOMPARABLE: Oculta permanentemente. Si es tu único aliado al inicio de tu turno, lanza moneda: Cruz = pierde Oculto este turno. A: TORMENTA PERFECTA (4F): Quita 2 de Vida (daño verdadero) a TODOS los enemigos.",
+        text: "Coste: 4 de Furor. P: BELLEZA INCOMPARABLE: Oculta permanentemente. Si es tu único aliado al inicio de tu turno, lanza moneda: Cruz = pierde Oculto este turno. A: TORMENTA PERFECTA (4F): Quita 2 de VIDA (daño verdadero) a TODOS los enemigos.",
         passiveName: "BELLEZA INCOMPARABLE", activeName: "TORMENTA PERFECTA", activeCost: 4,
         
         
@@ -3819,7 +3819,7 @@ const CARD_DB = [
     },
     {
         name: "Némesis", hp: 7, def: 7, atk: 8, type: "Personaje", subtype: "Ser vivo", tags: ["Diosa"], gender: "F", rarity: "S", cost: 2, series: 1,
-        text: "Coste: Tu vanguardia llena, que se destruye al colocar esta carta. P: NACIMIENTO DE DIVINIDAD: Una vez por turno, puedes destruir un aliado para curarla 1 Vida. A: OBLITERACIÓN (3F): Ataque especial que ignora completamente la Def del enemigo.",
+        text: "Coste: Tu vanguardia llena, que se destruye al colocar esta carta. P: NACIMIENTO DE DIVINIDAD: Una vez por turno, puedes destruir un aliado para curarla 1 VIDA. A: OBLITERACIÓN (3F): Ataque especial que ignora completamente la DEF del enemigo.",
         passiveName: "NACIMIENTO DE DIVINIDAD", activeName: "OBLITERACIÓN", activeCost: 3,
         // Coste de colocación migrado (31-jul-2026). Usa JUGAR requisitos (vanguardia llena) +
         // Su vanguardia entera es el COSTE: cada una manda su flecha ámbar a Némesis mientras
@@ -3974,7 +3974,7 @@ const CARD_DB = [
     {
         tempEffectExpiraLog: "El efecto del Frasco maldito sobre {objetivo} desaparece.",
         name: "Frasco maldito", type: "Ayuda", subtype: "Mágico", tags: ["Consumible"], rarity: "C", cost: 1, series: 1,
-        text: "Reacción. Puedes usarla antes de recibir un ataque normal. Baja en 2 el Atq del atacante hasta el inicio de tu próximo turno.",
+        text: "Reacción. Puedes usarla antes de recibir un ataque normal. Baja en 2 el ATQ del atacante hasta el inicio de tu próximo turno.",
         // Migrada a DSL (trigger REACCION sobre DAÑO, 22-jul-2026). La reacción es
         // declarativa (y así estrena el prompt con las cartas atacante→objetivo); el
         // efecto persistente -2 ATQ y su caducidad siguen en onUpdateTempEffect /
@@ -3996,7 +3996,7 @@ const CARD_DB = [
     },
     {
         name: "Poción revitalizante", type: "Ayuda", subtype: "Mágico", tags: ["Consumible"], rarity: "C", cost: 1, series: 1,
-        text: "+1 Def y +1 Atq a un aliado durante 3 turnos (baja la cuenta al final de tu turno). No acumulable en el mismo aliado.",
+        text: "+1 DEF y +1 ATQ a un aliado durante 3 turnos (baja la cuenta al final de tu turno). No acumulable en el mismo aliado.",
         // Migrada al DSL (27-jul-2026): usaba el modal genérico para elegir un aliado YA EN EL
         // CAMPO, violación de la norma de targeting en tablero (única infracción conocida que
         // quedaba). sinMarcaTemporalPropia (ya existente en requisitos/ELEGIR) cubre el "no
@@ -4037,7 +4037,7 @@ const CARD_DB = [
         // Requisito visible: un requisito de RECUENTO tambien tiene a QUIEN apuntar -las
         // cartas concretas que lo cumplen-, y son TODAS, sin `uno` (Toto, 14-ago-2026).
         requisitoVisible: [ { quien: "ALIADO", zona: "vanguardia" } ],
-        text: "1 turno. Requiere no haber atacado este turno y tener 2 o más aliados. Mientras esté en juego, solo puedes atacar 1 vez: el Atq del atacante será la suma del Atq de 2 aliados que elijas.",
+        text: "1 turno. Requiere no haber atacado este turno y tener 2 o más aliados. Mientras esté en juego, solo puedes atacar 1 vez: el ATQ del atacante será la suma del ATQ de 2 aliados que elijas.",
         // Migrada al DSL sobre el punto único de intercepción (§11). Cambio de estado
         // deliberado respecto a la imperativa: el candado de un-ataque vive en la
         // PROPIA carta de evento (planUsado, viaja con exportGameState) en vez de en
@@ -4087,7 +4087,7 @@ const CARD_DB = [
     },
     {
         name: "Barritas energéticas", type: "Ayuda", subtype: "Ingerible", tags: ["Consumible"], rarity: "C", cost: 1, series: 1,
-        text: "Cura 1 de Vida a dos aliados.",
+        text: "Cura 1 de VIDA a dos aliados.",
         abilities: [
             { trigger: "JUGAR", requisitos: [
                 { count: { filtros: [ { campo: "currentHp", op: "<", valorCampo: "maxHp" } ] }, op: ">=", valor: 2, msg: "Necesitas al menos 2 aliados dañados para usar las Barritas." } ] },
@@ -4101,7 +4101,7 @@ const CARD_DB = [
     },
     {
         name: "Chaqueta metálica defensiva de la muerte", type: "Ayuda", subtype: "Vestimenta", tags: ["Equipable"], rarity: "C", cost: 1, series: 1,
-        text: "Requisito: un aliado sin la etiqueta 'Cosa'. Anéxasela: +3 de Def y -3 de Atq mientras la lleve.",
+        text: "Requisito: un aliado sin la etiqueta 'Cosa'. Anéxasela: +3 de DEF y -3 de ATQ mientras la lleve.",
         abilities: [
             { trigger: "JUGAR", requisitos: [
                 { count: { filtros: [ { no: true, campo: "tags", op: "includes", valor: "Cosa" } ] }, op: ">=", valor: 1, msg: "No tienes aliados válidos (sin etiqueta 'Cosa')." } ] },
@@ -4118,10 +4118,10 @@ const CARD_DB = [
     },
     {
         name: "Muro parlante", hp: 5, def: 7, atk: 0, type: "Esbirro", subtype: "Ser mágico", tags: ["Cosa"], rarity: "C", cost: 1, series: 1,
-        text: "P: INAMOVIBLE: Mientras tenga 0 de Atq, no puede realizar ataques normales.",
+        text: "P: INAMOVIBLE: Mientras tenga 0 de ATQ, no puede realizar ataques normales.",
         passiveName: "INAMOVIBLE",
         abilities: [
-            { trigger: "PUEDE_ATACAR", resumenFase: "Con 0 de Atq no puede realizar ataques normales", porHabilidad: "INAMOVIBLE", si: { campo: "currentAtk", op: ">", valor: 0 },
+            { trigger: "PUEDE_ATACAR", resumenFase: "Con 0 de ATQ no puede realizar ataques normales", porHabilidad: "INAMOVIBLE", si: { campo: "currentAtk", op: ">", valor: 0 },
               msg: "INAMOVIBLE: {carta} no puede atacar mientras su ATQ sea 0 o menor." }
         ],
     },
@@ -4230,7 +4230,7 @@ const CARD_DB = [
         // +ATQ/+DEF ya calculados (vía onEquipUpdate/_statMods) -redundante y sin info real, ya
         // que el tempEffect a mano no lleva `duration`-.
         tempEffectSinLinea: true,
-        text: "Equipa a un aliado con etiqueta 'Usuario de Súper Evolución' de tu vanguardia: adopta las stats de Súper Evolución, recupera toda su Vida y pierde sus estados alterados. Tras 3 turnos tuyos se destruye y le devuelve sus stats, la Vida y la limpieza de estados.",
+        text: "Equipa a un aliado con etiqueta 'Usuario de Súper Evolución' de tu vanguardia: adopta las stats de Súper Evolución, recupera toda su VIDA y pierde sus estados alterados. Tras 3 turnos tuyos se destruye y le devuelve sus stats, la VIDA y la limpieza de estados.",
         // Migrada por completo (31-jul-2026). Tres piezas nuevas, las tres compartidas con las
         // otras dos cartas de la tanda (Poder Legado y Milkor MGL):
         //   · `mientrasEquipado: {superStats:true}` — el bono NO es un delta fijo sino la
@@ -4272,7 +4272,7 @@ const CARD_DB = [
     },
     {
         name: "Karolina", hp: 2, def: 3, atk: 7, type: "Personaje", subtype: "Ser vivo", tags: ["Mercenaria"], gender: "F", rarity: "A", cost: 4, series: 1,
-        text: "P: HUESO DURO: Def máxima 6. Ante ataque normal, solo pierde Vida si (Atq atacante - su Def) >= 2. Ante ataque especial, si es >= 1. A: HOSTIA MÁGICA TERRIBLE (2F): Ataque especial. Si tiene éxito, +1 Def permanente (máx 2 por puesta en juego).",
+        text: "P: HUESO DURO: DEF máxima 6. Ante ataque normal, solo pierde VIDA si (ATQ atacante - su DEF) >= 2. Ante ataque especial, si es >= 1. A: HOSTIA MÁGICA TERRIBLE (2F): Ataque especial. Si tiene éxito, +1 DEF permanente (máx 2 por puesta en juego).",
         passiveName: "HUESO DURO", activeName: "HOSTIA MÁGICA TERRIBLE", activeCost: 2,
         
         onAfterPlayAsync: async function(card, game, p) {
@@ -4425,7 +4425,7 @@ const CARD_DB = [
     },
     {
         name: "Achmay", hp: 8, def: 2, atk: 0, type: "Personaje", subtype: "Ser mágico", tags: ["Cosa"], gender: "M", rarity: "S", cost: 3, series: 1,
-        text: "P: YOLOLO: No puede atacar. Todos los ataques normales enemigos deben ir dirigidos a él. Si recibe un ataque normal, quita 1 Vida al atacante. A: PÉGAME, PERRA (2F): Obliga a un enemigo a realizar un ataque normal hacia Achmay en su próximo turno (si puede). Esta habilidad no gasta la acción de Achmay.",
+        text: "P: YOLOLO: No puede atacar. Todos los ataques normales enemigos deben ir dirigidos a él. Si recibe un ataque normal, quita 1 VIDA al atacante. A: PÉGAME, PERRA (2F): Obliga a un enemigo a realizar un ataque normal hacia Achmay en su próximo turno (si puede). Esta habilidad no gasta la acción de Achmay.",
         passiveName: "YOLOLO", activeName: "PÉGAME, PERRA", activeCost: 2,
         
         isTaunt: true, // Propiedad mágica que lee el motor para obligar los ataques
@@ -4510,7 +4510,7 @@ const CARD_DB = [
     },
     {
         name: "La Bestia", hp: 8, def: 4, atk: 4, type: "Esbirro", subtype: "Ser mágico", tags: ["Invocación"], rarity: "S", cost: 1, series: 2,
-        text: "Coste: 6 de Furor repartidos entre tus aliados. P: MANIFESTACIÓN PROHIBIDA: Si 'Dáedra' está activo (tuyo o rival), Def y Atq = 8. Si expira, baja. A: CATÁSTROFE (1F): Busca 'Fusión de planos' en el mazo. Baraja siempre.",
+        text: "Coste: 6 de Furor repartidos entre tus aliados. P: MANIFESTACIÓN PROHIBIDA: Si 'Dáedra' está activo (tuyo o rival), DEF y ATQ = 8. Si expira, baja. A: CATÁSTROFE (1F): Busca 'Fusión de planos' en el mazo. Baraja siempre.",
         passiveName: "MANIFESTACIÓN PROHIBIDA", activeName: "CATÁSTROFE", activeCost: 1,
         abilities: [
             { trigger: "ACTIVA", nombre: "CATÁSTROFE", coste: { furor: 1 }, sinObjetivo: true,
@@ -4574,7 +4574,7 @@ const CARD_DB = [
     },
     {
         name: "Xidachane", hp: 3, def: 3, atk: 4, type: "Personaje", subtype: "Ser vivo", tags: ["Alienígena", "Usuario de Súper Evolución"], gender: "M", rarity: "S", cost: 4, series: 2,
-        text: "P: PIRATA GALÁCTICO: Sus stats base son (3/3/4). Cada vez que destruye a un enemigo, gana un contador. A los 3 contadores, vuelve a tu mano. A: FRUSTRACIÓN (1F): Ataque normal. Si no tuviera éxito (no hace daño), aumenta todas sus stats y Vida en +2 permanentemente.",
+        text: "P: PIRATA GALÁCTICO: Sus stats base son (3/3/4). Cada vez que destruye a un enemigo, gana un contador. A los 3 contadores, vuelve a tu mano. A: FRUSTRACIÓN (1F): Ataque normal. Si no tuviera éxito (no hace daño), aumenta todas sus stats y VIDA en +2 permanentemente.",
         passiveName: "PIRATA GALÁCTICO", activeName: "FRUSTRACIÓN", activeCost: 1,
         superStats: { hp: 6, def: 5, atk: 7 },
         // Atribuida a FRUSTRACIÓN, no a PIRATA GALÁCTICO (Toto, 27-jul-2026): el +2 a Atq/Def
@@ -4693,7 +4693,7 @@ const CARD_DB = [
     },
     {
         name: "Domador", type: "Ayuda", subtype: "Ser vivo", tags: ["Consumible"], rarity: "C", cost: 1, series: 2,
-        text: "Elige un aliado con etiqueta 'Animal salvaje'. Aumenta su Def y Atq en 2 permanentemente (mientras siga en juego).",
+        text: "Elige un aliado con etiqueta 'Animal salvaje'. Aumenta su DEF y ATQ en 2 permanentemente (mientras siga en juego).",
         // Migrada (29-jul-2026): mismo patrón que Poción revitalizante (JUGAR requisitos +
         // AL_CONSUMIR con ELEGIR en tablero), pero con `stats` en MARCAR_TEMPORAL (28-jul-2026,
         // Capitán Guardia Real) en vez de un onUpdateTempEffect a mano — no hace falta escribirlo,
@@ -4747,7 +4747,7 @@ const CARD_DB = [
         name: "Karlos (KL)", hp: 6, def: 7, atk: 6, type: "Personaje", subtype: "Ser vivo", tags: ["Mercenario", "Usuario de VP"], gender: "M", rarity: "A", cost: 4, series: 2,
         // Requisito visible: a quién señala la flecha lima al presentarse (§14.bis).
         requisitoVisible: [ { quien: "ALIADO", algunFiltro: [ { campo: "name", op: "==", valor: "Karolina" }, { campo: "name", op: "==", valor: "Karlitos" }, { campo: "name", op: "==", valor: "Igniz" } ], uno: true } ],
-        text: "Requisito: Karolina, Karlitos o Igniz en tu campo o bien Coste: 2 de Furor. P: DAME TRABAJOS: Si su Vida <= 3, +2 Atq. A: ULTRA-CHOQUE (2F): Dos ataques normales a vanguardia rival.",
+        text: "Requisito: Karolina, Karlitos o Igniz en tu campo o bien Coste: 2 de Furor. P: DAME TRABAJOS: Si su VIDA <= 3, +2 ATQ. A: ULTRA-CHOQUE (2F): Dos ataques normales a vanguardia rival.",
         passiveName: "DAME TRABAJOS", activeName: "ULTRA-CHOQUE", activeCost: 2,
         abilities: [
             // EL "O BIEN", DECLARATIVO (Toto, 21-ago-2026). Era el último trozo de código a mano
@@ -4826,7 +4826,7 @@ const CARD_DB = [
         name: "Poder Legado", type: "Ayuda", subtype: "Técnica", tags: ["Equipable"], rarity: "S", cost: 1, series: 2,
         // Requisito visible: a quién señala la flecha lima al presentarse (§14.bis).
         requisitoVisible: [ { quien: "ALIADO", zona: "vanguardia", filtros: [ { campo: "name", op: "contieneTexto", valor: "Karlos" }, { campo: "currentHp", op: "<=", valor: 1 } ], uno: true } ],
-        text: "Requisito: un 'Karlos' de tu vanguardia con 1 de Vida o menos. Equípaselo: sus stats pasan a 9 y quedan fijas, y quien le ataque pierde 1 de Furor. Al inicio de tu próximo turno el equipo se destruye y Karlos vuelve a tu mano.",
+        text: "Requisito: un 'Karlos' de tu vanguardia con 1 de VIDA o menos. Equípaselo: sus stats pasan a 9 y quedan fijas, y quien le ataque pierde 1 de Furor. Al inicio de tu próximo turno el equipo se destruye y Karlos vuelve a tu mano.",
         // Que valgan 9 ya se ve en los números; que estén CONGELADAS no lo dice nadie, y es
         // lo que cambia cómo se juega contra él.
         efectoEquipadoTexto: "Sus stats no pueden cambiar, y quien le ataque pierde 1 de Furor",
@@ -5281,7 +5281,7 @@ const CARD_DB = [
     {
         name: "Arthas", hp: 2, def: 3, atk: 6, type: "Personaje", subtype: "Arma legendaria", tags: ["Equipable", "melé"], rarity: "B", cost: 4, series: 2,
         isDual: true, // <--- LA PALANCA PARA QUE EL MOTOR PINTE EL DEGRADADO
-        text: "Requisito: Karolina no está en tu vanguardia; si entra, Arthas se autodestruye. P: HERRERO LEGENDARIO: Carta dual. Como Personaje: equípalo gratis a un aliado en tu turno, dejando su hueco; si el portador cae, vuelve al campo, o a descartes si no hay sitio. Como Ayuda: anexa a un aliado sin etiqueta 'Animal salvaje' ni 'Cosa', ni sea Karolina, y le da +3 de Atq.",
+        text: "Requisito: Karolina no está en tu vanguardia; si entra, Arthas se autodestruye. P: HERRERO LEGENDARIO: Carta dual. Como Personaje: equípalo gratis a un aliado en tu turno, dejando su hueco; si el portador cae, vuelve al campo, o a descartes si no hay sitio. Como Ayuda: anexa a un aliado sin etiqueta 'Animal salvaje' ni 'Cosa', ni sea Karolina, y le da +3 de ATQ.",
         passiveName: "HERRERO LEGENDARIO",
         
         canPlayCard: function(card, game, p) {
@@ -5616,14 +5616,14 @@ const CARD_DB = [
         id: 901, name: "Clon de NoName", hp: 3, def: 3, atk: 6, type: "Esbirro", subtype: "Máquina", tags: ["Con conciencia"], gender: "M", rarity: "S", cost: 0, series: 1,
         isToken: true, // Etiqueta clave para ocultarlo
         reverseArrow: true, 
-        text: "Copia el Atq y Def de NoName en todo momento. Tiene Vida propia, no gana Furor y no puede usar Habilidades. Si NoName deja el campo, se desvanece.",
+        text: "Copia el ATQ y DEF de NoName en todo momento. Tiene VIDA propia, no gana Furor y no puede usar Habilidades. Si NoName deja el campo, se desvanece.",
         // Migrado a DSL (trigger ESPEJO, 21-jul-2026). Idéntico al Clon de Unmei.
         abilities: [{ trigger: "ESPEJO", de: "parentId", copiar: ["currentAtk", "currentDef"], furorCero: true, muerteSiSinPadre: true }]
     },
     {
         tempEffectExpiraLog: "El Liderazgo sobre {objetivo} expira.",
         name: "Capitán Guardia Real", hp: 3, def: 4, atk: 5, type: "Esbirro", subtype: "Ser vivo", tags: ["Guardia Real", "Traje protector"], rarity: "A", cost: 1, series: 2,
-        text: "A: LIDERAZGO (1F): Elige un aliado de tu vanguardia que no haya atacado. +2 Atq hasta el final del turno. Puedes usarla desde retaguardia.",
+        text: "A: LIDERAZGO (1F): Elige un aliado de tu vanguardia que no haya atacado. +2 ATQ hasta el final del turno. Puedes usarla desde retaguardia.",
         activeName: "LIDERAZGO", activeCost: 1,
         canUseAbilityFromRearguard: true,
         
@@ -5751,7 +5751,7 @@ const CARD_DB = [
     },
     {
         name: "Gladiador", hp: 5, def: 4, atk: 5, type: "Personaje", subtype: "Ser vivo", tags: ["Mercenario", "Draconiano", "Maleante"], rarity: "C", cost: 1, series: 2,
-        text: "P: OBSESIÓN DE VENGANZA: Al colocar: puedes anexarle un aliado de tu campo. Mientras la unión dure, gana +1 de Vida, Def y Atq. Al romperse, su Vida nunca baja a 0 por ello.",
+        text: "P: OBSESIÓN DE VENGANZA: Al colocar: puedes anexarle un aliado de tu campo. Mientras la unión dure, gana +1 de VIDA, DEF y ATQ. Al romperse, su VIDA nunca baja a 0 por ello.",
         passiveName: "OBSESIÓN DE VENGANZA",
         // Sin annexEffectText: igual que Kazuo, el +1 lo recibe Gladiador y su propia línea de
         // stats ya lo declara ("+1 VIDA MÁX., +1 DEF y +1 ATQ por OBSESIÓN DE VENGANZA").
@@ -5780,7 +5780,7 @@ const CARD_DB = [
     },
     {
         name: "Contendiente", hp: 3, def: 3, atk: 4, type: "Esbirro", subtype: "Ser vivo", tags: ["Guardia Real", "Draconiana", "Maleante"], rarity: "C", cost: 1, series: 2,
-        text: "A: BOMBAZO (1F): Ataque normal con +2 Atq durante el golpe. Lanza moneda: Cruz = pierde 1 Vida.",
+        text: "A: BOMBAZO (1F): Ataque normal con +2 ATQ durante el golpe. Lanza moneda: Cruz = pierde 1 VIDA.",
         activeName: "BOMBAZO", activeCost: 1,
         abilities: [
             { trigger: "ACTIVA", nombre: "BOMBAZO", coste: { furor: 1 },
@@ -5847,7 +5847,7 @@ const CARD_DB = [
     },
     {
         name: "Ayudante perturbada", hp: 2, def: 2, atk: 3, type: "Esbirro", subtype: "Ser vivo", tags: ["Científica"], gender: "F", rarity: "C", cost: 1, series: 2,
-        text: "P: MANO PARÁSITA: Cada vez que vaya a atacar, echa una moneda. Si sale cara, aumenta en 2 su Atq durante ese ataque.",
+        text: "P: MANO PARÁSITA: Cada vez que vaya a atacar, echa una moneda. Si sale cara, aumenta en 2 su ATQ durante ese ataque.",
         passiveName: "MANO PARÁSITA",
         // Migrada (31-jul-2026): mismo esqueleto que Oni ancho (YŌKAI VIOLENTO) — ANTES_DE_ATACAR
         // + MONEDA + BONO_ATAQUE, que ya recompute vía updatePassives en vez de restar a mano
@@ -5932,7 +5932,7 @@ const CARD_DB = [
     },
     {
         name: "Escape con bomba de humo", type: "Evento", rarity: "C", cost: 1, duration: 1, series: 2,
-        text: "1 turno. Mientras esté en juego, puedes retirar a tus aliados sin coste de Furor. Al expirar, cura 3 de Vida a cada aliado con etiqueta 'Ninja'.",
+        text: "1 turno. Mientras esté en juego, puedes retirar a tus aliados sin coste de Furor. Al expirar, cura 3 de VIDA a cada aliado con etiqueta 'Ninja'.",
         abilities: [
             // zona VANGUARDIA (Toto, 23-jul-2026): retirarse es pasar de vanguardia a
             // retaguardia, así que quien YA está en retaguardia no puede beneficiarse — el
@@ -5941,7 +5941,7 @@ const CARD_DB = [
             // (Esta ability estaba además DUPLICADA, lo que la listaba dos veces.)
             { trigger: "PREVIEW_GLOBAL", lineas: [ { quien: "ALIADO", zona: "VANGUARDIA", soloTipos: ["Personaje", "Esbirro"], texto: "Puede retirarse sin coste de Furor" } ] },
             { trigger: "AL_JUGAR", log: "¡Bomba de humo! El campo se llena de niebla.", logTipo: "ability" },
-            { trigger: "AL_CADUCAR", resumenFase: "Al expirar, cura 3 de Vida a cada aliado con etiqueta 'Ninja'", log: "La niebla se disipa.", logTipo: "system",
+            { trigger: "AL_CADUCAR", resumenFase: "Al expirar, cura 3 de VIDA a cada aliado con etiqueta 'Ninja'", log: "La niebla se disipa.", logTipo: "system",
               efectos: [ { op: "CURAR", valor: 3, conBeforeHealed: false, soloSiHerido: true,
                            floating: "CURADO", floatingStyle: "ft-green", offsetY: -20, fuente: "healing",
                            target: { quien: "ALIADO", filtros: [ { campo: "tags", op: "includes", valor: "Ninja" } ] } } ],
@@ -6046,7 +6046,7 @@ const CARD_DB = [
     },
     {
         name: "Milkor MGL", type: "Ayuda", subtype: "Arma", tags: ["Equipable", "a distancia"], rarity: "B", cost: 1, series: 2,
-        text: "Equípala a un aliado sin etiqueta 'Animal salvaje'. Al atacar normal, moneda - Cara: +4 de Atq durante el golpe, hasta un máximo de 8. Cruz: el rival elige el objetivo y el daño baja en 3. Se destruye al segundo uso.",
+        text: "Equípala a un aliado sin etiqueta 'Animal salvaje'. Al atacar normal, moneda - Cara: +4 de ATQ durante el golpe, hasta un máximo de 8. Cruz: el rival elige el objetivo y el daño baja en 3. Se destruye al segundo uso.",
         // Migrada (31-jul-2026), tercera y última de la tanda de equipos con vida propia. Es la
         // que tenía el trozo delicado: su interceptor DEVUELVE un valor al motor
         // ({dmgMod, newDefender}) y, en la rama de cruz, hace elegir al RIVAL a mitad del ataque.
@@ -6248,7 +6248,7 @@ const CARD_DB = [
     },
     {
         name: "Oni ancho", hp: 4, def: 4, atk: 6, type: "Esbirro", subtype: "Ser mágico", tags: ["Monstruo"], rarity: "B", cost: 1, series: 2,
-        text: "Coste: 2 de Furor. P: YŌKAI VIOLENTO: Al realizar un ataque normal, echa una moneda. Cara: +1 Atq. Cruz: -1 Atq durante ese ataque.",
+        text: "Coste: 2 de Furor. P: YŌKAI VIOLENTO: Al realizar un ataque normal, echa una moneda. Cara: +1 ATQ. Cruz: -1 ATQ durante ese ataque.",
         passiveName: "YŌKAI VIOLENTO",
         // YŌKAI VIOLENTO migrada (31-jul-2026) con el trigger NUEVO `ANTES_DE_ATACAR` y el op
         // `BONO_ATAQUE`. `soloAtaqueNormal` replica el `!game.abilityContext ||
@@ -6395,7 +6395,7 @@ const CARD_DB = [
     },
     {
         name: "Fanático", hp: 3, def: 3, atk: 3, type: "Esbirro", subtype: "Ser vivo", tags: ["Usuario de magia"], rarity: "B", cost: 1, series: 2,
-        text: "P: ADORACIÓN PERVERSA: Aumenta todas sus estadísticas (+1 Vida, +1 Def, +1 Atq) por cada aliado 'Ser mágico' con etiqueta 'Monstruo' (máximo de +3).",
+        text: "P: ADORACIÓN PERVERSA: Aumenta todas sus estadísticas (+1 VIDA, +1 DEF, +1 ATQ) por cada aliado 'Ser mágico' con etiqueta 'Monstruo' (máximo de +3).",
         passiveName: "ADORACIÓN PERVERSA",
         // Vida/Def/Atq suben LOS TRES a la vez, con el mismo recuento (aliados 'Ser mágico'
         // con etiqueta 'Monstruo', tope 3). El motor ya sabe reaplicar atk/def en cada pasada
@@ -6553,7 +6553,7 @@ const CARD_DB = [
     },
     {
         name: "Muñeca del mal", hp: 2, def: 2, atk: 4, type: "Esbirro", subtype: "No-muerto", tags: ["Monstruo", "Creación artificial"], rarity: "B", cost: 1, series: 2,
-        text: "P: IMPRECACIÓN: Cuando su Vida llegue a 0 debido a un ataque, echa una moneda. Si sale cara, destruye la carta que realizó ese ataque.",
+        text: "P: IMPRECACIÓN: Cuando su VIDA llegue a 0 debido a un ataque, echa una moneda. Si sale cara, destruye la carta que realizó ese ataque.",
         passiveName: "IMPRECACIÓN",
         // Migrada (31-jul-2026): TRAS_DEFENDER (mismo trigger de Imp mayor/Gólem multielemental)
         // con `si:{campo:"self.hp"}` para "cuando su Vida llegue a 0" e `ifObjetivo` para "SI el
@@ -6600,7 +6600,7 @@ const CARD_DB = [
     },
     {
         name: "Hiposaurio", hp: 6, def: 4, atk: 2, type: "Esbirro", subtype: "Ser vivo", tags: ["Bestia salvaje"], rarity: "B", cost: 1, series: 2,
-        text: "P: ECOSISTEMA VIVIENTE: Al sufrir Daño por tiempo, pierde 3 de Vida en vez de 1. A: CABREO (3F): Ataque normal con +2 de Atq durante el golpe.",
+        text: "P: ECOSISTEMA VIVIENTE: Al sufrir Daño por tiempo, pierde 3 de VIDA en vez de 1. A: CABREO (3F): Ataque normal con +2 de ATQ durante el golpe.",
         passiveName: "ECOSISTEMA VIVIENTE", activeName: "CABREO", activeCost: 3,
         // ECOSISTEMA VIVIENTE se queda imperativa (27-jul-2026, tanda de volumen): no hay
         // trigger DSL para "modificar el tick de Daño por tiempo", y no compensa crear uno
@@ -6624,7 +6624,7 @@ const CARD_DB = [
     {
         name: "Lolita", hp: 2, def: 2, atk: 2, type: "Esbirro", subtype: "Ser vivo", tags: ["Otaku"], rarity: "A", cost: 1, series: 2,
         isToken: true, // Esto le quita la retribución al morir automáticamente en checkDeath
-        text: "P: PRESTIGIO: Esta carta no te otorga retribución cuando su Vida llega a 0. A: NOCIONES DE OCULTISMO (1F): Ataque especial con +2 de Atq durante el golpe.",
+        text: "P: PRESTIGIO: Esta carta no te otorga retribución cuando su VIDA llega a 0. A: NOCIONES DE OCULTISMO (1F): Ataque especial con +2 de ATQ durante el golpe.",
         passiveName: "PRESTIGIO", activeName: "NOCIONES DE OCULTISMO", activeCost: 1,
         // Migrada por completo (27/28-jul-2026, tanda de volumen #2). Mismo patrón que
         // Hechicero/CHIRIBITA: ATACAR especial:true. CORRECCIÓN igual que allí: la vieja
@@ -6639,7 +6639,7 @@ const CARD_DB = [
     },
     {
         name: "Uniojo", hp: 2, def: 1, atk: 4, type: "Esbirro", subtype: "Ser vivo", tags: ["Animal salvaje"], rarity: "C", cost: 1, series: 2,
-        text: "P: COMENSAL: Reacción. Si la Vida de un aliado 'Ser vivo' llega a 0, puedes colocar a Uniojo desde tu mano en su misma posición. Si lo haces, aumenta su Vida máxima en 2.",
+        text: "P: COMENSAL: Reacción. Si la VIDA de un aliado 'Ser vivo' llega a 0, puedes colocar a Uniojo desde tu mano en su misma posición. Si lo haces, aumenta su VIDA máxima en 2.",
         passiveName: "COMENSAL",
         // Migrada a DSL (trigger REACCION sobre MUERTE_ALIADO, 21-ago-2026). Estrena el op
         // COLOCARSE: la carta entra desde la mano en el hueco del muerto. Al ser un Esbirro y no
@@ -6783,7 +6783,7 @@ const CARD_DB = [
     },
     {
         name: "Hechicero", hp: 3, def: 3, atk: 4, type: "Esbirro", subtype: "Ser vivo", tags: ["Usuario de magia"], rarity: "B", cost: 1, series: 2,
-        text: "A: CHIRIBITA (1F): Ataque especial con +1 de Atq durante el golpe.",
+        text: "A: CHIRIBITA (1F): Ataque especial con +1 de ATQ durante el golpe.",
         activeName: "CHIRIBITA", activeCost: 1,
         // Migrada por completo (27-jul-2026, tanda de volumen). Estrena `especial: true` en el
         // op ATACAR: la fórmula de daño de un ataque especial (Atq-Def, suelo 0.5/1 para
@@ -6805,7 +6805,7 @@ const CARD_DB = [
     {
         name: "Megalimo", hp: 6, def: 3, atk: 2, type: "Esbirro", subtype: "Ser vivo", tags: ["Creación artificial"], rarity: "S", cost: 1, series: 2,
         isEvolution: true,
-        text: "P: EVOLUCIÓN: Solo se coloca destruyendo un 'Limo crecido' de tu campo y ocupando su lugar, conservando sus bonos. Botón Extra: Consume el Furor que quieras para curar esa misma Vida. A: ABRAZO PERTURBADOR (3F): Ataque normal con +4 Atq. Si tiene éxito, confunde 2 turnos.",
+        text: "P: EVOLUCIÓN: Solo se coloca destruyendo un 'Limo crecido' de tu campo y ocupando su lugar, conservando sus bonos. Botón Extra: Consume el Furor que quieras para curar esa misma VIDA. A: ABRAZO PERTURBADOR (3F): Ataque normal con +4 ATQ. Si tiene éxito, confunde 2 turnos.",
         passiveName: "EVOLUCIÓN", activeName: "ABRAZO PERTURBADOR", activeCost: 3,
         onBeforePlayAsync: async function(card, game, p) {
             const limos = [...p.vanguard, ...p.rearguard].filter(c => c.name === 'Limo crecido');
@@ -6949,7 +6949,7 @@ const CARD_DB = [
     },
     {
         name: "Ángel", hp: 4, def: 4, atk: 4, type: "Esbirro", subtype: "Ser mágico", tags: ["Monstruo"], rarity: "A", cost: 1, series: 2,
-        text: "Coste: 2 de Furor. P: PRODIGIO: Al colocar: cura 1 de Vida a tu vanguardia. A: SANCIÓN (2F): Ataque especial a dos enemigos de la vanguardia rival.",
+        text: "Coste: 2 de Furor. P: PRODIGIO: Al colocar: cura 1 de VIDA a tu vanguardia. A: SANCIÓN (2F): Ataque especial a dos enemigos de la vanguardia rival.",
         passiveName: "PRODIGIO", activeName: "SANCIÓN", activeCost: 2,
         // PRODIGIO migrada (27-jul-2026, tanda de volumen): curar 1 a toda la vanguardia
         // dañada, mismo patrón ya usado por Escape con bomba de humo (CURAR soloSiHerido en
@@ -6980,7 +6980,7 @@ const CARD_DB = [
     // ===== CARTAS DECLARATIVAS DE PRUEBA (motor híbrido / DSL) =====
     {
         id: 990, name: "Bersérker de prueba", hp: 5, def: 4, atk: 3, type: "Esbirro", subtype: "Ser vivo", tags: ["Prueba"], rarity: "B", cost: 1, series: 1,
-        text: "P: FURIA: +3 Atq mientras su Vida sea <= 3.",
+        text: "P: FURIA: +3 ATQ mientras su VIDA sea <= 3.",
         passiveName: "FURIA",
         abilities: [
             { trigger: "PASIVA_CONTINUA", nombre: "FURIA",
@@ -6990,7 +6990,7 @@ const CARD_DB = [
     },
     {
         id: 991, name: "Tótem de prueba", hp: 6, def: 5, atk: 1, type: "Esbirro", subtype: "Ser vivo", tags: ["Prueba"], rarity: "B", cost: 1, series: 1,
-        text: "P: COMUNIÓN: +1 Atq y +1 Def por cada aliado con etiqueta 'Prueba' en mesa (máx 3).",
+        text: "P: COMUNIÓN: +1 ATQ y +1 DEF por cada aliado con etiqueta 'Prueba' en mesa (máx 3).",
         passiveName: "COMUNIÓN",
         abilities: [
             { trigger: "PASIVA_CONTINUA", nombre: "COMUNIÓN",
@@ -7160,7 +7160,7 @@ const CARD_DB = [
         // se hacen juntas porque comparten estructura EXACTA, que es justo el criterio de
         // familias de la §9 de la rúbrica — misma mecánica, misma redacción.
         name: "Publicidad mental", type: "Evento", rarity: "C", cost: 0, duration: 2, series: 1,
-        text: "2 turnos. Requiere elegir un aliado de tu vanguardia. Mientras esté en juego, ese aliado y todos los enemigos pierden 2 de Atq.",
+        text: "2 turnos. Requiere elegir un aliado de tu vanguardia. Mientras esté en juego, ese aliado y todos los enemigos pierden 2 de ATQ.",
         abilities: [
             { trigger: "JUGAR", requisitos: [
                 { count: { zona: "VANGUARDIA" }, op: ">=", valor: 1,
@@ -7180,7 +7180,7 @@ const CARD_DB = [
         // ninguna carta, pero entra aquí porque escribirla aparte habría costado más que
         // copiar la de al lado, y así las dos nacen redactadas igual (rúbrica §9).
         name: "Exhibicionismo", type: "Evento", rarity: "C", cost: 0, duration: 2, series: 1,
-        text: "2 turnos. Requiere elegir un aliado de tu vanguardia. Mientras esté en juego, ese aliado y todos los enemigos pierden 2 de Def.",
+        text: "2 turnos. Requiere elegir un aliado de tu vanguardia. Mientras esté en juego, ese aliado y todos los enemigos pierden 2 de DEF.",
         abilities: [
             { trigger: "JUGAR", requisitos: [
                 { count: { zona: "VANGUARDIA" }, op: ">=", valor: 1,
@@ -7209,7 +7209,7 @@ const CARD_DB = [
     },
     {
         name: "Cóctel molotov", type: "Ayuda", subtype: "Arma", tags: ["Consumible"], rarity: "C", series: 1,
-        text: "Quita 1 de Vida a un enemigo y le inflige Daño por tiempo durante 2 turnos.",
+        text: "Quita 1 de VIDA a un enemigo y le inflige Daño por tiempo durante 2 turnos.",
         abilities: [
             { trigger: "AL_CONSUMIR",
               efectos: [
@@ -7223,9 +7223,9 @@ const CARD_DB = [
     },
     {
         name: "Consagración", type: "Evento", rarity: "A", cost: 0, duration: 3, series: 1,
-        text: "3 turnos. Mientras esté en juego, cura 1 de Vida a cada aliado al final de tu turno. Al expirar, cura 1 de Vida a cada aliado.",
+        text: "3 turnos. Mientras esté en juego, cura 1 de VIDA a cada aliado al final de tu turno. Al expirar, cura 1 de VIDA a cada aliado.",
         abilities: [
-            { trigger: "FIN_TURNO", resumenFase: "Cura 1 de Vida a cada aliado", 
+            { trigger: "FIN_TURNO", resumenFase: "Cura 1 de VIDA a cada aliado", 
               efectos: [
                 { op: "CURAR", valor: 1, conBeforeHealed: false, soloSiHerido: true,
                   offsetY: -20, fuente: "healing",
@@ -7236,7 +7236,7 @@ const CARD_DB = [
                   logResumen: { msg: "La luz de Consagración cura +{delta} de Vida a {lista}.",
                                 msgVariado: "La luz de Consagración recorre el campo, curando a {lista}.",
                                 tipo: "healing" } } ] },
-            { trigger: "AL_CADUCAR", resumenFase: "Al expirar, cura 1 de Vida a cada aliado", log: "Consagración se desvanece con una última bendición.", logTipo: "ability",
+            { trigger: "AL_CADUCAR", resumenFase: "Al expirar, cura 1 de VIDA a cada aliado", log: "Consagración se desvanece con una última bendición.", logTipo: "ability",
               efectos: [
                 { op: "CURAR", valor: 1, conBeforeHealed: false, soloSiHerido: true,
                   offsetY: -20, fuente: "healing",
@@ -7248,10 +7248,10 @@ const CARD_DB = [
     },
     {
         name: "Robot de asalto AU", hp: 5, def: 5, atk: 5, type: "Esbirro", subtype: "Máquina", tags: ["Controlable"], gender: "N", rarity: "C", series: 1,
-        text: "P: SOBRECALENTAMIENTO: Al final de cada turno en el que tenga 2 o más de Furor, pierde 3 de Vida.",
+        text: "P: SOBRECALENTAMIENTO: Al final de cada turno en el que tenga 2 o más de Furor, pierde 3 de VIDA.",
         passiveName: "SOBRECALENTAMIENTO",
         abilities: [
-            { trigger: "FIN_TURNO", resumenFase: "Con 2 o más de Furor, pierde 3 de Vida", porHabilidad: "SOBRECALENTAMIENTO", 
+            { trigger: "FIN_TURNO", resumenFase: "Con 2 o más de Furor, pierde 3 de VIDA", porHabilidad: "SOBRECALENTAMIENTO", 
               efectos: [
                 { if: { campo: "furor", op: ">=", valor: 2 },
                   op: "MODIFICAR_STAT", target: { quien: "SELF" }, stat: "currentHp", delta: -3, comprobarMuerte: true,

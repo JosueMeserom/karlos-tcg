@@ -47,13 +47,13 @@ parser, no prosa).
 Si la carta declara `passiveName` o `activeName`, el texto **tiene** que nombrarla:
 
 ```
-P: MEGADRENALINA: Si su Vida es 3 o menos, +2 de Atq.
-A: BI-CHOQUE (1F): Ataca a 2 enemigos con Atq-1.
+P: MEGADRENALINA: Si su VIDA es 3 o menos, +2 de ATQ.
+A: BI-CHOQUE (1F): Ataca a 2 enemigos con ATQ-1.
 ```
 
 El nombre va en MAYÚSCULAS y **debe coincidir carácter a carácter** con `passiveName`/`activeName`
 de la plantilla. Es lo que permite al detalle montar la caja con su título, y al resto del juego
-firmar los efectos ("+1 Def y +1 Atq **por SABIDURÍA**" en "Afectado por:").
+firmar los efectos ("+1 DEF y +1 ATQ **por SABIDURÍA**" en "Afectado por:").
 
 > **Trampa conocida**: el parser separa las secciones buscando `P:` y `A:`. Un nombre acabado en
 > "A" seguido de dos puntos (SABIDURÍA:) llegó a colar una frontera falsa por culpa de `\b`, que
@@ -132,16 +132,23 @@ demasiado, no que lo diga con todas las letras.
 
 ## 5. Nombres de características, zonas y estados
 
-Se escriben como en la cara de la carta, y el orden cuando van juntas es **Vida → Def → Atq**
+Se escriben como en la cara de la carta, y el orden cuando van juntas es **VIDA → DEF → ATQ**
 (igual que en el detalle y en "Afectado por:").
 
 | Concepto | Canónico | Formas a eliminar |
 |---|---|---|
-| Ataque | `Atq` | `ATQ`, `Ataque` |
-| Defensa | `Def` | `DEF`, `Defensa` |
-| Vida | `Vida` | `vida`, `VIDA`, `HP` |
+| Ataque | `ATQ` | `Atq`, `atq`, `Ataque` |
+| Defensa | `DEF` | `Def`, `def`, `Defensa` |
+| Vida | `VIDA` | `Vida`, `vida`, `HP` |
 | Furor | `Furor` | — |
 | Zonas | `vanguardia`, `retaguardia` (minúscula) | `Vanguardia`, `Van.` |
+
+**Las tres características van en MAYÚSCULAS** (Toto, 23-ago-2026; hasta ese día la norma era la
+contraria). Se escriben **como en la cara de la carta** —VIDA · DEF · ATQ— y como ya las escribe
+el motor en el detalle y en los flotantes (`+2 ATQ`, `VIDA MÁX.`): antes el texto de una carta
+hablaba un idioma distinto del de su propio detalle. `Furor` no entra, porque no está en la cara
+de la carta; y los **logs tampoco**: ahí las características son prosa («cura 2 de VIDA a X»
+gritaría a mitad de frase), así que se quedan en minúscula inicial.
 
 Los **estados alterados** se nombran con el sustantivo, en mayúscula inicial, cuando se habla del
 estado; con el verbo en minúscula cuando se aplica:
@@ -284,7 +291,7 @@ y Sadame directamente se la calla. Forma canónica:
 > **Sustituye a `<carta>` en su lugar, conservando sus bonos.**
 
 Lo que SÍ distingue a unas de otras se escribe aparte, porque es distinto de verdad: si además
-restablece la Vida (Sadame: "Restablece Vida al inicio") o si hay condición de colocación. Ya
+restablece la VIDA (Sadame: "Restablece VIDA al inicio") o si hay condición de colocación. Ya
 aplicada en *Entrenamiento arduo*; las tres de arriba quedan pendientes de unificar.
 
 ---
@@ -751,11 +758,11 @@ El detalle cuenta lo que afecta a una carta por dos caminos, y **no son alternat
    Nada de eso mueve un stat, así que la foto no lo detecta.
 
 **Usar el 2 para algo que ya cuenta el 1 saca la entrada dos veces, y la flecha también.** Le pasó
-a Publicidad mental y a Exhibicionismo: declaraban «-2 de Atq por la publicidad» teniendo ya un
+a Publicidad mental y a Exhibicionismo: declaraban «-2 de ATQ por la publicidad» teniendo ya un
 `AURA` con `stats: { atk: -2 }` que lo pinta solo, y encima con peor redacción (la de la carta se
 salta la gramática de §13).
 
-Regla práctica: **si la línea nombra Vida, Def o Atq, casi siempre sobra.** El Furor es la
+Regla práctica: **si la línea nombra VIDA, DEF o ATQ, casi siempre sobra.** El Furor es la
 excepción — `_statMods` solo fotografía `currentAtk`, `currentDef`, `stealth` e `isSilenced`, así
 que lo que toque el Furor sí hay que escribirlo a mano.
 
