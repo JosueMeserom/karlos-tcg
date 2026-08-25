@@ -172,6 +172,8 @@ const escenarios = [
         ],
         logsIntencionados: [
             { de: '[ability] Manzanahoria', a: '[ability] Manzanahoria [1] de J1 (Jugador 1)', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado. Mismo mensaje, nombre completo' },
+            { de: 'El Limo primario expande su Vida a', a: 'El Limo primario [1] de J1 (Jugador 1) expande su Vida a',
+              motivo: 'ídem, ahora también en el log de SOBRECURACION: el compilador lo nombra con dueño desde el 25-ago-2026 (lo pedía la norma; la vieja usaba el nombre pelado)' },
         ],
     },
     {

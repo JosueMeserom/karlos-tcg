@@ -169,6 +169,9 @@ const escenarios = [
             { atacar: 'Robot de seguridad SP', objetivo: 'Mini-tigre' }, // mata al anexado: rompe el vínculo
         ],
         logsIntencionados: [
+            { de: '¡DESBORDE DE MANÁ otorga +1 Furor adicional a Garret!',
+              a: '¡DESBORDE DE MANÁ otorga +1 Furor adicional a Garret de J2 (Jugador 2)!',
+              motivo: 'ajeno a Gladiador: la Pasiva de Furor de Garret pasó al trigger FUROR_PROPIO el 25-ago-2026, y su log nombra la carta con dueño como manda la norma' },
             { de: '¡Gladiador se obsesiona y anexa a Mini-tigre!',
               a: '¡Gladiador se obsesiona y anexa a Mini-tigre [1] de J1 (Jugador 1)!',
               motivo: 'cambio de formato de nombre en el log' },

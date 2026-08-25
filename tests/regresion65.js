@@ -110,6 +110,8 @@ const escenarios = [
             { de: 'Kyle repara 2 de Vida a Limo primario [1] de J1 (Jugador 1).',
               a: 'Kyle de J1 (Jugador 1) repara la Vida de Limo primario [1] de J1 (Jugador 1) (4 -> 6).',
               motivo: MOTIVO_NOMBRE },
+            { de: 'El Limo primario expande su Vida a', a: 'El Limo primario [1] de J1 (Jugador 1) expande su Vida a',
+              motivo: MOTIVO_NOMBRE + ' (ahora también en el log de SOBRECURACION, 25-ago-2026)' },
         ],
         flotantesSoloVieja: [ { linea: 'inst_p1_2_1004 · REPARACIÓN MOLECULAR', motivo: MOTIVO_CARTEL } ],
     },

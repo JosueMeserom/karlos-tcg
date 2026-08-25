@@ -886,6 +886,21 @@ function compararCapturas(esc, vieja, nueva) {
     for (const regla of (esc.flotantesSoloNueva || [])) {
         if (!regla.motivo) throw new Error(`escenario "${esc.nombre}": flotantesSoloNueva sin "motivo" documentado`);
         const antes = flotantesNuevos.length;
+        // `ocurrencia: N` quita SOLO el N-ésimo que case, no todos (hermano del que ya tenía
+        // flotantesIntencionados). Hace falta cuando la nueva pinta el MISMO cartel más veces
+        // que la vieja -Sadame anuncia ZOMBIFICAR también al deshacer los anexos- y borrarlos
+        // todos se llevaría por delante el legítimo, escondiendo un fallo de recuento.
+        if (typeof regla.ocurrencia === 'number') {
+            let visto = 0;
+            flotantesNuevos = flotantesNuevos.filter(l => {
+                if (!l.includes(regla.linea)) return true;
+                return ++visto !== regla.ocurrencia;
+            });
+            if (visto < regla.ocurrencia) {
+                diffs.push(`flotantesSoloNueva: no hay un flotante nº ${regla.ocurrencia} que contenga "${regla.linea}" en la salida nueva`);
+            }
+            continue;
+        }
         flotantesNuevos = flotantesNuevos.filter(l => !l.includes(regla.linea));
         if (flotantesNuevos.length === antes) {
             diffs.push(`flotantesSoloNueva: la línea declarada "${regla.linea}" no aparece en la salida nueva`);
