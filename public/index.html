@@ -6985,9 +6985,9 @@
                     [...player.vanguard, ...player.rearguard].forEach(card => {
                         card.exhausted = false;
                         card.hasAttackedThisTurn = false;
-                        // La exposición del escondite frágil dura el turno del RIVAL: se acaba
-                        // cuando vuelve el tuyo, aquí mismo. Solo la de quien empieza turno.
-                        if (pid === this.activePlayerId) delete card._expuesto;
+                        // La exposición del escondite frágil dura EL TURNO en el que se tiró la
+                        // moneda: al empezar el siguiente, sea de quien sea, se acabó.
+                        delete card._expuesto;
                     });
                 });
 
@@ -7021,6 +7021,7 @@
                 // que ocupaban los viejos onStartTurn (ver allí).
                 await this.processStartPhaseEffects(this.activePlayerId); 
                 await _periodicos(this, 'EFECTOS INICIALES', 'DESPUES');
+                await this._esconditeFragil();
 
                 this.updatePhaseDisplay('EVENTO');
                 await showPhaseBanner(pName, 'FASE DE EVENTO');
@@ -7405,39 +7406,6 @@
                         });
                     }
                 });
-
-                // ESCONDITE FRÁGIL (Toto, 23-ago-2026) — REGLA UNIVERSAL, no de ninguna carta.
-                // El Oculto existe para obligar al rival a tener respuestas (ataques especiales,
-                // daño sin atacar). Si NO las tiene, una carta Oculta a la que además no se puede
-                // llegar de ninguna otra forma cierra la partida: eres intocable y desgastas al
-                // otro sin que pueda hacer nada. Esto es la válvula.
-                //
-                // La condición NO es "es tu única carta", es "el rival no tiene NADA a lo que
-                // atacar": ni una carta tuya alcanzable ni el ataque directo. Dicho así se cubre
-                // solo cualquier caso futuro -una carta que viva siempre en retaguardia, dos
-                // Ocultas tapándose entre ellas- sin tener que enumerarlos, y también el contrario
-                // (si el rival tiene un Simon, que sí puede atacar Ocultos, no hay candado y no
-                // hay moneda).
-                //
-                // Va aquí, con los estados: al final de tu turno, ya jugado todo, y lo que salga
-                // dura el turno entero del rival (§20). Recorre vanguardia y luego retaguardia,
-                // de izquierda a derecha, como el resto de la fase.
-                if (this._hayCandadoDeOculto(this.activePlayerId)) {
-                    for (const card of [...p.vanguard, ...p.rearguard]) {
-                        if (!card.stealth) continue;
-                        this.logMsg(`${this.getCardNameWithOwner(card)} no tiene tras quien esconderse: su escondite flaquea...`, 'system');
-                        const _res = await this.triggerCoinFlips(1, this.activePlayerId);
-                        if (_res && _res[0] === 'tails') {
-                            card._expuesto = true;
-                            this.logMsg(`Moneda: CRUZ - ¡${this.getCardNameWithOwner(card)} queda ${this.generoTexto(card, 'expuesto', 'expuesta')} durante el turno del rival!`, 'ability');
-                            showFloatingText(card.instanceId, this.generoTexto(card, 'EXPUESTO', 'EXPUESTA'), 'ft-red-stat', -30);
-                        } else {
-                            this.logMsg(`Moneda: CARA - ${this.getCardNameWithOwner(card)} sigue ${this.generoTexto(card, 'oculto', 'oculta')} en las sombras.`, 'neutral');
-                        }
-                    }
-                    this.updatePassives();
-                    this.render();
-                }
 
                 let myEvent = p.activeEvent;
                 if (myEvent && getCardTemplate(myEvent.id).onEndTurn) {
@@ -11838,6 +11806,49 @@
             // (Infusión de maná lo pone en la instancia). Toto, 23-ago-2026: se comprobaba solo
             // `canAttackStealth`, así que el equipo cambiaba el tipo de ataque pero no a quién
             // se podía atacar.
+            // ESCONDITE FRÁGIL (Toto, 23-ago-2026) — REGLA UNIVERSAL, no de ninguna carta.
+            //
+            // El Oculto existe para obligar a llevar respuestas: ataques especiales, daño sin
+            // atacar. Si el jugador de turno NO las tiene, una carta Oculta a la que además no se
+            // puede llegar de ninguna otra forma cierra la partida: el otro es intocable y te
+            // desgasta la Retribución sin que puedas hacer nada. Esto es la válvula.
+            //
+            // CUÁNDO: al final de los Efectos Iniciales del turno de QUIEN ESTÁ BLOQUEADO, o sea
+            // justo antes de que le toque atacar (Toto, 23-ago-2026, corrigiendo la primera
+            // versión, que lo miraba al terminar el turno del que se esconde). Puesto aquí
+            // alcanza también a los Ocultos que se aplican al EMPEZAR este turno -el camuflaje de
+            // Mill-, que en la otra posición todavía no existían; y la moneda cae justo cuando
+            // hace falta, no un turno antes.
+            //
+            // QUIÉN LA TIRA Y QUÉ ES BUENO: la tira EL JUGADOR DE TURNO -el bloqueado, que es
+            // quien no puede hacer nada- y **con CARA se quita ese Oculto**. Va con la convención
+            // de todas las monedas del juego: cara es el resultado bueno para quien la lanza.
+            // Una moneda POR CADA carta Oculta del rival.
+            //
+            // A QUIÉN NO ALCANZA: a una carta Oculta que además está AGOTADA. Si no puede actuar
+            // no está encerrando a nadie -Zoe entrenando, alguien paralizado por el PEM-, y el
+            // candado que esto viene a abrir no lo monta ella. Todo lo demás se refresca al
+            // empezar el turno, así que este filtro solo pilla a quien de verdad no puede.
+            async _esconditeFragil() {
+                const rid = this.activePlayerId === 'p1' ? 'p2' : 'p1';
+                if (!this._hayCandadoDeOculto(rid)) return;
+                let algo = false;
+                for (const card of [...this.players[rid].vanguard, ...this.players[rid].rearguard]) {
+                    if (!card.stealth || card.exhausted) continue;
+                    algo = true;
+                    this.logMsg(`${this.getCardNameWithOwner(card)} no tiene tras quien esconderse: su escondite flaquea...`, 'system');
+                    const _res = await this.triggerCoinFlips(1, this.activePlayerId);
+                    if (_res && _res[0] === 'heads') {
+                        card._expuesto = true;
+                        this.logMsg(`Moneda: CARA - ¡${this.getCardNameWithOwner(card)} queda ${this.generoTexto(card, 'expuesto', 'expuesta')} durante este turno!`, 'ability');
+                        showFloatingText(card.instanceId, this.generoTexto(card, 'EXPUESTO', 'EXPUESTA'), 'ft-red-stat', -30);
+                    } else {
+                        this.logMsg(`Moneda: CRUZ - ${this.getCardNameWithOwner(card)} sigue ${this.generoTexto(card, 'oculto', 'oculta')} en las sombras.`, 'neutral');
+                    }
+                }
+                if (algo) { this.updatePassives(); this.render(); }
+            }
+
             // ¿Está el rival de `pid` sin NADA que atacar? Es la condición del escondite frágil:
             // ninguna carta de `pid` es alcanzable por ninguna del rival, y tampoco hay ataque
             // directo (que exige el campo VACÍO, así que con una carta escondida tampoco lo hay).

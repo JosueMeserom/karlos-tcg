@@ -896,16 +896,19 @@ Las tres reglas del Oculto, juntas, porque estaban repartidas y ninguna carta la
 2. **El daño lo revela… solo si el Oculto viene de un efecto con duración.** Los permanentes
    (Pasiva de Edrielle, Activa de Súcubo, Zoe entrenando) NO se revelan: su fuente los repone en
    la siguiente pasada de pasivas, así que anunciarlo sería mentira.
-3. **Escondite frágil**: al final de tu turno, si tu rival no tiene NADA a lo que atacar —ni una
-   carta tuya alcanzable ni el ataque directo—, cada carta Oculta tuya echa una moneda; con cruz
-   queda expuesta durante todo el turno del rival.
+3. **Escondite frágil**: si al final de tu Fase de efectos iniciales no tienes NADA a lo que
+   atacar —ni una carta suya alcanzable ni el ataque directo—, echas una moneda **por cada carta
+   Oculta del rival**: con **cara**, se le quita ese Oculto durante este turno. La tiras **tú**,
+   el bloqueado, y cara es el resultado bueno para quien lanza, como en todas las monedas del
+   juego. **No entran las cartas Ocultas que además estén agotadas**: si no pueden actuar no te
+   están encerrando (Zoe entrenando, alguien paralizado).
 
 **La 3 es una regla del JUEGO, no de ninguna carta**, y por eso no se escribe en el texto de
 Edrielle ni de ninguna otra: vive en el panel de reglas. Su condición se pregunta con el mismo
 predicado que decide un ataque normal, así que cualquier carta futura que no se pueda atacar deja
 de servir de tapadera sin tocar nada.
 
-**Qué NO alcanza, y por qué está bien**: los Ocultos que llegan al empezar el turno del rival (el
-camuflaje de Mill) no están puestos cuando se mira el candado. No hace falta: el candado lo montan
-los permanentes, que pegan cada turno sin dejar de ser intocables; quien se camufla **por no
-atacar** no está desgastando a nadie.
+**Por qué en la Fase de efectos iniciales y no al final del turno del que se esconde**: puesta
+ahí, la moneda cae **justo antes de que te toque atacar** y alcanza también a los Ocultos que se
+aplican al EMPEZAR este turno —el camuflaje de Mill—, que en la otra posición aún no existían. Y
+lo que salga dura exactamente lo que hace falta: **este turno**.

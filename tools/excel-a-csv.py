@@ -123,15 +123,71 @@ def main():
         return 1
 
     filas = leer_hoja(entrada)
+
+    # LA COPIA ANTERIOR, para poder decir QUÉ ha cambiado (Toto, 23-ago-2026: "así llevamos un
+    # control"). Se guarda antes de pisar el CSV; también git-ignored.
+    previo = leer_csv(salida) if salida.exists() else None
+    if previo is not None:
+        (salida.parent / ('.' + salida.name + '.anterior')).write_text(
+            salida.read_text(encoding='utf-8-sig'), encoding='utf-8-sig')
+
     # utf-8-sig: el BOM que Excel espera para abrir el CSV sin destrozar las tildes.
     with open(salida, 'w', encoding='utf-8-sig', newline='') as f:
         csv.writer(f, delimiter=SEPARADOR, quoting=csv.QUOTE_MINIMAL).writerows(filas)
 
     print(f'{salida.name}: {len(filas)} filas, columnas A-{ULTIMA_COLUMNA} '
           f'(de la {chr(ord(ULTIMA_COLUMNA) + 1)} en adelante no se lee nada).')
-    if filas:
-        print('Cabecera: ' + SEPARADOR.join(filas[0]))
+    if previo is None:
+        print('(no había CSV anterior: nada que comparar)')
+    else:
+        comparar(previo, filas)
     return 0
+
+
+def leer_csv(ruta):
+    with open(ruta, encoding='utf-8-sig', newline='') as f:
+        return [f for f in csv.reader(f, delimiter=SEPARADOR)]
+
+
+def comparar(antes, ahora):
+    """Qué cartas se han añadido, quitado o TOCADO. La clave es el nombre (columna B): es lo
+    único estable -el número se repite y muchas filas no lo llevan-."""
+    def indexar(filas):
+        d = {}
+        for f in filas[1:]:
+            if len(f) > 1 and f[1].strip():
+                d[f[1].strip()] = f
+        return d
+    a, b = indexar(antes), indexar(ahora)
+    nuevas = [k for k in b if k not in a]
+    idas = [k for k in a if k not in b]
+    cambiadas = []
+    cabecera = ahora[0] if ahora else []
+    for k in b:
+        if k in a and [x.strip() for x in a[k]] != [x.strip() for x in b[k]]:
+            cols = []
+            for i in range(max(len(a[k]), len(b[k]))):
+                va = a[k][i].strip() if i < len(a[k]) else ''
+                vb = b[k][i].strip() if i < len(b[k]) else ''
+                if va != vb:
+                    cols.append((cabecera[i] if i < len(cabecera) else f'col{i}', va, vb))
+            cambiadas.append((k, cols))
+
+    if not (nuevas or idas or cambiadas):
+        print('Sin cambios respecto a la copia anterior.')
+        return
+    if nuevas:
+        print(f'\nNUEVAS ({len(nuevas)}): ' + ', '.join(nuevas))
+    if idas:
+        print(f'\nYA NO ESTÁN ({len(idas)}): ' + ', '.join(idas))
+    if cambiadas:
+        print(f'\nCAMBIADAS ({len(cambiadas)}):')
+        for k, cols in cambiadas:
+            print(f'  · {k}')
+            for campo, va, vb in cols:
+                print(f'      [{campo}]')
+                print(f'        antes: {va[:300]}')
+                print(f'        ahora: {vb[:300]}')
 
 
 if __name__ == '__main__':

@@ -123,7 +123,7 @@ const TEXTO_REGLAS = `
             <div>🤐 <b>Silenciado:</b> No puede usar sus Habilidades activas.</div>
             <div style="margin-top: 10px; border-top: 1px dashed #475569; padding-top: 5px;">👁️ <b>Oculto:</b> No puede ser objetivo DIRECTO de ataques normales; un ataque que alcance a toda una fila sin elegir objetivo sí le llega, y quien tenga sus ataques normales convertidos en especiales también puede señalarlo.
             <br>· <b>El daño lo revela</b> cuando el Oculto viene de un efecto con duración. Los Ocultos permanentes (los que da una Pasiva o una Habilidad mientras la carta siga en juego) NO se revelan al recibir daño: su fuente los repone.
-            <br>· <b>Escondite frágil:</b> al final de tu turno, si tu rival no tiene NADA a lo que atacar -ni una carta tuya alcanzable ni el ataque directo-, cada una de tus cartas Ocultas echa una moneda. Con cruz queda expuesta durante todo el turno de tu rival. Esconderse detrás de nada no es una estrategia.</div>
+            <br>· <b>Escondite frágil:</b> si al final de tu Fase de efectos iniciales no tienes NADA a lo que atacar -ni una carta suya alcanzable ni el ataque directo-, echas una moneda por cada carta Oculta del rival: con cara, se le quita ese Oculto durante este turno. No cuentan las cartas Ocultas que además estén agotadas: esas no te están encerrando. Esconderse detrás de nada no es una estrategia.</div>
         </div>
     </div>
 </div>

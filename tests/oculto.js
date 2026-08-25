@@ -6,14 +6,13 @@
 // intocable y le desgastas la Retribución sin que pueda hacer nada. No es "difícil de ganar", es
 // que no hay jugada posible.
 //
-// LA REGLA: al final de tu turno, si tu rival no tiene NADA a lo que atacar (ni una carta tuya
-// alcanzable ni el ataque directo), cada carta Oculta tuya echa una moneda; con cruz queda
-// expuesta durante todo el turno del rival.
+// LA REGLA: si al final de tu Fase de efectos iniciales no tienes NADA a lo que atacar (ni una
+// carta suya alcanzable ni el ataque directo), echas una moneda POR CADA carta Oculta del rival:
+// con CARA se le quita ese Oculto durante este turno. La tiras tú, el bloqueado, y cara es el
+// resultado bueno para quien lanza, como en todas las monedas del juego.
 //
-// ALCANCE (comprobado abajo): la moneda se mira al terminar TU turno, así que alcanza a los
-// Ocultos que ya están puestos -los permanentes, que son los que montan el candado de verdad- y
-// no a los que llegan al empezar el turno del rival (el camuflaje de Mill). No hace falta que los
-// alcance: quien se camufla por no atacar no está desgastando a nadie.
+// NO alcanza a una carta Oculta que además esté AGOTADA: si no puede actuar no está encerrando a
+// nadie (Zoe entrenando, alguien paralizado por el PEM).
 //
 // La condición NO es "es tu única carta" sino "no hay a quién atacar", y eso importa: así se
 // cubren solos los casos que aún no existen (una carta que viva siempre en retaguardia, dos
@@ -55,6 +54,8 @@ async function mesa(esc, monedas = []) {
 }
 
 (async () => {
+    // El candado se mira al final de los Efectos Iniciales de quien está bloqueado, así que los
+    // escenarios pasan turno UNA vez: la moneda cae al empezar el turno del que no puede atacar.
     console.log('--- Sola y Oculta: la moneda decide ---');
     {
         // Edrielle es Oculta PERMANENTE por Pasiva: aun así, el escondite frágil la alcanza.
@@ -62,16 +63,29 @@ async function mesa(esc, monedas = []) {
             turno: 2, turnoDe: 'p1', empieza: 'p2',
             p1: { vanguardia: ['Edrielle'] },
             p2: { vanguardia: ['Mini-tigre'] },
-        }, ['cruz']);
+        }, ['cara']);
         const edrielle = g.players.p1.vanguard[0];
         g.updatePassives();
         check('empieza Oculta', edrielle.stealth === true);
         await paso({ finTurno: true });
-        check('con CRUZ queda expuesta', edrielle._expuesto === true);
+        check('con CARA queda expuesta', edrielle._expuesto === true);
         check('...y el motor deja de verla Oculta, aunque su Pasiva la reponga',
             edrielle.stealth === false, 'stealth=' + edrielle.stealth);
-        check('...y se cuenta', logs().some(m => m.includes('expuesta durante el turno del rival')));
+        check('...y se cuenta', logs().some(m => m.includes('expuesta durante este turno')));
+        check('...en el turno de quien estaba bloqueado', g.activePlayerId === 'p2');
     }
+    {
+        const { g, paso } = await mesa({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: ['Edrielle'] },
+            p2: { vanguardia: ['Mini-tigre'] },
+        }, ['cruz']);
+        const edrielle = g.players.p1.vanguard[0];
+        await paso({ finTurno: true });
+        check('con CRUZ sigue escondida', !edrielle._expuesto && edrielle.stealth === true);
+    }
+
+    console.log('--- La exposición dura ese turno y se acaba con el siguiente ---');
     {
         const { g, paso } = await mesa({
             turno: 2, turnoDe: 'p1', empieza: 'p2',
@@ -79,29 +93,16 @@ async function mesa(esc, monedas = []) {
             p2: { vanguardia: ['Mini-tigre'] },
         }, ['cara']);
         const edrielle = g.players.p1.vanguard[0];
-        await paso({ finTurno: true });
-        check('con CARA sigue escondida', !edrielle._expuesto && edrielle.stealth === true);
-    }
-
-    console.log('--- La exposición dura el turno del rival y se acaba con el tuyo ---');
-    {
-        const { g, paso } = await mesa({
-            turno: 2, turnoDe: 'p1', empieza: 'p2',
-            p1: { vanguardia: ['Edrielle'] },
-            p2: { vanguardia: ['Mini-tigre'] },
-        }, ['cruz']);
-        const edrielle = g.players.p1.vanguard[0];
-        await paso({ finTurno: true });          // p1 -> p2: expuesta
-        check('durante el turno del rival, expuesta', edrielle.stealth === false);
-        await paso({ finTurno: true });          // p2 -> p1: vuelve su turno
-        check('al volver su turno, escondida otra vez', edrielle.stealth === true && !edrielle._expuesto);
+        await paso({ finTurno: true });          // turno de p2: expuesta y atacable
+        check('durante el turno del bloqueado, expuesta', edrielle.stealth === false);
+        await paso({ finTurno: true });          // vuelve el turno de p1
+        check('al turno siguiente, escondida otra vez', edrielle.stealth === true && !edrielle._expuesto);
     }
 
     console.log('--- Con alguien a quien atacar, no hay moneda ---');
     {
-        // El Mini-tigre aliado SÍ es alcanzable: el rival tiene a quién pegar, así que Edrielle
-        // se esconde detrás de algo de verdad y la regla no entra. Sin monedas guionizadas: si
-        // pidiera una, el arnés lo cantaría.
+        // El Mini-tigre aliado SÍ es alcanzable: p2 tiene a quién pegar, así que Edrielle se
+        // esconde detrás de algo de verdad. Sin monedas guionizadas: si pidiera una, se vería.
         const { g, paso, monedasSinUsar } = await mesa({
             turno: 2, turnoDe: 'p1', empieza: 'p2',
             p1: { vanguardia: ['Edrielle', 'Mini-tigre'] },
@@ -113,11 +114,10 @@ async function mesa(esc, monedas = []) {
         check('...y sigue Oculta', edrielle.stealth === true && !edrielle._expuesto);
     }
 
-    console.log('--- Si el rival PUEDE atacar Ocultos, tampoco hay candado ---');
+    console.log('--- Si el bloqueado PUEDE atacar Ocultos, tampoco hay candado ---');
     {
-        // Simon puede atacar a enemigos Ocultos de vanguardia (OJO BIÓNICO), así que no hay
-        // partida cerrada y la moneda no entra. Es el mismo predicado que usa un ataque normal:
-        // no hay que enumerar quién puede y quién no.
+        // Simon puede atacar a enemigos Ocultos de vanguardia (OJO BIÓNICO): no hay partida
+        // cerrada y la moneda no entra. Mismo predicado que usa un ataque normal.
         const { g, paso, monedasSinUsar } = await mesa({
             turno: 2, turnoDe: 'p1', empieza: 'p2',
             p1: { vanguardia: ['Edrielle'] },
@@ -129,26 +129,38 @@ async function mesa(esc, monedas = []) {
         check('...y sigue Oculta', edrielle.stealth === true);
     }
 
-    console.log('--- El Oculto que llega DESPUÉS (Mill) no entra, y está bien que no entre ---');
+    console.log('--- También alcanza al Oculto TEMPORAL (Mill) ---');
     {
-        // HALLAZGO al escribir esta suite: el camuflaje de Mill se aplica al EMPEZAR el turno del
-        // rival, así que al terminar el suyo -que es cuando se mira el candado- todavía no está
-        // Oculto y no echa moneda.
-        //
-        // Y no hace falta que la eche: el candado de verdad lo montan los Ocultos PERMANENTES,
-        // que pueden atacarte cada turno sin dejar de ser intocables. Mill no puede: si ataca
-        // pierde el camuflaje, y si no ataca no te está desgastando. Esconderse sin pegar no
-        // cierra ninguna partida, solo la alarga.
-        const { g, paso, monedasSinUsar } = await mesa({
+        // Mill se camufla al terminar su turno, así que cuando el rival llega a sus Efectos
+        // Iniciales SÍ está Oculto: por eso el candado se mira aquí y no al final del turno del
+        // que se esconde (Toto, 23-ago-2026). En la primera versión, Mill no entraba nunca.
+        const { g, paso } = await mesa({
             turno: 2, turnoDe: 'p1', empieza: 'p2',
             p1: { vanguardia: ['Mill'] },
             p2: { vanguardia: ['Mini-tigre'] },
-        });
+        }, ['cara']);
         const mill = g.players.p1.vanguard[0];
         await paso({ finTurno: true });
-        check('Mill se camufla al terminar su turno', mill.stealth === true);
-        check('...sin echar moneda: cuando se mira el candado aún no estaba Oculto',
-            monedasSinUsar() === 0 && mill._expuesto !== true);
+        check('Mill camuflado y solo también echa moneda', mill._expuesto === true);
+        check('...y queda al descubierto', mill.stealth === false);
+    }
+
+    console.log('--- Una Oculta AGOTADA no encierra a nadie: exenta ---');
+    {
+        // Zoe entrenando está Oculta y agotada mientras dure 'Entrenamiento arduo': no puede
+        // atacar, así que no es ella quien cierra la partida y la moneda no la toca (Toto,
+        // 23-ago-2026). Vale igual para cualquiera que no pueda actuar, p. ej. paralizado.
+        const { g, paso, monedasSinUsar } = await mesa({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: ['Zoe'], evento: { carta: 'Entrenamiento arduo', duracion: 3 } },
+            p2: { vanguardia: ['Mini-tigre'] },
+        });
+        const zoe = g.players.p1.vanguard[0];
+        g.updatePassives();
+        check('Zoe entrenando está Oculta y agotada', zoe.stealth === true && zoe.exhausted === true);
+        await paso({ finTurno: true });
+        check('...y no se le echa moneda', monedasSinUsar() === 0 && zoe._expuesto !== true);
+        check('...sigue entrenando a salvo', zoe.stealth === true);
     }
 
     console.log('');
