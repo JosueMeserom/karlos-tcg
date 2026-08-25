@@ -6985,6 +6985,9 @@
                     [...player.vanguard, ...player.rearguard].forEach(card => {
                         card.exhausted = false;
                         card.hasAttackedThisTurn = false;
+                        // La exposición del escondite frágil dura el turno del RIVAL: se acaba
+                        // cuando vuelve el tuyo, aquí mismo. Solo la de quien empieza turno.
+                        if (pid === this.activePlayerId) delete card._expuesto;
                     });
                 });
 
@@ -7403,6 +7406,39 @@
                     }
                 });
 
+                // ESCONDITE FRÁGIL (Toto, 23-ago-2026) — REGLA UNIVERSAL, no de ninguna carta.
+                // El Oculto existe para obligar al rival a tener respuestas (ataques especiales,
+                // daño sin atacar). Si NO las tiene, una carta Oculta a la que además no se puede
+                // llegar de ninguna otra forma cierra la partida: eres intocable y desgastas al
+                // otro sin que pueda hacer nada. Esto es la válvula.
+                //
+                // La condición NO es "es tu única carta", es "el rival no tiene NADA a lo que
+                // atacar": ni una carta tuya alcanzable ni el ataque directo. Dicho así se cubre
+                // solo cualquier caso futuro -una carta que viva siempre en retaguardia, dos
+                // Ocultas tapándose entre ellas- sin tener que enumerarlos, y también el contrario
+                // (si el rival tiene un Simon, que sí puede atacar Ocultos, no hay candado y no
+                // hay moneda).
+                //
+                // Va aquí, con los estados: al final de tu turno, ya jugado todo, y lo que salga
+                // dura el turno entero del rival (§20). Recorre vanguardia y luego retaguardia,
+                // de izquierda a derecha, como el resto de la fase.
+                if (this._hayCandadoDeOculto(this.activePlayerId)) {
+                    for (const card of [...p.vanguard, ...p.rearguard]) {
+                        if (!card.stealth) continue;
+                        this.logMsg(`${this.getCardNameWithOwner(card)} no tiene tras quien esconderse: su escondite flaquea...`, 'system');
+                        const _res = await this.triggerCoinFlips(1, this.activePlayerId);
+                        if (_res && _res[0] === 'tails') {
+                            card._expuesto = true;
+                            this.logMsg(`Moneda: CRUZ - ¡${this.getCardNameWithOwner(card)} queda ${this.generoTexto(card, 'expuesto', 'expuesta')} durante el turno del rival!`, 'ability');
+                            showFloatingText(card.instanceId, this.generoTexto(card, 'EXPUESTO', 'EXPUESTA'), 'ft-red-stat', -30);
+                        } else {
+                            this.logMsg(`Moneda: CARA - ${this.getCardNameWithOwner(card)} sigue ${this.generoTexto(card, 'oculto', 'oculta')} en las sombras.`, 'neutral');
+                        }
+                    }
+                    this.updatePassives();
+                    this.render();
+                }
+
                 let myEvent = p.activeEvent;
                 if (myEvent && getCardTemplate(myEvent.id).onEndTurn) {
                     await getCardTemplate(myEvent.id).onEndTurn(myEvent, this, this.activePlayerId);
@@ -7484,6 +7520,7 @@
                 // la base congelada- no se toca, porque aquí no hay forma de saber quién lo puso
                 // y borrarlo sería peor que dejarlo (Toto, 21-ago-2026).
                 _mesa().forEach(c => this._derivarOculto(c));
+
                 const _foto = () => { const m = {}; _mesa().forEach(c => m[c.instanceId] = [c.currentAtk, c.currentDef, !!c.stealth, !!c.isSilenced]); return m; };
                 // `habilidad` (nombre de la Pasiva/Activa) y `ref` (referencia estándar a la carta
                 // origen) se guardan POR SEPARADO, no fusionados en un texto: el panel de detalle
@@ -7661,6 +7698,13 @@
                         }
                     });
                 });
+
+                // ESCONDITE FRÁGIL, LO ÚLTIMO DE LA PASADA (Toto, 23-ago-2026): una carta expuesta
+                // por la moneda deja de estar Oculta pase lo que pase. Va aquí, después de TODAS
+                // las pasivas, porque las fuentes permanentes (Edrielle, Súcubo, la Zoe de
+                // Entrenamiento arduo) reimponen su `stealth` en la suya: si esto corriera antes,
+                // lo volverían a encender y la moneda no serviría de nada.
+                _mesa().forEach(c => { if (c._expuesto) c.stealth = false; });
             }
 
             // Tope de características 0-9 (y Vida máxima 9). Vive en su propio método porque se
@@ -11794,6 +11838,24 @@
             // (Infusión de maná lo pone en la instancia). Toto, 23-ago-2026: se comprobaba solo
             // `canAttackStealth`, así que el equipo cambiaba el tipo de ataque pero no a quién
             // se podía atacar.
+            // ¿Está el rival de `pid` sin NADA que atacar? Es la condición del escondite frágil:
+            // ninguna carta de `pid` es alcanzable por ninguna del rival, y tampoco hay ataque
+            // directo (que exige el campo VACÍO, así que con una carta escondida tampoco lo hay).
+            // Se pregunta con el mismo predicado que decide un ataque normal, así que cualquier
+            // carta futura que no se pueda atacar deja de servir de tapadera sin tocar esto.
+            _hayCandadoDeOculto(pid) {
+                const mias = [...this.players[pid].vanguard, ...this.players[pid].rearguard];
+                if (!mias.some(c => c.stealth)) return false;          // sin nadie escondido, nada que mirar
+                const rid = pid === 'p1' ? 'p2' : 'p1';
+                // Atacantes = su VANGUARDIA: de la retaguardia no se ataca.
+                const suyas = this.players[rid].vanguard;
+                if (!suyas.length) return false;                       // sin atacantes, el candado no es tuyo
+                // Un ataque normal solo llega a la VANGUARDIA: lo de la retaguardia no es
+                // alcanzable aunque no esté Oculto, y por eso tampoco hace de tapadera.
+                const alcanzable = this.players[pid].vanguard.some(obj => suyas.some(at => !this.motivoNoAtacable(at, obj)));
+                return !alcanzable;
+            }
+
             _puedeAtacarOculto(atacante) {
                 if (!atacante) return false;
                 const t = getCardTemplate(atacante.id) || {};

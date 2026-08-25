@@ -3749,54 +3749,17 @@ const CARD_DB = [
     },
     {
         name: "Edrielle", hp: 3, def: 3, atk: 5, type: "Personaje", subtype: "Ser mágico", tags: ["Invocación", "diosa"], gender: "F", rarity: "B", cost: 1, series: 1,
-        text: "Coste: 4 de Furor. P: BELLEZA INCOMPARABLE: Oculta permanentemente. Si es tu único aliado al inicio de tu turno, lanza moneda: Cruz = pierde Oculto este turno. A: TORMENTA PERFECTA (4F): Quita 2 de VIDA (daño verdadero) a TODOS los enemigos.",
+        text: "Coste: 4 de Furor. P: BELLEZA INCOMPARABLE: Oculta permanentemente. A: TORMENTA PERFECTA (4F): Quita 2 de VIDA (daño verdadero) a TODOS los enemigos.",
         passiveName: "BELLEZA INCOMPARABLE", activeName: "TORMENTA PERFECTA", activeCost: 4,
         
         
-        onStartTurn: async function(card, game) {
-            // Comprueba si es el turno de su dueño
-            if (card.owner !== game.activePlayerId) return;
-            
-            const p = game.players[card.owner];
-            const totalAllies = p.vanguard.length + p.rearguard.length;
-            
-            // Si está sola ante el peligro
-            if (totalAllies === 1) {
-                game.logMsg(`¡${game.getCardNameWithOwner(card)} está sola en el campo! Su escondite flaquea...`, 'system');
-                const results = await game.triggerCoinFlips(1, card.owner);
-                
-                if (results && results[0] === 'tails') {
-                    card.edrielleExposed = true; // Marca que anula el sigilo
-                    game.logMsg(`Moneda: CRUZ - ¡${game.getCardNameWithOwner(card)} queda expuesta a plena vista!`, 'ability');
-                    showFloatingText(card.instanceId, "EXPUESTA", "ft-red-stat", -30);
-                    // Fix (betasteo de Toto, 30-jul-2026): el badge de Oculto lo pinta render() a
-                    // partir de card.stealth, y ese campo SOLO se recalcula en onUpdatePassive —
-                    // sin este refresco explícito el badge aguantaba puesto hasta la siguiente
-                    // pasada natural (Fase principal), o sea que el log y el flotante cantaban
-                    // "EXPUESTA" mientras la carta seguía marcada como Oculta en el tablero.
-                    game.updatePassives();
-                    game.render();
-                } else {
-                    game.logMsg(`Moneda: CARA - ¡${game.getCardNameWithOwner(card)} logra mantenerse oculta en las sombras!`, 'neutral');
-                    card.edrielleExposed = false;
-                }
-            } else {
-                // Si invocaste a alguien el turno anterior, vuelve a estar a salvo
-                card.edrielleExposed = false;
-            }
-        },
-
+        // OCULTA PERMANENTE, y nada más (Toto, 23-ago-2026). La moneda de "si estás sola"
+        // ya no vive aquí: es una REGLA UNIVERSAL del juego (escondite frágil, ver
+        // _hayCandadoDeOculto en index.html y el panel de reglas), así que se le aplica igual
+        // -y mejor: antes tiraba la moneda al EMPEZAR su turno, cuando todavía podías anular el
+        // resultado colocando cualquier aliado, y ahora se tira al final, con todo jugado.
         onUpdatePassive: function(card, game) {
-            const p = game.players[card.owner];
-            const totalAllies = p.vanguard.length + p.rearguard.length;
-            
-            // Si hay guardaespaldas, reseteamos la exposición por si acaso
-            if (totalAllies > 1) {
-                card.edrielleExposed = false;
-            }
-            
-            // La pasiva le da sigilo SOLO si no ha sido expuesta
-            card.stealth = !card.edrielleExposed;
+            card.stealth = true;
         },
 
         // ACTIVA migrada (30-jul-2026): sin selección — daño verdadero a TODOS los enemigos

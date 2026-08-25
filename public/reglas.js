@@ -121,7 +121,9 @@ const TEXTO_REGLAS = `
             <div>🌫️ <b>Ceguera:</b> Lanza moneda al atacar normal. Cara = Ataca. Cruz = Falla el ataque.</div>
             <div>💤 <b>Sueño:</b> Lanza moneda al atacar o usar Habilidad. Cara = Actúa normalmente y elimina el estado. Cruz = No ocurre nada.</div>
             <div>🤐 <b>Silenciado:</b> No puede usar sus Habilidades activas.</div>
-            <div style="margin-top: 10px; border-top: 1px dashed #475569; padding-top: 5px;">👁️ <b>Oculto:</b> No puede ser objetivo DIRECTO de ataques normales; un ataque que alcance a toda una fila sin elegir objetivo sí le llega. El daño de cualquier fuente lo revela.</div>
+            <div style="margin-top: 10px; border-top: 1px dashed #475569; padding-top: 5px;">👁️ <b>Oculto:</b> No puede ser objetivo DIRECTO de ataques normales; un ataque que alcance a toda una fila sin elegir objetivo sí le llega, y quien tenga sus ataques normales convertidos en especiales también puede señalarlo.
+            <br>· <b>El daño lo revela</b> cuando el Oculto viene de un efecto con duración. Los Ocultos permanentes (los que da una Pasiva o una Habilidad mientras la carta siga en juego) NO se revelan al recibir daño: su fuente los repone.
+            <br>· <b>Escondite frágil:</b> al final de tu turno, si tu rival no tiene NADA a lo que atacar -ni una carta tuya alcanzable ni el ataque directo-, cada una de tus cartas Ocultas echa una moneda. Con cruz queda expuesta durante todo el turno de tu rival. Esconderse detrás de nada no es una estrategia.</div>
         </div>
     </div>
 </div>

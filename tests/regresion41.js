@@ -41,40 +41,11 @@ const escenarios = [
         p2: {},
         pasos: [ { habilidad: 'Edrielle' } ],
     },
-    {
-        // Control de NO-regresión del fix del badge de Oculto (betasteo de Toto,
-        // 30-jul-2026). El fix es puramente de REPINTADO: la vieja no refrescaba tras
-        // marcar edrielleExposed, así que el badge de Oculto aguantaba puesto hasta la
-        // pasada natural de Fase principal aunque el log y el flotante ya cantaran
-        // "EXPUESTA". El harness NO puede ver ese bug -solo captura estado final, y ahí
-        // ambas bases coinciden porque el updatePassives natural llega igualmente-;
-        // verificado aparte con un probe que instrumenta render() (vieja: 0 repintados
-        // durante onStartTurn, stealth sigue true al salir; nueva: 1 repintado con
-        // stealth ya false). Este escenario existe para garantizar lo que el harness SÍ
-        // puede garantizar: que el refresco extra no cambia NADA del estado de juego.
-        nombre: 'BELLEZA INCOMPARABLE, cruz: queda expuesta (control de que el fix del badge no toca el estado)',
-        turno: 2, turnoDe: 'p2', empieza: 'p1',
-        p1: { vanguardia: [ { carta: 'Edrielle', furor: 0 } ] },
-        p2: { vanguardia: ['Mini-tigre'] },
-        monedas: ['cruz'],
-        pasos: [ { finTurno: true } ],
-        logsIntencionados: [
-            { de: 'CRUZ - ¡Edrielle', a: 'CRUZ - ¡Edrielle de J1 (Jugador 1)', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado. Mismo mensaje, nombre completo' },
-            { de: '[system] ¡Edrielle', a: '[system] ¡Edrielle de J1 (Jugador 1)', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado. Mismo mensaje, nombre completo' },
-        ],
-    },
-    {
-        nombre: 'BELLEZA INCOMPARABLE, cara: se mantiene Oculta',
-        turno: 2, turnoDe: 'p2', empieza: 'p1',
-        p1: { vanguardia: [ { carta: 'Edrielle', furor: 0 } ] },
-        p2: { vanguardia: ['Mini-tigre'] },
-        monedas: ['cara'],
-        pasos: [ { finTurno: true } ],
-        logsIntencionados: [
-            { de: 'CARA - ¡Edrielle', a: 'CARA - ¡Edrielle de J1 (Jugador 1)', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado. Mismo mensaje, nombre completo' },
-            { de: '[system] ¡Edrielle', a: '[system] ¡Edrielle de J1 (Jugador 1)', motivo: 'NORMA DEL PROYECTO aplicada al {carta} del DSL (14-ago-2026): un log que nombra una carta dice de quien es, con el formato de siempre. La vieja usaba el nombre pelado. Mismo mensaje, nombre completo' },
-        ],
-    },
+    // Los dos escenarios de la moneda de Edrielle se han ido (23-ago-2026): esa moneda ya no es
+    // suya. Ahora es el ESCONDITE FRÁGIL, una regla universal del juego que se tira al FINAL de
+    // tu turno y con otra condición ("el rival no tiene nada a lo que atacar"), así que
+    // comparar contra la base congelada aquí no diría nada útil. Su cobertura vive en
+    // `tests/oculto.js`, con aserciones.
 ];
 
 correrSuite('regresion41', escenarios);

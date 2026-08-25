@@ -481,6 +481,10 @@ async function montar(esc) {
                 p1: { vanguardia: ['Zoe'], mano: c.mano, mazo: c.mazo, evento },
                 p2: { vanguardia: ['Mini-tigre'] },
             });
+            // Zoe entrenando está OCULTA y sola, así que al terminar su turno entra el escondite
+            // frágil (regla universal, 23-ago-2026) y pide moneda. Con cara sigue escondida y
+            // este escenario no cambia en nada.
+            ctx.monedas.push('heads');
             await ejecutarPaso(ctx, g, { finTurno: true });
             await ejecutarPaso(ctx, g, { finTurno: true });
             for (const paso of c.pasos) await ejecutarPaso(ctx, g, paso);

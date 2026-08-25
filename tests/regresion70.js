@@ -90,6 +90,7 @@ const escenarios = [
             { contiene: 'p2.vanguard.1.currentHp', motivo: 'Edrielle recibe el ataque especial que la vieja no permite ordenar' },
             { contiene: 'p2.vanguard.0.hasAttackedThisTurn', motivo: 'la marioneta ataca de verdad' },
             { contiene: 'p2.vanguard.0.exhausted', motivo: 'ídem: la marioneta gasta su acción al atacar' },
+            { contiene: 'edrielleExposed', motivo: 'campo de la Edrielle VIEJA: su moneda de "estás sola" ya no es suya, es el escondite frágil universal (23-ago-2026)' },
         ],
     },
     {

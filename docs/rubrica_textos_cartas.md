@@ -883,3 +883,29 @@ El visor tiene las dos piezas que antes empujaban al modal genérico:
 Lo estrenó SEGUIMIENTO (Erasmo), que enseñaba la cima del mazo rival con el modal genérico:
 `tests/auditar_imperativas.js` no lo cazaba porque su exención de «solo lectura» tapaba también
 las pilas. Ya no.
+
+---
+
+## §23. El Oculto, entero (Toto, 23-ago-2026)
+
+Las tres reglas del Oculto, juntas, porque estaban repartidas y ninguna carta las cuenta enteras:
+
+1. **No puede ser objetivo DIRECTO de un ataque normal.** Un ataque que alcance a toda una fila
+   sin elegir objetivo sí le llega, y quien tenga sus ataques normales convertidos en especiales
+   (Infusión de maná) también puede señalarlo. Lo decide `motivoNoAtacable`, un solo sitio.
+2. **El daño lo revela… solo si el Oculto viene de un efecto con duración.** Los permanentes
+   (Pasiva de Edrielle, Activa de Súcubo, Zoe entrenando) NO se revelan: su fuente los repone en
+   la siguiente pasada de pasivas, así que anunciarlo sería mentira.
+3. **Escondite frágil**: al final de tu turno, si tu rival no tiene NADA a lo que atacar —ni una
+   carta tuya alcanzable ni el ataque directo—, cada carta Oculta tuya echa una moneda; con cruz
+   queda expuesta durante todo el turno del rival.
+
+**La 3 es una regla del JUEGO, no de ninguna carta**, y por eso no se escribe en el texto de
+Edrielle ni de ninguna otra: vive en el panel de reglas. Su condición se pregunta con el mismo
+predicado que decide un ataque normal, así que cualquier carta futura que no se pueda atacar deja
+de servir de tapadera sin tocar nada.
+
+**Qué NO alcanza, y por qué está bien**: los Ocultos que llegan al empezar el turno del rival (el
+camuflaje de Mill) no están puestos cuando se mira el candado. No hace falta: el candado lo montan
+los permanentes, que pegan cada turno sin dejar de ser intocables; quien se camufla **por no
+atacar** no está desgastando a nadie.
