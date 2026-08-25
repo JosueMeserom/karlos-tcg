@@ -11,8 +11,14 @@ manual que se olvida y un borrado que se puede hacer mal.
 Ahora el flujo es: Toto guarda el .xlsx encima del que hay en `docs/` (por Z:, arrastrando) y se
 ejecuta esto. El recorte lo hace la máquina siempre igual.
 
-    python3 tools/excel-a-csv.py                    # docs/Cartas KG.xlsx -> docs/Cartas KG.csv
+    python3 tools/excel-a-csv.py                    # se descarga el Excel y regenera el CSV
+    python3 tools/excel-a-csv.py --local            # usa el .xlsx que ya haya en docs/, sin bajar
     python3 tools/excel-a-csv.py otro.xlsx salida.csv
+
+DE DÓNDE SALE EL EXCEL: de Dropbox, con el enlace privado que Toto guardó en
+`docs/.cartas-kg.url` (600, git-ignored, NUNCA se commitea ni se pega en ningún sitio). Así él
+sigue editándolo donde siempre y aquí se ve la última versión sin que mueva nada. Si el enlace no
+está o no hay red, se usa la copia local y se dice.
 
 NI EL XLSX NI EL CSV SE COMMITEAN (están en .gitignore): son ideas sin publicar.
 
@@ -84,13 +90,36 @@ def leer_hoja(ruta_xlsx, hoja=1):
     return filas
 
 
+def descargar(url, destino):
+    """Baja el Excel de Dropbox. Sin librerías: urllib viene con Python."""
+    import urllib.request
+    req = urllib.request.Request(url, headers={'User-Agent': 'karlos-tcg/1.0'})
+    with urllib.request.urlopen(req, timeout=60) as r, open(destino, 'wb') as f:
+        f.write(r.read())
+    # Un .xlsx es un ZIP: si Dropbox devuelve una página de error, esto lo caza en el acto en vez
+    # de dejar un fichero roto que reviente más tarde con un error incomprensible.
+    if not zipfile.is_zipfile(destino):
+        destino.unlink(missing_ok=True)
+        raise ValueError('lo descargado no es un .xlsx (¿el enlace ha caducado o pide login?)')
+
+
 def main():
     raiz = Path(__file__).resolve().parent.parent
-    entrada = Path(sys.argv[1]) if len(sys.argv) > 1 else raiz / 'docs' / 'Cartas KG.xlsx'
-    salida = Path(sys.argv[2]) if len(sys.argv) > 2 else raiz / 'docs' / 'Cartas KG.csv'
+    argv = [a for a in sys.argv[1:] if a != '--local']
+    solo_local = '--local' in sys.argv
+    entrada = Path(argv[0]) if len(argv) > 0 else raiz / 'docs' / 'Cartas KG.xlsx'
+    salida = Path(argv[1]) if len(argv) > 1 else raiz / 'docs' / 'Cartas KG.csv'
+
+    enlace = raiz / 'docs' / '.cartas-kg.url'
+    if not solo_local and len(argv) == 0 and enlace.exists():
+        try:
+            descargar(enlace.read_text(encoding='utf-8').strip(), entrada)
+            print('Excel descargado de Dropbox.')
+        except Exception as e:
+            print(f'No se ha podido descargar ({e}). Sigo con la copia local, que puede estar vieja.')
+
     if not entrada.exists():
-        print(f'No encuentro {entrada}.\n'
-              f'Guarda el Excel ahí (por Z: se arrastra y ya) y vuelve a ejecutarlo.')
+        print(f'No encuentro {entrada} y no hay de dónde bajarlo.')
         return 1
 
     filas = leer_hoja(entrada)
