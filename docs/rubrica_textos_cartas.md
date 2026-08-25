@@ -890,9 +890,15 @@ las pilas. Ya no.
 
 Las tres reglas del Oculto, juntas, porque estaban repartidas y ninguna carta las cuenta enteras:
 
-1. **No puede ser objetivo DIRECTO de un ataque normal.** Un ataque que alcance a toda una fila
-   sin elegir objetivo sí le llega, y quien tenga sus ataques normales convertidos en especiales
-   (Infusión de maná) también puede señalarlo. Lo decide `motivoNoAtacable`, un solo sitio.
+1. **No puede ser objetivo DIRECTO de un ataque normal, y de nada más.** Un ataque que alcance a
+   toda una fila sin elegir objetivo sí le llega, quien tenga sus ataques normales convertidos en
+   especiales (Infusión de maná) también puede señalarlo, y **cualquier Habilidad, Ayuda o Evento
+   que no consista en un ataque normal lo alcanza con total normalidad**: un ataque ESPECIAL, una
+   curación, un cambio de fila, copiarle los stats. Lo decide `motivoNoAtacable`, un solo sitio.
+   · **Al escribir una carta que elija enemigos, el filtro `stealth: falsy` SOLO se pone si lo que
+   viene detrás es un ataque normal.** Es el error más repetido al copiar una carta hermana: se
+   hereda el filtro de una Activa que sí atacaba (le pasó a Silhouette, a Garret y a Xanadu,
+   corregidas el 25-ago-2026).
 2. **El daño lo revela… solo si el Oculto viene de un efecto con duración.** Los permanentes
    (Pasiva de Edrielle, Activa de Súcubo, Zoe entrenando) NO se revelan: su fuente los repone en
    la siguiente pasada de pasivas, así que anunciarlo sería mentira.

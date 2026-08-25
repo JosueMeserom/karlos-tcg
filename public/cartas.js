@@ -1140,16 +1140,21 @@ const CARD_DB = [
                   logNoValidas: "No queda ningún Escudo mágico en el mazo ni en los descartes de {jugador}.",
                   logNoEncontrada: "No hay ningún Escudo mágico ahí.",
                   barajarDespues: { log: "Barajando el mazo de {jugador}...", inclusoSinValidas: true } } ] },
+            // SIN filtro de Oculto (Toto, 25-ago-2026): ANDANADA METEÓRICA es un ataque
+            // ESPECIAL, y el Oculto solo tapa de los ataques NORMALES. La vieja lo filtraba
+            // -copiado de las Activas de ataque normal, que sí deben-, y al migrar se replicó el
+            // fallo tal cual. Guardia, Agah, Gólem de tierra y Megalimo se quedan con el suyo:
+            // esas cuatro sí atacan normal.
             { trigger: "ACTIVA", nombre: "ANDANADA METEÓRICA", coste: { furor: 3 }, sinObjetivo: true,
               requisitos: [
-                { count: { quien: "ENEMIGO", zona: "vanguardia", filtros: [ { campo: "stealth", op: "falsy" } ] }, op: ">=", valor: 2,
-                  msg: "No hay suficientes enemigos válidos en vanguardia para ANDANADA METEÓRICA." } ],
+                { count: { quien: "ENEMIGO", zona: "vanguardia" }, op: ">=", valor: 2,
+                  msg: "No hay suficientes enemigos en vanguardia para ANDANADA METEÓRICA." } ],
               efectos: [
                 // Sin `cancelable: false` (Toto, 20-ago-2026): ese flag apagaba la norma del
                 // coste y la Activa cobraba al confirmarla, antes de elegir a nadie. Lo llevaba
                 // por fidelidad a la base congelada, donde no se podía cancelar una vez
                 // confirmada; Toto ha decidido que manda la norma. Su suite lo declara.
-                { op: "ELEGIR", de: "ENEMIGOS", zona: "VANGUARDIA", filtros: [ { campo: "stealth", op: "falsy" } ], cantidad: 2,
+                { op: "ELEGIR", de: "ENEMIGOS", zona: "VANGUARDIA", cantidad: 2,
                   titulo: "ANDANADA METEÓRICA: elige 2 enemigos distintos",
                   efectos: [ { op: "ATACAR", especial: true } ] } ] }
         ],
@@ -2373,10 +2378,9 @@ const CARD_DB = [
             const ctx = game.abilityContext;
             const enemyP = game.players[target.owner];
 
-            if (target.stealth) {
-                if (!isSilent) game.logError("No puedes seleccionar objetivos Ocultos.");
-                return false;
-            }
+            // SIN veto de Oculto (Toto, 25-ago-2026): ESTORNUDO DEVASTADOR no es un ataque -mueve
+            // a un enemigo de fila-, y el Oculto solo tapa de los ataques NORMALES. Estaba
+            // copiado de las Activas que sí atacan.
 
             if (ctx.targets.length === 0) {
                 if (target.location !== 'vanguard') {
@@ -2560,7 +2564,7 @@ const CARD_DB = [
                 { op: "FIJAR_STAT", stat: "currentDef", valor: { REF: "self.copiedBaseDef" } } ] },
             { trigger: "ACTIVA", nombre: "PONTE TRAJE", coste: { furor: 1 }, sinObjetivo: true,
               efectos: [
-                { op: "ELEGIR", de: "TODOS", cantidad: 1, sinOcultosEnemigos: true,
+                { op: "ELEGIR", de: "TODOS", cantidad: 1,
                   titulo: "PONTE TRAJE: ELIGE A QUIEN COPIARLE LOS STATS",
                   guardaSuma: [ { campo: "atkBase", en: "trajeAtk" }, { campo: "defBase", en: "trajeDef" } ],
                   guardaNombres: "modelo",
@@ -9332,10 +9336,6 @@ const DSL = {
             // excluirSelf: la propia carta fuente ya está en el campo cuando ELEGIR corre en
             // AL_JUGAR (Kazuo/Gladiador eligiendo a quién anexar), así que el pool de ALIADOS
             // la incluiría por defecto si no se filtra explícitamente (Toto, 27-jul-2026).
-            // sinOcultosEnemigos: un Oculto ENEMIGO no se puede señalar; los tuyos sí. Con
-            // `de:"TODOS"` no vale un filtro de `stealth`, que se llevaría por delante también a
-            // los aliados escondidos (PONTE TRAJE puede copiar a tu propia Edrielle).
-            if (e.sinOcultosEnemigos) pool = pool.filter(x => !(x.owner !== sourceCard.owner && x.stealth));
             if (e.excluirSelf) pool = pool.filter(x => x.instanceId !== sourceCard.instanceId);
             if (e.sinMarcaTemporalPropia) pool = pool.filter(x => !(x.tempEffects && x.tempEffects.some(t => t.sourceId === sourceCard.id)));
             if (e.zona === 'VANGUARDIA') pool = pool.filter(x => x.location === 'vanguard');

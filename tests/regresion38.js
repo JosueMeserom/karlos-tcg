@@ -9,8 +9,9 @@
 // hardcodeado); aquí un MODIFICAR_STAT anidado hace lo mismo explícitamente.
 //
 // ANDANADA METEÓRICA es un calco de Raiju/Gólem de tierra: ELEGIR de cantidad
-// EXACTA 2 + ATACAR especial:true, excluyendo Ocultos (a diferencia de Raiju, esta
-// SÍ los excluye, fiel a la vieja).
+// EXACTA 2 + ATACAR especial:true. SIN filtro de Oculto desde el 25-ago-2026: es un
+// ataque ESPECIAL y el Oculto solo tapa de los normales (Toto). La vieja sí filtraba
+// -y la migración lo replicó tal cual-, así que el último escenario compara justo eso.
 //
 // Se quedan imperativos: la búsqueda de Escudo mágico (mazo O descartes, BUSCAR no
 // soporta elegir zona) y los dos ganchos globales (+1 Furor extra en fase de
@@ -70,10 +71,35 @@ const escenarios = [
         logsSoloVieja: LOGS_SISTEMA_VIEJA,
     },
     {
-        nombre: 'ANDANADA METEÓRICA rechazada: solo hay un enemigo Oculto en vanguardia',
+        // EL OCULTO NO TAPA DE UN ESPECIAL (Toto, 25-ago-2026). La vieja rechazaba la Habilidad
+        // entera por no tener "2 enemigos válidos"; la nueva los ve a los dos y les pega.
+        nombre: 'ANDANADA METEÓRICA sí alcanza a un enemigo Oculto (es especial)',
         p1: { vanguardia: [ { carta: 'Garret', furor: 3 } ] },
-        p2: { vanguardia: ['Mini-tigre', { carta: 'Robot de seguridad SP', campos: { stealth: true } }] },
-        pasos: [ { habilidad: 'Garret' } ],
+        // Con Vida de sobra los dos: lo que se compara es a quién ALCANZA la Habilidad, y dos
+        // muertes llenarían el diff de mudanzas al descarte sin aportar nada.
+        p2: { vanguardia: [ { carta: 'Mini-tigre', vida: 9, campos: { maxHp: 9 } },
+                            { carta: 'Robot de seguridad SP', vida: 9, campos: { maxHp: 9, stealth: true } } ] },
+        pasos: [
+            { soloEn: 'nueva', habilidad: 'Garret' },
+            { soloEn: 'nueva', confirmar: true },
+            { soloEn: 'nueva', elegir: ['Mini-tigre', 'Robot de seguridad SP'] },
+        ],
+        logsSoloNueva: [
+            { linea: 'Robot de seguridad SP', motivo: 'el Oculto recibe el ataque especial que la vieja no dejaba ni señalar' },
+            { linea: 'Mini-tigre', motivo: 'y el otro enemigo también: la vieja rechazaba la Habilidad entera' },
+        ],
+        flotantesSoloNueva: [
+            { linea: '-3 FUR', motivo: 'la nueva sí usa la Habilidad y paga su coste' },
+            { linea: 'ANDANADA METEÓRICA', motivo: 'y la anuncia' },
+            { linea: '-6 VIDA', motivo: 'el golpe al Mini-tigre' },
+            { linea: '-8 VIDA', motivo: 'y el golpe al Oculto' },
+        ],
+        diferenciasEsperadas: [
+            { contiene: 'p1.vanguard.0.furor', motivo: 'la vieja no llega a cobrar nada' },
+            { contiene: 'p1.vanguard.0.exhausted', motivo: 'ídem: no gasta la acción' },
+            { contiene: 'p2.vanguard.0.currentHp', motivo: 'los dos enemigos reciben su ataque especial' },
+            { contiene: 'p2.vanguard.1.currentHp', motivo: 'ídem, incluido el Oculto' },
+        ],
     },
 ];
 
