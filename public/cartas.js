@@ -2889,6 +2889,8 @@ const CARD_DB = [
             filtros: [ { no: true, campo: "tags", op: "includes", valor: "Animal salvaje" },
                        { no: true, campo: "tags", op: "includes", valor: "Cosa" } ] } ],
         text: "Requisito: un aliado sin la etiqueta 'Animal salvaje' ni 'Cosa'. Anéxasela a ese aliado: +1 de Atq, +2 en sus ataques especiales, y 1 de Furor más al inicio de cada turno mientras lo lleve.",
+        // Solo lo que NO son números: el +1 de ATQ permanente ya sale automático (§18).
+        efectoEquipadoTexto: "Sus ataques especiales golpean con 1 de ATQ extra, y gana 1 de Furor más al inicio de cada turno",
         abilities: [
             { trigger: "JUGAR", requisitos: [
                 { count: { filtros: [ { no: true, campo: "tags", op: "includes", valor: "Animal salvaje" },
@@ -2919,6 +2921,8 @@ const CARD_DB = [
             algunFiltro: [ { campo: "tags", op: "includes", valor: "Policía" },
                            { campo: "tags", op: "includes", valor: "Guardia Real" } ] } ],
         text: "Requisito: un aliado con etiqueta 'Policía' o con etiqueta 'Guardia Real'. Anéxasela a ese aliado: 1 de Furor más al inicio de cada turno mientras lo lleve. Si tiene etiqueta 'Policía', además +1 de Atq y +1 de Def; si tiene etiqueta 'Guardia Real', al equiparla busca en tu mazo una Ayuda con etiqueta 'Tecnología', añádela a tu mano y baraja.",
+        // El +1/+1 de los "Policía" ya sale automático; esto es lo que no cuenta nadie.
+        efectoEquipadoTexto: "Gana 1 de Furor más al inicio de cada turno",
         abilities: [
             { trigger: "JUGAR", requisitos: [
                 { count: { algunFiltro: [ { campo: "tags", op: "includes", valor: "Policía" },
@@ -3005,6 +3009,8 @@ const CARD_DB = [
         // dos cajas del detalle. Mismo trato que Té helado, y por eso no lleva requisitoVisible:
         // la flecha la pone sola el `esCoste` del tributo, en rojo y con su "Tributa 1 FUR".
         text: "Coste: 1 de Furor. Anéxasela al aliado que tributó y cúrale 2 de Vida: +1 de Def e inmune a los estados alterados mientras la lleve. Al equiparla, se le eliminan los estados alterados que tuviera.",
+        // El +1 de DEF sale solo; la inmunidad no la dice nadie.
+        efectoEquipadoTexto: "Es inmune a los estados alterados",
         abilities: [
             { trigger: "JUGAR", requisitos: [
                 { count: { filtros: [ { campo: "furor", op: ">=", valor: 1 } ] }, op: ">=", valor: 1,
@@ -3035,6 +3041,10 @@ const CARD_DB = [
     {
         id: 2002, name: "Guantes sedientos", type: "Ayuda", subtype: "Arma", tags: ["Equipable", "melé"], rarity: "B", cost: 0, series: 1,
         text: "Anéxasela a un aliado: cada vez que haga daño con un ataque normal, se cura esa cantidad de Vida, hasta 1. Al cabo de 3 turnos deja de curarle y pasa a darle +2 de Atq.",
+        // Anclado a los Contadores, que es lo que el jugador ve en la chapa: cuando se
+        // acaban, la línea deja de valer justo cuando la chapa desaparece y llega el +2 de ATQ,
+        // que ya sale automático.
+        efectoEquipadoTexto: "Mientras le queden Contadores, cada vez que hace daño con un ataque normal se cura esa cantidad de Vida (hasta 1)",
         abilities: [
             { trigger: "AL_EQUIPAR",
               efectos: [
@@ -4817,6 +4827,9 @@ const CARD_DB = [
         // Requisito visible: a quién señala la flecha lima al presentarse (§14.bis).
         requisitoVisible: [ { quien: "ALIADO", zona: "vanguardia", filtros: [ { campo: "name", op: "contieneTexto", valor: "Karlos" }, { campo: "currentHp", op: "<=", valor: 1 } ], uno: true } ],
         text: "Requisito: un 'Karlos' de tu vanguardia con 1 de Vida o menos. Equípaselo: sus stats pasan a 9 y quedan fijas, y quien le ataque pierde 1 de Furor. Al inicio de tu próximo turno el equipo se destruye y Karlos vuelve a tu mano.",
+        // Que valgan 9 ya se ve en los números; que estén CONGELADAS no lo dice nadie, y es
+        // lo que cambia cómo se juega contra él.
+        efectoEquipadoTexto: "Sus stats no pueden cambiar, y quien le ataque pierde 1 de Furor",
         // Migrada (31-jul-2026), segunda de la tanda de equipos con vida propia. Reutiliza
         // `cuentaAtras` de Súper Evolución (aquí de UN solo turno) y estrena dos piezas:
         //   · `mientrasEquipado: {fijar:{...}, ignorarTopes:true}` — stats BLOQUEADOS a un valor
