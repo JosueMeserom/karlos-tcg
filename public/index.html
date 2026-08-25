@@ -3952,13 +3952,17 @@
             // sin fuente y sin firma. Con categorías, el Oculto es un estado como los demás y
             // solo compite con los de SU categoría (la Estasis que viene, que tampoco puede
             // convivir con él).
-            //   · 'alteracion'  -> Sueño, Confusión, Ceguera, Daño por tiempo, Silencio.
-            //   · 'ocultacion'  -> Oculto (y la futura Estasis).
+            //   · 'alteracion' -> Sueño, Confusión, Ceguera, Daño por tiempo, Silencio: los que
+            //     te estropean algo.
+            //   · 'velo'       -> Oculto y, cuando llegue, Estasis: los que te apartan del
+            //     alcance del rival. Bautizados "estados velo" por Toto (25-ago-2026); esta
+            //     categoría se llamaba 'ocultacion', que describía solo al Oculto.
             // Un estado sin categoría declarada cae en 'alteracion', que es como se comportaba
             // todo hasta ahora: quien no se declare, no cambia.
             static get CATEGORIA_ESTADO() {
                 return { dot: 'alteracion', confusion: 'alteracion', ceguera: 'alteracion',
-                         sueno: 'alteracion', silencio: 'alteracion', oculto: 'ocultacion' };
+                         sueno: 'alteracion', silencio: 'alteracion',
+                         oculto: 'velo', estasis: 'velo' };
             }
             _categoriaEstado(type) { return Game.CATEGORIA_ESTADO[type] || 'alteracion'; }
 

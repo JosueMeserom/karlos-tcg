@@ -37,8 +37,16 @@ Aparte, **Tengu orgulloso** (ya mixta) necesita "contar caras de moneda" para mi
 
 - **Descuento de tributo de Fusión de planos** (aplazado de antes).
 - **Candado de la cola de reconexión** (aplazado de antes).
-- **Estasis**: estado nuevo, en la categoría 'ocultacion' junto al Oculto (no pueden convivir). Se
-  hará cuando llegue una carta que lo pida.
+- **Estasis**: estado nuevo, de la familia **velo** junto al Oculto (no pueden convivir). Se hará
+  cuando llegue una carta que lo pida; la especificación de Toto (25-ago-2026), ya cerrada:
+  - No puede ser objetivo de **ningún** ataque (ni normal ni especial).
+  - Inmune a cualquier daño y a cualquier efecto de cartas de Personaje, Evento o Ayuda.
+  - Pero está **siempre agotada** y **no puede ganar Furor**.
+  - Y si es tu **único** aliado, el rival puede atacarte **directamente**.
+
+  Es decir, como el Kami, más lo de estar siempre agotada y lo del ataque directo. El motivo del
+  contrapeso: una carta en Estasis sale de ahí por un contador o por alguna otra condición, y
+  mientras tanto te está ocupando un hueco sin hacer nada útil - ni siquiera acumular Furor.
 
 ---
 

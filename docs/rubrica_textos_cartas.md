@@ -912,3 +912,24 @@ de servir de tapadera sin tocar nada.
 ahí, la moneda cae **justo antes de que te toque atacar** y alcanza también a los Ocultos que se
 aplican al EMPEZAR este turno —el camuflaje de Mill—, que en la otra posición aún no existían. Y
 lo que salga dura exactamente lo que hace falta: **este turno**.
+
+---
+
+## §24. Los estados: dos familias, y cómo baja su contador (Toto, 25-ago-2026)
+
+Todo estado pertenece a **una** de estas dos familias, y una carta solo puede llevar **uno de cada
+familia a la vez**: aplicarle otro de la misma familia sustituye al que tenía (`Game.CATEGORIA_ESTADO`).
+
+| Familia | Quiénes | Qué hacen |
+|---|---|---|
+| **alteración** | Daño por tiempo, Confusión, Ceguera, Sueño, Silenciado | te estropean algo |
+| **velo** («estados velo») | Oculto y, cuando llegue, Estasis | te apartan del alcance del rival |
+
+**El contador baja al TERMINAR el turno del jugador dueño de la carta.** Los turnos del rival no
+lo gastan. La única excepción es el **Daño por tiempo**, que va al revés: golpea al **inicio** del
+turno de su dueño y baja **justo después de cada golpe**, así que «3 turnos» son exactamente 3
+golpes. Al escribir una carta que aplique un estado, no hace falta explicar nada de esto en su
+`text`: es regla del juego y vive en el panel de reglas.
+
+Estasis todavía no existe; su especificación cerrada está en `docs/TODO.md` §3, y entra cuando la
+pida una carta.
