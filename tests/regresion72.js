@@ -33,6 +33,10 @@ const NOMBRE = {
           motivo: 'ídem' },
         { de: 'Sadame deshace todos sus anexos.', a: 'Sadame de J1 (Jugador 1) deshace todos sus anexos.',
           motivo: 'ídem' },
+        // El log de la regeneración pasa a decir "cura" (Toto, 26-ago-2026): dice lo mismo y es
+        // más corto, que ese texto se repite por cada zombi.
+        { de: 'regenera 2 Vida.', a: 'cura 2 de Vida.', motivo: 'redacción acortada, mismo efecto' },
+        { de: 'regenera 1 Vida.', a: 'cura 1 de Vida.', motivo: 'ídem' },
         // Diferencia que NO nace de esta migración: Karlos ya estaba migrado, y el anuncio de
         // pasiva desactivada usa desde entonces la frase genérica del compilador (ver regresion25).
         { de: 'MEGADRENALINA (Karlos de J1 (Jugador 1)) desactivada.',

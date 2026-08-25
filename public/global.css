@@ -1224,9 +1224,13 @@ button.game-btn:disabled { background: #64748b; cursor: not-allowed; opacity: 0.
     15%  { opacity: 1; }
     100% { transform: translate(0, -50%) rotate(var(--ang, 0deg)) scaleX(1); opacity: 0.95; }
 }
+/* OJO con el transform (Toto, 26-ago-2026): esta animacion SUSTITUYE a ataduraCrece, y lo que
+   ella dejaba puesto con `forwards` desaparece en cuanto empieza otra que no lo repita. Sin
+   estas dos lineas el hilo perdia su rotacion y su largo en el ultimo instante y aparecia
+   horizontal, apuntando a otra carta -se veia clarisimo anexando a alguien de retaguardia-. */
 @keyframes ataduraSeVa {
-    0%   { opacity: 0.95; }
-    100% { opacity: 0; }
+    0%   { transform: translate(0, -50%) rotate(var(--ang, 0deg)) scaleX(1); opacity: 0.95; }
+    100% { transform: translate(0, -50%) rotate(var(--ang, 0deg)) scaleX(1); opacity: 0; }
 }
 .annex-cord {
     position: fixed; height: 4px; margin: 0;

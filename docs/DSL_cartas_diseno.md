@@ -338,14 +338,19 @@ Anexado a: <Nombre>[ [copyId]] ...    (en la carta ANEXADA)
   Sadame anexa con su Activa `ZOMBIFICAR`, y sin el campo se atribuiría a `RAÍCES NINJA` (el
   mismo error de atribución que se corrigió en Karolina/Xidachane).
 * **`annexEffectText`** (plantilla del anfitrión) describe lo que la unión provoca **en el
-  anexado** — el `Zombificado: ...` de Sadame. Sale como **línea propia** del anexado, con la
-  misma gramática. No se declara cuando el efecto lo recibe el anfitrión (Gladiador, Kazuo):
-  eso ya lo publica su propia línea de stats, y repetirlo sería duplicar.
+  anexado** — el `Zombificado: ...` de Sadame. No se declara cuando el efecto lo recibe el
+  anfitrión (Gladiador, Kazuo): eso ya lo publica su propia línea de stats, y repetirlo sería
+  duplicar.
+* **Con `annexEffectText`, el vínculo y su efecto van en UNA SOLA LÍNEA** (Toto, 26-ago-2026):
+  `Anexado a <Carta> - <lo que le hace>`, **sin los dos puntos** (ahí ya no separan nada) y con
+  la fuente debajo, como cualquier otra línea. Antes eran dos líneas seguidas repitiendo el
+  mismo vínculo, la misma Habilidad y la misma fuente. Sin texto propio, la forma de siempre con
+  sus dos puntos.
 
 ```
 Anexo: Mini-tigre [1] por OBSESIÓN DE VENGANZA, fuente: esta carta
 Anexado a: Gladiador por OBSESIÓN DE VENGANZA, fuente: Gladiador de J1 (Ultra_K)
-Zombificado: regenera 2 de Vida al final del turno y no puede recibir Ayudas de curación por ZOMBIFICAR, fuente: Sadame de J1 (Ultra_K)
+Anexado a Sadame - Zombificado: cura 2 de VIDA al final de tu turno y no puede recibir Ayudas que curen VIDA por ZOMBIFICAR, fuente: Sadame de J1 (Ultra_K)
 ```
 
 ### 13.4 Cómo se construye (implementación)

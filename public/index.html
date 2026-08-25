@@ -5588,11 +5588,17 @@
                             const _tO = getCardTemplate(origin.id) || {};
                             const _habO = _tO.annexHabilidad || _tO.passiveName || null;
                             const _refO = this.refCarta(origin);
-                            effects.push(this.lineaEfecto(`Anexado a: ${this.nCarta(origin)}`, { habilidad: _habO, ref: _refO }));
-                            // annexEffectText describe lo que la unión provoca EN EL ANEXADO (el
-                            // Zombificado de Sadame); es una afección más, así que va en su propia
-                            // línea con la misma gramática, no pegada a la del vínculo.
-                            if (_tO.annexEffectText) effects.push(this.lineaEfecto(_tO.annexEffectText, { habilidad: _habO, ref: _refO }));
+                            // UNA SOLA LÍNEA (Toto, 26-ago-2026). `annexEffectText` describe lo
+                            // que la unión provoca EN EL ANEXADO (el Zombificado de Sadame), y
+                            // salía en su propia línea debajo: mismo vínculo, misma Habilidad y
+                            // misma fuente repetidos dos veces. Cuando hay texto propio, la
+                            // afección pasa a ser `Anexado a <Carta> - <lo que le hace>` -SIN los
+                            // dos puntos, que ahí ya no separan nada- y la fuente sigue debajo,
+                            // como en cualquier otra línea. Sin texto propio, la de siempre.
+                            const _anexo = _tO.annexEffectText
+                                ? `Anexado a ${this.nCarta(origin)} - ${_tO.annexEffectText}`
+                                : `Anexado a: ${this.nCarta(origin)}`;
+                            effects.push(this.lineaEfecto(_anexo, { habilidad: _habO, ref: _refO }));
                         }
                     }
                     if (card.attachments && card.attachments.length > 0) {

@@ -551,14 +551,14 @@ const CARD_DB = [
     },
     { 
         id: 6, name: "Sadame", hp: 2, def: 4, atk: 5, type: "Personaje", subtype: 'No-muerto', tags: ["Ninja", "Usuaria de magia"], gender: 'F', rarity: "A", 
-        text: "P: RAÍCES NINJA: Al curarse de más, su VIDA máxima sube hasta un tope de 6. Gana +1 de Furor extra de las cartas. A: ZOMBIFICAR (1F): Anexa un aliado 'Ser vivo' y lo vuelve un zombi: mientras lo sea, regenera 2 de VIDA al final de tu turno y no puede recibir Ayudas que curen VIDA. Si ya tienes zombis, elige entre zombificar a otro aliado o deshacer los anexos de hasta todos tus zombis.", 
+        text: "P: RAÍCES NINJA: Al curarse de más, su VIDA máxima sube hasta un tope de 6. Gana +1 de Furor extra de las cartas. A: ZOMBIFICAR (1F): Anexa un aliado 'Ser vivo' y lo vuelve un zombi: mientras lo sea, cura 2 de VIDA al final de tu turno y no puede recibir Ayudas que curen VIDA. Si ya tienes zombis, elige entre zombificar a otro aliado o deshacer los anexos de hasta todos tus zombis.", 
         passiveName: "RAÍCES NINJA", activeName: "ZOMBIFICAR", activeCost: 1, series: 1,
         uncopyable: true, // Zombificar usa arrays exclusivos de anexo
         // El vínculo lo crea su ACTIVA, no la Pasiva: sin este campo, el detalle lo atribuiría
         // a RAÍCES NINJA (mismo tipo de error que se corrigió en Karolina/Xidachane).
         annexHabilidad: "ZOMBIFICAR",
         // annexEffectText = lo que la unión provoca EN EL ANEXADO (aquí sí lo hay: el zombi).
-        annexEffectText: "Zombificado: regenera 2 de VIDA al final del turno y no puede recibir Ayudas de curación de VIDA",
+        annexEffectText: "Zombificado: cura 2 de VIDA al final de tu turno y no puede recibir Ayudas que curen VIDA",
 
         // MIGRADA ENTERA (25-ago-2026). Sus ocho hooks salen con cuatro piezas nuevas:
         //   · `soloDe` en SOBRECURACION: la expansión de Vida máxima solo cuenta si quien cura
@@ -620,7 +620,7 @@ const CARD_DB = [
                 { op: "CURAR", target: { selfLista: "attachments" }, valor: 2,
                   conBeforeHealed: false, soloSiHerido: true,
                   floating: "ZOMBIFICAR", floatingStyle: "ft-ability", offsetFloating: -40,
-                  log: "ZOMBIFICAR: {objetivo} regenera {curado} Vida." } ] }
+                  log: "ZOMBIFICAR: {objetivo} cura {curado} de Vida." } ] }
         ],
 
     },
@@ -9209,13 +9209,23 @@ const DSL = {
             // `marcar`: los campos que van y vienen CON el vínculo (esZombi), puestos y quitados
             // aquí para que no puedan quedarse sueltos por un lado.
             if (e.alterna && target.attachedTo === sourceCard.instanceId) {
+                // La ruptura se ve ANTES de romperse (Toto, 26-ago-2026): mientras el hilo se
+                // tensa y se parte, el vínculo sigue vivo -y su flecha, dibujada-; el anexo se
+                // deshace de verdad al terminar el gesto. Mismo criterio que al atar.
+                if (!e.sinAnimacion && typeof animateAnnex === 'function') { try { await animateAnnex(sourceCard.instanceId, target.instanceId, true); } catch (err) {} }
                 sourceCard.attachments = (sourceCard.attachments || []).filter(id => id !== target.instanceId);
                 target.attachedTo = null;
                 delete target.reverseArrow;
                 (e.marcar || []).forEach(k => { delete target[k]; });
                 if (e.logDesanexa) game.logMsg(DSL._fill(e.logDesanexa, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
-                if (typeof animateAnnex === 'function') { try { await animateAnnex(sourceCard.instanceId, target.instanceId, true); } catch (err) {} }
                 return true;
+            }
+            // LA ATADURA VA DELANTE (Toto, 26-ago-2026): el vínculo se formaliza -flecha, marcas
+            // y efectos- cuando el hilo TERMINA de llegar, no cuando sale. Antes se ataba al
+            // instante y la animación era un adorno a toro pasado. Va aquí arriba, antes de las
+            // dos formas de anexar, para que las dos se comporten igual.
+            if (!e.sinAnimacion && typeof animateAnnex === 'function') {
+                try { await animateAnnex(sourceCard.instanceId, target.instanceId, false); } catch (err) {}
             }
             if (e.reverse) {
                 if (sourceCard.attachedTo) {
@@ -9237,9 +9247,6 @@ const DSL = {
             if (e.reverseArrowEnObjetivo) target.reverseArrow = true;
             if (e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
             if (e.floating && typeof showFloatingText === 'function') showFloatingText(sourceCard.instanceId, e.floating.texto, e.floating.estilo || 'ft-green', e.floating.offset !== undefined ? e.floating.offset : -30);
-            // La ATADURA es del OP, no de la carta: así cualquier Habilidad que anexe se lee
-            // igual (Toto, 26-ago-2026). `sinAnimacion` para quien no la quiera.
-            if (!e.sinAnimacion && typeof animateAnnex === 'function') { try { await animateAnnex(sourceCard.instanceId, target.instanceId, false); } catch (err) {} }
             return true;
         }
         if (e.op === 'OPCIONES') {
