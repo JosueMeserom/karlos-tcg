@@ -143,7 +143,7 @@ const TEXTO_REGLAS = `
     <p class="rule-text" style="color:#fbbf24; font-weight:bold; margin-top:20px; text-transform:uppercase;">Fases del turno</p>
     <ul class="list-steps">
         <li><b>1. Fase de robo:</b> Robar una carta (si mazo vacío, barajar descartes y robar).</li>
-        <li><b>2. Fase de efectos iniciales:</b> En este orden: Evento, Vanguardia (izda a dcha), Retaguardia (izda a dcha), Daños por tiempo.</li>
+        <li><b>2. Fase de efectos iniciales:</b> En este orden: Evento, Vanguardia (izda a dcha), Retaguardia (izda a dcha), Daños por tiempo, escondite frágil.</li>
         <li><b>3. Fase de evento:</b> Restar 1 turno al Evento activo (ejecuta efecto si expira).</li>
         <li><b>4. Fase de furor:</b> Sumar 1 de Furor (máx 4) a Vanguardia.</li>
         <li><b>5. Fase principal:</b> (En cualquier orden)

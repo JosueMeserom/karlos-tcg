@@ -3,7 +3,7 @@
 Lo que queda por hacer, con su porqué. Se actualiza al cerrar cada cosa: lo que Toto no rebate
 después de hacerlo se da por bueno y se quita de aquí.
 
-> Última revisión: 22-ago-2026 · 167 cartas en CARD_DB · 107 suites en verde
+> Última revisión: 25-ago-2026 · 167 cartas en CARD_DB · 109 suites en verde
 
 ---
 
@@ -17,17 +17,23 @@ existe 'Diosa').
 
 ---
 
-## 2. Migración al DSL: 4 imperativas puras + 4 híbridas
+## 2. Migración al DSL: 3 imperativas puras + 4 híbridas
 
-Quedan (entre paréntesis, sus hooks a mano). En total, 151 hooks escritos a mano en el fichero.
+Quedan (entre paréntesis, sus hooks a mano). En total, 137 hooks escritos a mano en el fichero.
 
 | Carta | Qué le falta al DSL |
 |---|---|
 | **NoName** (9) | **corrección del 22-ago-2026**: esos 9 hooks NO son el clon, son **RÉPLICA**, que copia la Activa de un enemigo delegando `canActivateAbility`/`onExecuteAbility`/`onValidateTarget`/`onTargetsReady`/… al template ajeno. Candidata a irreducible: es *meta* sobre la interfaz de hooks, y funciona igual con cartas ya migradas (regresion68 lo fija) |
-| **Silhouette** (7), **Sadame** (7), **Arthas** (8) | sin leer a fondo todavía: cada una pide su propio análisis |
+| **Sadame** (7), **Arthas** (8) | sin leer a fondo todavía: cada una pide su propio análisis |
 | **Erasmo** (2, ya híbrida) | DOMINIO ya es declarativa; **SEGUIMIENTO** se queda: una línea que expone la mano rival en cada pasada de pasivas y un BOTÓN propio para mirar el mazo (haría falta un trigger de acción personalizada para una sola carta) |
 | **Xanadu** (4, ya híbrida) | REPULSIÓN ABSOLUTA ya es declarativa; **ESTORNUDO DEVASTADOR** se queda por lo mismo que MOTOCICLETA: el enemigo que entra depende del que sale (límite de 2 Personajes sobre la vanguardia que QUEDARÍA) |
 | **Mill** (4, ya híbrida) | su Pasiva ya es declarativa; **MOTOCICLETA** se queda: su tercer objetivo solo es válido según los dos anteriores (el límite de 2 Personajes se calcula sobre el campo que QUEDARÍA), y eso no es un filtro por campo sino una cuenta condicional |
+
+**Silhouette, cerrada el 25-ago-2026** (suite `tests/regresion71.js`): sus siete hooks salieron con
+cuatro piezas nuevas, todas genéricas - `eventoEnJuego` como requisito de colocación (lo compartían
+las tres cartas de 'Una buena razón', así que Xanadu y Diego Antonio soltaron el suyo de paso),
+los campos `atkBase`/`defBase`, `guardaSuma` en lista y `FIJAR_STAT` dentro de una
+`PASIVA_CONTINUA` (fijar un stat en cada pasada en vez de sumarle un delta).
 
 Aparte, **Tengu orgulloso** (ya mixta) necesita "contar caras de moneda" para migrar su Activa.
 

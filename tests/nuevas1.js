@@ -57,10 +57,12 @@ const enCampo = (g, pid, nombre) => [...g.players[pid].vanguard, ...g.players[pi
 const buscar = (g, pid, nombre) => [...g.players[pid].vanguard, ...g.players[pid].rearguard].find(c => c.name === nombre);
 
 (async () => {
-    console.log('--- Una buena razón: desbloquea a Xanadu y Diego Antonio ---');
+    console.log('--- Una buena razón: desbloquea a Xanadu, Diego Antonio y Silhouette ---');
     // El motivo de que esta tanda vaya primera. Las dos cartas están implementadas desde hace
     // tiempo y eran INCOLOCABLES: su canPlayCard busca este Evento por nombre y no existía.
-    for (const carta of ['Xanadu', 'Diego Antonio']) {
+    // Silhouette se suma el 25-ago-2026, al migrar su requisito al DSL: las tres comparten
+    // ahora el mismo `eventoEnJuego`, así que se comprueban juntas.
+    for (const carta of ['Xanadu', 'Diego Antonio', 'Silhouette']) {
         const { g, paso } = await mesa({
             turno: 2, turnoDe: 'p1', empieza: 'p2',
             p1: { mano: [carta], evento: 'Una buena razón' },

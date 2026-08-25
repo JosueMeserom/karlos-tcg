@@ -1534,11 +1534,11 @@ const CARD_DB = [
         text: "Efecto: Elige de tu pila de descarte un 'Ser vivo' que no requiera coste ni condiciones extra para colocarse y devuélvelo a tu mano.", cost: 0, series: 1,
         
         abilities: [
-            { trigger: "JUGAR", requisitos: [ { count: { zona: "DESCARTES", filtros: [ { campo: "subtype", op: "==", valor: "Ser vivo" } ], plantillaSin: ["onBeforePlayAsync"] }, op: ">=", valor: 1, msg: "No tienes 'Seres vivos' válidos en tu pila de descartes." } ] },
+            { trigger: "JUGAR", requisitos: [ { count: { zona: "DESCARTES", filtros: [ { campo: "subtype", op: "==", valor: "Ser vivo" } ], plantillaSin: ["onBeforePlayAsync", "canPlayCard"] }, op: ">=", valor: 1, msg: "No tienes 'Seres vivos' válidos en tu pila de descartes." } ] },
             { trigger: "AL_CONSUMIR",
               efectos: [
                 { op: "BUSCAR", en: "DESCARTES", cantidad: 1, destino: "MANO",
-                  filtros: [ { campo: "subtype", op: "==", valor: "Ser vivo" } ], plantillaSin: ["onBeforePlayAsync"],
+                  filtros: [ { campo: "subtype", op: "==", valor: "Ser vivo" } ], plantillaSin: ["onBeforePlayAsync", "canPlayCard"],
                   abortaSiCancelas: true, titulo: "RECUPERAR SER VIVO",
                   log: "{carta} recupera a {objetivo} de los descartes." } ] }
         ],
@@ -2293,17 +2293,6 @@ const CARD_DB = [
         text: "Requisito: 'Una buena razón' activo en cualquier campo. P: REPULSIÓN ABSOLUTA: Al recibir un ataque normal, puede pagar 1 de Furor para evitarlo con todos sus efectos. A: ESTORNUDO DEVASTADOR (2F): Intercambia un enemigo de vanguardia por uno de retaguardia. Si no hay retaguardia enemiga, lo devuelve a su mano.",
         passiveName: "REPULSIÓN ABSOLUTA", activeName: "ESTORNUDO DEVASTADOR", activeCost: 2,
 
-        onBeforePlayAsync: async function(card, game, p) {
-            const p1Event = game.players.p1.activeEvent;
-            const p2Event = game.players.p2.activeEvent;
-            const eventActive = (p1Event && p1Event.name === "Una buena razón") || (p2Event && p2Event.name === "Una buena razón");
-            if (!eventActive) {
-                game.logMsg(`No puedes colocar a ${game.getCardNameWithOwner(card)} si 'Una buena razón' no está en juego.`, 'system');
-                return false;
-            }
-            return true;
-        },
-        
         // REPULSIÓN ABSOLUTA migrada a DSL (23-ago-2026) con el trigger ANTES_DE_DEFENDER, que
         // es exactamente para esto: una esquiva REAL, decidida ANTES del daño. Estrena dos
         // piezas, las dos genéricas: `prompt` en el trigger (la esquiva cuesta Furor, así que se
@@ -2319,6 +2308,11 @@ const CARD_DB = [
         // calcula sobre la vanguardia que QUEDARÍA), y eso es una cuenta condicional, no un
         // filtro por campo.
         abilities: [
+            // El requisito de colocación, declarativo desde el 25-ago-2026 (`eventoEnJuego`):
+            // era un onBeforePlayAsync idéntico en las tres cartas de 'Una buena razón'.
+            { trigger: "JUGAR", requisitos: [
+                { eventoEnJuego: "Una buena razón", op: ">=", valor: 1,
+                  msg: "No puedes colocar a {carta} si 'Una buena razón' no está en juego." } ] },
             { trigger: "ANTES_DE_DEFENDER", nombre: "REPULSIÓN ABSOLUTA",
               soloAtaqueNormal: true, salvoIncontrarrestable: true,
               logIncontrarrestable: "{objetivo} ignora las defensas evasivas gracias a su pasiva.",
@@ -2481,21 +2475,17 @@ const CARD_DB = [
         
         cannotRetreat: true, // Flag leído por index.html para bloquear la retirada manual
         
-        onBeforePlayAsync: async function(card, game, p) {
-            const eventActive = (game.players.p1.activeEvent?.name === "Una buena razón") || (game.players.p2.activeEvent?.name === "Una buena razón");
-            if (!eventActive) {
-                game.logMsg(`No puedes colocar a ${game.getCardNameWithOwner(card)} sin el evento 'Una buena razón' en juego.`, 'system');
-                return false;
-            }
-            return true;
-        },
         // Migrado el RELOJ (5-ago-2026): la entrada (Furor + contadores), el tic de cada turno y
         // la muerte al agotarse, más PACIFISMO, que es justo lo que congela ese tic. Estrena el op
         // `CUENTA_ATRAS`, compartido con Meca EBA. Lo que se queda imperativo y por qué: el veto de
-        // colocación mira un EVENTO en juego ('Una buena razón'), y los `requisitos` del DSL solo
-        // saben contar CARTAS en zonas; y la inversión de daño (onBeforeTakeDamage) no tiene
-        // trigger — es la única carta del juego que la usa, así que no compensa inventarlo.
+        // colocación ya es declarativo (`eventoEnJuego`, 25-ago-2026: era la pieza que le
+        // faltaba al DSL y que compartían las tres cartas de 'Una buena razón'); lo que se queda
+        // a mano es la inversión de daño (onBeforeTakeDamage), que no tiene trigger — es la única
+        // carta del juego que la usa, así que no compensa inventarlo.
         abilities: [
+            { trigger: "JUGAR", requisitos: [
+                { eventoEnJuego: "Una buena razón", op: ">=", valor: 1,
+                  msg: "No puedes colocar a {carta} sin el evento 'Una buena razón' en juego." } ] },
             { trigger: "AL_JUGAR",
               log: "¡CÓLERA INFINITA! {carta} entra con 3 contadores de Cólera.",
               efectos: [
@@ -2544,89 +2534,43 @@ const CARD_DB = [
         text: "Requisito: 'Una buena razón' activo en cualquier campo. P: REINA DEL COSPLAY: Al inicio de tu turno, cura 2 VIDA. A: PONTE TRAJE (1F): Elige cualquier aliado o enemigo en el campo. Copias sus stats base (ATQ y DEF).",
         passiveName: "REINA DEL COSPLAY", activeName: "PONTE TRAJE", activeCost: 1,
         
-        onBeforePlayAsync: async function(card, game, p) {
-            const eventActive = (game.players.p1.activeEvent?.name === "Una buena razón") || (game.players.p2.activeEvent?.name === "Una buena razón");
-            if (!eventActive) {
-                game.logMsg(`No puedes colocar a ${game.getCardNameWithOwner(card)} sin el evento 'Una buena razón' en juego.`, 'system');
-                return false;
-            }
-            return true;
-        },
-        onStartTurn: async function(card, game) {
-            if (card.owner === game.activePlayerId && card.currentHp < card.maxHp) {
-                let amount = 2;
-                const template = getCardTemplate(card.id);
-                if (typeof template.onBeforeHealed === 'function') amount = template.onBeforeHealed(card, amount, card, game);
-                
-                const missing = card.maxHp - card.currentHp;
-                const heal = Math.min(amount, missing);
-                if (heal > 0) {
-                    showFloatingText(card.instanceId, "REINA DEL COSPLAY", "ft-ability", -40);
-                    game.modifyStat(card, 'currentHp', heal);
-                    game.logMsg(`¡${card.passiveName}! ${game.getCardNameWithOwner(card)} se cura ${heal} Vida.`, 'ability');
-                }
-            }
-        },
-        onUpdatePassive: function(card, game) {
-            if (card.copiedBaseAtk !== undefined) card.currentAtk = card.copiedBaseAtk;
-            if (card.copiedBaseDef !== undefined) card.currentDef = card.copiedBaseDef;
-        },
-        canActivateAbility: function(card, game) {
-            if (card.furor < 1) { game.logMsg("Falta Furor (1).", 'system'); return false; }
-            return true;
-        },
-        onExecuteAbility: function(card, game) {
-            game.selectedCard = card;
-            game.inputState = 'SELECT_ABILITY_TARGETS';
-            // Custom targetType que hemos habilitado en el index.html
-            game.abilityContext = { targets: [], maxTargets: 1, name: 'PONTE TRAJE', targetType: 'any_field' };
-            game.logError("PONTE TRAJE: Elige CUALQUIER aliado o enemigo en el campo.");
-            game.render();
-        },
-        onValidateTarget: function(card, target, game, isSilent = false) {
-            if (target.location !== 'vanguard' && target.location !== 'rearguard') {
-                if (!isSilent) game.logMsg("El objetivo debe estar en el campo de batalla.", 'system');
-                return false;
-            }
-            if (target.stealth && target.owner !== card.owner) {
-                if (!isSilent) game.logError("No puedes seleccionar a un enemigo Oculto.");
-                return false;
-            }
-            return true;
-        },
-        onTargetsReady: async function(card, game) {
-            const target = game.abilityContext.targets[0];
-            game.modifyStat(card, 'furor', -1);
-            
-            const targetTemplate = getCardTemplate(target.id);
-            const oldAtk = card.currentAtk;
-            const oldDef = card.currentDef;
-
-            card.copiedBaseAtk = targetTemplate.atk;
-            card.copiedBaseDef = targetTemplate.def;
-            
-            // Forzamos actualización para calcular la diferencia matemática
-            game.updatePassives();
-            
-            const diffAtk = card.currentAtk - oldAtk;
-            const diffDef = card.currentDef - oldDef;
-
-            // Secuencia de popups encadenados automáticamente por la cola
-            showFloatingText(card.instanceId, card.activeName, "ft-ability", -40);
-            
-            if (diffAtk > 0) showFloatingText(card.instanceId, `+${diffAtk} ATQ`, "ft-green", -20);
-            else if (diffAtk < 0) showFloatingText(card.instanceId, `${diffAtk} ATQ`, "ft-red-stat", -20);
-            
-            if (diffDef > 0) showFloatingText(card.instanceId, `+${diffDef} DEF`, "ft-green", 0);
-            else if (diffDef < 0) showFloatingText(card.instanceId, `${diffDef} DEF`, "ft-red-stat", 0);
-
-            game.logMsg(`¡${game.getCardNameWithOwner(card)} copia los stats base de ${game.getCardNameWithOwner(target)}! (ATQ: ${card.copiedBaseAtk}, DEF: ${card.copiedBaseDef})`, 'ability');
-            
-            card.exhausted = true;
-            game.isActionLocked = false;
-            game.cancelAction();
-            game.render();
-        }
+        // MIGRADA ENTERA (25-ago-2026). Los siete hooks a mano se van; lo que estrena cada uno:
+        //   · el requisito de colocación -> `eventoEnJuego` en el JUGAR, que ya vale para las
+        //     tres cartas de 'Una buena razón' (antes: un onBeforePlayAsync copiado tres veces).
+        //   · REINA DEL COSPLAY -> INICIO_TURNO + CURAR, tal cual.
+        //   · PONTE TRAJE -> ACTIVA con un ELEGIR `de:"TODOS"`; el Furor lo cobra el compilador
+        //     al resolverse la elección, que es la norma (nada de cancelable:false).
+        //   · el "copias sus stats base" -> `guardaSuma` con los campos nuevos atkBase/defBase,
+        //     que leen la PLANTILLA del elegido, y dos FIJAR_STAT que lo dejan escrito en la
+        //     carta (copiedBaseAtk/Def, los mismos campos de siempre: el estado no cambia).
+        //   · y la reaplicación en cada pasada de pasivas -> PASIVA_CONTINUA con FIJAR_STAT,
+        //     que es lo que hacía su onUpdatePassive: FIJA el stat, no le suma un delta.
+        abilities: [
+            { trigger: "JUGAR", requisitos: [
+                { eventoEnJuego: "Una buena razón", op: ">=", valor: 1,
+                  msg: "No puedes colocar a {carta} sin el evento 'Una buena razón' en juego." } ] },
+            { trigger: "INICIO_TURNO", nombre: "REINA DEL COSPLAY",
+              efectos: [
+                { op: "CURAR", valor: 2, floating: "REINA DEL COSPLAY",
+                  log: "¡REINA DEL COSPLAY! {objetivo} se cura {curado} Vida." } ] },
+            // El traje puesto se reaplica en cada pasada: si no, el reseteo a stats de plantilla
+            // que abre updatePassives lo borraría en cuanto pasara cualquier otra cosa.
+            { trigger: "PASIVA_CONTINUA", nombre: "PONTE TRAJE", then: [
+                { op: "FIJAR_STAT", stat: "currentAtk", valor: { REF: "self.copiedBaseAtk" } },
+                { op: "FIJAR_STAT", stat: "currentDef", valor: { REF: "self.copiedBaseDef" } } ] },
+            { trigger: "ACTIVA", nombre: "PONTE TRAJE", coste: { furor: 1 }, sinObjetivo: true,
+              efectos: [
+                { op: "ELEGIR", de: "TODOS", cantidad: 1, sinOcultosEnemigos: true,
+                  titulo: "PONTE TRAJE: ELIGE A QUIEN COPIARLE LOS STATS",
+                  guardaSuma: [ { campo: "atkBase", en: "trajeAtk" }, { campo: "defBase", en: "trajeDef" } ],
+                  guardaNombres: "modelo",
+                  efectos: [
+                    { op: "FIJAR_STAT", target: { quien: "SELF" }, stat: "copiedBaseAtk", valor: { REF: "vars.trajeAtk" },
+                      floating: { texto: "ATQ = {valor}", estilo: "ft-ability", offset: -20 } },
+                    { op: "FIJAR_STAT", target: { quien: "SELF" }, stat: "copiedBaseDef", valor: { REF: "vars.trajeDef" },
+                      floating: { texto: "DEF = {valor}", estilo: "ft-ability", offset: 0 },
+                      log: "¡{carta} copia los stats base de {modelo}! (ATQ: {trajeAtk}, DEF: {trajeDef})" } ] } ] }
+        ],
     },
     {
         name: "Cañón de positrones", type: "Ayuda", subtype: "Técnica", tags: ["Consumible"], rarity: "A", series: 2, cost: 0,
@@ -2715,11 +2659,11 @@ const CARD_DB = [
             { trigger: "JUGAR", requisitos: [
                 { count: { zona: "VANGUARDIA" }, op: ">=", valor: 4, msg: "Tu vanguardia debe estar llena (4 cartas)." },
                 { count: { zona: "RETAGUARDIA" }, op: "<=", valor: 3, msg: "Tu retaguardia está llena." },
-                { count: { zona: "DESCARTES", filtros: [ { campo: "subtype", op: "==", valor: "Ser vivo" } ], plantillaSin: ["onBeforePlayAsync"] }, op: ">=", valor: 1, msg: "No hay 'Seres vivos' aptos en tu pila de descartes." } ] },
+                { count: { zona: "DESCARTES", filtros: [ { campo: "subtype", op: "==", valor: "Ser vivo" } ], plantillaSin: ["onBeforePlayAsync", "canPlayCard"] }, op: ">=", valor: 1, msg: "No hay 'Seres vivos' aptos en tu pila de descartes." } ] },
             { trigger: "AL_CONSUMIR",
               efectos: [
                 { op: "BUSCAR", en: "DESCARTES", cantidad: 1, destino: "RETAGUARDIA", animacionResurrect: true, sinAnimacion: true,
-                  filtros: [ { campo: "subtype", op: "==", valor: "Ser vivo" } ], plantillaSin: ["onBeforePlayAsync"],
+                  filtros: [ { campo: "subtype", op: "==", valor: "Ser vivo" } ], plantillaSin: ["onBeforePlayAsync", "canPlayCard"],
                   abortaSiCancelas: true, titulo: "REGENERAR EN RETAGUARDIA",
                   log: "¡La Cápsula bio-regenera a {objetivo} en la retaguardia!" } ] }
         ],
@@ -7454,6 +7398,9 @@ const DSL = {
         if (k === 'atk') return c.currentAtk;
         if (k === 'def') return c.currentDef;
         if (k === 'furorMax') return KARLOS_RULES.getFurorMax(c); // campo computado (capa de reglas)
+        // atkBase/defBase: lo que dice la PLANTILLA, sin buffs ni equipos (Silhouette copia
+        // "stats base", no el Atq de este instante). 'atk'/'def' a secas siguen siendo el actual.
+        if (k === 'atkBase' || k === 'defBase') { const t = DSL._tmpl(c.id) || {}; return k === 'atkBase' ? t.atk : t.def; }
         if (k === 'dotActivo') return !!(c.status && c.status.dot && c.status.dot.duration > 0); // campo computado: ¿tiene Daño por Tiempo activo?
         // Ruta con puntos (Karlitos, 31-jul-2026): "counters.karlitos_entrenamiento.count".
         // Los contadores viven anidados, así que sin esto no se podía condicionar por su valor.
@@ -7885,12 +7832,19 @@ const DSL = {
     // _passiveDeltas (que solo suma/resta). Se aplican directamente sobre la carta, DESPUÉS
     // de los deltas, con la misma recursión de if/then/else:
     //   · MARCAR      -> pone un campo de la propia carta (p. ej. stealth: siempre Oculta).
+    //   · FIJAR_STAT  -> FIJA un stat en cada pasada en vez de sumarle un delta (Silhouette:
+    //     mientras lleve el traje puesto, su Atq/Def son los que copió). Si el valor no resuelve
+    //     -todavía no ha copiado a nadie- no se toca nada.
     //   · SUELO_STAT  -> impide que un stat baje de su valor base de plantilla ("no bajan de base").
     // El motor los recoge igual en el registro de modificadores (updatePassives diffea antes
     // y después), así que salen en "Afectado por:" con la sintaxis estándar sin nada extra.
     _passiveExtras(card, game, effects, nombreHab) {
         (effects || []).forEach(e => {
             if (e.if) { DSL._passiveExtras(card, game, DSL._cond(card, game, e.if) ? e.then : (e.else || []), nombreHab); return; }
+            if (e.op === 'FIJAR_STAT') {
+                const v = DSL._value(card.owner, game, e.valor, card, { self: card });
+                if (v !== undefined && v !== null && !Number.isNaN(v)) card[e.stat] = v;
+            }
             if (e.op === 'MARCAR') {
                 card[e.campo] = (e.valor !== undefined) ? e.valor : true;
                 // badge: la marca es CONTINUA y debe salir en "Afectado por:" en TODAS las
@@ -8414,7 +8368,7 @@ const DSL = {
             // cartas que usan esta rama declaran el suyo, así que el fallback no lo usaba nadie.
             if (e.floating && typeof showFloatingText === 'function') showFloatingText(target.instanceId, e.floating, e.floatingStyle || 'ft-ability', e.offsetFloating !== undefined ? e.offsetFloating : -40);
             game.modifyStat(target, 'currentHp', heal);
-            if (e.log) game.logMsg(DSL._fill(e.log, Object.assign({}, (DSL._vars && DSL._vars[sourceCard.instanceId]) || {}, ctx, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target), antes, despues: target.currentHp })), 'ability');
+            if (e.log) game.logMsg(DSL._fill(e.log, Object.assign({}, (DSL._vars && DSL._vars[sourceCard.instanceId]) || {}, ctx, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target), antes, despues: target.currentHp, curado: heal })), 'ability');
             return true;
         }
         if (e.op === 'DAÑO') {
@@ -9378,6 +9332,10 @@ const DSL = {
             // excluirSelf: la propia carta fuente ya está en el campo cuando ELEGIR corre en
             // AL_JUGAR (Kazuo/Gladiador eligiendo a quién anexar), así que el pool de ALIADOS
             // la incluiría por defecto si no se filtra explícitamente (Toto, 27-jul-2026).
+            // sinOcultosEnemigos: un Oculto ENEMIGO no se puede señalar; los tuyos sí. Con
+            // `de:"TODOS"` no vale un filtro de `stealth`, que se llevaría por delante también a
+            // los aliados escondidos (PONTE TRAJE puede copiar a tu propia Edrielle).
+            if (e.sinOcultosEnemigos) pool = pool.filter(x => !(x.owner !== sourceCard.owner && x.stealth));
             if (e.excluirSelf) pool = pool.filter(x => x.instanceId !== sourceCard.instanceId);
             if (e.sinMarcaTemporalPropia) pool = pool.filter(x => !(x.tempEffects && x.tempEffects.some(t => t.sourceId === sourceCard.id)));
             if (e.zona === 'VANGUARDIA') pool = pool.filter(x => x.location === 'vanguard');
@@ -9425,10 +9383,12 @@ const DSL = {
             // ANTES de elegir para que una cancelación no herede valores de una
             // ejecución anterior de la misma carta.
             const _vs = () => { DSL._vars = DSL._vars || {}; return DSL._vars[sourceCard.instanceId] = DSL._vars[sourceCard.instanceId] || {}; };
-            if (e.guardaSuma) delete _vs()[e.guardaSuma.en];
+            // guardaSuma admite UNA o VARIAS (Silhouette guarda a la vez el Atq y la Def base
+            // de quien copia). Antes solo cabía una y hacía falta declarar dos ELEGIR.
+            [].concat(e.guardaSuma || []).forEach(g => { delete _vs()[g.en]; });
             if (e.guardaNombres) delete _vs()[e.guardaNombres];
             const _guarda = (lista) => {
-                if (e.guardaSuma) _vs()[e.guardaSuma.en] = lista.reduce((acc, x) => acc + (Number(DSL._field(x, e.guardaSuma.campo)) || 0), 0);
+                [].concat(e.guardaSuma || []).forEach(g => { _vs()[g.en] = lista.reduce((acc, x) => acc + (Number(DSL._field(x, g.campo)) || 0), 0); });
                 if (e.guardaNombres) _vs()[e.guardaNombres] = lista.map(x => DSL._nombre(game, x)).join(' y ');
                 // guardaIdEnSelf: ancla el instanceId del elegido EN LA PROPIA CARTA
                 // (viaja con exportGameState; lo leen AURA soloSelfId, las reglas de
@@ -10406,6 +10366,12 @@ const DSL = {
                         val = p.activeEvent ? 1 : 0;
                     // eventoActivoRival ('Una buena razón', 7-ago-2026): hermano del de arriba
                     // pero mirando el campo del RIVAL. Hasta ahora ninguna carta lo necesitaba.
+                    // eventoEnJuego (25-ago-2026): un Evento CONCRETO en mesa, mire quien lo
+                    // mire. 'Una buena razón' habilita a Silhouette, Xanadu y Diego Antonio esté
+                    // en el campo de quien esté, y eso era justo lo que obligaba a las tres a
+                    // llevar su onBeforePlayAsync escrito a mano.
+                    } else if (r.eventoEnJuego !== undefined) {
+                        val = ['p1', 'p2'].filter(id => ((game.players[id].activeEvent || {}).name === r.eventoEnJuego)).length;
                     } else if (r.eventoActivoRival !== undefined) {
                         val = game.players[card.owner === 'p1' ? 'p2' : 'p1'].activeEvent ? 1 : 0;
                     } else if (r.mano) {
