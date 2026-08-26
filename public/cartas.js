@@ -7104,11 +7104,11 @@ const CARD_DB = [
         text: "P: PESTILENCIA: Al morir, todas las demás cartas del campo pierden 1 de VIDA.",
         passiveName: "PESTILENCIA",
         abilities: [
-            { trigger: "AL_MORIR", nombre: "PESTILENCIA",
-              log: "¡PESTILENCIA! La cáscara revienta y su infección se esparce por todo el campo.", logTipo: "ability",
+            { trigger: "AL_MORIR", nombre: "PESTILENCIA", trasMorir: true,
+              log: { msg: "¡PESTILENCIA! {carta} revienta y su infección se esparce por todo el campo.", tipo: "ability" },
               efectos: [
                 // `excluirSelf`: ella ya está muerta; contarla otra vez solo ensuciaría el log.
-                { op: "MODIFICAR_STAT", target: { quien: "TODOS", excludeSelf: true }, stat: "currentHp", delta: -1,
+                { op: "MODIFICAR_STAT", target: { quien: "TODOS" }, stat: "currentHp", delta: -1,
                   comprobarMuerte: true, animacion: "DANO_VERDADERO", animacionSinLanzador: true } ] }
         ],
     },
@@ -11639,8 +11639,22 @@ const DSL = {
         // Retribución: así Incluso En El KG vuelve a la mano (op VOLVER_A_MANO). Sin
         // gestionada, devuelve false y la muerte procede normal tras los efectos (Goodman
         // busca en el mazo si le queda Furor y luego muere). `si` es el gate opcional.
+        // `trasMorir: true` -> el efecto corre cuando la carta YA está en el descarte
+        // (`onDeathAfter`), no justo antes de irse. Es lo que necesita cualquier muerte cuyo
+        // efecto alcance "a todos": si la carta sigue en la mesa se cuenta a sí misma, y con
+        // `comprobarMuerte` eso es un bucle (la PESTILENCIA de la Cáscara violenta, 26-ago-2026).
+        // Quien quiera impedir su propia muerte o dejar algo en su hueco sigue usando el momento
+        // de siempre, que es el único que puede hacerlo.
         const alMorir = abs.find(a => a.trigger === 'AL_MORIR');
-        if (alMorir && typeof tmpl.onDeath !== 'function') {
+        if (alMorir && alMorir.trasMorir && typeof tmpl.onDeathAfter !== 'function') {
+            tmpl.onDeathAfter = async function (card, game) {
+                if (alMorir.si && !DSL._cond(card, game, alMorir.si)) return;
+                const relleno = { carta: DSL._nombre(game, card), nombre: card.name, pasiva: tmpl.passiveName || alMorir.nombre || '' };
+                if (alMorir.log) game.logMsg(DSL._fill(alMorir.log.msg || alMorir.log, relleno), (alMorir.log && alMorir.log.tipo) || alMorir.logTipo || 'ability');
+                await DSL._runEffectList(alMorir.efectos || [], card, game, card.owner, [card], _habDeCarta(alMorir));
+            };
+        }
+        if (alMorir && !alMorir.trasMorir && typeof tmpl.onDeath !== 'function') {
             tmpl.onDeath = async function (card, game) {
                 if (alMorir.si && !DSL._cond(card, game, alMorir.si)) return false;
                 const relleno = { carta: DSL._nombre(game, card), nombre: card.name, pasiva: tmpl.passiveName || alMorir.nombre || '' };

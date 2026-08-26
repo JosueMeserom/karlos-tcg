@@ -947,3 +947,20 @@ cambios de stat (`modifyStat`: no le bajan nada y no gana Furor), los estados nu
 el ataque directo (una carta en Estasis no cuenta como defensora). En el DSL, los pools la excluyen
 por defecto, igual que a los Avatares. Se aplica como cualquier otro estado:
 `{ op: "APLICAR_ESTADO", estado: "estasis", duracion: N }`.
+
+---
+
+## §25. Un efecto de muerte que alcanza "a todos" corre DESPUÉS de irse (26-ago-2026)
+
+`AL_MORIR` tiene **dos momentos**, y elegir mal el segundo es un bucle:
+
+* **Antes de irse** (por defecto, `onDeath`): la carta sigue en la mesa con la Vida a 0. Es el
+  único momento en el que se puede **impedir la propia muerte** (`gestionada: true`, Incluso En El
+  KG) o dejar algo **en su hueco**, porque el hueco todavía existe.
+* **Después de irse** (`trasMorir: true`, `onDeathAfter`): la carta ya está en el descarte. Es el
+  que necesita **cualquier efecto que alcance a "todos"** — si corre antes, la carta se cuenta a sí
+  misma, y con `comprobarMuerte` eso se realimenta: se mata, vuelve a esparcirse, se mata…
+  (PESTILENCIA de la Cáscara violenta).
+
+Y el motor tiene candado: `checkDeath` no entra dos veces en la misma carta, ni mientras se está
+procesando su muerte ni una vez que ya está en el descarte. Una carta se muere UNA vez.

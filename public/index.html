@@ -10347,6 +10347,18 @@
             }
 
             async checkDeath(card, triggerRetribution = true, skipAnim = false) {
+                // CANDADO DE RE-ENTRADA (Toto, 26-ago-2026). Procesar una muerte lleva sus awaits
+                // -el AL_MORIR de la carta, su animación, las reacciones de mano- y durante todos
+                // ellos la carta SIGUE en el campo con la Vida a 0: cualquier cosa que vuelva a
+                // preguntar por ella entra otra vez, dispara otra vez su AL_MORIR y, si ese
+                // AL_MORIR hace daño, se realimenta. Una carta se muere UNA vez.
+                // Dos condiciones, y las dos hacen falta: `_procesandoMuerte` cubre la re-entrada
+                // MIENTRAS se procesa, y estar ya en el descarte cubre la llamada tardía (el
+                // `checkDeath` que el flujo de ataque hace al terminar, cuando la carta ya se fue).
+                // Ninguna de las dos estorba a una carta que RESUCITA: al volver al campo su
+                // `location` deja de ser 'discard' y la bandera se limpia sola en el `finally`.
+                if (card._procesandoMuerte || card.location === 'discard') return;
+                card._procesandoMuerte = true;
                 try {
                     if (card.currentHp <= 0) {
                         const template = getCardTemplate(card.id);
@@ -10366,7 +10378,7 @@
                             const handled = await template.onDeath(card, this);
                             if (handled) {
                                 await this.processRetribution(card.owner); 
-                                return;
+                                return;   // el `finally` suelta la bandera: vuelve al juego (Incluso En El KG)
                             }
                         }
 
@@ -10458,6 +10470,17 @@
                         if (!p.discard) p.discard = [];
                         p.discard.push(card);
 
+                        // YA NO ESTÁ EN EL CAMPO (Toto, 26-ago-2026). Hay efectos de muerte que
+                        // tienen que ocurrir DESPUÉS de irse, no antes: la PESTILENCIA de la
+                        // Cáscara violenta golpea "a todos", y mientras ella siguiera en la mesa se
+                        // contaba a sí misma -volvía a morir, volvía a esparcirse, y así-. El
+                        // AL_MORIR de siempre sigue corriendo ANTES, que es lo que necesita quien
+                        // quiere impedir su propia muerte o dejar algo en su hueco; esto es el otro
+                        // momento, para quien solo tiene consecuencias.
+                        if (typeof template.onDeathAfter === 'function') {
+                            try { await template.onDeathAfter(card, this); } catch (eDA) { console.error(eDA); }
+                        }
+
                         // Si la carta tiene la etiqueta isToken, JAMÁS dará premio
                         if (triggerRetribution && !card.isToken) {
                             await this.processRetribution(card.owner);
@@ -10507,6 +10530,8 @@
                     // el tablero entero con el hueco abierto y sin recolocar nunca.
                     this._soltarHuecoDeMuerte();
                     console.error("Error en checkDeath:", e);
+                } finally {
+                    delete card._procesandoMuerte;
                 }
             }
 

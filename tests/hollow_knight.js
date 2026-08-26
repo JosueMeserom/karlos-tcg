@@ -48,6 +48,10 @@ const enCampo = (g, pid, n) => !!buscar(g, pid, n);
         const v0 = { karlos: karlos.currentHp, oso: oso.currentHp };
         await paso({ atacar: 'Oso con armadura', objetivo: 'Cáscara violenta' });
         check('la cáscara muere', !enCampo(g, 'p1', 'Cáscara violenta'));
+        // Y muere UNA vez: su pestilencia alcanza "a todos", así que si corriera con ella todavía
+        // en la mesa se contaría a sí misma y se re-mataría en bucle (Toto, 26-ago-2026). Por eso
+        // la Pasiva es `trasMorir: true` y el motor tiene candado de re-entrada en checkDeath.
+        check('...una sola vez, sin bucle', g.players.p1.discard.filter(c => c.name === 'Cáscara violenta').length === 1);
         check('...y se lleva 1 de Vida del aliado', karlos.currentHp === v0.karlos - 1, 'vida=' + karlos.currentHp);
         check('...y 1 del enemigo que la mató', oso.currentHp === v0.oso - 1, 'vida=' + oso.currentHp);
     }
