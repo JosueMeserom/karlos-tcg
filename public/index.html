@@ -1993,6 +1993,7 @@
         // mueve nada a mano ni se tocan los botones elevados (_liftExhaustedBtn), porque el
         // elemento que se transforma es la carta entera y sus hijos van con ella.
         const DESLIZA_MS = 400;
+        const FLECHA_NACE_MS = 170;   // lo que tarda una flecha de anexo en dibujarse (y en borrarse)
         // La consulta va ACOTADA al contenedor (querySelectorAll sobre él) en vez de con un
         // selector descendente global: es más barato y no depende de que el motor de selectores
         // soporte descendencia.
@@ -10997,7 +10998,7 @@
 
                 this.renderPlayer('p1');
                 this.renderPlayer('p2');
-                setTimeout(() => this.drawConnections(), 0);
+                setTimeout(() => this.seguirFlechas(), 0);
                 
                 this.adjustCardHeaders();
                 // Va DESPUÉS de repintar: los clones se colocan sobre los huecos reales, que
@@ -11795,90 +11796,186 @@
                         this.stopPreview();
                     }
                 }, 0); }
-                
-                svg.innerHTML = '';
-                const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-                svg.appendChild(defs);
 
-                const colorsUsed = new Set();
+                // LAS FLECHAS SE ACTUALIZAN, NO SE REHACEN (Toto, 26-ago-2026). Antes esto
+                // empezaba con `svg.innerHTML = ''` y volvía a crear todo en cada repintado, con
+                // dos consecuencias: no había forma de animar el nacimiento (cada repaso lo
+                // habría relanzado) y, sobre todo, la flecha se dibujaba UNA vez con las cartas
+                // ya en su sitio final mientras ellas seguían deslizándose — se quedaba clavada
+                // en el aire hasta el siguiente render. Ahora cada flecha es un <path> con su
+                // propia clave (anexado|anfitrión): si ya existe se le recalcula la curva, si es
+                // nueva nace dibujándose, y la que desaparece se despide antes de irse. Con eso,
+                // `seguirFlechas()` puede repintarlas cada fotograma del deslizamiento.
+                let defs = svg.querySelector('defs');
+                if (!defs) { defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs'); svg.appendChild(defs); }
+                const _marcador = (color) => {
+                    const markerId = `arrowhead-${color.replace('#', '')}`;
+                    if (!defs.querySelector(`#${markerId}`)) {
+                        const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+                        marker.setAttribute('id', markerId);
+                        marker.setAttribute('markerWidth', '14');
+                        marker.setAttribute('markerHeight', '11');
+                        marker.setAttribute('markerUnits', 'userSpaceOnUse'); // tamaño fijo, no escala con el grosor
+                        marker.setAttribute('refX', '0.5');
+                        marker.setAttribute('refY', '5.5');
+                        marker.setAttribute('orient', 'auto');
+                        const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                        polygon.setAttribute('points', '0 0, 14 5.5, 0 11');
+                        polygon.setAttribute('fill', color);
+                        polygon.setAttribute('fill-opacity', '1');
+                        marker.appendChild(polygon);
+                        defs.appendChild(marker);
+                    }
+                    return markerId;
+                };
 
+                const vivas = new Set();
                 ['p1', 'p2'].forEach(pid => {
                     const p = this.players[pid];
                     [...p.vanguard, ...p.rearguard].forEach(card => {
-                        if (card.attachedTo) {
-                            const originCard = this.findCard(card.attachedTo);
-                            if (originCard) {
-                                let arrowColor = '#a855f7'; 
-                                if (originCard.name === 'Sadame') arrowColor = '#a855f7';
+                        if (!card.attachedTo) return;
+                        const originCard = this.findCard(card.attachedTo);
+                        if (!originCard) return;
+                        const el1 = document.querySelector(`.card[data-id="${card.instanceId}"]`);        // Anexado
+                        const el2 = document.querySelector(`.card[data-id="${originCard.instanceId}"]`);  // Anfitrión
+                        if (!el1 || !el2) return;
 
-                                const markerId = `arrowhead-${arrowColor.replace('#', '')}`;
-                                if (!colorsUsed.has(arrowColor)) {
-                                    colorsUsed.add(arrowColor);
-                                    const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
-                                    marker.setAttribute('id', markerId);
-                                    marker.setAttribute('markerWidth', '14'); 
-                                    marker.setAttribute('markerHeight', '11');
-                                    marker.setAttribute('markerUnits', 'userSpaceOnUse'); // tamaño fijo, no escala con el grosor
-                                    marker.setAttribute('refX', '0.5'); 
-                                    marker.setAttribute('refY', '5.5');
-                                    marker.setAttribute('orient', 'auto');
-                                    
-                                    const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-                                    polygon.setAttribute('points', '0 0, 14 5.5, 0 11'); 
-                                    polygon.setAttribute('fill', arrowColor);
-                                    polygon.setAttribute('fill-opacity', '1'); 
-                                    marker.appendChild(polygon);
-                                    defs.appendChild(marker);
-                                }
+                        const arrowColor = '#a855f7';
+                        const markerId = _marcador(arrowColor);
+                        const clave = `${card.instanceId}|${originCard.instanceId}`;
+                        vivas.add(clave);
 
-                                const el1 = document.querySelector(`.card[data-id="${card.instanceId}"]`); 
-                                const el2 = document.querySelector(`.card[data-id="${originCard.instanceId}"]`); 
-                                
-                                if (el1 && el2) {
-                                    const rect1 = el1.getBoundingClientRect(); // Anexado
-                                    const rect2 = el2.getBoundingClientRect(); // Anfitrión
-                                    const boardRect = document.getElementById('game-board').getBoundingClientRect();
-                                    
-                                    const isP1 = originCard.owner === 'p1';
-                                    
-                                    // Comprobamos si alguna de las dos cartas pide invertir la flecha
-                                    const reverse = originCard.reverseArrow || card.reverseArrow;
-                                    
-                                    // Si reverse es true, la flecha nace en el Anexado y va al Anfitrión
-                                    const startRect = reverse ? rect1 : rect2;
-                                    const endRect = reverse ? rect2 : rect1;
-                                    
-                                    const startX = startRect.left + startRect.width/2 - boardRect.left;
-                                    const startY = isP1 ? startRect.top - boardRect.top : startRect.bottom - boardRect.top;
-                                    
-                                    const endX = endRect.left + endRect.width/2 - boardRect.left;
-                                    const endY = isP1 ? endRect.top - boardRect.top : endRect.bottom - boardRect.top;
-                                    
-                                    const cx = (startX + endX) / 2; 
-                                    const heightOffset = isP1 ? -50 : 50; 
-                                    const cy = isP1 ? Math.min(startY, endY) + heightOffset : Math.max(startY, endY) + heightOffset;
-                                    
-                                    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                                    // La línea acaba en la BASE de la punta: recortamos 14px siguiendo la tangente final de la curva
-                                    const _tx = endX - cx, _ty = endY - cy;
-                                    const _tl = Math.hypot(_tx, _ty) || 1;
-                                    const _ex = endX - (_tx / _tl) * 14, _ey = endY - (_ty / _tl) * 14;
-                                    const d = `M ${startX} ${startY} Q ${cx} ${cy} ${_ex} ${_ey}`;
-                                    
-                                    path.setAttribute('d', d);
-                                    path.setAttribute('fill', 'none');
-                                    path.setAttribute('stroke', arrowColor); 
-                                    path.setAttribute('stroke-width', '3');
-                                    path.setAttribute('stroke-dasharray', '6,6');
-                                    path.setAttribute('opacity', '0.9');
-                                    path.setAttribute('marker-end', `url(#${markerId})`);
-                                    
-                                    svg.appendChild(path);
-                                }
-                            }
+                        const rect1 = el1.getBoundingClientRect();
+                        const rect2 = el2.getBoundingClientRect();
+                        const boardRect = document.getElementById('game-board').getBoundingClientRect();
+                        const isP1 = originCard.owner === 'p1';
+                        // Comprobamos si alguna de las dos cartas pide invertir la flecha
+                        const reverse = originCard.reverseArrow || card.reverseArrow;
+                        // Si reverse es true, la flecha nace en el Anexado y va al Anfitrión
+                        const startRect = reverse ? rect1 : rect2;
+                        const endRect = reverse ? rect2 : rect1;
+                        const startX = startRect.left + startRect.width / 2 - boardRect.left;
+                        const startY = isP1 ? startRect.top - boardRect.top : startRect.bottom - boardRect.top;
+                        const endX = endRect.left + endRect.width / 2 - boardRect.left;
+                        const endY = isP1 ? endRect.top - boardRect.top : endRect.bottom - boardRect.top;
+                        const cx = (startX + endX) / 2;
+                        const heightOffset = isP1 ? -50 : 50;
+                        const cy = isP1 ? Math.min(startY, endY) + heightOffset : Math.max(startY, endY) + heightOffset;
+                        // La línea acaba en la BASE de la punta: recortamos 14px siguiendo la tangente final de la curva
+                        const _tx = endX - cx, _ty = endY - cy;
+                        const _tl = Math.hypot(_tx, _ty) || 1;
+                        const _ex = endX - (_tx / _tl) * 14, _ey = endY - (_ty / _tl) * 14;
+                        const d = `M ${startX} ${startY} Q ${cx} ${cy} ${_ex} ${_ey}`;
+
+                        let path = svg.querySelector(`path[data-flecha="${clave}"]`);
+                        if (path && path.getAttribute('data-yendose')) return;  // se está despidiendo: no resucita
+                        if (!path) {
+                            path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                            path.setAttribute('data-flecha', clave);
+                            path.setAttribute('fill', 'none');
+                            path.setAttribute('stroke', arrowColor);
+                            path.setAttribute('stroke-width', '3');
+                            path.setAttribute('opacity', '0.9');
+                            path.setAttribute('marker-end', `url(#${markerId})`);
+                            path.setAttribute('d', d);
+                            svg.appendChild(path);
+                            this._nacerFlecha(svg, defs, path, d, clave);
+                        } else {
+                            path.setAttribute('d', d);
+                            // Si está naciendo, su máscara tiene que seguir la misma curva.
+                            const _mp = defs.querySelector(`path[data-mascara="${clave}"]`);
+                            if (_mp) _mp.setAttribute('d', d);
                         }
                     });
                 });
+
+                // Las que ya no toca pintar se despiden (se borran al revés, de la punta al
+                // origen) en vez de desaparecer de golpe.
+                svg.querySelectorAll('path[data-flecha]').forEach(path => {
+                    const clave = path.getAttribute('data-flecha');
+                    if (vivas.has(clave) || path.getAttribute('data-yendose')) return;
+                    this._morirFlecha(svg, defs, path, clave);
+                });
+            }
+
+            // NACER / MORIR de una flecha de anexo (Toto, 26-ago-2026). El truco es el mismo del
+            // "dibujado" de las flechas de presentación -un guion tan largo como la línea, que se
+            // desplaza de invisible a visible-, pero aplicado a una MÁSCARA en vez de al propio
+            // trazo: la flecha ya usa `stroke-dasharray` para sus puntos en movimiento, así que
+            // tocárselo le quitaría eso. Enmascarada, los puntos siguen fluyendo mientras la
+            // curva se revela. (Un `clipPath` no vale: ignora los trazos, solo recorta por relleno.)
+            _mascaraFlecha(defs, clave, d, desde) {
+                const maskId = `flecha-mask-${clave.replace(/[^a-zA-Z0-9]/g, '')}`;
+                let mask = defs.querySelector(`#${maskId}`);
+                let mp = defs.querySelector(`path[data-mascara="${clave}"]`);
+                if (!mask || !mp) {
+                    mask = document.createElementNS('http://www.w3.org/2000/svg', 'mask');
+                    mask.setAttribute('id', maskId);
+                    mask.setAttribute('maskUnits', 'userSpaceOnUse');
+                    mp = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    mp.setAttribute('data-mascara', clave);
+                    mp.setAttribute('stroke', '#fff');
+                    mp.setAttribute('stroke-width', '30');   // ancho de sobra: la punta también entra
+                    mp.setAttribute('fill', 'none');
+                    mask.appendChild(mp);
+                    defs.appendChild(mask);
+                }
+                mp.setAttribute('d', d);
+                const L = mp.getTotalLength ? (mp.getTotalLength() + 30) : 600;
+                mp.style.transition = 'none';
+                mp.setAttribute('stroke-dasharray', L);
+                mp.setAttribute('stroke-dashoffset', desde === 'origen' ? L : -L);
+                void mp.getBoundingClientRect();   // reflow: sin esto la transición no arranca
+                return { maskId, mp, L };
+            }
+            _nacerFlecha(svg, defs, path, d, clave) {
+                if (!path.getTotalLength) return;
+                const { maskId, mp } = this._mascaraFlecha(defs, clave, d, 'origen');
+                path.setAttribute('mask', `url(#${maskId})`);
+                mp.style.transition = `stroke-dashoffset ${FLECHA_NACE_MS}ms linear`;
+                mp.setAttribute('stroke-dashoffset', 0);
+                setTimeout(() => {
+                    // Ya entera: fuera la máscara, que si no se arrastra en cada repintado.
+                    path.removeAttribute('mask');
+                    const m = defs.querySelector(`#${maskId}`);
+                    if (m) m.remove();
+                }, FLECHA_NACE_MS + 40);
+            }
+            _morirFlecha(svg, defs, path, clave) {
+                path.setAttribute('data-yendose', '1');
+                const d = path.getAttribute('d');
+                if (!path.getTotalLength) { path.remove(); return; }
+                const { maskId, mp, L } = this._mascaraFlecha(defs, clave, d, 'punta');
+                mp.setAttribute('stroke-dashoffset', 0);
+                void mp.getBoundingClientRect();
+                path.setAttribute('mask', `url(#${maskId})`);
+                // Al revés que al nacer: el guion se va hacia la PUNTA, así que lo último que
+                // queda visible es el arranque.
+                mp.style.transition = `stroke-dashoffset ${FLECHA_NACE_MS}ms linear`;
+                mp.setAttribute('stroke-dashoffset', -L);
+                setTimeout(() => {
+                    path.remove();
+                    const m = defs.querySelector(`#${maskId}`);
+                    if (m) m.remove();
+                }, FLECHA_NACE_MS + 40);
+            }
+
+            // Las flechas SIGUEN a sus cartas mientras estas se deslizan (Toto, 26-ago-2026).
+            // `getBoundingClientRect` ya devuelve la posición VISUAL -incluye el transform del
+            // FLIP-, así que basta con repintar en cada fotograma mientras dure el deslizamiento.
+            // Antes se dibujaban una sola vez, con las cartas ya contadas en su destino pero
+            // todavía viajando, y la flecha se quedaba colgada en el aire hasta el render
+            // siguiente (y en el cliente remoto, hasta que algo más lo forzara).
+            seguirFlechas(ms = DESLIZA_MS + 60) {
+                if (this._siguiendoFlechas) { this._siguiendoFlechasHasta = Date.now() + ms; return; }
+                this._siguiendoFlechas = true;
+                this._siguiendoFlechasHasta = Date.now() + ms;
+                const paso = () => {
+                    this.drawConnections();
+                    if (Date.now() < this._siguiendoFlechasHasta) requestAnimationFrame(paso);
+                    else this._siguiendoFlechas = false;
+                };
+                requestAnimationFrame(paso);
             }
 
             // ¿Se pinta como Oculta? El booleano (fuentes permanentes) o el estado con duración
