@@ -21,10 +21,12 @@ Quedan tres de la serie, y cada una pide una pieza concreta:
   ataque**, que es el hermano que le falta a `BONO_ATAQUE` y que hoy no existe en ningún sitio.
 - **Aguijón onírico** (Ayuda): targeting en dos pasos con condiciones distintas (un aliado que aún
   no haya gastado su acción; un enemigo que no pueda actuar o esté dormido).
-- **Mapa de Cornifer** (Evento): mirar las 3 primeras del mazo y robar la que quieras (un `BUSCAR`
-  limitado a la cima, que hoy enseña la pila entera) + la mano rival siempre visible (el
-  `handExposedTo` que Erasmo pone a mano; en un Evento haría falta que `MARCAR_JUGADOR` supiera
-  apuntar al RIVAL y que las PASIVA_CONTINUA lo ejecutaran).
+- **Mapa de Cornifer** (Evento): mirar las 3 primeras del mazo y robar la que quieras + la mano
+  rival siempre visible. **El visor ya sabe hacer la primera parte**: `openDeckSearchViewer` acepta
+  `soloVisibles` (enseña la pila entera y solo destapa las que digas), que es como se hizo el
+  SEGUIMIENTO de Erasmo; lo que falta es que `BUSCAR` lo sepa declarar. Para la mano visible está
+  el `handExposedTo` que Erasmo pone a mano: en un Evento haría falta que `MARCAR_JUGADOR` supiera
+  apuntar al RIVAL y que `_passiveExtras` lo ejecutara.
 
 **Ajuste de equilibrio en Hollow Knight** (26-ago-2026): se le añadió **Coste: 2 de Furor**, que
 en el Excel no tiene. Sus stats (5/5/7 = 17) están al nivel de Xanadu, Valafar o Zoe calcinante, y

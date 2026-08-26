@@ -890,10 +890,12 @@ las pilas. Ya no.
 
 Las tres reglas del Oculto, juntas, porque estaban repartidas y ninguna carta las cuenta enteras:
 
-1. **No puede ser objetivo DIRECTO de un ataque normal, y de nada más.** Un ataque que alcance a
-   toda una fila sin elegir objetivo sí le llega, quien tenga sus ataques normales convertidos en
-   especiales (Infusión de maná) también puede señalarlo, y **cualquier Habilidad, Ayuda o Evento
-   que no consista en un ataque normal lo alcanza con total normalidad**: un ataque ESPECIAL, una
+1. **No puede ser objetivo DIRECTO de un ataque normal, y de nada más.** La palabra que manda es
+   **ELEGIR**: el Oculto protege de que te SEÑALEN. Un ataque que alcance a toda una fila sin
+   elegir objetivo sí le llega; un ataque que **impone una regla** y que por tanto nadie elige
+   -la venganza obligada del Devoto acechador- también; quien tenga sus ataques normales
+   convertidos en especiales (Infusión de maná) puede señalarlo; y **cualquier Habilidad, Ayuda o
+   Evento que no consista en un ataque normal lo alcanza con total normalidad**: un ataque ESPECIAL, una
    curación, un cambio de fila, copiarle los stats. Lo decide `motivoNoAtacable`, un solo sitio.
    · **Al escribir una carta que elija enemigos, el filtro `stealth: falsy` SOLO se pone si lo que
    viene detrás es un ataque normal.** Es el error más repetido al copiar una carta hermana: se

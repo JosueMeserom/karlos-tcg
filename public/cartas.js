@@ -7109,7 +7109,7 @@ const CARD_DB = [
               efectos: [
                 // `excluirSelf`: ella ya está muerta; contarla otra vez solo ensuciaría el log.
                 { op: "MODIFICAR_STAT", target: { quien: "TODOS", excludeSelf: true }, stat: "currentHp", delta: -1,
-                  comprobarMuerte: true } ] }
+                  comprobarMuerte: true, animacion: "DANO_VERDADERO", animacionSinLanzador: true } ] }
         ],
     },
     {
@@ -7242,15 +7242,22 @@ const CARD_DB = [
         // gasta SU acción en la venganza, así que un ataque suyo se puede "gastar" provocándole.
         id: 2013, name: "Devoto acechador", hp: 4, def: 2, atk: 4, type: "Esbirro", subtype: "Ser mágico",
         tags: ["Animal salvaje"], gender: "M", rarity: "B", series: "HK",
-        text: "P: ADORADOR DE HERRAH: Al recibir un ataque, al inicio de tu siguiente turno ataca obligatoriamente a quien le atacó, con +1 de ATQ y gastando su acción.",
+        text: "P: ADORADOR DE HERRAH: Al recibir un ataque, al inicio de tu siguiente turno ataca obligatoriamente a quien le atacó, con +1 de ATQ y gastando su acción. Alcanza incluso a un Oculto.",
         passiveName: "ADORADOR DE HERRAH",
+        // El aviso que se ve en la carta mientras dura el rencor (Toto, 26-ago-2026): una bandera
+        // invisible que decide el turno siguiente tiene que verse, como el camuflaje de Mill o el
+        // escudo de Simon.
+        tempEffectText: "Va a vengarse: al empezar su turno atacará obligatoriamente a quien le golpeó",
         abilities: [
             // Quién le pegó el último: `guardaIdsEnSelf` deja el instanceId del atacante en la
             // propia carta (mismo mecanismo que usa Cogorza para recordar a quiénes alcanzó).
             { trigger: "TRAS_DEFENDER", nombre: "ADORADOR DE HERRAH",
               efectos: [
                 { op: "LOG", guardaIdsEnSelf: "acechado",
-                  log: "{carta} graba el rostro de {objetivo}: se lo cobrará.", logTipo: "ability" } ] },
+                  log: "{carta} graba el rostro de {objetivo}: se lo cobrará.", logTipo: "ability" },
+                { op: "MARCAR_TEMPORAL", target: { quien: "SELF" }, conOwner: true,
+                  badge: { icono: "🎯", color: "#b91c1c" },
+                  floating: "RENCOR", floatingStyle: "ft-red-stat", offsetFloating: -20 } ] },
             // Y a la primera oportunidad, la venganza. Si el objetivo ya no está en el campo, el
             // ORDENAR_ATAQUE no encuentra a nadie y la Pasiva se queda en nada.
             { trigger: "INICIO_TURNO", nombre: "ADORADOR DE HERRAH",
@@ -7258,7 +7265,8 @@ const CARD_DB = [
               efectos: [
                 { op: "ORDENAR_ATAQUE", atacante: { quien: "SELF" }, target: { selfLista: "acechado" }, bonoAtq: 1,
                   log: "¡ADORADOR DE HERRAH! {carta} se lanza a por {objetivo} sin pensárselo." },
-                { op: "MARCAR", target: { quien: "SELF" }, campo: "acechado", valor: null } ] }
+                { op: "MARCAR", target: { quien: "SELF" }, campo: "acechado", valor: null },
+                { op: "QUITAR_MARCA", target: { quien: "SELF" } } ] }
         ],
     },
     {
@@ -9979,7 +9987,10 @@ const DSL = {
             // Cualquier efecto que NO sea una elección ya cambia algo: punto de compromiso.
             if (e.op !== 'ELEGIR' && e.op !== 'BUSCAR' && e.op !== 'OPCIONES') await DSL._comprometer(sourceCard, game);
             if (DSL._ANIMS[e.animacion] && targets.length && !(opts && opts.sinAnimacion)) {
-                await DSL._ANIMS[e.animacion](DSL._lanzador(sourceCard), targets.map(t => t.instanceId));
+                // `animacionSinLanzador`: solo el impacto, sin la parte que sale de la carta que
+                // lo provoca. Para cuando esa carta ya NO ESTÁ -la Cáscara violenta reparte su
+                // pestilencia justo al morir- y canalizar desde un hueco no significa nada.
+                await DSL._ANIMS[e.animacion](e.animacionSinLanzador ? null : DSL._lanzador(sourceCard), targets.map(t => t.instanceId));
             }
             // logResumen (Consagración, 7-ago-2026): UN log agregado para un efecto que se aplica
             // a TODO un grupo, en vez de silencio o un log por carta. Genérico -no es cosa de
@@ -10537,10 +10548,18 @@ const DSL = {
                         // explícitamente el valor TOTAL actual (no el diff) para que la línea
                         // muestre siempre el bonus vigente, incluso en pasadas donde d.hp no cambió.
                         // Con d.hp=0 no hay nada que declarar (no hay línea "+0 VIDA MÁX.").
+                        // LA FIRMA NO DEPENDE DE `silencioso` (Toto, 26-ago-2026). Iba
+                        // `habilidad: ab.silencioso ? null : _nombreReal`, mezclando dos cosas que
+                        // no tienen nada que ver: `silencioso` dice "no anuncies esto en cada
+                        // pasada con un log y un flotante", no "que la línea del detalle salga sin
+                        // firmar". El resultado era una carta con DOS líneas seguidas de la misma
+                        // Pasiva, una con "por REY PESADILLA" y la otra sin nada (Grimm mermado).
+                        // El Atq/Def de esa misma pasiva SÍ la lleva, porque lo firma el registro
+                        // automático de updatePassives, que no sabe de `silencioso`.
                         if (d.hp && typeof game.registrarStatMod === 'function') {
                             game.registrarStatMod(card, {
                                 stat: 'VIDA MÁX.', delta: d.hp, fuente: _nombreReal, ref: 'esta carta',
-                                habilidad: ab.silencioso ? null : _nombreReal, turnos: null,
+                                habilidad: _nombreReal, turnos: null,
                                 srcId: card.instanceId, srcAltId: null, srcZone: null,
                             });
                         }

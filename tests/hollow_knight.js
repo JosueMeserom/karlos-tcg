@@ -192,6 +192,7 @@ const enCampo = (g, pid, n) => !!buscar(g, pid, n);
         const devoto = buscar(g, 'p1', 'Devoto acechador'), tigre = buscar(g, 'p2', 'Mini-tigre');
         await paso({ atacar: 'Mini-tigre', objetivo: 'Devoto acechador' });
         check('apunta a quien le pegó', (devoto.acechado || []).length === 1);
+        check('...y lo AVISA con una marca visible', (devoto.tempEffects || []).length === 1);
         const v0 = tigre.currentHp;
         await paso({ finTurno: true });   // empieza el turno de p1: la venganza es obligatoria
         check('...y al empezar su turno se la cobra', tigre.currentHp < v0, 'vida=' + tigre.currentHp);
@@ -199,6 +200,7 @@ const enCampo = (g, pid, n) => !!buscar(g, pid, n);
         check('...con el +1 de ATQ de la venganza', tigre.currentHp === v0 - 2, 'quitó ' + (v0 - tigre.currentHp));
         check('...gastando su acción', devoto.exhausted === true || devoto.hasAttackedThisTurn === true);
         check('...y suelta el rencor tras cobrárselo', !(devoto.acechado || []).length);
+        check('...retirando también su marca', !(devoto.tempEffects || []).length);
     }
 
     console.log('\n--- Grimm: REY PESADILLA y TROPEL DE MURCIÉLAGOS ---');
