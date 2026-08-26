@@ -7172,7 +7172,7 @@ const CARD_DB = [
                           log: "{carta} engarza un amuleto de fuerza." },
                         { op: "FLOTANTE", target: { quien: "SELF" }, texto: "+1 ATQ", estilo: "ft-green", offset: -20 },
                         { op: "MODIFICAR_CONTADORES", target: { quien: "SELF" }, contador: "knight_amuleto", delta: 1,
-                          nombre: "Amuletos", icono: "🔮" } ] },
+                          nombreContador: "Amuletos", icono: "🔮" } ] },
                     { label: "ATAQUE ESPECIAL (+1 DEF PERMANENTE)",
                       efectos: [
                         { op: "ELEGIR", de: "ENEMIGOS", zona: "VANGUARDIA", cantidad: 1,
@@ -7182,7 +7182,7 @@ const CARD_DB = [
                           log: "{carta} engarza un amuleto de caparazón." },
                         { op: "FLOTANTE", target: { quien: "SELF" }, texto: "+1 DEF", estilo: "ft-green", offset: -20 },
                         { op: "MODIFICAR_CONTADORES", target: { quien: "SELF" }, contador: "knight_amuleto", delta: 1,
-                          nombre: "Amuletos", icono: "🔮" } ] } ] } ] },
+                          nombreContador: "Amuletos", icono: "🔮" } ] } ] } ] },
             // Los bonos son PERMANENTES, así que se reaplican en cada pasada (updatePassives
             // resetea los stats a los de plantilla). Mismo patrón que Xidachane.
             { trigger: "PASIVA_CONTINUA", nombre: "CONSEGUIR AMULETO", silencioso: true, then: [
@@ -7213,7 +7213,7 @@ const CARD_DB = [
               si: { campo: "status.estasis.duration", op: ">=", valor: 1 },
               efectos: [
                 { op: "MODIFICAR_CONTADORES", target: { quien: "SELF" }, contador: "hk_sello", delta: 1,
-                  nombre: "Grietas", icono: "🥚",
+                  nombreContador: "Grietas", icono: "🥚",
                   log: "El sello de {carta} se agrieta un poco más." },
                 { if: { campo: "counters.hk_sello.count", op: ">=", valor: 3 },
                   then: [
@@ -10185,6 +10185,13 @@ const DSL = {
                 // `de` de un ELEGIR: sin esto, un valor no contemplado caía en el pool de ALIADOS
                 // sin decir nada (le pasó a 'TODOS' hasta el 23-ago-2026). Una carta que no valida
                 // se queda MUDA -no se le instala ningún hook-, así que el fallo se ve enseguida.
+                // Un contador que CREA cuenta (delta positivo) necesita su nombre visible: sin
+                // él, el detalle enseña la clave interna ('knight_amuleto x1'), que es lo que vio
+                // Toto el 26-ago-2026. Se llama `nombreContador` y no `nombre` porque en un efecto
+                // `nombre` ya significa otra cosa (la habilidad a la que se atribuye).
+                if (e.op === 'MODIFICAR_CONTADORES' && typeof e.delta === 'number' && e.delta > 0 && !e.nombreContador) {
+                    errs.push(`abilities[${i}] efecto[${j}]: MODIFICAR_CONTADORES sin 'nombreContador' (el detalle enseñaría la clave interna)`);
+                }
                 if (e.op === 'ELEGIR' && e.de !== undefined && !['ALIADOS', 'ENEMIGOS', 'TODOS', 'MANO'].includes(e.de)) {
                     errs.push(`abilities[${i}] efecto[${j}]: ELEGIR con 'de' desconocido '${e.de}'`);
                 }
