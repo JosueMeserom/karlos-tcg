@@ -6103,85 +6103,37 @@ const CARD_DB = [
         // YŌKAI SOBERBIO era solo el tributo de colocación, ya visible en la caja COSTE.
         text: "Coste: 2 de Furor. A: DOMINANCIA ILUSORIA (1F): Echa 2 monedas. Por cada cara, realiza 2 ataques normales a un enemigo (pudiendo elegir objetivos distintos para cada ráfaga).",
         activeName: "DOMINANCIA ILUSORIA", activeCost: 1,
-        canActivateAbility: function(card, game) {
-            if (card.furor < (card.activeCost || 1)) { game.logError(`Falta Furor.`); return false; }
-            const enemyId = card.owner === 'p1' ? 'p2' : 'p1';
-            
-            // Verificamos que al menos haya un enemigo en vanguardia que NO esté en sigilo
-            const validEnemies = game.players[enemyId].vanguard.filter(c => !c.stealth);
-            
-            if (validEnemies.length === 0) { 
-                game.logError("No hay enemigos válidos (sin Ocultarse) en la vanguardia para aplicar el ataque."); 
-                return false; 
-            }
-            return true;
-        },
-        onExecuteAbility: async function(card, game) {
-            game.modifyStat(card, 'furor', -1);
-            showFloatingText(card.instanceId, card.activeName, "ft-ability", -30);
-            
-            game.logMsg(`¡${game.getCardNameWithOwner(card)} invoca ilusiones y lanza 2 monedas!`, 'ability');
-            game.isActionLocked = true;
-            const results = await game.triggerCoinFlips(2, card.owner);
-            if (!results) { game.cancelAction(); return; }
-            
-            const heads = results.filter(r => r === 'heads').length;
-            if (heads === 0) {
-                game.logMsg("0 CARAS. Las ilusiones se desvanecen.", 'neutral');
-                card.exhausted = true;
-                game.isActionLocked = false;
-                game.cancelAction();
-                game.render();
-                return;
-            }
-            
-            game.logMsg(`${heads} CARAS. ${game.getCardNameWithOwner(card)} realizará ${heads} ráfagas de 2 ataques.`, 'ability');
-            game.selectedCard = card;
-            game.inputState = 'SELECT_ABILITY_TARGETS';
-            game.abilityContext = { targets: [], maxTargets: heads, name: 'DOMINANCIA ILUSORIA', targetType: 'enemy', isNormalAttack: true, cannotCancel: true };
-            game.isActionLocked = true;
-            game.render();
-        },
-        onValidateTarget: function(card, target, game, isSilent) {
-            if (target.owner === card.owner || target.location !== 'vanguard') return false;
-            return true; 
-        },
-        onTargetsReady: async function(card, game) {
-            const targets = game.abilityContext.targets;
-            game.inputState = 'EXECUTING';
-            game.render();
-            await game.sleep(500);
-            
-            for (let t of targets) {
-                // Abortar si el Tengu muere/desaparece antes de empezar esta ráfaga
-                if (card.currentHp <= 0 || (card.location !== 'vanguard' && card.location !== 'rearguard')) break;
-                
-                const realTarget = game.findCard(t.instanceId);
-                
-                // Comprobamos Vida y UBICACIÓN (que siga en el campo)
-                if (realTarget && (realTarget.location === 'vanguard' || realTarget.location === 'rearguard') && realTarget.currentHp > 0) {
-                    game.logMsg(`¡Tengu dirige una ráfaga de 2 ataques hacia ${game.getCardNameWithOwner(realTarget)}!`, 'ability');
-                    
-                    for (let i = 0; i < 2; i++) {
-                        // Antes de cada guantazo, doble comprobación
-                        if (card.currentHp <= 0 || (card.location !== 'vanguard' && card.location !== 'rearguard')) break;
-                        if (realTarget.currentHp <= 0 || (realTarget.location !== 'vanguard' && realTarget.location !== 'rearguard')) break;
-                        
-                        await game.performAttack(card, realTarget);
-                        await game.sleep(400);
-                    }
-                }
-            }
-            
-            card.exhausted = true;
-            game.isActionLocked = false;
-            game.cancelAction();
-            game.render();
-        },
-        // El tributo de colocación, que era su otro hook a mano, ya es declarativo.
+        // MIGRADA ENTERA (26-ago-2026), la última que quedaba de la lista. Lo que le faltaba al
+        // DSL era saber CONTAR CARAS: MONEDA con `cantidad` mayor que 1 deja el recuento en una
+        // var (`guardaCaras`) y sus ramas pasan a leerse "salió al menos una" / "ninguna". Con
+        // eso, el resto ya existía: un ELEGIR cuyo cupo sale de esa var y dos ATACAR por elegido.
+        //
+        // El ELEGIR va `cancelable: false` CON MOTIVO, y es de los pocos sitios donde eso es
+        // correcto: las monedas ya están echadas, o sea que algo irreversible ya ha pasado y no
+        // hay nada que deshacer (auditar_costes lo comprueba solo: mira si hubo mutación antes).
         abilities: [
-            { trigger: "COSTE_COLOCACION", furor: 2 }
+            { trigger: "COSTE_COLOCACION", furor: 2 },
+            { trigger: "ACTIVA", nombre: "DOMINANCIA ILUSORIA", coste: { furor: 1 }, sinObjetivo: true, ataqueNormal: true,
+              requisitos: [
+                { count: { quien: "ENEMIGO", zona: "VANGUARDIA", filtros: [ { campo: "stealth", op: "falsy" } ] }, op: ">=", valor: 1,
+                  msg: "No hay enemigos válidos (sin Ocultarse) en la vanguardia para aplicar el ataque." } ],
+              efectos: [
+                { op: "MONEDA", cantidad: 2, guardaCaras: "rafagas",
+                  log: "¡{carta} invoca ilusiones y lanza 2 monedas!",
+                  cruz: [ { op: "LOG", log: "0 CARAS. Las ilusiones se desvanecen.", logTipo: "neutral" } ],
+                  cara: [
+                    { op: "LOG", log: "{rafagas} CARAS. {carta} realizará {rafagas} ráfagas de 2 ataques." },
+                    { op: "ELEGIR", de: "ENEMIGOS", zona: "VANGUARDIA", cantidad: { REF: "vars.rafagas" },
+                      hastaCantidad: true, cancelable: false,
+                      filtros: [ { campo: "stealth", op: "falsy" } ],
+                      titulo: "DOMINANCIA ILUSORIA: elige a quién va cada ráfaga",
+                      // El anuncio va DENTRO, así que sale una vez por ráfaga, delante de sus
+                      // dos golpes (que es como lo contaba la versión imperativa).
+                      efectos: [
+                        { op: "LOG", log: "¡{carta} dirige una ráfaga de 2 ataques hacia {objetivo}!" },
+                        { op: "ATACAR" }, { op: "ATACAR" } ] } ] } ] }
         ]
+
     },
     {
         // Sin passiveName ni "P: ..." en el text (Toto, 27-jul-2026): su supuesta pasiva
@@ -8414,10 +8366,19 @@ const DSL = {
                     : DSL._fill(e.motivo, { carta: DSL._nombre(game, sourceCard), objetivo: target ? DSL._nombre(game, target) : '', jugador: dnM, habilidad: habilidad || '' }))
                 : DSL._motivoMoneda(game, sourceCard, habilidad, target);
             const res = await game.triggerCoinFlips(e.cantidad || 1, ownerId, null, _motivoMoneda);
-            const cruz = res && res[0] === 'tails'; // sin resultado (cancelado) => rama de cara, como las cartas originales
+            // VARIAS MONEDAS A LA VEZ (Tengu orgulloso, 26-ago-2026). Con `cantidad: 1` -el caso
+            // de siempre- esto es exactamente lo de antes. Con más de una:
+            //   · `guardaCaras` deja el RECUENTO de caras en vars, para lo que venga después
+            //     (Tengu lanza 2 y ataca una ráfaga POR CARA);
+            //   · `cara` pasa a significar "salió al menos una" y `cruz` "ninguna", que es la
+            //     lectura natural de una tirada múltiple.
+            // {caras} queda disponible en los rellenos de esta rama.
+            const _caras = (res || []).filter(r => r === 'heads').length;
+            if (e.guardaCaras) { DSL._vars = DSL._vars || {}; (DSL._vars[sourceCard.instanceId] = DSL._vars[sourceCard.instanceId] || {})[e.guardaCaras] = _caras; }
+            const cruz = res && (e.cantidad > 1 ? _caras === 0 : res[0] === 'tails'); // sin resultado (cancelado) => rama de cara, como las cartas originales
             // objetivo (Muñeca del mal, 31-jul-2026): faltaba en el fill de logCara/logCruz.
             // objetivoG (Cogorza, 31-jul-2026): su código de género, para {objetivoG?masc|fem}.
-            const FM = (t) => DSL._fill(t, { carta: DSL._nombre(game, sourceCard), jugador: dnM, objetivo: target ? DSL._nombre(game, target) : '', objetivoG: target ? target.gender : undefined });
+            const FM = (t) => DSL._fill(t, Object.assign({}, (DSL._vars && DSL._vars[sourceCard.instanceId]) || {}, { carta: DSL._nombre(game, sourceCard), jugador: dnM, objetivo: target ? DSL._nombre(game, target) : '', objetivoG: target ? target.gender : undefined, caras: _caras }));
             if (cruz) {
                 if (e.logCruz) game.logMsg(FM(e.logCruz.msg), e.logCruz.tipo || 'combat');
                 if (Array.isArray(e.cruz)) await DSL._runEffectList(e.cruz, sourceCard, game, ownerId, [target], habilidad);
@@ -8945,7 +8906,9 @@ const DSL = {
         // -"se le ha agotado la paciencia" va ANTES de decidir si hay intercambio o muerte- y
         // colgarlos de un op cualquiera obliga a inventarse un efecto vacío.
         if (e.op === 'LOG') {
-            game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
+            // Con las `vars` de la carta en el relleno: un LOG suele venir justo detrás de algo
+            // que las dejó puestas ({caras} de una tirada, {duo} de un ELEGIR...).
+            game.logMsg(DSL._fill(e.log, Object.assign({}, ctx.vars, { carta: DSL._nombre(game, sourceCard), objetivo: target ? DSL._nombre(game, target) : '' })), e.logTipo || 'ability');
             return true;
         }
         if (e.op === 'FLOTANTE') {
@@ -9330,7 +9293,8 @@ const DSL = {
             if (e.sinMarcaTemporalPropia) pool = pool.filter(x => !(x.tempEffects && x.tempEffects.some(t => t.sourceId === sourceCard.id)));
             if (e.zona === 'VANGUARDIA') pool = pool.filter(x => x.location === 'vanguard');
             else if (e.zona === 'RETAGUARDIA') pool = pool.filter(x => x.location === 'rearguard');
-            let n = e.cantidad || 1;
+            // La cantidad puede venir de una var (Tengu: tantas ráfagas como caras salieron).
+            let n = DSL._value(ownerId, game, e.cantidad, sourceCard, { self: sourceCard, vars: (DSL._vars && DSL._vars[sourceCard.instanceId]) || {} }) || 1;
             if (e.hastaCantidad && pool.length < n) n = pool.length;
             // siNoElegido (Gárgola, 31-jul-2026): rama de efectos "de lo contrario" — corre si
             // NO hay pool válido O si el jugador declina la elección (en vez de abortar la

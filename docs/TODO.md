@@ -3,7 +3,7 @@
 Lo que queda por hacer, con su porqué. Se actualiza al cerrar cada cosa: lo que Toto no rebate
 después de hacerlo se da por bueno y se quita de aquí.
 
-> Última revisión: 25-ago-2026 · 167 cartas en CARD_DB · 111 suites en verde
+> Última revisión: 26-ago-2026 · 167 cartas en CARD_DB · 112 suites en verde
 
 ---
 
@@ -17,13 +17,17 @@ existe 'Diosa').
 
 ---
 
-## 2. Migración al DSL: 1 irreducible + 1 candidata + 4 híbridas
+## 2. Migración al DSL: CERRADA — quedan 2 irreducibles + 3 híbridas
 
-Quedan (entre paréntesis, sus hooks a mano). En total, 128 hooks escritos a mano en el fichero.
+**La fase de migración por tandas termina el 26-ago-2026.** Ya no queda ninguna carta "pendiente
+de migrar": lo que sigue escrito a mano está ahí porque se ha leído a fondo y se ha decidido que
+no compensa, con su motivo y su suite. Lo de abajo es la lista de esas decisiones, no una cola de
+trabajo. En total, 128 hooks escritos a mano en el fichero (122 sin contar los `get*` de
+interfaz, que es como se contaban antes).
 
 | Carta | Qué le falta al DSL |
 |---|---|
-| **NoName** (9) | **corrección del 22-ago-2026**: esos 9 hooks NO son el clon, son **RÉPLICA**, que copia la Activa de un enemigo delegando `canActivateAbility`/`onExecuteAbility`/`onValidateTarget`/`onTargetsReady`/… al template ajeno. Candidata a irreducible: es *meta* sobre la interfaz de hooks, y funciona igual con cartas ya migradas (regresion68 lo fija) |
+| **NoName** (9) | **IRREDUCIBLE, decidido el 26-ago-2026.** RÉPLICA no *hace* nada: DELEGA. Cada uno de sus hooks mira si hay `mimicId` y, si lo hay, llama al hook del mismo nombre de la plantilla ajena. Es *meta* sobre la interfaz de hooks, no una habilidad — y por eso mismo funciona igual con cartas ya migradas al DSL (sus hooks los genera el compilador y se llaman igual). Un trigger declarativo para esto sería un `DELEGA_EN_OTRA_CARTA`, o sea el propio mecanismo con otro nombre. Cubierta por `tests/regresion68.js` (4 escenarios) y `tests/replica.js` (el anuncio y el `mimicId` en el punto de compromiso) |
 | **Arthas** (7, ya híbrida) | **IRREDUCIBLE, leída a fondo el 25-ago-2026.** Ya son declarativos el veto de Karolina al colocarla y el +3 de ATQ del arma. Lo demás es la maquinaria de carta DUAL, que no comparte con NADIE: el modal de "¿cómo la juegas?" (que además cambia el tipo de carta a mitad de jugada), `onDualLimitFallback`, su botón morado propio (`getCustomActions`, como el de Erasmo), un `onExecuteAyuda` que puede sacarla de la MANO o del CAMPO, la autodestrucción si Karolina llega después, y la vuelta al campo al caer su portador eligiendo fila por cupo. Cubierta por `tests/regresion73.js` (7 escenarios), escrita ANTES de tocarla |
 | **Erasmo** (2, ya híbrida) | DOMINIO ya es declarativa; **SEGUIMIENTO** se queda: una línea que expone la mano rival en cada pasada de pasivas y un BOTÓN propio para mirar el mazo (haría falta un trigger de acción personalizada para una sola carta) |
 | **Xanadu** (4, ya híbrida) | REPULSIÓN ABSOLUTA ya es declarativa; **ESTORNUDO DEVASTADOR** se queda por lo mismo que MOTOCICLETA: el enemigo que entra depende del que sale (límite de 2 Personajes sobre la vanguardia que QUEDARÍA) |
@@ -47,7 +51,11 @@ las tres cartas de 'Una buena razón', así que Xanadu y Diego Antonio soltaron 
 los campos `atkBase`/`defBase`, `guardaSuma` en lista y `FIJAR_STAT` dentro de una
 `PASIVA_CONTINUA` (fijar un stat en cada pasada en vez de sumarle un delta).
 
-Aparte, **Tengu orgulloso** (ya mixta) necesita "contar caras de moneda" para migrar su Activa.
+**Tengu orgulloso, cerrada el 26-ago-2026** (suite `tests/regresion74.js`), la última de la lista:
+lo que le faltaba al DSL era saber **contar caras**. Una `MONEDA` con `cantidad` mayor que 1 deja
+el recuento en una var (`guardaCaras`) y sus ramas pasan a leerse "salió al menos una" /
+"ninguna"; el `cantidad` de un `ELEGIR` puede venir de esa var, y el op `LOG` rellena con ellas.
+Con eso, DOMINANCIA ILUSORIA es declarativa entera.
 
 ---
 
