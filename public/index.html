@@ -2065,11 +2065,6 @@
                 void _mov.offsetWidth;                     // fuerza el reflow antes de soltar
                 _mov.style.transition = `transform ${DESLIZA_MS}ms cubic-bezier(.2,.8,.2,1)`;
                 _mov.style.transform = _base ? _cs : '';
-                // Aviso de que HAY cartas viajando: solo mientras dure esto repintan las flechas
-                // de anexo fotograma a fotograma (ver seguirFlechas). Fuera de aquí se dibujan una
-                // vez y se quedan quietas, que si no cualquier repintado -un zoom al pasar el
-                // ratón- las ponía a moverse y distraía (Toto, 26-ago-2026).
-                window.__deslizaHasta = Date.now() + DESLIZA_MS + 60;
                 setTimeout(() => { _mov.style.transition = ''; }, DESLIZA_MS + 50);
             });
         }
@@ -11853,19 +11848,19 @@
                         const el2 = document.querySelector(`.card[data-id="${originCard.instanceId}"]`);  // Anfitrión
                         if (!el1 || !el2) return;   // sin nodos no hay geometría que recalcular: se deja como está
 
-                        const rect1 = el1.getBoundingClientRect();
-                        const rect2 = el2.getBoundingClientRect();
+                        const anc1 = this._anclaFlecha(card.instanceId, el1);
+                        const anc2 = this._anclaFlecha(originCard.instanceId, el2);
                         const boardRect = document.getElementById('game-board').getBoundingClientRect();
                         const isP1 = originCard.owner === 'p1';
                         // Comprobamos si alguna de las dos cartas pide invertir la flecha
                         const reverse = originCard.reverseArrow || card.reverseArrow;
                         // Si reverse es true, la flecha nace en el Anexado y va al Anfitrión
-                        const startRect = reverse ? rect1 : rect2;
-                        const endRect = reverse ? rect2 : rect1;
-                        const startX = startRect.left + startRect.width / 2 - boardRect.left;
-                        const startY = isP1 ? startRect.top - boardRect.top : startRect.bottom - boardRect.top;
-                        const endX = endRect.left + endRect.width / 2 - boardRect.left;
-                        const endY = isP1 ? endRect.top - boardRect.top : endRect.bottom - boardRect.top;
+                        const startAnc = reverse ? anc1 : anc2;
+                        const endAnc = reverse ? anc2 : anc1;
+                        const startX = startAnc.cx - boardRect.left;
+                        const startY = (isP1 ? startAnc.top : startAnc.bottom) - boardRect.top;
+                        const endX = endAnc.cx - boardRect.left;
+                        const endY = (isP1 ? endAnc.top : endAnc.bottom) - boardRect.top;
                         const cx = (startX + endX) / 2;
                         const heightOffset = isP1 ? -50 : 50;
                         const cy = isP1 ? Math.min(startY, endY) + heightOffset : Math.max(startY, endY) + heightOffset;
@@ -11952,6 +11947,75 @@
                 requestAnimationFrame(paso);
             }
 
+            // DE DÓNDE AGARRA UNA FLECHA (Toto, 26-ago-2026). No del rect visual: del sitio que
+            // la carta ocupa en el LAYOUT. La diferencia es justo lo que hacía falta — un rect
+            // visual cambia con CUALQUIER transform (el zoom al pasar el ratón, el tambaleo al
+            // recibir un golpe, la embestida al atacar, el FLIP al recolocarse), y la flecha se
+            // ponía a bailar con todos ellos. El layout solo cambia cuando la carta pasa a ocupar
+            // OTRO SITIO de verdad, que es exactamente la regla que pidió Toto: seguir los
+            // cambios de posición reales y no los que van y vuelven ni los que solo deforman.
+            //
+            // El centro de layout = centro visual MENOS lo que la traslade su transform (el suyo y
+            // el de su wrapper, que es quien mueve el FLIP). Un `scale` no entra en la cuenta: se
+            // aplica respecto al centro, así que no lo mueve. Y la altura sale de `offsetHeight`,
+            // que ignora los transforms, así que los bordes tampoco se estiran con el zoom.
+            _anclaLayout(el) {
+                const r = el.getBoundingClientRect();
+                let tx = 0, ty = 0;
+                const _wrap = (el.parentElement && el.parentElement.classList.contains('card-wrapper')) ? el.parentElement : null;
+                for (const n of [el, _wrap]) {
+                    if (!n) continue;
+                    try {
+                        const _t = getComputedStyle(n).transform;
+                        if (!_t || _t === 'none') continue;
+                        const m = new DOMMatrixReadOnly(_t);
+                        tx += m.m41; ty += m.m42;
+                    } catch (e) { /* sin DOMMatrix (probes): se toma el rect tal cual */ }
+                }
+                const cx = r.left + r.width / 2 - tx;
+                const cy = r.top + r.height / 2 - ty;
+                const h = el.offsetHeight || r.height;
+                return { cx, top: cy - h / 2, bottom: cy + h / 2 };
+            }
+            // La misma curva y la misma duración que usa la carta al deslizarse, resuelta de
+            // verdad (Newton sobre la bézier) y no aproximada: así el extremo de la flecha va
+            // pegado a su carta durante todo el viaje en vez de adelantarla o quedarse atrás.
+            _curvaDesliza(p) {
+                const _bx = (t) => 3 * t * (1 - t) * (1 - t) * 0.2 + 3 * t * t * (1 - t) * 0.2 + t * t * t;
+                const _by = (t) => 3 * t * (1 - t) * (1 - t) * 0.8 + 3 * t * t * (1 - t) * 1 + t * t * t;
+                let t = p;
+                for (let i = 0; i < 6; i++) {
+                    const x = _bx(t) - p;
+                    const d = (_bx(t + 0.001) - _bx(t - 0.001)) / 0.002;
+                    if (Math.abs(d) < 1e-6) break;
+                    t -= x / d;
+                    if (t < 0) t = 0; else if (t > 1) t = 1;
+                }
+                return _by(t);
+            }
+            // El ancla que se pinta AHORA: si la de layout ha cambiado, la flecha viaja hasta la
+            // nueva en DESLIZA_MS. Cubre el caso animado (deslizamiento) y el brusco (un cambio de
+            // sitio sin animación: la flecha se muda igual de suave en vez de dar un salto).
+            _anclaFlecha(id, el) {
+                if (!this._anclasFlecha) this._anclasFlecha = new Map();
+                const dest = this._anclaLayout(el);
+                const st = this._anclasFlecha.get(id);
+                if (!st) { this._anclasFlecha.set(id, { act: dest, desde: dest, dest, t0: 0 }); return dest; }
+                const _lejos = Math.abs(dest.cx - st.dest.cx) > 0.5 || Math.abs(dest.top - st.dest.top) > 0.5;
+                if (_lejos) { st.desde = st.act; st.dest = dest; st.t0 = Date.now(); }
+                const p = st.t0 ? Math.min(1, (Date.now() - st.t0) / DESLIZA_MS) : 1;
+                if (p >= 1) { st.act = st.dest; st.t0 = 0; return st.act; }
+                const e = this._curvaDesliza(p);
+                const _l = (a, b) => a + (b - a) * e;
+                st.act = { cx: _l(st.desde.cx, st.dest.cx), top: _l(st.desde.top, st.dest.top), bottom: _l(st.desde.bottom, st.dest.bottom) };
+                return st.act;
+            }
+            _flechasEnMovimiento() {
+                if (this._anclasFlecha) { for (const st of this._anclasFlecha.values()) if (st.t0) return true; }
+                const svg = document.getElementById('connections-layer');
+                return !!(svg && svg.querySelector('path[data-t]'));
+            }
+
             // Las flechas SIGUEN a sus cartas mientras estas se deslizan (Toto, 26-ago-2026).
             // `getBoundingClientRect` ya devuelve la posición VISUAL -incluye el transform del
             // FLIP-, así que basta con repintar en cada fotograma mientras dure el deslizamiento.
@@ -11960,17 +12024,15 @@
             // siguiente (y en el cliente remoto, hasta que algo más lo forzara).
             seguirFlechas() {
                 this.drawConnections();
-                // Y solo si hay cartas DESLIZÁNDOSE se sigue repintando: lo dice el aviso que deja
-                // `_deslizarFila`. Un repintado cualquiera (un zoom, una chapa, un flotante) no
-                // mueve a nadie de sitio, así que ponerse a repintar en cada fotograma solo
-                // conseguía que las flechas bailaran sin motivo.
-                if (this._siguiendoFlechas) return;
-                const _fin = () => (window.__deslizaHasta || 0);
-                if (Date.now() >= _fin()) return;
+                // El bucle vive mientras haya ALGO de flechas moviéndose: un ancla viajando a su
+                // sitio nuevo o una flecha naciendo/despidiéndose. No mientras dure un repintado
+                // cualquiera: un zoom, una chapa o un flotante no mueven a nadie de sitio, y
+                // repintar por ellos era lo que ponía las flechas a bailar (Toto, 26-ago-2026).
+                if (this._siguiendoFlechas || !this._flechasEnMovimiento()) return;
                 this._siguiendoFlechas = true;
                 const paso = () => {
                     this.drawConnections();
-                    if (Date.now() < _fin()) requestAnimationFrame(paso);
+                    if (this._flechasEnMovimiento()) requestAnimationFrame(paso);
                     else this._siguiendoFlechas = false;
                 };
                 requestAnimationFrame(paso);
