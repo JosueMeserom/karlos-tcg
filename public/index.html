@@ -1071,7 +1071,16 @@
             };
 
             if (romper) {
-                // Los dos cabos nacen en el punto de ruptura, cada uno mirando a su carta.
+                // Tres tiempos, y dura lo mismo que atar (~1 s) a proposito: el cartel con el
+                // nombre de la Habilidad sale 400 ms despues del coste -la cola de flotantes es
+                // por carta-, asi que con un gesto corto caia justo al final y los dos se leian
+                // distinto. Con esto los dos anuncian igual (Toto, 26-ago-2026).
+                //   1. el hilo, que YA estaba puesto, se pone tirante y se ilumina;
+                //   2. chasquido: se parte por la mitad;
+                //   3. cada cabo se recoge hacia su carta, ya sin color.
+                const tenso = _hilo('tenso', x0, y0, dist);
+                await game.sleep(400);
+                tenso.remove();
                 const mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
                 _hilo('roto-2', mx, my, dist / 2);   // el que se recoge hacia el origen
                 _hilo('roto-1', mx, my, dist / 2);   // y el que se recoge hacia el destino
@@ -1082,7 +1091,7 @@
                 capa.appendChild(chispa);
                 const libre = document.querySelector(`.card[data-id="${destinoId}"]`);
                 if (libre) libre.classList.add('annex-free');
-                await game.sleep(460);
+                await game.sleep(500);
                 if (libre) libre.classList.remove('annex-free');
                 capa.remove();
                 return;
