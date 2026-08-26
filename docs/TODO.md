@@ -3,7 +3,7 @@
 Lo que queda por hacer, con su porqué. Se actualiza al cerrar cada cosa: lo que Toto no rebate
 después de hacerlo se da por bueno y se quita de aquí.
 
-> Última revisión: 26-ago-2026 · 167 cartas en CARD_DB · 113 suites en verde
+> Última revisión: 26-ago-2026 · 167 cartas en CARD_DB · 114 suites en verde
 
 ---
 
@@ -61,7 +61,15 @@ Con eso, DOMINANCIA ILUSORIA es declarativa entera.
 
 ## 3. Piezas del DSL pendientes
 
-- **Descuento de tributo de Fusión de planos** (aplazado de antes).
+**Descuento de tributo — HECHO el 26-ago-2026** (`tests/tributo_descuento.js`, 9 comprobaciones).
+El tributo de colocación era un número CERRADO en el compilador -horneado en el filtro del
+requisito y en el delta del cobro-, así que nadie podía rebajarlo desde fuera; por eso 'Fusión de
+planos' llevaba su regla sin implementar desde que se escribió. Ahora es un punto de consulta
+(`DSL._costeTributo`) y el descuento se declara como una regla más:
+`{ trigger: "GLOBAL_TRIBUTO", reglas: [ { si: { filtros: [...] }, accion: { mitad: true } } ] }`,
+con `accion: { sumar: N }` de hermana. Vale para cualquier Evento futuro que quiera abaratar o
+encarecer tributos, y el texto de la carta por fin dice lo que hace.
+
 - **Candado de la cola de reconexión** (aplazado de antes).
 **Estasis — HECHA el 26-ago-2026** (`tests/estasis.js`, 14 comprobaciones). Un solo predicado en
 el motor, `_enEstasis(card)`, consultado desde los seis sitios que la hacen valer: el targeting de

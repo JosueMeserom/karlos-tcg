@@ -6911,15 +6911,22 @@ const CARD_DB = [
         // La busca La Bestia (CATÁSTROFE), que YA está implementada: su Activa buscaba esta
         // carta en el mazo y nunca podía encontrarla.
         //
-        // Lo que el texto del Excel pide -"los Esbirros 'Monstruo' que pidan tributo de Furor
-        // sólo requieren la mitad"- NO se implementa todavía: el tributo lo resuelve
-        // DSL.tributoFuror con la cantidad fija que cada carta le pasa, así que rebajarlo
-        // exige un punto de consulta que hoy no existe. Se deja anotado como la pieza
-        // "descuento de tributo" y la carta entra con lo demás funcionando, que es lo que
-        // desbloquea a La Bestia. Ojo: NO se inventa nada, el texto lo dice y está pendiente.
+        // EL DESCUENTO DE TRIBUTO, por fin (26-ago-2026). Era la pieza que le faltaba a esta
+        // carta desde que se escribió: su texto del Excel dice "los Esbirros 'Monstruo' que pidan
+        // tributo de Furor para ser colocados sólo requieren la mitad (si fuera 1, requieren 0),
+        // para los DOS jugadores", y el tributo era un número cerrado en el compilador que nadie
+        // podía tocar. Ahora es un punto de consulta (`DSL._costeTributo`) y esto es una regla
+        // declarativa más, que además vale para cualquier Evento futuro que quiera abaratar o
+        // encarecer tributos.
         name: "Fusión de planos", type: "Evento", rarity: "S", cost: 0, duration: 3, series: 1,
-        text: "3 turnos. Al expirar, todos los enemigos pierden 2 de Furor.",
+        text: "3 turnos. Mientras esté en juego, los Esbirros con etiqueta 'Monstruo' pagan la mitad del tributo de Furor que pidan para entrar al campo, redondeando hacia abajo, y vale para los dos jugadores. Al expirar, todos los enemigos pierden 2 de Furor.",
         abilities: [
+            { trigger: "GLOBAL_TRIBUTO",
+              resumenFase: "Los Esbirros 'Monstruo' pagan la mitad de tributo al colocarse (los dos jugadores)",
+              reglas: [
+                { si: { filtros: [ { campo: "type", op: "==", valor: "Esbirro", dePlantilla: true },
+                                   { campo: "tags", op: "includes", valor: "Monstruo", dePlantilla: true } ] },
+                  accion: { mitad: true } } ] },
             { trigger: "AL_CADUCAR", resumenFase: "Al expirar, todos los enemigos pierden 2 de Furor", log: "¡Los planos se separan de nuevo, drenando a los enemigos!", logTipo: "ability",
               efectos: [
                 { op: "MODIFICAR_STAT", target: { quien: "ENEMIGO" }, stat: "furor", delta: -2 } ] }
@@ -7237,7 +7244,7 @@ const KARLOS_RULES = {
 //  Valores: número | {COUNT:{...}} | {REF:"objetivo.furorMax"} (campos computados)
 // ===================================================================
 const DSL = {
-    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE', 'AURA', 'ANTES_DE_JUGAR', 'PUEDE_ATACAR', 'SOBRECURACION', 'REACCION', 'AL_MORIR', 'AL_MORIR_ALIADO', 'AL_DESTRUIR', 'ESPEJO', 'ANTES_DE_ATACAR', 'TRAS_ATACAR', 'TRAS_DEFENDER', 'ANTES_DE_DEFENDER', 'INTERCEPTOR_ATAQUE', 'EQUIPO_ANTES_DE_DEFENDER', 'EQUIPO_ANTES_DE_ATACAR', 'GLOBAL_ANTES_DE_CAMBIO_STAT', 'COSTE_COLOCACION', 'PERIODICO', 'INTERCEPTOR_LETAL', 'AL_CAMBIAR_DE_ZONA', 'FUROR_PROPIO'],
+    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE', 'AURA', 'ANTES_DE_JUGAR', 'PUEDE_ATACAR', 'SOBRECURACION', 'REACCION', 'AL_MORIR', 'AL_MORIR_ALIADO', 'AL_DESTRUIR', 'ESPEJO', 'ANTES_DE_ATACAR', 'TRAS_ATACAR', 'TRAS_DEFENDER', 'ANTES_DE_DEFENDER', 'INTERCEPTOR_ATAQUE', 'EQUIPO_ANTES_DE_DEFENDER', 'EQUIPO_ANTES_DE_ATACAR', 'GLOBAL_ANTES_DE_CAMBIO_STAT', 'COSTE_COLOCACION', 'PERIODICO', 'INTERCEPTOR_LETAL', 'AL_CAMBIAR_DE_ZONA', 'FUROR_PROPIO', 'GLOBAL_TRIBUTO'],
     // Los 5 últimos ops solo tienen sentido dentro de una REACCION (los interpreta
     // DSL._runReaccion, no _doEffect): controlan el resultado que la reacción
     // devuelve al motor de combate (redirigir el ataque, cancelarlo, drenar Furor
@@ -7665,6 +7672,32 @@ const DSL = {
     //   opts.excluirSelf  -> no puede pagarse a sí misma (la carta ya está en el campo)
     //   opts.msgSinPagador-> logError si nadie puede pagar (si se omite, mensaje genérico)
     //   opts.titulo       -> texto del prompt de selección
+    // CUÁNTO CUESTA DE VERDAD UN TRIBUTO DE COLOCACIÓN, aquí y ahora (26-ago-2026). Hasta hoy
+    // el número lo fijaba cada carta y no había forma de rebajarlo desde fuera; 'Fusión de planos'
+    // pide justo eso ("los Esbirros 'Monstruo' que pidan tributo de Furor sólo requieren la
+    // mitad"), y por eso quedaba pendiente. Es un punto de consulta, no un cálculo: pregunta a los
+    // Eventos EN JUEGO -de los dos jugadores- si alguno declara un `GLOBAL_TRIBUTO`.
+    //   { trigger: "GLOBAL_TRIBUTO", reglas: [ { si: { filtros: [...] }, accion: { mitad: true } } ] }
+    //   accion: { mitad: true } (redondeando hacia abajo, así que 1 pasa a 0) | { sumar: N }
+    _costeTributo(carta, game, base) {
+        let c = base;
+        if (!carta || !game || !game.players) return c;
+        ['p1', 'p2'].forEach(pid => {
+            const ev = game.players[pid] && game.players[pid].activeEvent;
+            if (!ev) return;
+            const t = DSL._tmpl(ev.id) || {};
+            (t.abilities || []).filter(a => a.trigger === 'GLOBAL_TRIBUTO').forEach(ab => {
+                (ab.reglas || []).forEach(r => {
+                    if (r.si && !(r.si.filtros || []).every(f => DSL._match(carta, f))) return;
+                    const ac = r.accion || {};
+                    if (ac.mitad) c = Math.floor(c / 2);
+                    else if (typeof ac.sumar === 'number') c = c + ac.sumar;
+                });
+            });
+        });
+        return Math.max(0, c);
+    },
+
     async tributoFuror(card, game, p, coste, opts) {
         const o = opts || {};
         const valid = [...p.vanguard, ...p.rearguard].filter(c =>
@@ -8121,6 +8154,8 @@ const DSL = {
         if (e.guardaNombre && target) { DSL._vars = DSL._vars || {}; (DSL._vars[sourceCard.instanceId] = DSL._vars[sourceCard.instanceId] || {})[e.guardaNombre] = DSL._nombre(game, target); }
         if (e.op === 'MODIFICAR_STAT') {
             let d = DSL._deltaStat(e, sourceCard, target, game, ownerId, ctx);
+            // Si es el cobro de un tributo de colocación, lo que se cobra es lo que valga AHORA.
+            if (e.tributoBase !== undefined) d = -DSL._costeTributo(sourceCard, game, e.tributoBase);
             // Reacción de mano ante daño que NO viene de un ataque (Toto, 31-jul-2026: lo pilló
             // con Atomización). El daño de efecto se aplica por aquí y no por dealDamage, así que
             // una carta que reacciona a "un aliado va a recibir daño" no se enteraba. El motor
@@ -9258,8 +9293,13 @@ const DSL = {
                      : e.de === 'TODOS' ? [...p.vanguard, ...p.rearguard, ...rivalP.vanguard, ...rivalP.rearguard]
                      : e.de === 'MANO' ? p.hand.filter(x => x.instanceId !== sourceCard.instanceId)
                      : [...p.vanguard, ...p.rearguard];
-            pool = pool.filter(x => (e.filtros || []).every(f => DSL._match(x, f)) &&
-                                    (!e.algunFiltro || e.algunFiltro.some(f => DSL._match(x, f))));
+            // TRIBUTO DE COLOCACIÓN: su número no está cerrado, se pregunta ahora (un Evento
+            // puede rebajarlo). {tributo} queda disponible en el título y en los logs.
+            const _tributo = e.tributoBase !== undefined ? DSL._costeTributo(sourceCard, game, e.tributoBase) : null;
+            if (_tributo !== null) { DSL._vars = DSL._vars || {}; (DSL._vars[sourceCard.instanceId] = DSL._vars[sourceCard.instanceId] || {}).tributo = _tributo; }
+            const _fT = (f) => (f.tributo && _tributo !== null) ? Object.assign({}, f, { valor: _tributo }) : f;
+            pool = pool.filter(x => (e.filtros || []).every(f => DSL._match(x, _fT(f))) &&
+                                    (!e.algunFiltro || e.algunFiltro.some(f => DSL._match(x, _fT(f)))));
             pool = pool.filter(x => !((getCardTemplate(x.id) || {}).isAvatar)); // Kami: intocable
             pool = pool.filter(x => !(x.status && x.status.estasis && x.status.estasis.duration > 0)); // y la Estasis, ídem
             // `atacablePor`: deja solo a quien ESE atacante podría señalar en un ataque normal.
@@ -10079,12 +10119,16 @@ const DSL = {
         }
 
         const n = cc.furor || 0;
-        const filtros = [{ campo: 'furor', op: '>=', valor: n }].concat(cc.filtros || []);
+        // `tributo: true` en el filtro y `tributoBase` en el count/ELEGIR: el número NO se cierra
+        // aquí (26-ago-2026). Un Evento en juego puede rebajarlo -'Fusión de planos' lo parte por
+        // la mitad para los Esbirros 'Monstruo'-, así que lo que se compila es "esto es un tributo
+        // de N" y quien lo usa pregunta cuánto vale AHORA (DSL._costeTributo).
+        const filtros = [{ campo: 'furor', op: '>=', valor: n, tributo: true }].concat(cc.filtros || []);
 
         // 1. El requisito: sin nadie que pueda pagar, la carta ni se juega. Se AÑADE al JUGAR que
         //    la carta ya tenga (varias tienen otros requisitos suyos) en vez de crear un segundo,
         //    que el compilador no miraría: busca el primero.
-        const req = { count: { quien: 'ALIADO', filtros, excludeSelf: !!cc.excluirSelf },
+        const req = { count: { quien: 'ALIADO', filtros, excludeSelf: !!cc.excluirSelf, tributoBase: n },
                       op: '>=', valor: 1,
                       msg: cc.msgSinPagador || `Necesitas un aliado con al menos ${n} de Furor para el tributo de ${tmpl.name}.` };
         const jugar = abs.find(a => a.trigger === 'JUGAR');
@@ -10094,14 +10138,14 @@ const DSL = {
         // 2. El cobro: elegir pagador (cancelable — mientras eliges no ha pasado nada) y cobrarle.
         //    Va DELANTE de lo que la carta ya hiciera antes de colocarse: primero se paga.
         const tributo = {
-            op: 'ELEGIR', de: 'ALIADOS', cantidad: 1, filtros, excludeSelf: !!cc.excluirSelf,
-            titulo: cc.titulo || `${tmpl.name}: ELIGE TRIBUTO (-${n} FUROR)`,
+            op: 'ELEGIR', de: 'ALIADOS', cantidad: 1, filtros, excludeSelf: !!cc.excluirSelf, tributoBase: n,
+            titulo: cc.titulo || `${tmpl.name}: ELIGE TRIBUTO (-{tributo} FUROR)`,
             // `fuente: null` -> el flotante sale "-2 FUR" y no "-2 FUR (Ángel)". La flecha del
             // tributo, que sale sola con el `esCoste`, ya está diciendo quién paga y para qué
             // carta; repetirlo en el flotante es la misma redundancia que retiramos en Nethuns.
             // Además es lo que hacía el helper viejo, así que la migración no cambia nada
             // visible (lo cazó la suite de Ángel).
-            efectos: [ Object.assign({ op: 'MODIFICAR_STAT', stat: 'furor', delta: -n, esCoste: true, fuente: null },
+            efectos: [ Object.assign({ op: 'MODIFICAR_STAT', stat: 'furor', delta: -n, tributoBase: n, esCoste: true, fuente: null },
                                      cc.log ? { log: cc.log } : {}) ],
         };
         const antes = abs.find(a => a.trigger === 'ANTES_DE_JUGAR');
@@ -10319,7 +10363,12 @@ const DSL = {
                         else if (_z === 'DESCARTES') pool = [...p.discard];
                         if (r.count.plantillaSin) pool = pool.filter(x => { const t = getCardTemplate(x.id); return t && !r.count.plantillaSin.some(hk => typeof t[hk] === 'function'); });
                         if (r.count.conAlgunEstado) pool = pool.filter(c => c.status && Object.keys(c.status).length > 0);
-                        (r.count.filtros || []).forEach(f => { pool = pool.filter(c => DSL._match(c, f)); });
+                        // Un filtro de TRIBUTO se resuelve ahora, no con el número compilado.
+                        const _tri = r.count.tributoBase !== undefined ? DSL._costeTributo(card, game, r.count.tributoBase) : null;
+                        (r.count.filtros || []).forEach(f => {
+                            const ff = (f.tributo && _tri !== null) ? Object.assign({}, f, { valor: _tri }) : f;
+                            pool = pool.filter(c => DSL._match(c, ff));
+                        });
                         if (r.count.algunFiltro) pool = pool.filter(c => r.count.algunFiltro.some(f => DSL._match(c, f)));
                         if (r.count.algunEstado) pool = pool.filter(c => c.status && r.count.algunEstado.some(k => c.status[k]));
                         if (!r.count.permitirAvatar && _z !== 'DESCARTES') pool = pool.filter(x => !((getCardTemplate(x.id) || {}).isAvatar));
