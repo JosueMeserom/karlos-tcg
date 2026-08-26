@@ -3122,6 +3122,11 @@
                         // que la aborte y nos reenvíe el estado final. Sin esto, el rival se
                         // quedaba en "Esperando a que X elija..." para siempre.
                         this._reconnectRecovery = true;
+                        // Y el candado puesto desde YA: entre que reconectamos y llega el volcado
+                        // del rival, cualquier acción ordenada que llegue se aplicaría sobre un
+                        // tablero que todavía no es el bueno.
+                        this.awaitingHardSync = true;
+                        this._colaRetenida = null;
                     } else {
                         // Partida nueva
                         if (waitingMsg) waitingMsg.innerText = "¡Sincronización completa! Preparando la mesa...";
@@ -3308,6 +3313,16 @@
                         if (!this.CONVERTED_ACTIONS.has(data.action)) return;
                     }
 
+                    // 3b. EL CANDADO DE LA COLA (Toto, 26-ago-2026; idea suya de hace tiempo).
+                    // Mientras esperamos un volcado autoritativo -reconexión, o un hueco de orden-
+                    // NUESTRO estado no vale: aplicar encima una acción ordenada es construir sobre
+                    // arena, y cuando llegue el volcado o se pierde (la pisa) o se cuenta dos veces.
+                    // Hasta hoy esto era una VENTANA de unos 60 ms en la que sencillamente se
+                    // confiaba; ahora es un candado: se RETIENEN aparte y se replican después,
+                    // descartando las que el volcado ya traiga dentro (eso lo dice su `_seq`).
+                    // Solo se retiene lo ordenado: un HARD_SYNC, un chat o una animación siguen su
+                    // camino, faltaría más -el volcado es justo lo que estamos esperando-.
+                    if (this._retenerSiCandado(data)) return;
                     // 3. TODAS las demás acciones van a la cola (incluido REQUEST_SYNC)
                     this.actionQueue.push(data);
                     this.processActionQueue();
@@ -3410,6 +3425,7 @@
                             this.importGameState(data.state);
                             if (data._seqSnapshot) this.lastSeqByRole = { ...data._seqSnapshot };
                             this.awaitingHardSync = false;
+                            this._soltarColaRetenida();
                         }
                     }
                 }
@@ -5103,11 +5119,41 @@
                 return;
             }
 
+            // ¿HAY QUE RETENER ESTA ACCIÓN? (parte del candado, en su propio método para que la
+            // suite pueda preguntárselo al motor de verdad en vez de a una copia de la regla).
+            // Solo lo ordenado: un HARD_SYNC -que es justo lo que esperamos-, un chat o una
+            // animación siguen su camino.
+            _retenerSiCandado(data) {
+                if (!this.awaitingHardSync || typeof data._seq !== 'number' || data.action === 'HARD_SYNC') return false;
+                (this._colaRetenida = this._colaRetenida || []).push(data);
+                this._dbgRx('CANDADO: acción retenida hasta el volcado', { accion: data.action, seq: data._seq });
+                return true;
+            }
+
+            // SUELTA EL CANDADO (Toto, 26-ago-2026). Con el estado autoritativo ya importado, lo
+            // retenido se decide por su número de orden: lo que el volcado YA incluye se tira -el
+            // `_seqSnapshot` que viene con él dice hasta dónde llega- y lo que pasó DESPUÉS se
+            // aplica en orden, que si no se perdería. Sin esto, el candado sería un agujero peor
+            // que la ventana que viene a cerrar.
+            _soltarColaRetenida() {
+                const retenidas = this._colaRetenida || [];
+                this._colaRetenida = null;
+                if (!retenidas.length) return;
+                const pendientes = retenidas
+                    .filter(d => d._seq > (this.lastSeqByRole[d._from] || 0))
+                    .sort((a, b) => (a._from === b._from) ? a._seq - b._seq : 0);
+                this._dbgRx('CANDADO: soltando', { retenidas: retenidas.length, sePierden: retenidas.length - pendientes.length });
+                if (!pendientes.length) return;
+                this.actionQueue.push(...pendientes);
+                this.processActionQueue();
+            }
+
             // Pide al rival un volcado completo del estado cuando detectamos un hueco en el orden.
             requestHardSync() {
                 if (this.awaitingHardSync) return;     // evita pedir sync en bucle
                 this.awaitingHardSync = true;
                 this.actionQueue = [];                  // lo pendiente es basura: el estado completo lo arregla
+                this._colaRetenida = null;              // y lo retenido de un candado anterior, también
                 this.logMsg("Desincronización detectada. Recuperando el estado de la partida...", "system");
                 if (this.socket) {
                     this.socket.emit('gameAction', {

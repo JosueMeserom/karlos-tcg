@@ -3,7 +3,7 @@
 Lo que queda por hacer, con su porqué. Se actualiza al cerrar cada cosa: lo que Toto no rebate
 después de hacerlo se da por bueno y se quita de aquí.
 
-> Última revisión: 26-ago-2026 · 167 cartas en CARD_DB · 114 suites en verde
+> Última revisión: 26-ago-2026 · 167 cartas en CARD_DB · 115 suites en verde
 
 ---
 
@@ -59,7 +59,7 @@ Con eso, DOMINANCIA ILUSORIA es declarativa entera.
 
 ---
 
-## 3. Piezas del DSL pendientes
+## 3. Piezas del DSL pendientes — LAS TRES, HECHAS (26-ago-2026)
 
 **Descuento de tributo — HECHO el 26-ago-2026** (`tests/tributo_descuento.js`, 9 comprobaciones).
 El tributo de colocación era un número CERRADO en el compilador -horneado en el filtro del
@@ -70,7 +70,13 @@ planos' llevaba su regla sin implementar desde que se escribió. Ahora es un pun
 con `accion: { sumar: N }` de hermana. Vale para cualquier Evento futuro que quiera abaratar o
 encarecer tributos, y el texto de la carta por fin dice lo que hace.
 
-- **Candado de la cola de reconexión** (aplazado de antes).
+**Candado de la cola — HECHO el 26-ago-2026** (`tests/candado_cola.js`, 13 comprobaciones).
+Mientras un cliente espera un volcado autoritativo (reconexión, o un hueco de orden) las acciones
+ORDENADAS ya no se aplican sobre un tablero que todavía no es el bueno: se **retienen** aparte y,
+al importar el volcado -que trae el `_seqSnapshot` del servidor-, se descarta lo que el volcado ya
+incluye y se aplica en orden lo que pasó después. El candado se pone también al RECONECTAR, que es
+el caso de verdad. Antes esto era una ventana de ~60 ms en la que se confiaba.
+
 **Estasis — HECHA el 26-ago-2026** (`tests/estasis.js`, 14 comprobaciones). Un solo predicado en
 el motor, `_enEstasis(card)`, consultado desde los seis sitios que la hacen valer: el targeting de
 ataques (va DELANTE del Provocando y del Oculto), el daño, los cambios de stat (no le bajan nada y
@@ -78,6 +84,21 @@ no gana Furor), los estados nuevos (salvo la propia Estasis), el agotamiento (se
 pasada) y el ataque directo (no cuenta como defensora). En el DSL los pools la excluyen por
 defecto, igual que a los Avatares, y se aplica con
 `{ op: "APLICAR_ESTADO", estado: "estasis", duracion: N }`. Chapa propia 🧊 con su cuenta.
+
+---
+
+## 3.bis. Pasada de redacción a TODAS las cartas (pedido por Toto, 26-ago-2026)
+
+Las descripciones no son consistentes entre sí. La rúbrica existe y `auditar_textos.js` la
+comprueba, pero **solo caza lo que sabe mirar**: quedan cartas con la misma mecánica redactada de
+formas distintas, y eso no lo ve ninguna auditoría. Hace falta una pasada carta por carta.
+
+El plan que tiene sentido, y el orden importa: **primero la auto-redacción desde el DSL** (§4, el
+editor la quiere igual), que genera la frase a partir de lo que la carta HACE. Sirve para dos
+cosas a la vez — de plantilla para reescribir las viejas, y de **comparador**: si la frase generada
+y el `text` escrito no dicen lo mismo, o el texto está mal o la carta hace otra cosa. Eso último ya
+pasó con Sadame el 26-ago-2026, y se descubrió de casualidad. Ahora es viable: 160 cartas de 167
+son declarativas.
 
 ---
 
