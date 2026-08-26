@@ -7329,6 +7329,18 @@ const CARD_DB = [
                 { op: "CONTAR_OBJETIVO", campo: "hornetDefensas", enLaVez: 2,
                   log: "¡PROTECTORA DE LAS RUINAS! {carta} ya ha visto ese golpe de {objetivo}.",
                   efectos: [ { op: "REDUCIR_DAÑO", valor: 2, floating: { texto: "-2 DAÑO", estilo: "ft-green", offset: -20 } } ] } ] },
+            // El rastro de la Pasiva, en el detalle: por dónde va la cuenta con cada enemigo.
+            { trigger: "PREVIEW", nombre: "PROTECTORA DE LAS RUINAS", lineas: [
+                { porMapa: "hornetAtaques", si: { op: "==", valor: 1 },
+                  texto: "Su próximo ataque contra {objetivo} llevará +2 de ATQ" },
+                { porMapa: "hornetAtaques", si: { op: ">=", valor: 2 },
+                  texto: "Ya no gana ATQ extra atacando a {objetivo}" },
+                { porMapa: "hornetDefensas", si: { op: "==", valor: 1 },
+                  texto: "El próximo ataque de {objetivo} le hará 2 de daño menos" },
+                { porMapa: "hornetDefensas", si: { op: ">=", valor: 2 },
+                  texto: "Ya no reduce el daño de los ataques de {objetivo}" },
+                { porMapa: "hornetAguja",
+                  texto: "Ya no puede volver a atar a {objetivo} con ATADURA DE AGUJA" } ] },
             { trigger: "ACTIVA", nombre: "ATADURA DE AGUJA", coste: { furor: 2 }, sinObjetivo: true, ataqueNormal: true,
               requisitos: [
                 { count: { quien: "ENEMIGO", zona: "VANGUARDIA", noContadoEn: "hornetAguja",
@@ -7346,6 +7358,32 @@ const CARD_DB = [
                         { op: "MARCAR_TEMPORAL", pierdeSuTurno: true,
                           floating: "ATADO", floatingStyle: "ft-ability", offsetFloating: -30,
                           log: "¡El hilo de {carta} inmoviliza a {objetivo}: se saltará su próximo turno!" } ] } ] } ] }
+        ],
+    },
+
+    {
+        // El mapa que lo cambia todo: dejas de robar a ciegas y encima ves lo que tiene el otro.
+        // No hace daño ni sube stats; lo que da es INFORMACIÓN, que en este juego es media partida.
+        id: 2016, name: "Mapa de Cornifer", type: "Evento", rarity: "B", cost: 0, duration: 3, series: "HK",
+        text: "Coste: 1 de Furor de un aliado. 3 turnos. Mientras esté en juego, en tu fase de robo miras las 3 primeras cartas de tu mazo y te quedas una en lugar de robar, barajando después; y la mano de tu rival está siempre visible para ti.",
+        abilities: [
+            { trigger: "COSTE_COLOCACION", furor: 1 },
+            // La mano rival, a la vista. Se reimpone en cada pasada (es un campo del JUGADOR, no
+            // de una carta) y desaparece sola en cuanto el Evento se va.
+            { trigger: "PASIVA_CONTINUA", silencioso: true, then: [
+                { op: "MARCAR_JUGADOR", jugador: "RIVAL", campo: "handExposedTo", valor: "DUENO" } ] },
+            // Y el robo con vistas, ANTES de robar: eliges una de las tres de arriba y esa es tu
+            // carta del turno (`_saltarRobo`), no una extra.
+            { trigger: "PERIODICO", fase: "ROBO", momento: "ANTES", deQuien: "PROPIO",
+              resumenFase: "Miras las 3 primeras de tu mazo y te quedas una en lugar de robar",
+              efectos: [
+                { op: "BUSCAR", en: "MAZO", soloPrimeras: 3, cantidad: 1, barajarDespues: true,
+                  titulo: "MAPA DE CORNIFER: elige una de las tres de arriba",
+                  logIntro: "{jugador} despliega el mapa y estudia lo que viene.",
+                  log: "{jugador} se queda con {objetivo} en lugar de robar a ciegas.",
+                  logSinEleccion: "{jugador} cierra el mapa sin quedarse nada... y roba de todos modos.",
+                  // El robo del turno SOLO se salta si de verdad se ha llevado una carta.
+                  siExito: [ { op: "MARCAR_JUGADOR", campo: "_saltarRobo", valor: true } ] } ] }
         ],
     },
 ];
@@ -7500,7 +7538,7 @@ const KARLOS_RULES = {
 //  Valores: número | {COUNT:{...}} | {REF:"objetivo.furorMax"} (campos computados)
 // ===================================================================
 const DSL = {
-    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE', 'AURA', 'ANTES_DE_JUGAR', 'PUEDE_ATACAR', 'SOBRECURACION', 'REACCION', 'AL_MORIR', 'AL_MORIR_ALIADO', 'AL_DESTRUIR', 'ESPEJO', 'ANTES_DE_ATACAR', 'TRAS_ATACAR', 'TRAS_DEFENDER', 'ANTES_DE_DEFENDER', 'INTERCEPTOR_ATAQUE', 'EQUIPO_ANTES_DE_DEFENDER', 'EQUIPO_ANTES_DE_ATACAR', 'GLOBAL_ANTES_DE_CAMBIO_STAT', 'COSTE_COLOCACION', 'PERIODICO', 'INTERCEPTOR_LETAL', 'AL_CAMBIAR_DE_ZONA', 'FUROR_PROPIO', 'GLOBAL_TRIBUTO', 'AL_COGER_RETRIBUCION', 'ANTES_DE_RECIBIR_DAÑO'],
+    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE', 'AURA', 'ANTES_DE_JUGAR', 'PUEDE_ATACAR', 'SOBRECURACION', 'REACCION', 'AL_MORIR', 'AL_MORIR_ALIADO', 'AL_DESTRUIR', 'ESPEJO', 'ANTES_DE_ATACAR', 'TRAS_ATACAR', 'TRAS_DEFENDER', 'ANTES_DE_DEFENDER', 'INTERCEPTOR_ATAQUE', 'EQUIPO_ANTES_DE_DEFENDER', 'EQUIPO_ANTES_DE_ATACAR', 'GLOBAL_ANTES_DE_CAMBIO_STAT', 'COSTE_COLOCACION', 'PERIODICO', 'INTERCEPTOR_LETAL', 'AL_CAMBIAR_DE_ZONA', 'FUROR_PROPIO', 'GLOBAL_TRIBUTO', 'AL_COGER_RETRIBUCION', 'ANTES_DE_RECIBIR_DAÑO', 'PREVIEW'],
     // Los 5 últimos ops solo tienen sentido dentro de una REACCION (los interpreta
     // DSL._runReaccion, no _doEffect): controlan el resultado que la reacción
     // devuelve al motor de combate (redirigir el ataque, cancelarlo, drenar Furor
@@ -8022,6 +8060,17 @@ const DSL = {
             if (e.op === 'FIJAR_STAT') {
                 const v = DSL._value(card.owner, game, e.valor, card, { self: card });
                 if (v !== undefined && v !== null && !Number.isNaN(v)) card[e.stat] = v;
+            }
+            // MARCAR_JUGADOR en una pasiva continua: pone un campo del JUGADOR en cada pasada.
+            // Con `jugador: "RIVAL"` apunta al otro, y `valor: "DUENO"` guarda de quién es la
+            // carta -que es como se declara "tu rival tiene la mano visible PARA TI"-. Igual que
+            // MARCAR, hay que reimponerlo en cada pasada: no es un efecto de una vez.
+            if (e.op === 'MARCAR_JUGADOR') {
+                const _pid = e.jugador === 'RIVAL' ? (card.owner === 'p1' ? 'p2' : 'p1') : card.owner;
+                if (game.players && game.players[_pid]) {
+                    game.players[_pid][e.campo] = (e.valor === 'DUENO') ? card.owner
+                                                : (e.valor !== undefined ? e.valor : true);
+                }
             }
             if (e.op === 'MARCAR') {
                 card[e.campo] = (e.valor !== undefined) ? e.valor : true;
@@ -8723,7 +8772,13 @@ const DSL = {
                 const zona = zonas[0]; // zona "principal": la que se baraja y la que ve el visor de mazo
                 const dn = typeof game.getDisplayName === 'function' ? game.getDisplayName(pid) : pid;
                 const F = (txt) => DSL._fill(txt, { carta: DSL._nombre(game, sourceCard), jugador: dn });
-                const _todas = zonas.reduce((acc, z) => acc.concat(z), []);
+                // `soloPrimeras: N` (Mapa de Cornifer, 26-ago-2026): la búsqueda no ve la pila
+                // entera, solo las N de ARRIBA. El visor la enseña completa igual -su tamaño es
+                // información legítima y así se ve de dónde salen-, pero solo esas N van
+                // destapadas y son elegibles, que es justo lo que ya sabía hacer con `soloVisibles`
+                // (el SEGUIMIENTO de Erasmo). La cima es el FINAL del array.
+                const _recorta = (z) => (typeof e.soloPrimeras === 'number') ? z.slice(-e.soloPrimeras) : z;
+                const _todas = zonas.reduce((acc, z) => acc.concat(_recorta(z)), []);
                 let lista = _todas.filter(x => (e.filtros || []).every(f => DSL._match(x, f)) &&
                                              (!e.algunFiltro || e.algunFiltro.some(f => DSL._match(x, f))));
                 if (e.plantillaSin) lista = lista.filter(x => { const t = getCardTemplate(x.id); return t && !e.plantillaSin.some(hk => typeof t[hk] === 'function'); });
@@ -8907,7 +8962,7 @@ const DSL = {
                         continue;
                     }
                     const zIdx = _zonasNombre.indexOf(elegida);
-                    const poolZona = zonas[zIdx].filter(x => (e.filtros || []).every(f => DSL._match(x, f)) &&
+                    const poolZona = _recorta(zonas[zIdx]).filter(x => (e.filtros || []).every(f => DSL._match(x, f)) &&
                                                              (!e.algunFiltro || e.algunFiltro.some(f => DSL._match(x, f))));
                     if (e.logIntro) game.logMsg(F(e.logIntro), e.logIntroTipo || 'ability');
                     if (elegida === 'MAZO' && typeof game.openDeckSearchViewer === 'function') {
@@ -8922,7 +8977,8 @@ const DSL = {
                         // del barajado sí es de este camino, así que se añade si toca.
                         const _nom = DSL._nombresBuscados(e);
                         const _aviso = poolZona.length ? null : DSL._avisoVacio(_nom, 'deck', !!e.barajarDespues);
-                        const r = await game.openDeckSearchViewer(pid, poolZona, F(e.titulo || 'ELIGE UNA CARTA'), _aviso, e.cantidad || 1, 'deck', _nom, !!e.barajarDespues);
+                        const r = await game.openDeckSearchViewer(pid, poolZona, F(e.titulo || 'ELIGE UNA CARTA'), _aviso, e.cantidad || 1, 'deck', _nom, !!e.barajarDespues,
+                            (typeof e.soloPrimeras === 'number') ? { mirador: pid, soloVisibles: poolZona.map(c => c.instanceId) } : null);
                         const elegidas = Array.isArray(r) ? r : (r ? [r] : []);
                         if (elegidas.length > 0) { for (const t of elegidas) await aMano(t); algunExito = true; }
                         else if (e.logSinEleccion) game.logMsg(F(e.logSinEleccion), 'system');
@@ -9058,6 +9114,13 @@ const DSL = {
                 }
                 else if (e.logSinEleccion) game.logMsg(F(e.logSinEleccion), 'system');
                 await baraja(); // se baraja aunque no se cogiera nada (fidelidad: la búsqueda ya revolvió el mazo)
+            }
+            // `siExito`: efectos que corren SOLO si la búsqueda se llevó algo (el Mapa de
+            // Cornifer se salta el robo del turno únicamente si de verdad se quedó una carta).
+            // Mismo nombre y misma idea que el `siExito` de ATACAR.
+            if (algunExito && Array.isArray(e.siExito) && e.siExito.length) {
+                const _r = await DSL._runEffectList(e.siExito, sourceCard, game, ownerId, [target].filter(Boolean), habilidad);
+                if (_r && _r.ok === false) return false;
             }
             return algunExito ? true : 'skip';
         }
@@ -10569,9 +10632,15 @@ const DSL = {
         }
         if (passives.length && typeof tmpl.onUpdatePassive !== 'function') {
             tmpl.onUpdatePassive = function (card, game) {
-                // Las pasivas solo actúan con la carta EN MESA (mano/mazo/descartes quedan intactos).
+                // Las pasivas solo actúan con la carta EN MESA (mano/mazo/descartes quedan
+                // intactos). Un EVENTO también está "en mesa": ocupa su ranura, y el motor le
+                // llama a este mismo hook (Mapa de Cornifer, 26-ago-2026 — antes se salía por
+                // aquí y su pasiva continua no corría nunca).
                 const pl = game.players && game.players[card.owner];
-                if (!pl || ![...pl.vanguard, ...pl.rearguard].some(x => x.instanceId === card.instanceId)) return;
+                if (!pl) return;
+                const _enMesa = [...pl.vanguard, ...pl.rearguard].some(x => x.instanceId === card.instanceId)
+                             || (pl.activeEvent && pl.activeEvent.instanceId === card.instanceId);
+                if (!_enMesa) return;
                 passives.forEach((ab, i) => {
                     const efs = DSL._cond(card, game, ab.if) ? ab.then : (ab.else || []);
                     const d = DSL._passiveDeltas(card, game, efs);
@@ -11555,6 +11624,44 @@ const DSL = {
                     }
                 }
                 return amount;
+            };
+        }
+
+        // PREVIEW -> onGetPreviewEffects: líneas propias en el "Afectado por:" de la carta, para
+        // contar lo que no se ve en ningún stat. Nace con Hornet (26-ago-2026): sus contadores por
+        // pareja deciden el próximo ataque contra CADA enemigo y no había forma de saber por dónde
+        // iba la cuenta. Con chapas habría sido peor -una por enemigo y por mitad de la Pasiva-,
+        // así que va donde va todo lo demás: al detalle.
+        //   lineas: [ { porMapa: "campo", si: { op, valor }, texto: "... {objetivo} ..." } ]
+        // `porMapa` recorre un mapa de CONTAR_OBJETIVO (instanceId -> veces) y saca UNA línea por
+        // carta que siga en mesa y cuya cuenta cumpla el `si`. {objetivo} es su nombre y {veces} la
+        // cuenta. Sin `porMapa`, la línea es fija y sale siempre (con su `si` opcional sobre la
+        // propia carta).
+        const preview = abs.find(a => a.trigger === 'PREVIEW');
+        if (preview && typeof tmpl.onGetPreviewEffects !== 'function') {
+            tmpl.onGetPreviewEffects = function (card, game) {
+                const out = [];
+                const _hab = preview.nombre || tmpl.passiveName || null;
+                const _mesa = [...game.players.p1.vanguard, ...game.players.p1.rearguard,
+                               ...game.players.p2.vanguard, ...game.players.p2.rearguard];
+                (preview.lineas || []).forEach(ln => {
+                    if (!ln.porMapa) {
+                        if (ln.si && !DSL._cond(card, game, ln.si)) return;
+                        out.push(game.lineaEfecto(DSL._fill(ln.texto, { carta: card.name }), { habilidad: _hab, ref: 'esta carta' }));
+                        return;
+                    }
+                    const mapa = card[ln.porMapa] || {};
+                    Object.keys(mapa).forEach(id => {
+                        const otra = _mesa.find(c => c.instanceId === id);
+                        if (!otra) return;   // ya no está en mesa: su cuenta no le interesa a nadie
+                        const veces = mapa[id];
+                        if (ln.si && !DSL._cmp(veces, ln.si.op, ln.si.valor)) return;
+                        out.push(game.lineaEfecto(
+                            DSL._fill(ln.texto, { carta: card.name, objetivo: game.nCarta(otra), veces }),
+                            { habilidad: _hab, ref: 'esta carta' }));
+                    });
+                });
+                return out;
             };
         }
 

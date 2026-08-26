@@ -234,7 +234,13 @@ for (const c of CARTAS) {
         // (c) Todo lo que un Evento hace va bajo un MARCADOR de sección; sin él el parser lo pinta
         //     como párrafo plano, sin caja ni color.
         const MARCAS = /^(Antes de colocarla, |Al colocarla, |Mientras esté en juego, |Al expirar, )/;
-        const _cuerpo = t.replace(/^\s*\d+\s*turnos?\.\s*/, '').replace(/^Requiere\s+[^.]+\.\s*/, '');
+        // Se descuentan las partes que el detalle saca A SU PROPIA CAJA antes de partir por
+        // marcadores: el coste de colocación (que va SIEMPRE el primero, como en cualquier otra
+        // carta), la duración y el requisito. Lo que quede es el cuerpo, y ESO sí tiene que
+        // colgar de un marcador (26-ago-2026: el Mapa de Cornifer estrena Evento CON coste).
+        const _cuerpo = t.replace(/^\s*Coste:\s*[^.]+\.\s*/i, '')
+                         .replace(/^\s*\d+\s*turnos?\.\s*/, '')
+                         .replace(/^Requiere\s+[^.]+\.\s*/, '');
         _cuerpo.split(/(?=Antes de colocarla, |Al colocarla, |Mientras esté en juego, |Al expirar, )/)
             .map(x => x.trim()).filter(Boolean)
             .forEach(seg => { if (!MARCAS.test(seg)) add('EVENTO-SIN-MARCADOR', c, `"${seg.slice(0, 45)}…" no cuelga de ningún marcador (queda como párrafo plano)`); });

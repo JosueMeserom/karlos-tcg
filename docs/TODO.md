@@ -3,7 +3,7 @@
 Lo que queda por hacer, con su porqué. Se actualiza al cerrar cada cosa: lo que Toto no rebate
 después de hacerlo se da por bueno y se quita de aquí.
 
-> Última revisión: 26-ago-2026 · 174 cartas en CARD_DB · 117 suites en verde
+> Última revisión: 27-ago-2026 · 175 cartas en CARD_DB · 117 suites en verde
 
 ---
 
@@ -22,15 +22,18 @@ cuente la enésima, y su filtro hermano `noContadoEn` para no repetir objetivo) 
 ataque" **respetando el suelo del juego** (un golpe nunca deja de quitar algo; `sinSuelo` para
 quien de verdad quiera anularlo).
 
-Quedan dos de la serie:
+**Tanda 4 (26/27-ago-2026)**: **Mapa de Cornifer**, el primer Evento CON coste de colocación, con
+tres piezas nuevas — `soloPrimeras: N` en BUSCAR (la búsqueda solo ve la cima del mazo, apoyada en
+el `soloVisibles` del visor que ya existía), `siExito` en BUSCAR, y `MARCAR_JUGADOR` dentro de una
+PASIVA_CONTINUA con `jugador: "RIVAL"` y `valor: "DUENO"` (la mano del rival, siempre visible).
+Además, el motor aprendió que un EVENTO también está "en mesa" para sus pasivas continuas (se
+salía por el guard de vanguardia/retaguardia y no corrían nunca) y que el robo de la fase se puede
+saltar (`_saltarRobo`) cuando algo ya se ha llevado una carta en su lugar.
+
+Queda UNA de la serie:
 - **Aguijón onírico** (Ayuda): targeting en dos pasos con condiciones distintas (un aliado que aún
-  no haya gastado su acción; un enemigo que no pueda actuar o esté dormido).
-- **Mapa de Cornifer** (Evento): mirar las 3 primeras del mazo y robar la que quieras + la mano
-  rival siempre visible. **El visor ya sabe hacer la primera parte**: `openDeckSearchViewer` acepta
-  `soloVisibles` (enseña la pila entera y solo destapa las que digas), que es como se hizo el
-  SEGUIMIENTO de Erasmo; lo que falta es que `BUSCAR` lo sepa declarar. Para la mano visible está
-  el `handExposedTo` que Erasmo pone a mano: en un Evento haría falta que `MARCAR_JUGADOR` supiera
-  apuntar al RIVAL y que `_passiveExtras` lo ejecutara.
+  no haya gastado su acción; un enemigo que no pueda actuar o esté dormido), el aliado gasta su
+  acción, ataque especial, +4 de Furor al que pega y otros +4 a un tercero si el enemigo muere.
 
 **Ajuste de equilibrio en Hollow Knight** (26-ago-2026): se le añadió **Coste: 2 de Furor**, que
 en el Excel no tiene. Sus stats (5/5/7 = 17) están al nivel de Xanadu, Valafar o Zoe calcinante, y

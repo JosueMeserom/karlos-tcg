@@ -7182,7 +7182,14 @@
                 this.updatePhaseDisplay('ROBO');
                 await showPhaseBanner(pName, 'FASE DE ROBO');
                 await _periodicos(this, 'ROBO', 'ANTES');
-                if (this.turn > 1 || this.activePlayerId === 'p2') {
+                // `_saltarRobo`: algo hecho en ROBO/ANTES ya se ha llevado una carta a la mano EN
+                // LUGAR del robo normal (el Mapa de Cornifer: miras las tres de arriba y te quedas
+                // una). La bandera la pone quien lo hace y se consume aquí mismo, en el único
+                // sitio donde se roba por fase (Toto, 26-ago-2026).
+                const _pRobo = this.players[this.activePlayerId];
+                if (_pRobo && _pRobo._saltarRobo) {
+                    delete _pRobo._saltarRobo;
+                } else if (this.turn > 1 || this.activePlayerId === 'p2') {
                     await this.drawCard(this.activePlayerId);
                 }
                 await _periodicos(this, 'ROBO', 'DESPUES');

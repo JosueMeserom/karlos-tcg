@@ -252,7 +252,7 @@ const enCampo = (g, pid, n) => !!buscar(g, pid, n);
     console.log('\n--- Hornet: PROTECTORA DE LAS RUINAS y ATADURA DE AGUJA ---');
     {
         // Atacando: la 1ª normal, la 2ª con +2 de ATQ, la 3ª otra vez normal.
-        const { g, paso } = await mesa({
+        const { g, paso, ctx } = await mesa({
             turno: 2, turnoDe: 'p1', empieza: 'p2',
             p1: { vanguardia: [{ carta: 'Hornet' }] },
             p2: { vanguardia: [{ carta: 'Mini-tigre', vida: 20, campos: { maxHp: 20 } }] },
@@ -266,8 +266,14 @@ const enCampo = (g, pid, n) => !!buscar(g, pid, n);
         };
         const g1 = await golpe(), g2 = await golpe(), g3 = await golpe();
         check('el primer ataque es el normal (ATQ 5 - DEF 3 = 2)', g1 === 2, 'quitó ' + g1);
+        // El rastro en el detalle: qué le queda pendiente con cada enemigo (sin chapas, que con
+        // una por enemigo y por mitad de la Pasiva el tablero sería ilegible).
+        const _tpl = (c) => ctx.sandbox.getCardTemplate(c.id);
+        const _lineas = () => { const h = buscar(g, 'p1', 'Hornet'); return (_tpl(h).onGetPreviewEffects(h, g) || []).join(' || '); };
         check('...el SEGUNDO al mismo enemigo pega 2 más', g2 === g1 + 2, 'quitó ' + g2);
         check('...y el tercero vuelve a lo normal', g3 === g1, 'quitó ' + g3);
+        check('el detalle cuenta que ya no hay más bono contra ese enemigo',
+            /Ya no gana ATQ extra atacando a Mini-tigre/.test(_lineas()), _lineas());
     }
     {
         // Defendiéndose: el segundo golpe del mismo enemigo hace 2 menos.
@@ -323,6 +329,39 @@ const enCampo = (g, pid, n) => !!buscar(g, pid, n);
         await paso({ finTurno: true }); await paso({ finTurno: true });
         await paso({ habilidad: 'Hornet' });
         check('no se le puede volver a atar', ctx.pendientes.length === 0);
+    }
+
+    console.log('\n--- Mapa de Cornifer: robar con vistas y la mano rival al descubierto ---');
+    {
+        const { g, paso, ctx } = await mesa({
+            turno: 2, turnoDe: 'p2', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'Mini-tigre', furor: 1 }], mano: ['Mapa de Cornifer'],
+                  mazo: ['Karlos', 'Kyle', 'Aniceto', 'Longaniza', 'Manzanahoria'] },
+            p2: { vanguardia: ['Oso con armadura'], mano: ['Longaniza'] },
+        });
+        await paso({ finTurno: true });                 // pasa a p1, que es quien lo juega
+        // OJO: al empezar su turno la fase de Furor ya le ha dado 1 al Mini-tigre, así que se
+        // mide el ANTES y el DESPUÉS en vez de dar por hecho que se queda a 0.
+        const _furorAntes = buscar(g, 'p1', 'Mini-tigre').furor;
+        await paso({ jugar: 'Mapa de Cornifer' });
+        await paso({ elegir: ['Mini-tigre'] });         // el tributo de 1
+        check('el Evento entra pagando su tributo', !!g.players.p1.activeEvent
+            && buscar(g, 'p1', 'Mini-tigre').furor === _furorAntes - 1,
+            'furor ' + _furorAntes + ' -> ' + buscar(g, 'p1', 'Mini-tigre').furor);
+        g.updatePassives();
+        check('...y la mano del rival queda expuesta', g.players.p2.handExposedTo === 'p1');
+        const manoAntes = g.players.p1.hand.length;
+        const mazoAntes = g.players.p1.deck.length;
+        await paso({ finTurno: true }); await paso({ finTurno: true });   // vuelve su turno: fase de robo
+        // El visor se abre con las 3 de arriba; se coge una.
+        check('el visor se abre con las 3 de arriba y solo esas', ctx.pendientes.length === 1
+            && ctx.pendientes[0].tipo === 'visorMazo' && ctx.pendientes[0].elegibles.length === 3,
+            (ctx.pendientes[0] || {}).tipo + ' · ' + ((ctx.pendientes[0] || {}).elegibles || []).map(c => c.name).join(','));
+        await paso({ elegir: [ctx.pendientes[0].elegibles[0].name] });
+        check('se lleva UNA carta, no dos', g.players.p1.hand.length === manoAntes + 1,
+            'mano ' + manoAntes + ' -> ' + g.players.p1.hand.length);
+        check('...y sale del mazo (en lugar del robo normal)', g.players.p1.deck.length === mazoAntes - 1,
+            'mazo ' + mazoAntes + ' -> ' + g.players.p1.deck.length);
     }
 
     console.log('');
