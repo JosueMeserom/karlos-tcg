@@ -3,7 +3,7 @@
 Lo que queda por hacer, con su porqué. Se actualiza al cerrar cada cosa: lo que Toto no rebate
 después de hacerlo se da por bueno y se quita de aquí.
 
-> Última revisión: 26-ago-2026 · 173 cartas en CARD_DB · 116 suites en verde
+> Última revisión: 26-ago-2026 · 174 cartas en CARD_DB · 117 suites en verde
 
 ---
 
@@ -15,10 +15,14 @@ Cáscara violenta, Gran cáscara centinela, The Knight y **Hollow Knight**, que 
 `bonoAtq` en ORDENAR_ATAQUE) y **Grimm** (se traga TODO el Furor de un aliado y llega mermado para
 siempre si la ofrenda no llegaba a 4).
 
-Quedan tres de la serie, y cada una pide una pieza concreta:
-- **Hornet**: contadores POR PAREJA (cuántas veces le he pegado a ESTE, cuántas veces me ha pegado
-  ÉL) — haría falta un op tipo `CONTAR_OBJETIVO` y, sobre todo, un **bono de DEF para un solo
-  ataque**, que es el hermano que le falta a `BONO_ATAQUE` y que hoy no existe en ningún sitio.
+**Tanda 3 (26-ago-2026)**: **Hornet**, con las dos piezas que le faltaban al DSL — el op
+`CONTAR_OBJETIVO` (cuántas veces le he hecho ESTO a ESTA carta, con `enLaVez: N` para que solo
+cuente la enésima, y su filtro hermano `noContadoEn` para no repetir objetivo) y el trigger
+`ANTES_DE_RECIBIR_DAÑO` con el op `REDUCIR_DAÑO`, que es el equivalente a "+N de DEF durante ese
+ataque" **respetando el suelo del juego** (un golpe nunca deja de quitar algo; `sinSuelo` para
+quien de verdad quiera anularlo).
+
+Quedan dos de la serie:
 - **Aguijón onírico** (Ayuda): targeting en dos pasos con condiciones distintas (un aliado que aún
   no haya gastado su acción; un enemigo que no pueda actuar o esté dormido).
 - **Mapa de Cornifer** (Evento): mirar las 3 primeras del mazo y robar la que quieras + la mano

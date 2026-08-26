@@ -7307,6 +7307,47 @@ const CARD_DB = [
                   logResumen: "¡TROPEL DE MURCIÉLAGOS! La bandada arrasa la vanguardia rival." } ] }
         ],
     },
+
+    {
+        // La cazadora: no pega más fuerte por insistir... salvo la SEGUNDA vez contra el mismo
+        // rival, que es cuando ya le ha cogido el aire. Lo mismo defendiéndose. La tercera y
+        // sucesivas, nada: el elemento sorpresa se gasta.
+        id: 2015, name: "Hornet", hp: 4, def: 4, atk: 5, type: "Personaje", subtype: "Ser mágico",
+        tags: ["Animal salvaje"], gender: "F", rarity: "A", series: "HK",
+        text: "P: PROTECTORA DE LAS RUINAS: Al atacar por segunda vez al mismo enemigo, +2 de ATQ en ese ataque; al recibir el segundo ataque de ese mismo enemigo, 2 de daño menos. La tercera vez y siguientes no cambian nada. A: ATADURA DE AGUJA (2F): Ataque normal; si acierta, ese enemigo no podrá actuar en el próximo turno rival. Solo una vez por enemigo.",
+        passiveName: "PROTECTORA DE LAS RUINAS", activeName: "ATADURA DE AGUJA", activeCost: 2,
+        abilities: [
+            // Atacando: la cuenta va por enemigo, y solo la SEGUNDA suma.
+            { trigger: "ANTES_DE_ATACAR", nombre: "PROTECTORA DE LAS RUINAS", requiereObjetivo: true, soloAtaqueNormal: true,
+              efectos: [
+                { op: "CONTAR_OBJETIVO", campo: "hornetAtaques", enLaVez: 2,
+                  log: "¡PROTECTORA DE LAS RUINAS! {carta} ya conoce los movimientos de {objetivo}.",
+                  efectos: [ { op: "BONO_ATAQUE", valor: 2, floating: { texto: "+2 ATQ", estilo: "ft-green", offset: -20 } } ] } ] },
+            // Defendiéndose: misma cuenta, por atacante, y en la segunda encaja 2 menos.
+            { trigger: "ANTES_DE_RECIBIR_DAÑO", nombre: "PROTECTORA DE LAS RUINAS", soloDeAtaque: true,
+              efectos: [
+                { op: "CONTAR_OBJETIVO", campo: "hornetDefensas", enLaVez: 2,
+                  log: "¡PROTECTORA DE LAS RUINAS! {carta} ya ha visto ese golpe de {objetivo}.",
+                  efectos: [ { op: "REDUCIR_DAÑO", valor: 2, floating: { texto: "-2 DAÑO", estilo: "ft-green", offset: -20 } } ] } ] },
+            { trigger: "ACTIVA", nombre: "ATADURA DE AGUJA", coste: { furor: 2 }, sinObjetivo: true, ataqueNormal: true,
+              requisitos: [
+                { count: { quien: "ENEMIGO", zona: "VANGUARDIA", noContadoEn: "hornetAguja",
+                           filtros: [ { campo: "stealth", op: "falsy" } ] }, op: ">=", valor: 1,
+                  msg: "No queda ningún enemigo al que {carta} no haya atado ya." } ],
+              efectos: [
+                { op: "ELEGIR", de: "ENEMIGOS", zona: "VANGUARDIA", cantidad: 1,
+                  noContadoEn: "hornetAguja", filtros: [ { campo: "stealth", op: "falsy" } ],
+                  titulo: "ATADURA DE AGUJA: elige a quién atas",
+                  efectos: [
+                    // La cuenta se lleva ANTES del ataque: aunque el enemigo muera, esa aguja ya
+                    // se gastó en él, y si vuelve al campo tampoco se le puede volver a atar.
+                    { op: "CONTAR_OBJETIVO", campo: "hornetAguja" },
+                    { op: "ATACAR", siExito: [
+                        { op: "MARCAR_TEMPORAL", pierdeSuTurno: true,
+                          floating: "ATADO", floatingStyle: "ft-ability", offsetFloating: -30,
+                          log: "¡El hilo de {carta} inmoviliza a {objetivo}: se saltará su próximo turno!" } ] } ] } ] }
+        ],
+    },
 ];
 
 // ===================================================================
@@ -7459,12 +7500,12 @@ const KARLOS_RULES = {
 //  Valores: número | {COUNT:{...}} | {REF:"objetivo.furorMax"} (campos computados)
 // ===================================================================
 const DSL = {
-    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE', 'AURA', 'ANTES_DE_JUGAR', 'PUEDE_ATACAR', 'SOBRECURACION', 'REACCION', 'AL_MORIR', 'AL_MORIR_ALIADO', 'AL_DESTRUIR', 'ESPEJO', 'ANTES_DE_ATACAR', 'TRAS_ATACAR', 'TRAS_DEFENDER', 'ANTES_DE_DEFENDER', 'INTERCEPTOR_ATAQUE', 'EQUIPO_ANTES_DE_DEFENDER', 'EQUIPO_ANTES_DE_ATACAR', 'GLOBAL_ANTES_DE_CAMBIO_STAT', 'COSTE_COLOCACION', 'PERIODICO', 'INTERCEPTOR_LETAL', 'AL_CAMBIAR_DE_ZONA', 'FUROR_PROPIO', 'GLOBAL_TRIBUTO', 'AL_COGER_RETRIBUCION'],
+    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE', 'AURA', 'ANTES_DE_JUGAR', 'PUEDE_ATACAR', 'SOBRECURACION', 'REACCION', 'AL_MORIR', 'AL_MORIR_ALIADO', 'AL_DESTRUIR', 'ESPEJO', 'ANTES_DE_ATACAR', 'TRAS_ATACAR', 'TRAS_DEFENDER', 'ANTES_DE_DEFENDER', 'INTERCEPTOR_ATAQUE', 'EQUIPO_ANTES_DE_DEFENDER', 'EQUIPO_ANTES_DE_ATACAR', 'GLOBAL_ANTES_DE_CAMBIO_STAT', 'COSTE_COLOCACION', 'PERIODICO', 'INTERCEPTOR_LETAL', 'AL_CAMBIAR_DE_ZONA', 'FUROR_PROPIO', 'GLOBAL_TRIBUTO', 'AL_COGER_RETRIBUCION', 'ANTES_DE_RECIBIR_DAÑO'],
     // Los 5 últimos ops solo tienen sentido dentro de una REACCION (los interpreta
     // DSL._runReaccion, no _doEffect): controlan el resultado que la reacción
     // devuelve al motor de combate (redirigir el ataque, cancelarlo, drenar Furor
     // tras él, fijar el daño, autoataque del atacante).
-    OPS_EFECTO: ['MODIFICAR_STAT', 'CURAR', 'DAÑO', 'APLICAR_ESTADO', 'MODIFICAR_CONTADORES', 'ATACAR', 'MONEDA', 'ROBAR', 'BUSCAR', 'MARCAR', 'VER_MANO', 'LIMPIAR_ESTADOS', 'ELEGIR', 'DESTRUIR_EVENTO', 'MARCAR_TEMPORAL', 'DESCARTAR', 'EQUIPAR', 'MARCAR_JUGADOR', 'FLOTANTE', 'FIJAR_STAT', 'REDIRIGIR', 'CANCELAR_ATAQUE', 'MARCAR_DRENAJE', 'FIJAR_DAÑO', 'ATACANTE_SE_AUTOATACA', 'VOLVER_A_MANO', 'RETRIBUCION', 'SUELO_STAT', 'TECHO_STAT', 'NO_CONSUMIR', 'BONO_ATAQUE', 'MARCAR_PARTIDA', 'ESQUIVAR', 'DESEQUIPAR', 'DAÑO_ATAQUE', 'REDIRIGIR_ATAQUE', 'SECUESTRAR_STAT', 'DEVOLVER_STAT', 'CUENTA_ATRAS', 'QUITAR_MARCA', 'COLOCARSE', 'CREAR_CLON', 'INTERCAMBIAR_POSICION', 'LOG', 'ORDENAR_ATAQUE', 'OPCIONES'],
+    OPS_EFECTO: ['MODIFICAR_STAT', 'CURAR', 'DAÑO', 'APLICAR_ESTADO', 'MODIFICAR_CONTADORES', 'ATACAR', 'MONEDA', 'ROBAR', 'BUSCAR', 'MARCAR', 'VER_MANO', 'LIMPIAR_ESTADOS', 'ELEGIR', 'DESTRUIR_EVENTO', 'MARCAR_TEMPORAL', 'DESCARTAR', 'EQUIPAR', 'MARCAR_JUGADOR', 'FLOTANTE', 'FIJAR_STAT', 'REDIRIGIR', 'CANCELAR_ATAQUE', 'MARCAR_DRENAJE', 'FIJAR_DAÑO', 'ATACANTE_SE_AUTOATACA', 'VOLVER_A_MANO', 'RETRIBUCION', 'SUELO_STAT', 'TECHO_STAT', 'NO_CONSUMIR', 'BONO_ATAQUE', 'MARCAR_PARTIDA', 'ESQUIVAR', 'DESEQUIPAR', 'DAÑO_ATAQUE', 'REDIRIGIR_ATAQUE', 'SECUESTRAR_STAT', 'DEVOLVER_STAT', 'CUENTA_ATRAS', 'QUITAR_MARCA', 'COLOCARSE', 'CREAR_CLON', 'INTERCAMBIAR_POSICION', 'LOG', 'ORDENAR_ATAQUE', 'OPCIONES', 'CONTAR_OBJETIVO', 'REDUCIR_DAÑO'],
     OPS_CMP: ['==', '!=', '<=', '>=', '<', '>', 'includes', 'contieneTexto', 'includesCI', 'truthy', 'falsy'],
     QUIEN: ['SELF', 'ALIADO', 'ENEMIGO', 'TODOS', 'ATACANTE', 'DEFENSOR', 'PORTADOR', 'PAGADOR'], // ATACANTE/DEFENSOR: solo en GLOBAL_TRAS_ATAQUE y REACCION
 
@@ -7596,6 +7637,11 @@ const DSL = {
         // anexadoASelf (Sadame, 26-ago-2026): true = solo los que YA llevo anexados; false =
         // solo los que no. Hermano de conMarcaTemporalPropia: una relación con self que un
         // `filtro` no puede expresar, porque _match no ve la carta fuente.
+        if (spec.noContadoEn && selfCard) {
+            const _m = selfCard[spec.noContadoEn] || {};
+            const _b = DSL._pool(ownerId, game, Object.assign({}, spec, { noContadoEn: null }), selfCard);
+            return _b.filter(x => !_m[x.instanceId]);
+        }
         if (spec.anexadoASelf !== undefined && selfCard) {
             const _b = DSL._pool(ownerId, game, Object.assign({}, spec, { anexadoASelf: undefined }), selfCard);
             return _b.filter(x => x.instanceId !== selfCard.instanceId
@@ -9474,6 +9520,39 @@ const DSL = {
             if (e.floating && typeof showFloatingText === 'function') showFloatingText(sourceCard.instanceId, e.floating.texto, e.floating.estilo || 'ft-green', e.floating.offset !== undefined ? e.floating.offset : -30);
             return true;
         }
+        if (e.op === 'CONTAR_OBJETIVO') {
+            // CUÁNTAS VECES LE HE HECHO ESTO A ESTA CARTA (Hornet, 26-ago-2026). Lleva la cuenta
+            // en un mapa de la PROPIA carta, con el instanceId del objetivo por clave, y con
+            // `enLaVez: N` corre sus efectos SOLO en la enésima -"la segunda vez que ataque al
+            // mismo enemigo", "las terceras y sucesivas no hacen nada"-. Sin `enLaVez` solo
+            // cuenta, que también sirve: el mapa es lo que luego mira el filtro `noContadoEn`
+            // para no repetir objetivo.
+            // El mapa viaja en el estado (es un campo normal de la carta), así que sobrevive a
+            // un volcado y los dos clientes cuentan lo mismo.
+            if (!target) return 'skip';
+            const _mapa = sourceCard[e.campo] = sourceCard[e.campo] || {};
+            _mapa[target.instanceId] = (_mapa[target.instanceId] || 0) + 1;
+            const _n = _mapa[target.instanceId];
+            DSL._vars = DSL._vars || {};
+            (DSL._vars[sourceCard.instanceId] = DSL._vars[sourceCard.instanceId] || {})[e.guardaEn || 'veces'] = _n;
+            if (e.enLaVez !== undefined && _n !== e.enLaVez) return 'skip';
+            if (e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target), veces: _n }), e.logTipo || 'ability');
+            if (Array.isArray(e.efectos) && e.efectos.length) {
+                const r = await DSL._runEffectList(e.efectos, sourceCard, game, ownerId, [target], habilidad, opts);
+                if (r && r.ok === false) return false;
+            }
+            return true;
+        }
+        if (e.op === 'REDUCIR_DAÑO') {
+            // Solo tiene sentido dentro de ANTES_DE_RECIBIR_DAÑO, que es quien lee este
+            // transitorio y lo resta del golpe. Vive en `game` y no en la carta, como ESQUIVAR:
+            // es de UNA resolución y no debe ensuciar el estado que compara el arnés.
+            game._dslReduceDano = (game._dslReduceDano || 0) + (DSL._value(ownerId, game, e.valor, sourceCard, ctx) || 0);
+            if (e.sinSuelo) game._dslSinSueloDano = true;
+            if (e.floating && typeof showFloatingText === 'function') showFloatingText(sourceCard.instanceId, e.floating.texto, e.floating.estilo || 'ft-green', e.floating.offset !== undefined ? e.floating.offset : -20);
+            if (e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), objetivo: target ? DSL._nombre(game, target) : '' }), e.logTipo || 'ability');
+            return true;
+        }
         if (e.op === 'OPCIONES') {
             // MODAL DE RAMAS (Sadame, 26-ago-2026): "¿zombificar a otro, o deshacer anexos?".
             //   opciones: [ { label, si?, efectos: [...] }, ... ]
@@ -9556,6 +9635,9 @@ const DSL = {
             // la incluiría por defecto si no se filtra explícitamente (Toto, 27-jul-2026).
             // anexadoASelf: mismo filtro que en _pool (zombificar solo a quien no lo está,
             // soltar solo a quien sí). ELEGIR se construye su propio pool, así que va aquí también.
+            // noContadoEn: fuera los que ya están en un mapa de CONTAR_OBJETIVO de esta carta
+            // ("no se puede usar con los enemigos en los que ya se usó").
+            if (e.noContadoEn) pool = pool.filter(x => !((sourceCard[e.noContadoEn] || {})[x.instanceId]));
             if (e.anexadoASelf !== undefined) pool = pool.filter(x => (x.attachedTo === sourceCard.instanceId) === !!e.anexadoASelf);
             if (e.excluirSelf) pool = pool.filter(x => x.instanceId !== sourceCard.instanceId);
             if (e.sinMarcaTemporalPropia) pool = pool.filter(x => !(x.tempEffects && x.tempEffects.some(t => t.sourceId === sourceCard.id)));
@@ -11473,6 +11555,35 @@ const DSL = {
                     }
                 }
                 return amount;
+            };
+        }
+
+        // ANTES_DE_RECIBIR_DAÑO -> onBeforeTakeDamage: el último punto en el que se puede tocar
+        // un golpe que ya viene calculado. Devuelve el daño final, así que sus efectos hablan por
+        // el op REDUCIR_DAÑO (y podría crecer con un FIJAR_DAÑO el día que haga falta).
+        //   soloDeAtaque: solo si el golpe viene de un ataque (hay atacante), no de un efecto.
+        //   soloAtaqueNormal / soloAtaqueEspecial: por tipo de golpe.
+        // El daño nunca baja de 0 aquí: el suelo de "siempre quita algo" lo pone el motor antes.
+        const antesDano = abs.find(a => a.trigger === 'ANTES_DE_RECIBIR_DAÑO');
+        if (antesDano && typeof tmpl.onBeforeTakeDamage !== 'function') {
+            tmpl.onBeforeTakeDamage = async function (card, attacker, dmg, isSpecial, game) {
+                if (antesDano.soloDeAtaque && !attacker) return dmg;
+                if (antesDano.soloAtaqueNormal && isSpecial) return dmg;
+                if (antesDano.soloAtaqueEspecial && !isSpecial) return dmg;
+                if (antesDano.si && !DSL._cond(card, game, antesDano.si)) return dmg;
+                game._dslReduceDano = 0;
+                game._dslSinSueloDano = false;
+                await DSL._runEffectList(antesDano.efectos || [], card, game, card.owner, [attacker].filter(Boolean), antesDano.nombre || tmpl.passiveName || null);
+                const _r = game._dslReduceDano || 0;
+                const _sinSuelo = !!game._dslSinSueloDano;
+                delete game._dslReduceDano; delete game._dslSinSueloDano;
+                if (!_r) return dmg;
+                // CON EL SUELO DEL JUEGO, que es lo que significa "+N de DEF durante ese ataque":
+                // un golpe nunca deja de quitar algo por mucha Defensa que tengas (1, o 0,5 si un
+                // Esbirro pega a un Personaje). Quien quiera anular el daño DEL TODO -un escudo-
+                // lo dirá con `sinSuelo`, que es otra cosa y debe declararse.
+                const _suelo = (attacker && attacker.type === 'Esbirro' && card.type === 'Personaje') ? 0.5 : 1;
+                return _sinSuelo ? Math.max(0, dmg - _r) : Math.max(dmg - _r, Math.min(dmg, _suelo));
             };
         }
 

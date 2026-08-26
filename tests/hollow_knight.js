@@ -249,6 +249,82 @@ const enCampo = (g, pid, n) => !!buscar(g, pid, n);
         check('...y no llega a la retaguardia', k.currentHp === v[2]);
     }
 
+    console.log('\n--- Hornet: PROTECTORA DE LAS RUINAS y ATADURA DE AGUJA ---');
+    {
+        // Atacando: la 1ª normal, la 2ª con +2 de ATQ, la 3ª otra vez normal.
+        const { g, paso } = await mesa({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'Hornet' }] },
+            p2: { vanguardia: [{ carta: 'Mini-tigre', vida: 20, campos: { maxHp: 20 } }] },
+        });
+        const tigre = buscar(g, 'p2', 'Mini-tigre');
+        const golpe = async () => {
+            const antes = tigre.currentHp;
+            await paso({ atacar: 'Hornet', objetivo: 'Mini-tigre' });
+            await paso({ finTurno: true }); await paso({ finTurno: true });
+            return antes - tigre.currentHp;
+        };
+        const g1 = await golpe(), g2 = await golpe(), g3 = await golpe();
+        check('el primer ataque es el normal (ATQ 5 - DEF 3 = 2)', g1 === 2, 'quitó ' + g1);
+        check('...el SEGUNDO al mismo enemigo pega 2 más', g2 === g1 + 2, 'quitó ' + g2);
+        check('...y el tercero vuelve a lo normal', g3 === g1, 'quitó ' + g3);
+    }
+    {
+        // Defendiéndose: el segundo golpe del mismo enemigo hace 2 menos.
+        const { g, paso } = await mesa({
+            turno: 2, turnoDe: 'p2', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'Hornet', vida: 20, campos: { maxHp: 20 } }] },
+            // Valafar pega 8: contra los 4 de DEF de Hornet son 4 de daño, así que los 2 de
+            // menos se ven de verdad (con un atacante flojo el golpe ya estaría en el suelo).
+            p2: { vanguardia: [{ carta: 'Valafar' }] },
+        });
+        const hornet = buscar(g, 'p1', 'Hornet');
+        const recibir = async () => {
+            const antes = hornet.currentHp;
+            await paso({ atacar: 'Valafar', objetivo: 'Hornet' });
+            await paso({ finTurno: true }); await paso({ finTurno: true });
+            return antes - hornet.currentHp;
+        };
+        const r1 = await recibir(), r2 = await recibir(), r3 = await recibir();
+        check('el primer golpe recibido entra entero (ATQ 8 - DEF 4 = 4)', r1 === 4, 'recibió ' + r1);
+        check('...el SEGUNDO del mismo enemigo hace 2 menos', r2 === r1 - 2, 'recibió ' + r2);
+        check('...y el tercero vuelve a entrar entero', r3 === r1, 'recibió ' + r3);
+    }
+    {
+        // Y el SUELO se respeta: "+2 de DEF" nunca deja un golpe en 0, igual que en el resto del
+        // juego. Karlos pega 5 contra 4 de DEF: 1 de daño, y la segunda vez sigue siendo 1.
+        const { g, paso } = await mesa({
+            turno: 2, turnoDe: 'p2', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'Hornet', vida: 20, campos: { maxHp: 20 } }] },
+            p2: { vanguardia: [{ carta: 'Karlos' }] },
+        });
+        const hornet = buscar(g, 'p1', 'Hornet');
+        const recibir = async () => {
+            const antes = hornet.currentHp;
+            await paso({ atacar: 'Karlos', objetivo: 'Hornet' });
+            await paso({ finTurno: true }); await paso({ finTurno: true });
+            return antes - hornet.currentHp;
+        };
+        await recibir();
+        check('un golpe que ya estaba en el suelo sigue quitando 1', (await recibir()) === 1);
+    }
+    {
+        // ATADURA DE AGUJA: ata a uno y ya no se le puede volver a atar.
+        const { g, paso, ctx } = await mesa({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'Hornet', furor: 4 }] },
+            p2: { vanguardia: [{ carta: 'Mini-tigre', vida: 20, campos: { maxHp: 20 } }] },
+        });
+        const tigre = buscar(g, 'p2', 'Mini-tigre');
+        await paso({ habilidad: 'Hornet' }); await paso({ confirmar: true });
+        await paso({ elegir: ['Mini-tigre'] });
+        check('el atado se salta su turno', (tigre.tempEffects || []).some(t => t.pierdeSuTurno));
+        check('...y queda anotado', !!(buscar(g, 'p1', 'Hornet').hornetAguja || {})[tigre.instanceId]);
+        await paso({ finTurno: true }); await paso({ finTurno: true });
+        await paso({ habilidad: 'Hornet' });
+        check('no se le puede volver a atar', ctx.pendientes.length === 0);
+    }
+
     console.log('');
     if (fallos) { console.log(`SUITE hollow_knight: ${fallos} FALLOS de ${comprobaciones} comprobaciones`); process.exit(1); }
     console.log(`SUITE hollow_knight: ${comprobaciones}/${comprobaciones} comprobaciones — LA TANDA HK CUMPLE`);
