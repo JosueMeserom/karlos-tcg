@@ -2065,6 +2065,11 @@
                 void _mov.offsetWidth;                     // fuerza el reflow antes de soltar
                 _mov.style.transition = `transform ${DESLIZA_MS}ms cubic-bezier(.2,.8,.2,1)`;
                 _mov.style.transform = _base ? _cs : '';
+                // Aviso de que HAY cartas viajando: solo mientras dure esto repintan las flechas
+                // de anexo fotograma a fotograma (ver seguirFlechas). Fuera de aquí se dibujan una
+                // vez y se quedan quietas, que si no cualquier repintado -un zoom al pasar el
+                // ratón- las ponía a moverse y distraía (Toto, 26-ago-2026).
+                window.__deslizaHasta = Date.now() + DESLIZA_MS + 60;
                 setTimeout(() => { _mov.style.transition = ''; }, DESLIZA_MS + 50);
             });
         }
@@ -11836,14 +11841,17 @@
                         if (!card.attachedTo) return;
                         const originCard = this.findCard(card.attachedTo);
                         if (!originCard) return;
-                        const el1 = document.querySelector(`.card[data-id="${card.instanceId}"]`);        // Anexado
-                        const el2 = document.querySelector(`.card[data-id="${originCard.instanceId}"]`);  // Anfitrión
-                        if (!el1 || !el2) return;
-
                         const arrowColor = '#a855f7';
                         const markerId = _marcador(arrowColor);
                         const clave = `${card.instanceId}|${originCard.instanceId}`;
+                        // La flecha se cuenta como VIVA por el ESTADO, no por el DOM: el vínculo
+                        // existe aunque en este instante no encuentre sus nodos (un repintado a
+                        // medias, una carta dentro de un visor). Si no, la flecha se despedía y
+                        // volvía a nacer -con su dibujado y todo- por un parpadeo del DOM.
                         vivas.add(clave);
+                        const el1 = document.querySelector(`.card[data-id="${card.instanceId}"]`);        // Anexado
+                        const el2 = document.querySelector(`.card[data-id="${originCard.instanceId}"]`);  // Anfitrión
+                        if (!el1 || !el2) return;   // sin nodos no hay geometría que recalcular: se deja como está
 
                         const rect1 = el1.getBoundingClientRect();
                         const rect2 = el2.getBoundingClientRect();
@@ -11950,13 +11958,19 @@
             // Antes se dibujaban una sola vez, con las cartas ya contadas en su destino pero
             // todavía viajando, y la flecha se quedaba colgada en el aire hasta el render
             // siguiente (y en el cliente remoto, hasta que algo más lo forzara).
-            seguirFlechas(ms = DESLIZA_MS + 60) {
-                if (this._siguiendoFlechas) { this._siguiendoFlechasHasta = Date.now() + ms; return; }
+            seguirFlechas() {
+                this.drawConnections();
+                // Y solo si hay cartas DESLIZÁNDOSE se sigue repintando: lo dice el aviso que deja
+                // `_deslizarFila`. Un repintado cualquiera (un zoom, una chapa, un flotante) no
+                // mueve a nadie de sitio, así que ponerse a repintar en cada fotograma solo
+                // conseguía que las flechas bailaran sin motivo.
+                if (this._siguiendoFlechas) return;
+                const _fin = () => (window.__deslizaHasta || 0);
+                if (Date.now() >= _fin()) return;
                 this._siguiendoFlechas = true;
-                this._siguiendoFlechasHasta = Date.now() + ms;
                 const paso = () => {
                     this.drawConnections();
-                    if (Date.now() < this._siguiendoFlechasHasta) requestAnimationFrame(paso);
+                    if (Date.now() < _fin()) requestAnimationFrame(paso);
                     else this._siguiendoFlechas = false;
                 };
                 requestAnimationFrame(paso);
