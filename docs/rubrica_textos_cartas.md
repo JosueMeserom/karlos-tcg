@@ -937,5 +937,11 @@ turno de su dueño y baja **justo después de cada golpe**, así que «3 turnos�
 golpes. Al escribir una carta que aplique un estado, no hace falta explicar nada de esto en su
 `text`: es regla del juego y vive en el panel de reglas.
 
-Estasis todavía no existe; su especificación cerrada está en `docs/TODO.md` §3, y entra cuando la
-pida una carta.
+**Estasis, implementada el 26-ago-2026** (`tests/estasis.js`). Un solo predicado en el motor,
+`_enEstasis(card)`, consultado desde los seis sitios que la hacen valer: el targeting de ataques
+(`motivoNoAtacable`, y va DELANTE del Provocando y del Oculto), el daño (`dealDamage`), los
+cambios de stat (`modifyStat`: no le bajan nada y no gana Furor), los estados nuevos
+(`applyStatus`, salvo la propia Estasis), el agotamiento (se reimpone en cada pasada de pasivas) y
+el ataque directo (una carta en Estasis no cuenta como defensora). En el DSL, los pools la excluyen
+por defecto, igual que a los Avatares. Se aplica como cualquier otro estado:
+`{ op: "APLICAR_ESTADO", estado: "estasis", duracion: N }`.

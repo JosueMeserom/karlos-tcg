@@ -7394,6 +7394,9 @@ const DSL = {
                  : DSL._zone(game, ownerId, spec.zona);
         if (spec.excludeSelf && selfCard) pool = pool.filter(c => c.instanceId !== selfCard.instanceId);
         if (!spec.permitirAvatar) pool = pool.filter(c => !((getCardTemplate(c.id) || {}).isAvatar)); // Kami: intocable por defecto
+        // ESTASIS (26-ago-2026): inmune a los efectos de cualquier carta, así que ni sale como
+        // objetivo. Mismo criterio de default-on que el Avatar de la línea de arriba.
+        pool = pool.filter(c => !(c.status && c.status.estasis && c.status.estasis.duration > 0));
         // Inmunidad a Eventos enemigos (Eris; Toto, 5-ago-2026): si la carta fuente es un
         // EVENTO, sus efectos no alcanzan a los enemigos que la declaren. Va aquí, en el punto
         // único por el que pasan TODOS los targets del DSL, y no en cada carta: hasta ahora la
@@ -9258,6 +9261,7 @@ const DSL = {
             pool = pool.filter(x => (e.filtros || []).every(f => DSL._match(x, f)) &&
                                     (!e.algunFiltro || e.algunFiltro.some(f => DSL._match(x, f))));
             pool = pool.filter(x => !((getCardTemplate(x.id) || {}).isAvatar)); // Kami: intocable
+            pool = pool.filter(x => !(x.status && x.status.estasis && x.status.estasis.duration > 0)); // y la Estasis, ídem
             // `atacablePor`: deja solo a quien ESE atacante podría señalar en un ataque normal.
             // No copia las reglas -Provocando, Oculto, Avatar-: pregunta al mismo sitio que las
             // aplica cuando atacas tú (`motivoNoAtacable`). Así una Habilidad que ORDENA un

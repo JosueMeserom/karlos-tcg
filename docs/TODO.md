@@ -3,7 +3,7 @@
 Lo que queda por hacer, con su porqué. Se actualiza al cerrar cada cosa: lo que Toto no rebate
 después de hacerlo se da por bueno y se quita de aquí.
 
-> Última revisión: 26-ago-2026 · 167 cartas en CARD_DB · 112 suites en verde
+> Última revisión: 26-ago-2026 · 167 cartas en CARD_DB · 113 suites en verde
 
 ---
 
@@ -63,16 +63,13 @@ Con eso, DOMINANCIA ILUSORIA es declarativa entera.
 
 - **Descuento de tributo de Fusión de planos** (aplazado de antes).
 - **Candado de la cola de reconexión** (aplazado de antes).
-- **Estasis**: estado nuevo, de la familia **velo** junto al Oculto (no pueden convivir). Se hará
-  cuando llegue una carta que lo pida; la especificación de Toto (25-ago-2026), ya cerrada:
-  - No puede ser objetivo de **ningún** ataque (ni normal ni especial).
-  - Inmune a cualquier daño y a cualquier efecto de cartas de Personaje, Evento o Ayuda.
-  - Pero está **siempre agotada** y **no puede ganar Furor**.
-  - Y si es tu **único** aliado, el rival puede atacarte **directamente**.
-
-  Es decir, como el Kami, más lo de estar siempre agotada y lo del ataque directo. El motivo del
-  contrapeso: una carta en Estasis sale de ahí por un contador o por alguna otra condición, y
-  mientras tanto te está ocupando un hueco sin hacer nada útil - ni siquiera acumular Furor.
+**Estasis — HECHA el 26-ago-2026** (`tests/estasis.js`, 14 comprobaciones). Un solo predicado en
+el motor, `_enEstasis(card)`, consultado desde los seis sitios que la hacen valer: el targeting de
+ataques (va DELANTE del Provocando y del Oculto), el daño, los cambios de stat (no le bajan nada y
+no gana Furor), los estados nuevos (salvo la propia Estasis), el agotamiento (se reimpone en cada
+pasada) y el ataque directo (no cuenta como defensora). En el DSL los pools la excluyen por
+defecto, igual que a los Avatares, y se aplica con
+`{ op: "APLICAR_ESTADO", estado: "estasis", duracion: N }`. Chapa propia 🧊 con su cuenta.
 
 ---
 

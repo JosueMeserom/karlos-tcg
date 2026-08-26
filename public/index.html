@@ -3888,6 +3888,15 @@
                 if (getCardTemplate(card.id).isAvatar && amount < 0 && source !== 'avatar_passive') {
                     return; 
                 }
+                // ESTASIS: inmune a lo que le quiten (daño, drenajes, bajadas de stat) y sin
+                // ganancia de Furor. Lo que SÍ pasa son sus propios contadores, que no son un
+                // stat y van por otro cauce (modifyCounters): así puede contar los turnos que le
+                // quedan dentro. `source 'estasis'` es la puerta de servicio por si algún día algo
+                // tiene que tocarla desde dentro.
+                if (this._enEstasis(card) && source !== 'estasis') {
+                    if (amount < 0) return;
+                    if (stat === 'furor' && amount > 0) return;
+                }
 
                 // --- NUEVO: Intercepción Genérica de Cambio de Stats ---
                 for (let pid of ['p1', 'p2']) {
@@ -4057,6 +4066,11 @@
 
             applyStatus(card, type, duration, sourceCard, sourceAbility) {
                 if (getCardTemplate(card.id).isAvatar) return; 
+                // En Estasis no le entra ningún estado nuevo (es inmune a los efectos de las
+                // cartas), salvo la propia Estasis: refrescarla o sustituirla sí vale, que si no
+                // no habría forma de alargarla ni de que su hermano de familia -el Oculto- la
+                // reemplace por la vía normal de categorías.
+                if (this._enEstasis(card) && type !== 'estasis') return;
                 // Inmunidad concedida por un equipo (Hagoromo). Va aquí, con la de los Avatares,
                 // porque este es el único sitio por el que pasan TODOS los estados alterados:
                 // comprobarlo en cada carta que los aplica seria dejarse la mitad.
@@ -5446,6 +5460,7 @@
                                 else if (key === 'ceguera') name = 'Ceguera';
                                 else if (key === 'sueno') name = 'Sueño';
                                 else if (key === 'oculto') name = this.generoTexto(card, 'Oculto', 'Oculta');
+                                else if (key === 'estasis') name = 'Estasis';
                                 const _fu = this.refFuente(val.sourceInstanceId, val.source || val.sourceName, card);
                                 effects.push(this.lineaEfecto(name, { turnos: val.duration, habilidad: val.sourceAbility, ref: _fu }));
                             }
@@ -5654,7 +5669,7 @@
                         const _obj = this.refCarta(otra); // misma sintaxis que "fuente:", pero como destino
                         if (otra.status) for (const [k, v2] of Object.entries(otra.status)) {
                             if (v2 && v2.duration > 0 && ((v2.sourceInstanceId && v2.sourceInstanceId === card.instanceId) || v2.sourceName === card.name || v2.source === card.name)) {
-                                const nm = k === 'dot' ? 'Daño por tiempo' : k === 'confusion' ? 'Confusión' : k === 'ceguera' ? 'Ceguera' : k === 'sueno' ? 'Sueño' : k === 'oculto' ? this.generoTexto(otra, 'Oculto', 'Oculta') : k;
+                                const nm = k === 'dot' ? 'Daño por tiempo' : k === 'confusion' ? 'Confusión' : k === 'ceguera' ? 'Ceguera' : k === 'sueno' ? 'Sueño' : k === 'oculto' ? this.generoTexto(otra, 'Oculto', 'Oculta') : k === 'estasis' ? 'Estasis' : k;
                                 _salientes.push(this.lineaEfecto(nm, { turnos: v2.duration, habilidad: v2.sourceAbility, ref: _obj, comoObjetivo: true }));
                             }
                         }
@@ -6260,6 +6275,7 @@
                 if (!ctx.pool.has(card.instanceId)) {
                     const _t = getCardTemplate(card.id) || {};
                     if (_t.isAvatar && _soyElChooser) this.logError(`${card.name} es un AVATAR y no puede ser objetivo de nada.`);
+                    if (this._enEstasis(card) && _soyElChooser) this.logError(`${card.name} está en ESTASIS y no puede ser objetivo de nada.`);
                     return;
                 }
                 if (ctx.targets.some(t => t.instanceId === card.instanceId)) return;
@@ -7632,6 +7648,10 @@
                         card.currentAtk = template.atk;
                         card.currentDef = template.def;
                         card.isSilenced = false; // se resetea aquí; las Auras lo reimponen después
+                        // ESTASIS: agotada SIEMPRE, cada pasada. No es que "se agote al entrar":
+                        // es que mientras dure no puede actuar, así que se reimpone igual que se
+                        // reimponen las auras (Toto, 26-ago-2026).
+                        if (this._enEstasis(card)) card.exhausted = true;
                         card.inmuneAEstados = false; // igual: la reimpone onEquipUpdate si lleva el equipo
                         delete this._statMods[card.instanceId]; // su pizarra empieza limpia con el reseteo
                     });
@@ -8653,7 +8673,10 @@
                 const enemyId = this.activePlayerId === 'p1' ? 'p2' : 'p1';
                 const enemyP = this.players[enemyId];
 
-                return (enemyP.vanguard.length === 0 && enemyP.rearguard.length === 0);
+                // Una carta en ESTASIS no cuenta como defensora: si es lo único que le queda al
+                // rival, el ataque directo sigue disponible (Toto, 26-ago-2026).
+                const _defiende = (c) => !this._enEstasis(c);
+                return (!enemyP.vanguard.some(_defiende) && !enemyP.rearguard.some(_defiende));
             }
 
             // --- ATAQUE DIRECTO ---
@@ -9957,6 +9980,10 @@
             }
 
             async dealDamage(attacker, defender, dmg, isSpecial = false) {
+                if (this._enEstasis(defender)) {
+                    this.logMsg(`${this.getCardNameWithOwner(defender)} está en ESTASIS: el golpe la atraviesa sin tocarla.`, 'system');
+                    return;
+                }
                 if (getCardTemplate(defender.id).isAvatar) {
                     this.logMsg(`${defender.name} es un AVATAR y es inmune al daño.`, 'system');
                     return;
@@ -12142,6 +12169,9 @@
                 const t = getCardTemplate(objetivo.id) || {};
                 const hayProvocando = this.players[objetivo.owner].vanguard.some(c => getCardTemplate(c.id).isTaunt);
                 if (hayProvocando && !t.isTaunt) return '¡Debes dirigir tus ataques normales al objetivo que está Provocando!';
+                // La Estasis va DELANTE de todo: no la salta ni el Provocando ni quien puede
+                // señalar Ocultos, porque no es "difícil de alcanzar", es que no está.
+                if (this._enEstasis(objetivo)) return `¡${this.getCardNameWithOwner(objetivo)} está en ESTASIS y no puede ser objetivo de ningún ataque!`;
                 if (objetivo.stealth && !this._puedeAtacarOculto(atacante)) return `¡No puedes atacar a ${this.getCardNameWithOwner(objetivo)} porque está Oculto!`;
                 if (t.isAvatar) return `${objetivo.name} es un AVATAR y no puede ser objetivo de nada.`;
                 return null;
@@ -12149,6 +12179,21 @@
 
             _estaOculta(card) {
                 return !!(card.stealth || (card.status && card.status.oculto && card.status.oculto.duration > 0));
+            }
+
+            // ESTASIS (Toto, 26-ago-2026). El otro estado de la familia VELO, hermano del Oculto,
+            // y el más tajante del juego: la carta se sale de la partida sin irse del campo.
+            //   · no puede ser objetivo de NINGÚN ataque, ni normal ni especial;
+            //   · es inmune al daño y a los efectos de cualquier carta (Personaje, Evento, Ayuda);
+            //   · pero está SIEMPRE agotada y NO gana Furor;
+            //   · y si es tu único aliado, el rival te ataca DIRECTAMENTE: no hace de muro.
+            // O sea, un Kami al que además le cobran el alquiler: te ocupa un hueco sin hacer nada
+            // ni acumular energía, y de ahí sale por un contador o por su propia condición. Ese
+            // contrapeso es lo que evita que sea un refugio gratis.
+            // Un solo predicado, como `_estaOculta`: lo consultan el targeting, el daño, los
+            // estados, el Furor, el agotamiento y el ataque directo.
+            _enEstasis(card) {
+                return !!(card && card.status && card.status.estasis && card.status.estasis.duration > 0);
             }
 
             createCardEl(card, inHand = false, isVisualOnly = false) {
@@ -12259,6 +12304,7 @@
                         }
                         
                         if (getCardTemplate(card.id).isAvatar) isTargetable = false; // KAMI ES INTOCABLE
+                        if (this._enEstasis(card)) isTargetable = false;                // y la ESTASIS, también
                         if (isTargetable) el.classList.add('targetable');
                     }
                     
@@ -12289,6 +12335,7 @@
                         }
                         
                         if (getCardTemplate(card.id).isAvatar) isValidTarget = false; 
+                        if (this._enEstasis(card)) isValidTarget = false;
                         
                         if (isValidTarget && (!this.selectedCard || this.selectedCard.instanceId !== card.instanceId)) {
                             el.classList.add('valid-target');
@@ -12497,6 +12544,20 @@
                 // estado-, así que mirando solo el booleano el ojo no aparecía hasta la siguiente
                 // pasada, un par de fases más tarde. Las fuentes permanentes (Berry, Súcubo, Zoe)
                 // siguen poniendo `stealth` a mano y entran por la otra mitad del `or`.
+                // ESTASIS: chapa propia, hermana de la del ojo (las dos son de la familia velo).
+                // Cristal azul hielo, y con su cuenta si la tiene: lo normal es que la Estasis
+                // dure unos turnos y saber cuántos quedan es media decisión de la partida.
+                if (this._enEstasis(card)) {
+                    const estasisBadge = document.createElement('div');
+                    estasisBadge.className = 'stealth-badge estasis-badge';
+                    estasisBadge.dataset.badge = 'estasis';
+                    estasisBadge.dataset.arrowColor = '#38bdf8';
+                    const _d = card.status.estasis.duration;
+                    estasisBadge.innerHTML = (_d === null || _d === undefined || _d > 90)
+                        ? '🧊'
+                        : `<span style="font-size:0.9rem; line-height:1;">🧊</span><span style="font-size:0.7rem; font-weight:bold; color:#e0f2fe; line-height:1;">${_d}</span>`;
+                    el.appendChild(estasisBadge);
+                }
                 if (this._estaOculta(card)) {
                     const stealthBadge = document.createElement('div');
                     stealthBadge.className = 'stealth-badge';
