@@ -7235,6 +7235,70 @@ const CARD_DB = [
                     { op: "ATACAR", especial: true, minimoDano: 3 } ] } ] }
         ],
     },
+
+    // ══ CROSSOVER HOLLOW KNIGHT, tanda 2 — 26-ago-2026 ══════════════════════════════════════
+    {
+        // El vengativo: pégale y te lo devuelve, quiera él o no. La obligación es lo interesante:
+        // gasta SU acción en la venganza, así que un ataque suyo se puede "gastar" provocándole.
+        id: 2013, name: "Devoto acechador", hp: 4, def: 2, atk: 4, type: "Esbirro", subtype: "Ser mágico",
+        tags: ["Animal salvaje"], gender: "M", rarity: "B", series: "HK",
+        text: "P: ADORADOR DE HERRAH: Al recibir un ataque, al inicio de tu siguiente turno ataca obligatoriamente a quien le atacó, con +1 de ATQ y gastando su acción.",
+        passiveName: "ADORADOR DE HERRAH",
+        abilities: [
+            // Quién le pegó el último: `guardaIdsEnSelf` deja el instanceId del atacante en la
+            // propia carta (mismo mecanismo que usa Cogorza para recordar a quiénes alcanzó).
+            { trigger: "TRAS_DEFENDER", nombre: "ADORADOR DE HERRAH",
+              efectos: [
+                { op: "LOG", guardaIdsEnSelf: "acechado",
+                  log: "{carta} graba el rostro de {objetivo}: se lo cobrará.", logTipo: "ability" } ] },
+            // Y a la primera oportunidad, la venganza. Si el objetivo ya no está en el campo, el
+            // ORDENAR_ATAQUE no encuentra a nadie y la Pasiva se queda en nada.
+            { trigger: "INICIO_TURNO", nombre: "ADORADOR DE HERRAH",
+              si: { campo: "acechado.length", op: ">=", valor: 1 },
+              efectos: [
+                { op: "ORDENAR_ATAQUE", atacante: { quien: "SELF" }, target: { selfLista: "acechado" }, bonoAtq: 1,
+                  log: "¡ADORADOR DE HERRAH! {carta} se lanza a por {objetivo} sin pensárselo." },
+                { op: "MARCAR", target: { quien: "SELF" }, campo: "acechado", valor: null } ] }
+        ],
+    },
+    {
+        // El Rey Pesadilla: entra arrasando la energía de un aliado. Si ese aliado no tenía 4 de
+        // Furor, Grimm llega mermado PARA SIEMPRE — el jugador decide si le urge tanto.
+        id: 2014, name: "Grimm", hp: 7, def: 4, atk: 7, type: "Personaje", subtype: "Ser mágico",
+        tags: ["Animal salvaje", "Mundo onírico"], gender: "M", rarity: "S", series: "HK",
+        text: "Coste: Todo el Furor de un aliado que elijas. P: REY PESADILLA: Si esa ofrenda no llega a 4, pierde 2 de VIDA y 2 de ATQ para siempre. A: TROPEL DE MURCIÉLAGOS (2F): Quita 1 de VIDA a toda la vanguardia rival.",
+        passiveName: "REY PESADILLA", activeName: "TROPEL DE MURCIÉLAGOS", activeCost: 2,
+        abilities: [
+            { trigger: "JUGAR", requisitos: [
+                { count: {}, op: ">=", valor: 1, msg: "{carta} necesita un aliado del que alimentarse." } ] },
+            { trigger: "ANTES_DE_JUGAR", nombre: "REY PESADILLA", efectos: [
+                { op: "ELEGIR", de: "ALIADOS", cantidad: 1, esRequisito: true,
+                  titulo: "REY PESADILLA: ¿quién le entrega TODO su Furor?",
+                  guardaSuma: [ { campo: "furor", en: "ofrenda" } ],
+                  efectos: [
+                    // Todo su Furor, sea cuanto sea: el delta sale del propio objetivo.
+                    { op: "MODIFICAR_STAT", stat: "furor", delta: { REF: "objetivo.furor", factor: -1 }, esCoste: true, fuente: null,
+                      log: "{objetivo} entrega toda su energía al Rey Pesadilla." },
+                    { op: "FIJAR_STAT", target: { quien: "SELF" }, stat: "ofrendaRecibida", valor: { REF: "vars.ofrenda" } },
+                    { if: { campo: "ofrendaRecibida", op: "<", valor: 4 },
+                      then: [
+                        { op: "MARCAR", target: { quien: "SELF" }, campo: "grimmMermado", valor: true,
+                          log: "La ofrenda no basta: {carta} se manifiesta incompleto.", logTipo: "ability" } ] } ] } ] },
+            // La merma es permanente, así que se reaplica en cada pasada de pasivas.
+            { trigger: "PASIVA_CONTINUA", nombre: "REY PESADILLA", silencioso: true,
+              if: { campo: "grimmMermado", op: "truthy" },
+              then: [ { op: "MODIFICAR_STAT", stat: "hp", delta: -2 },
+                      { op: "MODIFICAR_STAT", stat: "atk", delta: -2 } ] },
+            { trigger: "ACTIVA", nombre: "TROPEL DE MURCIÉLAGOS", coste: { furor: 2 }, sinObjetivo: true,
+              requisitos: [
+                { count: { quien: "ENEMIGO", zona: "VANGUARDIA" }, op: ">=", valor: 1,
+                  msg: "No hay nadie en la vanguardia rival a quien enviar los murciélagos." } ],
+              efectos: [
+                { op: "MODIFICAR_STAT", target: { quien: "ENEMIGO", zona: "VANGUARDIA" }, stat: "currentHp", delta: -1,
+                  comprobarMuerte: true, animacion: "HABILIDAD_MALA",
+                  logResumen: "¡TROPEL DE MURCIÉLAGOS! La bandada arrasa la vanguardia rival." } ] }
+        ],
+    },
 ];
 
 // ===================================================================
@@ -9207,7 +9271,12 @@ const DSL = {
             // Un respiro antes del golpe: el jugador acaba de elegir a los dos y conviene que
             // vea QUIÉN va a pegar a QUIÉN antes de que la carta salga disparada.
             if (typeof game.sleep === 'function') await game.sleep(e.pausa !== undefined ? e.pausa : 800);
+            // `bonoAtq`: el ataque ordenado sale con más fuerza (Devoto acechador ataca de vuelta
+            // con +1). Se recompone con updatePassives y NO restando a mano, que es el bug de
+            // doble resta documentado en Hiposaurio/Hawke/Oni ancho.
+            if (typeof e.bonoAtq === 'number' && e.bonoAtq) _mar.currentAtk += e.bonoAtq;
             if (typeof game.performAttack === 'function') await game.performAttack(_mar, target);
+            if (typeof e.bonoAtq === 'number' && e.bonoAtq && typeof game.updatePassives === 'function') game.updatePassives();
             return true;
         }
         if (e.op === 'VOLVER_A_MANO') {

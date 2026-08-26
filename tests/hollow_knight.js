@@ -182,6 +182,67 @@ const enCampo = (g, pid, n) => !!buscar(g, pid, n);
         check('...y el golpe quita 3 aunque el cálculo diera 2', oso.currentHp === o0 - 3, 'vida=' + oso.currentHp);
     }
 
+    console.log('\n--- Devoto acechador: ADORADOR DE HERRAH ---');
+    {
+        const { g, paso, logs } = await mesa({
+            turno: 2, turnoDe: 'p2', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'Devoto acechador' }] },
+            p2: { vanguardia: [{ carta: 'Mini-tigre', vida: 9, campos: { maxHp: 9 } }] },
+        });
+        const devoto = buscar(g, 'p1', 'Devoto acechador'), tigre = buscar(g, 'p2', 'Mini-tigre');
+        await paso({ atacar: 'Mini-tigre', objetivo: 'Devoto acechador' });
+        check('apunta a quien le pegó', (devoto.acechado || []).length === 1);
+        const v0 = tigre.currentHp;
+        await paso({ finTurno: true });   // empieza el turno de p1: la venganza es obligatoria
+        check('...y al empezar su turno se la cobra', tigre.currentHp < v0, 'vida=' + tigre.currentHp);
+        // Su ATQ es 4 y el Mini-tigre tiene 3 de DEF: 4-3 = 1, y con el +1 de la venganza, 2.
+        check('...con el +1 de ATQ de la venganza', tigre.currentHp === v0 - 2, 'quitó ' + (v0 - tigre.currentHp));
+        check('...gastando su acción', devoto.exhausted === true || devoto.hasAttackedThisTurn === true);
+        check('...y suelta el rencor tras cobrárselo', !(devoto.acechado || []).length);
+    }
+
+    console.log('\n--- Grimm: REY PESADILLA y TROPEL DE MURCIÉLAGOS ---');
+    {
+        // Con 4 de Furor en la ofrenda, entra entero.
+        const { g, paso } = await mesa({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'Mini-tigre', furor: 4 }], mano: ['Grimm'] },
+            p2: { vanguardia: ['Oso con armadura'] },
+        });
+        await paso({ jugar: 'Grimm' });
+        await paso({ elegir: ['Mini-tigre'] });
+        const gr = buscar(g, 'p1', 'Grimm');
+        check('entra tragándose TODO el Furor del elegido', !!gr && buscar(g, 'p1', 'Mini-tigre').furor === 0);
+        check('...y con 4 llega entero', gr.currentAtk === 7 && gr.maxHp === 7, gr.currentAtk + '/' + gr.maxHp);
+    }
+    {
+        // Con 2, llega mermado PARA SIEMPRE.
+        const { g, paso } = await mesa({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'Mini-tigre', furor: 2 }], mano: ['Grimm'] },
+            p2: { vanguardia: ['Oso con armadura'] },
+        });
+        await paso({ jugar: 'Grimm' });
+        await paso({ elegir: ['Mini-tigre'] });
+        const gr = buscar(g, 'p1', 'Grimm');
+        check('con una ofrenda pobre entra mermado', gr.currentAtk === 5, 'atq=' + gr.currentAtk);
+        check('...también de Vida máxima', gr.maxHp === 5, 'maxHp=' + gr.maxHp);
+        g.updatePassives();
+        check('...y la merma no se cura sola', gr.currentAtk === 5 && gr.maxHp === 5);
+    }
+    {
+        const { g, paso } = await mesa({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'Grimm', furor: 2 }] },
+            p2: { vanguardia: [{ carta: 'Mini-tigre' }, { carta: 'Oso con armadura' }], retaguardia: [{ carta: 'Karlos' }] },
+        });
+        const t = buscar(g, 'p2', 'Mini-tigre'), o = buscar(g, 'p2', 'Oso con armadura'), k = buscar(g, 'p2', 'Karlos');
+        const v = [t.currentHp, o.currentHp, k.currentHp];
+        await paso({ habilidad: 'Grimm' }); await paso({ confirmar: true });
+        check('el tropel muerde a toda la vanguardia rival', t.currentHp === v[0] - 1 && o.currentHp === v[1] - 1);
+        check('...y no llega a la retaguardia', k.currentHp === v[2]);
+    }
+
     console.log('');
     if (fallos) { console.log(`SUITE hollow_knight: ${fallos} FALLOS de ${comprobaciones} comprobaciones`); process.exit(1); }
     console.log(`SUITE hollow_knight: ${comprobaciones}/${comprobaciones} comprobaciones — LA TANDA HK CUMPLE`);

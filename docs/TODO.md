@@ -3,7 +3,7 @@
 Lo que queda por hacer, con su porqué. Se actualiza al cerrar cada cosa: lo que Toto no rebate
 después de hacerlo se da por bueno y se quita de aquí.
 
-> Última revisión: 26-ago-2026 · 171 cartas en CARD_DB · 116 suites en verde
+> Última revisión: 26-ago-2026 · 173 cartas en CARD_DB · 116 suites en verde
 
 ---
 
@@ -11,10 +11,20 @@ después de hacerlo se da por bueno y se quita de aquí.
 
 **CROSSOVER HOLLOW KNIGHT (serie HK), tanda 1 hecha el 26-ago-2026** (`tests/hollow_knight.js`):
 Cáscara violenta, Gran cáscara centinela, The Knight y **Hollow Knight**, que estrena la Estasis.
-Quedan de esa serie: **Hornet** (contadores por pareja atacante-atacado), **Grimm** (tributo de
-TODO el Furor de un aliado, con castigo si no llega a 4), **Aguijón onírico** (Ayuda con targeting
-en dos pasos), **Mapa de Cornifer** (Evento: mirar las 3 de arriba del mazo + mano rival visible) y
-**Devoto acechador** (ataque de vuelta obligado al último que le pegó).
+**Tanda 2 (26-ago-2026)**: **Devoto acechador** (venganza obligada al inicio de su turno, con
+`bonoAtq` en ORDENAR_ATAQUE) y **Grimm** (se traga TODO el Furor de un aliado y llega mermado para
+siempre si la ofrenda no llegaba a 4).
+
+Quedan tres de la serie, y cada una pide una pieza concreta:
+- **Hornet**: contadores POR PAREJA (cuántas veces le he pegado a ESTE, cuántas veces me ha pegado
+  ÉL) — haría falta un op tipo `CONTAR_OBJETIVO` y, sobre todo, un **bono de DEF para un solo
+  ataque**, que es el hermano que le falta a `BONO_ATAQUE` y que hoy no existe en ningún sitio.
+- **Aguijón onírico** (Ayuda): targeting en dos pasos con condiciones distintas (un aliado que aún
+  no haya gastado su acción; un enemigo que no pueda actuar o esté dormido).
+- **Mapa de Cornifer** (Evento): mirar las 3 primeras del mazo y robar la que quieras (un `BUSCAR`
+  limitado a la cima, que hoy enseña la pila entera) + la mano rival siempre visible (el
+  `handExposedTo` que Erasmo pone a mano; en un Evento haría falta que `MARCAR_JUGADOR` supiera
+  apuntar al RIVAL y que las PASIVA_CONTINUA lo ejecutaran).
 
 **Ajuste de equilibrio en Hollow Knight** (26-ago-2026): se le añadió **Coste: 2 de Furor**, que
 en el Excel no tiene. Sus stats (5/5/7 = 17) están al nivel de Xanadu, Valafar o Zoe calcinante, y
