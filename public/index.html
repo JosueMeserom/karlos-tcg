@@ -3716,7 +3716,13 @@
                 // "(N turnos restantes)" (Toto, 27-jul-2026): igual para estados alterados y
                 // efectos temporales; con la cuenta atrás ya se sobreentiende que es temporal,
                 // así que sustituye también al antiguo "(efecto temporal)".
-                const t = (turnos !== undefined && turnos !== null && turnos !== '')
+                // SIN CUENTA ATRÁS (Toto, 26-ago-2026): un estado que dura "hasta que pase algo"
+                // -la Estasis de Hollow Knight, que se rompe con contadores, no con turnos- se
+                // aplica con una duración enorme (`Game.DURACION_SIN_CUENTA`) porque el motor
+                // cuenta turnos en todas partes; enseñar ese número sería mentir, así que se
+                // omite igual que en un aura. La chapa hace lo mismo.
+                const _sinCuenta = typeof turnos === 'number' && turnos >= Game.DURACION_SIN_CUENTA;
+                const t = (turnos !== undefined && turnos !== null && turnos !== '' && !_sinCuenta)
                     ? ` (${turnos} turno${turnos === 1 ? '' : 's'} restante${turnos === 1 ? '' : 's'})` : '';
                 const h = habilidad ? ` por ${habilidad}` : '';
                 // `nota` (Toto, 31-jul-2026): coletilla OPCIONAL entre la parte automática y el
@@ -4073,6 +4079,12 @@
             //     categoría se llamaba 'ocultacion', que describía solo al Oculto.
             // Un estado sin categoría declarada cae en 'alteracion', que es como se comportaba
             // todo hasta ahora: quien no se declare, no cambia.
+            // Duración a partir de la cual un estado se considera SIN cuenta atrás: dura hasta
+            // que algo lo quite, no hasta que se acaben unos turnos. No es infinito a propósito
+            // -Infinity no sobrevive a un JSON, y todo el estado viaja por la red-, es un número
+            // grande y redondo que ninguna carta va a usar de verdad.
+            static get DURACION_SIN_CUENTA() { return 900; }
+
             static get CATEGORIA_ESTADO() {
                 return { dot: 'alteracion', confusion: 'alteracion', ceguera: 'alteracion',
                          sueno: 'alteracion', silencio: 'alteracion',
@@ -10587,6 +10599,17 @@
                     } catch(e) { console.error(e); }
                     _aLaMano();
                     this.logMsg(`${this.getDisplayName(playerId)} coge 1 retribución (le quedan ${p.hp}).`, 'system');
+                    // Aviso a las cartas EN MESA de los dos jugadores: coger una retribución es un
+                    // hito de la partida y hay cartas que lo cuentan (Hollow Knight y su sello).
+                    // Va aquí, en el único sitio por el que pasan todas las retribuciones.
+                    for (const pid of ['p1', 'p2']) {
+                        for (const c of [...this.players[pid].vanguard, ...this.players[pid].rearguard]) {
+                            const t = getCardTemplate(c.id);
+                            if (typeof t.onRetribucionCogida === 'function') {
+                                try { await t.onRetribucionCogida(c, playerId, this); } catch (e) { console.error(e); }
+                            }
+                        }
+                    }
                 } else {
                     p.hp = 0;
                 }
@@ -12597,11 +12620,11 @@
                     const estasisBadge = document.createElement('div');
                     estasisBadge.className = 'stealth-badge estasis-badge';
                     estasisBadge.dataset.badge = 'estasis';
-                    estasisBadge.dataset.arrowColor = '#38bdf8';
+                    estasisBadge.dataset.arrowColor = '#6366f1';   // el mismo aro que el ojo: misma familia
                     const _d = card.status.estasis.duration;
-                    estasisBadge.innerHTML = (_d === null || _d === undefined || _d > 90)
+                    estasisBadge.innerHTML = (_d === null || _d === undefined || _d >= Game.DURACION_SIN_CUENTA)
                         ? '🧊'
-                        : `<span style="font-size:0.9rem; line-height:1;">🧊</span><span style="font-size:0.7rem; font-weight:bold; color:#e0f2fe; line-height:1;">${_d}</span>`;
+                        : `<span style="font-size:0.85rem; line-height:1;">🧊</span><span style="font-size:0.7rem; font-weight:bold; color:#a5b4fc; line-height:1;">${_d}</span>`;
                     el.appendChild(estasisBadge);
                 }
                 if (this._estaOculta(card)) {

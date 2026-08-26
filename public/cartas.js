@@ -7092,6 +7092,149 @@ const CARD_DB = [
                       log: "{carta} devora el Necronomicón y gana Furor." } ] } ] }
         ],
     },
+
+    // ══ CROSSOVER HOLLOW KNIGHT (serie HK), primera tanda — 26-ago-2026 ══════════════════════
+    // Cuatro cartas del Excel de Toto. La grande es Hollow Knight, que estrena la ESTASIS; las
+    // otras tres son piezas que ya sabíamos hacer y que además la acompañan bien en mesa.
+    {
+        // La barata del mazo: 2/2/3 y una despedida que hace daño a TODO el campo, la suya
+        // incluida. Es la carta que hace que un intercambio "gratis" no lo sea.
+        id: 2009, name: "Cáscara violenta", hp: 2, def: 2, atk: 3, type: "Esbirro", subtype: "No-muerto",
+        tags: ["Animal salvaje"], gender: "N", rarity: "C", series: "HK",
+        text: "P: PESTILENCIA: Al morir, todas las demás cartas del campo pierden 1 de VIDA.",
+        passiveName: "PESTILENCIA",
+        abilities: [
+            { trigger: "AL_MORIR", nombre: "PESTILENCIA",
+              log: "¡PESTILENCIA! La cáscara revienta y su infección se esparce por todo el campo.", logTipo: "ability",
+              efectos: [
+                // `excluirSelf`: ella ya está muerta; contarla otra vez solo ensuciaría el log.
+                { op: "MODIFICAR_STAT", target: { quien: "TODOS", excludeSelf: true }, stat: "currentHp", delta: -1,
+                  comprobarMuerte: true } ] }
+        ],
+    },
+    {
+        // La muralla: cara de colocar y capaz de comerse un ataque normal entero si tiene Furor
+        // guardado. Hermana declarada de REPULSIÓN ABSOLUTA (Xanadu), con el mismo trigger.
+        id: 2010, name: "Gran cáscara centinela", hp: 5, def: 3, atk: 6, type: "Esbirro", subtype: "Ser mágico",
+        tags: ["Animal salvaje"], gender: "F", rarity: "B", series: "HK",
+        text: "Coste: 2 de Furor. P: GUARDIA DE ÉLITE: Al recibir un ataque normal, puede pagar 2 de Furor para negarlo con todos sus efectos.",
+        passiveName: "GUARDIA DE ÉLITE",
+        abilities: [
+            { trigger: "COSTE_COLOCACION", furor: 2 },
+            { trigger: "ANTES_DE_DEFENDER", nombre: "GUARDIA DE ÉLITE",
+              soloAtaqueNormal: true, salvoIncontrarrestable: true,
+              logIncontrarrestable: "{objetivo} atraviesa la guardia: su ataque no se puede contrarrestar.",
+              si: [ { campo: "furor", op: ">=", valor: 2 } ],
+              prompt: "GUARDIA DE ÉLITE\n\n¿Gastar 2 de Furor para negar el ataque de {objetivo}?",
+              opciones: { si: "SÍ (-2 FUROR)", no: "NO" },
+              efectos: [
+                { op: "MODIFICAR_STAT", target: { quien: "SELF" }, stat: "furor", delta: -2 },
+                { op: "FLOTANTE", target: { quien: "SELF" }, texto: "GUARDIA", estilo: "ft-ability", offset: -30 },
+                { op: "ESQUIVAR", animacion: "REPELER",
+                  log: "¡GUARDIA DE ÉLITE! {defensor} planta el escudo y detiene el ataque de {objetivo}.", logTipo: "ability" } ] }
+        ],
+    },
+    {
+        // El protagonista pequeño: no pega fuerte, pero se cura mucho si le dejas quieto y va
+        // creciendo con cada amuleto... hasta cuatro. Estrena OPCIONES en una carta de verdad.
+        id: 2011, name: "The Knight", hp: 5, def: 2, atk: 4, type: "Personaje", subtype: "Ser mágico",
+        tags: ["Animal salvaje", "Poder heredado"], gender: "N", rarity: "A", series: "HK",
+        text: "P: CONCENTRACIÓN DE ALMA: Si no hace nada en tu turno, al final se cura 3 de VIDA. A: CONSEGUIR AMULETO (1F): Elige entre un ataque normal y +1 de ATQ permanente, o un ataque especial y +1 de DEF permanente. Solo 4 veces.",
+        passiveName: "CONCENTRACIÓN DE ALMA", activeName: "CONSEGUIR AMULETO", activeCost: 1,
+        abilities: [
+            { trigger: "FIN_TURNO", nombre: "CONCENTRACIÓN DE ALMA",
+              // "No hacer nada" es no haber atacado y no haber gastado la acción (usar la Activa
+              // la gasta), que es como lo mira el resto del juego.
+              si: [ { campo: "hasAttackedThisTurn", op: "falsy" }, { campo: "exhausted", op: "falsy" } ],
+              efectos: [
+                { op: "CURAR", valor: 3, floating: "CONCENTRACIÓN DE ALMA",
+                  log: "¡CONCENTRACIÓN DE ALMA! {objetivo} medita en silencio y cura {curado} de Vida." } ] },
+            { trigger: "ACTIVA", nombre: "CONSEGUIR AMULETO", coste: { furor: 1 },
+              requisitos: [
+                // `no` sobre "tiene ya 4": con el campo sin crear, "menos de 4" saldría falso.
+                { campo: "counters.knight_amuleto.count", op: ">=", valor: 4, no: true,
+                  msg: "{carta} ya lleva los 4 amuletos que puede cargar." },
+                { count: { quien: "ENEMIGO", zona: "VANGUARDIA" }, op: ">=", valor: 1,
+                  msg: "No hay enemigos en la vanguardia a los que atacar." } ],
+              sinObjetivo: true,
+              efectos: [
+                { op: "OPCIONES", titulo: "CONSEGUIR AMULETO",
+                  opciones: [
+                    { label: "ATAQUE NORMAL (+1 ATQ PERMANENTE)",
+                      efectos: [
+                        { op: "ELEGIR", de: "ENEMIGOS", zona: "VANGUARDIA", cantidad: 1,
+                          filtros: [ { campo: "stealth", op: "falsy" } ],
+                          titulo: "CONSEGUIR AMULETO: elige a quién atacas",
+                          efectos: [ { op: "ATACAR" } ] },
+                        // MARCAR con delta y no MODIFICAR_STAT: `atkBonus` no es un stat del
+                        // motor, es la cuenta propia de la carta que su PASIVA_CONTINUA reaplica.
+                        { op: "MARCAR", target: { quien: "SELF" }, campo: "atkBonus", delta: 1,
+                          log: "{carta} engarza un amuleto de fuerza." },
+                        { op: "FLOTANTE", target: { quien: "SELF" }, texto: "+1 ATQ", estilo: "ft-green", offset: -20 },
+                        { op: "MODIFICAR_CONTADORES", target: { quien: "SELF" }, contador: "knight_amuleto", delta: 1,
+                          nombre: "Amuletos", icono: "🔮" } ] },
+                    { label: "ATAQUE ESPECIAL (+1 DEF PERMANENTE)",
+                      efectos: [
+                        { op: "ELEGIR", de: "ENEMIGOS", zona: "VANGUARDIA", cantidad: 1,
+                          titulo: "CONSEGUIR AMULETO: elige a quién atacas",
+                          efectos: [ { op: "ATACAR", especial: true } ] },
+                        { op: "MARCAR", target: { quien: "SELF" }, campo: "defBonus", delta: 1,
+                          log: "{carta} engarza un amuleto de caparazón." },
+                        { op: "FLOTANTE", target: { quien: "SELF" }, texto: "+1 DEF", estilo: "ft-green", offset: -20 },
+                        { op: "MODIFICAR_CONTADORES", target: { quien: "SELF" }, contador: "knight_amuleto", delta: 1,
+                          nombre: "Amuletos", icono: "🔮" } ] } ] } ] },
+            // Los bonos son PERMANENTES, así que se reaplican en cada pasada (updatePassives
+            // resetea los stats a los de plantilla). Mismo patrón que Xidachane.
+            { trigger: "PASIVA_CONTINUA", nombre: "CONSEGUIR AMULETO", silencioso: true, then: [
+                { op: "MODIFICAR_STAT", stat: "atk", delta: { REF: "self.atkBonus" } },
+                { op: "MODIFICAR_STAT", stat: "def", delta: { REF: "self.defBonus" } } ] }
+        ],
+    },
+    {
+        // LA GRANDE, y la que estrena la ESTASIS. Entra sellada -intocable, pero sin hacer nada y
+        // sin ganar Furor- y despierta cuando el campo ya se ha cobrado tres cartas.
+        //
+        // AJUSTE DE EQUILIBRIO respecto al Excel (26-ago-2026, ver el mensaje a Toto): lleva
+        // COSTE DE COLOCACIÓN de 2 de Furor, que no tenía. Sus stats (5/5/7 = 17) están al nivel
+        // de Xanadu, Valafar o Zoe calcinante, y TODAS las de ese escalón pagan algo por entrar;
+        // era la única que entraba gratis, y encima protegida mientras esperaba.
+        id: 2012, name: "Hollow Knight", hp: 5, def: 5, atk: 7, type: "Personaje", subtype: "Ser mágico",
+        tags: ["Animal salvaje", "Poder heredado"], gender: "M", rarity: "S", series: "HK",
+        text: "Coste: 2 de Furor. P: SELLO DEL HUEVO NEGRO: Al colocar: queda en Estasis. Cada vez que alguien coge una retribución, gana 1 Contador; con 3, el sello se rompe. A: RECORDAR (1F): Coste: 2 de VIDA propia. Ataque especial que nunca quita menos de 3 de VIDA.",
+        passiveName: "SELLO DEL HUEVO NEGRO", activeName: "RECORDAR", activeCost: 1,
+        abilities: [
+            { trigger: "COSTE_COLOCACION", furor: 2 },
+            { trigger: "AL_JUGAR", nombre: "SELLO DEL HUEVO NEGRO",
+              efectos: [
+                { op: "APLICAR_ESTADO", target: { quien: "SELF" }, estado: "estasis", duracion: 900,
+                  log: "¡SELLO DEL HUEVO NEGRO! {carta} entra sellado, intocable y ausente." } ] },
+            // El sello se agrieta con cada carta que cae, en cualquiera de los dos campos.
+            { trigger: "AL_COGER_RETRIBUCION", nombre: "SELLO DEL HUEVO NEGRO", deQuien: "AMBOS",
+              si: { campo: "status.estasis.duration", op: ">=", valor: 1 },
+              efectos: [
+                { op: "MODIFICAR_CONTADORES", target: { quien: "SELF" }, contador: "hk_sello", delta: 1,
+                  nombre: "Grietas", icono: "🥚",
+                  log: "El sello de {carta} se agrieta un poco más." },
+                { if: { campo: "counters.hk_sello.count", op: ">=", valor: 3 },
+                  then: [
+                    { op: "LIMPIAR_ESTADOS", target: { quien: "SELF" }, estados: ["estasis"],
+                      log: "¡El SELLO DEL HUEVO NEGRO se rompe y {carta} despierta!", logTipo: "ability" },
+                    { op: "MODIFICAR_CONTADORES", target: { quien: "SELF" }, contador: "hk_sello", vaciar: true } ] } ] },
+            { trigger: "ACTIVA", nombre: "RECORDAR", coste: { furor: 1 },
+              requisitos: [
+                { campo: "currentHp", op: ">", valor: 2, msg: "A {carta} no le queda Vida suficiente para recordar." },
+                { count: { quien: "ENEMIGO", zona: "VANGUARDIA" }, op: ">=", valor: 1,
+                  msg: "No hay enemigos en la vanguardia a los que atacar." } ],
+              sinObjetivo: true,
+              efectos: [
+                { op: "ELEGIR", de: "ENEMIGOS", zona: "VANGUARDIA", cantidad: 1,
+                  titulo: "RECORDAR: elige a quién golpea el recuerdo",
+                  efectos: [
+                    { op: "MODIFICAR_STAT", target: { quien: "SELF" }, stat: "currentHp", delta: -2, esCoste: true,
+                      log: "{carta} se abre una herida vieja para recordar." },
+                    { op: "ATACAR", especial: true, minimoDano: 3 } ] } ] }
+        ],
+    },
 ];
 
 // ===================================================================
@@ -7244,7 +7387,7 @@ const KARLOS_RULES = {
 //  Valores: número | {COUNT:{...}} | {REF:"objetivo.furorMax"} (campos computados)
 // ===================================================================
 const DSL = {
-    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE', 'AURA', 'ANTES_DE_JUGAR', 'PUEDE_ATACAR', 'SOBRECURACION', 'REACCION', 'AL_MORIR', 'AL_MORIR_ALIADO', 'AL_DESTRUIR', 'ESPEJO', 'ANTES_DE_ATACAR', 'TRAS_ATACAR', 'TRAS_DEFENDER', 'ANTES_DE_DEFENDER', 'INTERCEPTOR_ATAQUE', 'EQUIPO_ANTES_DE_DEFENDER', 'EQUIPO_ANTES_DE_ATACAR', 'GLOBAL_ANTES_DE_CAMBIO_STAT', 'COSTE_COLOCACION', 'PERIODICO', 'INTERCEPTOR_LETAL', 'AL_CAMBIAR_DE_ZONA', 'FUROR_PROPIO', 'GLOBAL_TRIBUTO'],
+    TRIGGERS: ['PASIVA_CONTINUA', 'JUGAR', 'AL_JUGAR', 'AL_USAR_AYUDA', 'AL_CADUCAR', 'FIN_TURNO', 'INICIO_TURNO', 'AL_ENTRAR', 'AL_CONSUMIR', 'AL_EQUIPAR', 'PREVIEW_GLOBAL', 'ACTIVA', 'GLOBAL_TRAS_ATAQUE', 'GLOBAL_MODIFICAR_FUROR', 'GLOBAL_INICIO_TURNO', 'GLOBAL_ANTES_DE_ATAQUE', 'AURA', 'ANTES_DE_JUGAR', 'PUEDE_ATACAR', 'SOBRECURACION', 'REACCION', 'AL_MORIR', 'AL_MORIR_ALIADO', 'AL_DESTRUIR', 'ESPEJO', 'ANTES_DE_ATACAR', 'TRAS_ATACAR', 'TRAS_DEFENDER', 'ANTES_DE_DEFENDER', 'INTERCEPTOR_ATAQUE', 'EQUIPO_ANTES_DE_DEFENDER', 'EQUIPO_ANTES_DE_ATACAR', 'GLOBAL_ANTES_DE_CAMBIO_STAT', 'COSTE_COLOCACION', 'PERIODICO', 'INTERCEPTOR_LETAL', 'AL_CAMBIAR_DE_ZONA', 'FUROR_PROPIO', 'GLOBAL_TRIBUTO', 'AL_COGER_RETRIBUCION'],
     // Los 5 últimos ops solo tienen sentido dentro de una REACCION (los interpreta
     // DSL._runReaccion, no _doEffect): controlan el resultado que la reacción
     // devuelve al motor de combate (redirigir el ataque, cancelarlo, drenar Furor
@@ -8362,6 +8505,10 @@ const DSL = {
                         // Def. El suelo 0.5/1 sigue aplicando si el Atq es <= 0.
                         let dmg = e.ignorarDefensa ? sourceCard.currentAtk : sourceCard.currentAtk - target.currentDef;
                         if (dmg <= 0) dmg = (sourceCard.type === 'Esbirro' && target.type === 'Personaje') ? 0.5 : 1;
+                        // `minimoDano` (Hollow Knight, RECORDAR): el golpe nunca baja de ahí, aunque
+                        // el cálculo dé menos. No es lo mismo que FIJAR_DAÑO (que ignora el
+                        // cálculo entero): aquí un golpe grande sigue siendo grande.
+                        if (typeof e.minimoDano === 'number' && dmg < e.minimoDano) dmg = e.minimoDano;
                         await game.dealDamage(sourceCard, target, dmg, !!e.especial);
                         await game.checkDeath(target);
                     }
@@ -9671,6 +9818,20 @@ const DSL = {
         let anyApplied = false;
         for (const e of (efectos || [])) {
             if (e.if && !DSL._cond(sourceCard, game, e.if)) continue; // condición evaluada sobre la carta fuente
+            // BLOQUE CONDICIONAL como efecto: `{ if: <cond>, then: [...], else: [...] }`, sin
+            // `op`. Las pasivas ya lo entendían y los efectos no: un bloque así se ignoraba EN
+            // SILENCIO -no casaba con ningún op y se caía por el final-, que es de los fallos más
+            // caros de encontrar. Ahora corre la rama que toque (26-ago-2026, escribiendo Hollow
+            // Knight; me pasó a mí, y `validate` ya no deja pasar un efecto sin `op` ni `then`).
+            if (!e.op && (e.then || e.else)) {
+                const rama = DSL._cond(sourceCard, game, e.if) ? e.then : e.else;
+                if (Array.isArray(rama) && rama.length) {
+                    const rr = await DSL._runEffectList(rama, sourceCard, game, ownerId, fallbackTargets, habilidad, opts);
+                    if (rr && rr.ok === false) return { ok: false };
+                    if (rr && rr.anyApplied) anyApplied = true;
+                }
+                continue;
+            }
             // `siObjetivo`: condición sobre el OBJETIVO, no sobre la fuente (Toto, 19-ago-2026).
             // Dentro de un ELEGIR los efectos corren con el elegido como objetivo, así que esto es
             // lo que permite "y si el elegido es X, ademas haz Y" — Permiso especial busca en el
@@ -10012,7 +10173,14 @@ const DSL = {
             if (!DSL.TRIGGERS.includes(ab.trigger)) errs.push(`abilities[${i}]: trigger desconocido '${ab.trigger}'`);
             const effs = [...(ab.then || []), ...(ab.else || []), ...(ab.efectos || [])];
             effs.forEach((e, j) => {
+                // Un efecto sin `op` solo vale si es un BLOQUE condicional (`if` + then/else).
+                // Sin esto, una `if` suelta sin ramas se ignoraba en silencio (26-ago-2026).
+                if (e.if && !e.op && !e.then && !e.else) {
+                    errs.push(`abilities[${i}] efecto[${j}]: tiene 'if' pero ni 'op' ni 'then'/'else': no haría nada`);
+                    return;
+                }
                 if (e.if) return;
+                if (!e.op && (e.then || e.else)) return;   // bloque condicional sin condición: raro pero válido
                 if (!DSL.OPS_EFECTO.includes(e.op)) errs.push(`abilities[${i}] efecto[${j}]: op desconocida '${e.op}'`);
                 // `de` de un ELEGIR: sin esto, un valor no contemplado caía en el pool de ALIADOS
                 // sin decir nada (le pasó a 'TODOS' hasta el 23-ago-2026). Una carta que no valida
@@ -10752,7 +10920,12 @@ const DSL = {
                     // `o` de los filtros; los requisitos sueltos siguen siendo AND entre ellos.
                     const _cumple = (r) => {
                         const val = r.count ? DSL._count(card.owner, game, r.count, card) : DSL._field(card, r.campo);
-                        return DSL._cmp(val, r.op, r.valor);
+                        // `no: true` NIEGA el requisito, igual que en los filtros y en los `if`.
+                        // Hace falta para condicionar sobre un campo que empieza sin existir: "no
+                        // tiene 4 contadores" es cierto también cuando no tiene ninguno, mientras
+                        // que "tiene menos de 4" con undefined sale falso (The Knight, 26-ago-2026).
+                        const _r = DSL._cmp(val, r.op, r.valor);
+                        return r.no ? !_r : _r;
                     };
                     for (const r of (activa.requisitos || [])) {
                         if (r.o ? r.o.some(_cumple) : _cumple(r)) continue;
@@ -10853,6 +11026,12 @@ const DSL = {
                 if (DSL._cobroPendiente && DSL._cobroPendiente.id === card.instanceId) {
                     const _cp = DSL._cobroPendiente; DSL._cobroPendiente = null; _cp.fn();
                 }
+                // Una pasada de pasivas SIEMPRE al cerrar (26-ago-2026, con The Knight). El
+                // cierre de abajo la hacía, pero solo cuando la carta NO se había agotado ya —y
+                // una Activa que ATACA agota dentro de performAttack, que corre su updatePassives
+                // ANTES de los efectos posteriores-. Resultado: un bono permanente puesto después
+                // del ataque (los amuletos) no se veía hasta el siguiente repintado que tocara.
+                game.updatePassives();
                 if (!card.exhausted) {
                     // sinAgotar (Achmay, PÉGAME PERRA, 31-jul-2026): "Esta habilidad no gasta
                     // la acción de Achmay" — cierra la acción igual (candado, sync, render)
@@ -11199,6 +11378,21 @@ const DSL = {
                     }
                 }
                 return amount;
+            };
+        }
+
+        // AL_COGER_RETRIBUCION -> onRetribucionCogida: alguien acaba de coger una retribución
+        // (o sea, alguien acaba de perder una carta). El motor avisa a TODAS las cartas en mesa de
+        // los dos jugadores desde `processRetribution`, que es el único sitio por el que pasan.
+        //   deQuien: 'AMBOS' (por defecto) | 'PROPIO' (solo las mías) | 'RIVAL'
+        const retri = abs.find(a => a.trigger === 'AL_COGER_RETRIBUCION');
+        if (retri && typeof tmpl.onRetribucionCogida !== 'function') {
+            tmpl.onRetribucionCogida = async function (card, playerId, game) {
+                const _q = retri.deQuien || 'AMBOS';
+                if (_q === 'PROPIO' && playerId !== card.owner) return;
+                if (_q === 'RIVAL' && playerId === card.owner) return;
+                if (retri.si && !DSL._cond(card, game, retri.si)) return;
+                await DSL._runEffectList(retri.efectos || [], card, game, card.owner, [card], retri.nombre || tmpl.passiveName || null);
             };
         }
 

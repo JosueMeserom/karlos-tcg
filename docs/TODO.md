@@ -3,13 +3,26 @@
 Lo que queda por hacer, con su porqué. Se actualiza al cerrar cada cosa: lo que Toto no rebate
 después de hacerlo se da por bueno y se quita de aquí.
 
-> Última revisión: 26-ago-2026 · 167 cartas en CARD_DB · 115 suites en verde
+> Última revisión: 26-ago-2026 · 171 cartas en CARD_DB · 116 suites en verde
 
 ---
 
 ## 1. El grueso: las cartas del Excel
 
-**157 filas de `docs/Cartas KG.csv` sin implementar.** Es lo único grande que le queda al juego.
+**CROSSOVER HOLLOW KNIGHT (serie HK), tanda 1 hecha el 26-ago-2026** (`tests/hollow_knight.js`):
+Cáscara violenta, Gran cáscara centinela, The Knight y **Hollow Knight**, que estrena la Estasis.
+Quedan de esa serie: **Hornet** (contadores por pareja atacante-atacado), **Grimm** (tributo de
+TODO el Furor de un aliado, con castigo si no llega a 4), **Aguijón onírico** (Ayuda con targeting
+en dos pasos), **Mapa de Cornifer** (Evento: mirar las 3 de arriba del mazo + mano rival visible) y
+**Devoto acechador** (ataque de vuelta obligado al último que le pegó).
+
+**Ajuste de equilibrio en Hollow Knight** (26-ago-2026): se le añadió **Coste: 2 de Furor**, que
+en el Excel no tiene. Sus stats (5/5/7 = 17) están al nivel de Xanadu, Valafar o Zoe calcinante, y
+las cuatro que hay por encima (Diego Antonio, Némesis, Garret, Kami) pagan todas un peaje serio
+por entrar. Era la única de ese escalón que entraba gratis, y encima protegida por su propia
+Estasis mientras esperaba. Los stats se dejan como están.
+
+**153 filas de `docs/Cartas KG.csv` sin implementar.** Es lo único grande que le queda al juego.
 
 Criterio que funcionó: mirar qué **etiquetas están huérfanas** y llenar esos huecos primero, en vez
 de seguir el orden del CSV. Hoy sigue sin ninguna carta la etiqueta **'Dios'** en masculino (solo
