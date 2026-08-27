@@ -7314,6 +7314,8 @@ const CARD_DB = [
         // sucesivas, nada: el elemento sorpresa se gasta.
         id: 2015, name: "Hornet", hp: 4, def: 4, atk: 5, type: "Personaje", subtype: "Ser mágico",
         tags: ["Animal salvaje"], gender: "F", rarity: "A", series: "HK",
+        // Lo que la aguja le hace al atado, para su detalle (y la chapa la pone el propio op).
+        tempEffectText: "{genero?Atado|Atada} por la aguja: se saltará su próximo turno",
         text: "P: PROTECTORA DE LAS RUINAS: Al atacar por segunda vez al mismo enemigo, +2 de ATQ en ese ataque; al recibir el segundo ataque de ese mismo enemigo, 2 de daño menos. La tercera vez y siguientes no cambian nada. A: ATADURA DE AGUJA (2F): Ataque normal; si acierta, ese enemigo no podrá actuar en el próximo turno rival. Solo una vez por enemigo.",
         passiveName: "PROTECTORA DE LAS RUINAS", activeName: "ATADURA DE AGUJA", activeCost: 2,
         abilities: [
@@ -7394,11 +7396,11 @@ const CARD_DB = [
         // energía a los tuyos.
         id: 2017, name: "Aguijón onírico", type: "Ayuda", subtype: "Arma", tags: ["Consumible"],
         rarity: "A", cost: 0, series: "HK",
-        text: "Requisito: un aliado que no haya gastado su acción y un enemigo agotado, sin turno o con Sueño. Gasta la acción de ese aliado: hace un ataque especial a ese enemigo y gana 4 de Furor. Si lo mata, otro aliado que elijas gana otros 4.",
+        text: "Requisito: un aliado de tu vanguardia que no haya gastado su acción y un enemigo agotado, sin turno o con Sueño en la vanguardia o retaguardia rival. Gasta la acción de ese aliado: hace un ataque especial a ese enemigo y gana 4 de Furor. Si lo mata, otro aliado que elijas gana otros 4.",
         abilities: [
             { trigger: "JUGAR", requisitos: [
-                { count: { filtros: [ { campo: "exhausted", op: "falsy" } ] }, op: ">=", valor: 1,
-                  msg: "Ninguno de tus aliados tiene ya acción que gastar." },
+                { count: { zona: "VANGUARDIA", filtros: [ { campo: "exhausted", op: "falsy" } ] }, op: ">=", valor: 1,
+                  msg: "Ninguno de tus aliados de vanguardia tiene ya acción que gastar." },
                 { count: { quien: "ENEMIGO", algunFiltro: [
                     { campo: "exhausted", op: "truthy" },
                     { campo: "paralizado", op: "truthy" },
@@ -7408,6 +7410,11 @@ const CARD_DB = [
             // la empuña y quien paga con su acción.
             { trigger: "AL_USAR_AYUDA",
               requisitosObjetivo: [
+                // De VANGUARDIA: el aliado va a ATACAR, y atacar es cosa de la primera fila
+                // (Toto, 27-ago-2026). "Un aliado que no haya gastado su acción" se escribió
+                // pensando en quien de verdad puede gastarla.
+                { campo: "location", op: "==", valor: "vanguard",
+                  msg: "{objetivo} no está en la vanguardia: no puede empuñar el aguijón." },
                 { campo: "exhausted", op: "falsy", msg: "{objetivo} ya ha gastado su acción este turno." } ],
               efectos: [
                 { op: "ELEGIR", de: "ENEMIGOS", cantidad: 1,
@@ -9156,7 +9163,15 @@ const DSL = {
                     if (_zonaVisor === 'deck') await DSL._comprometer(sourceCard, game);
                     // maxCount = e.cantidad: single (1) devuelve una carta o null; multi (>1)
                     // devuelve un array (Inspiración: hasta 2, mín. 1).
-                    const r = await game.openDeckSearchViewer(pid, lista, F(e.titulo || 'ELIGE UNA CARTA'), null, e.cantidad || 1, _zonaVisor);
+                    // `soloPrimeras`: la pila se ve ENTERA -su tamaño es información legítima-
+                    // pero solo van destapadas las que la carta deja mirar (Mapa de Cornifer: las
+                    // 3 de la cima). Es el mismo `soloVisibles` del visor que usa el SEGUIMIENTO
+                    // de Erasmo. OJO: este es el camino de UNA zona, que es por el que pasan casi
+                    // todas las búsquedas; el de `confirmarPorZona` lo tenía y este no, así que
+                    // el mazo se veía enterito (Toto, 27-ago-2026).
+                    const _optsVisor = (typeof e.soloPrimeras === 'number')
+                        ? { mirador: pid, soloVisibles: lista.map(c => c.instanceId) } : null;
+                    const r = await game.openDeckSearchViewer(pid, lista, F(e.titulo || 'ELIGE UNA CARTA'), null, e.cantidad || 1, _zonaVisor, null, false, _optsVisor);
                     elegidas = Array.isArray(r) ? r : (r ? [r] : []);
                 } else {
                     elegidas = await game.openVisualSearchModal(F(e.titulo || 'ELIGE UNA CARTA'), lista, e.cantidad || 1, !!e.autoSeleccion, pid);
@@ -9979,6 +9994,13 @@ const DSL = {
             if (e.badge) marca.badge = e.badge;
             if (e.oculto) marca.oculto = true;                 // Oculta al portador mientras dure
             if (e.pierdeSuTurno) marca.pierdeSuTurno = true;   // se agota solo al llegar SU turno
+            // Y CON CHAPA DE OFICIO (Toto, 27-ago-2026). Una marca que le va a quitar el turno a
+            // alguien es de las cosas más gordas que hay y hasta hoy no se veía en la carta: solo
+            // salía en el detalle, y solo si su plantilla declaraba `tempEffectText`. Ahora la
+            // chapa la pone el propio op, así que la llevan TODAS -PEM, Canceladora, Nuckelavee,
+            // ATADURA DE AGUJA- sin que ninguna tenga que acordarse. Se puede pisar declarando
+            // `badge` a mano, como cualquier otra.
+            if (e.pierdeSuTurno && !marca.badge) marca.badge = { icono: '⏸️', color: '#475569' };
             // provocaAtaque (Achmay, 31-jul-2026): ver el onStartTurnTempEffect genérico más
             // abajo (guard "MARCAR_TEMPORAL" en JSON.stringify(abs)).
             if (e.provocaAtaque) marca.provocaAtaque = true;

@@ -964,3 +964,27 @@ por defecto, igual que a los Avatares. Se aplica como cualquier otro estado:
 
 Y el motor tiene candado: `checkDeath` no entra dos veces en la misma carta, ni mientras se está
 procesando su muerte ni una vez que ya está en el descarte. Una carta se muere UNA vez.
+
+---
+
+## §26. Zonas en el texto: al aliado que paga no se le pone, al objetivo enemigo sí (27-ago-2026)
+
+Pregunta de Toto, contestada mirando las 47 Ayudas. **La convención que ya existe es esta**, y
+conviene mantenerla:
+
+* **MATIZ (Toto, 27-ago-2026): "gastar su acción" implica VANGUARDIA.** Si lo que se le pide al
+  aliado es *gastar su acción del turno* para algo que se parece a un ataque, el aliado tiene que
+  poder actuar de verdad — y eso, salvo excepciones, es la primera fila. El Aguijón onírico lo
+  dice ("un aliado de tu vanguardia") y lo comprueba. Atomización, que es la otra que gasta una
+  acción, hoy no lo dice: entra en la pasada de redacción pendiente (§3.bis del TODO).
+* **El aliado que paga, tributa o actúa NO lleva zona.** Ninguna de las siete Ayudas que le piden
+  algo a un aliado la menciona: *"Elige un aliado no agotado"* (Atomización), *"la acción de un
+  aliado"* (Necronomicón), *"2 de Furor de un Personaje 'Karlos'"* (Cañón de positrones), *"de un
+  aliado 'Draconiano/a'"* (Furia berserker), *"de dos aliados distintos"* (Rezo en grupo)… En
+  todas vale cualquiera de las dos filas y no hace falta decirlo.
+* **El objetivo ENEMIGO sí la lleva** cuando alcanza las dos: *"un enemigo de la vanguardia o
+  retaguardia rival"* (Cañón de positrones), y por eso mismo la lleva el Aguijón onírico. Un
+  ataque normal solo llega a la vanguardia, así que ahí la zona es la regla y tampoco se escribe;
+  lo que se escribe es cuando el efecto **se sale** de lo normal.
+
+O sea: la zona se menciona cuando **cambia** lo que el jugador espera, no como coletilla.

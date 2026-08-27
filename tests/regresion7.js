@@ -84,6 +84,7 @@ const escenarios = [
     {
         nombre: 'PEM: paga 1 Furor y paraliza a la única Máquina enemiga',
         diferenciasEsperadas: [
+            { contiene: 'tempEffects.0.badge', motivo: 'las marcas que hacen perder el turno llevan chapa de oficio desde el 27-ago-2026 (la pone el op MARCAR_TEMPORAL, no la carta): una marca que decide un turno futuro tiene que verse' },
             { contiene: 'tempEffects.0.pierdeSuTurno', motivo: 'la marca ahora LLEVA ESCRITO lo que antes hacía un hook a mano de la carta: el motor ya tenía handlers genéricos para `pierdeSuTurno`, así que la carta solo tiene que declararlo' },
         ],
         p1: { vanguardia: [{ carta: 'Oso con armadura', furor: 1 }], mano: ['PEM'] },

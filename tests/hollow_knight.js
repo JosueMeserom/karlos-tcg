@@ -415,6 +415,18 @@ const enCampo = (g, pid, n) => !!buscar(g, pid, n);
         check('sin enemigos indefensos no se puede jugar',
             g.players.p1.hand.some(c => c.name === 'Aguijón onírico'));
     }
+    {
+        // El que lo empuña tiene que estar en VANGUARDIA: es quien va a atacar (Toto, 27-ago-2026).
+        const { g, paso } = await mesa({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'Karlos', campos: { exhausted: true } }], retaguardia: [{ carta: 'Kyle' }],
+                  mano: ['Aguijón onírico'] },
+            p2: { vanguardia: [{ carta: 'Mini-tigre', campos: { exhausted: true } }] },
+        });
+        await paso({ jugar: 'Aguijón onírico' });
+        check('con la vanguardia agotada no se puede jugar, aunque haya alguien atrás',
+            g.players.p1.hand.some(c => c.name === 'Aguijón onírico'));
+    }
 
     console.log('');
     if (fallos) { console.log(`SUITE hollow_knight: ${fallos} FALLOS de ${comprobaciones} comprobaciones`); process.exit(1); }

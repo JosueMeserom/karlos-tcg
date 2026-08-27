@@ -36,7 +36,12 @@ saltar (`_saltarRobo`) cuando algo ya se ha llevado una carta en su lugar.
 el campo computado `paralizado` (lleva una marca que le hace saltarse el turno), que es lo que
 permite filtrar "un enemigo que no pueda actuar".
 
-**Las 9 cartas de la serie HK están hechas** (`tests/hollow_knight.js`, 63 comprobaciones).
+**Las 9 cartas de la serie HK están hechas** (`tests/hollow_knight.js`, 64 comprobaciones).
+
+Idea suelta de Toto sobre el Aguijón (27-ago-2026), no hecha: en vez de exigir vanguardia, dejar
+que lo empuñe **cualquier aliado que de verdad pueda actuar aunque esté en retaguardia** (Berry
+gana Furor desde atrás). Hoy no existe un "puede actuar desde retaguardia" que consultar — habría
+que marcarlo carta por carta —, así que se queda en vanguardia, que es lo que su texto dice.
 
 **Ajuste de equilibrio en Hollow Knight** (26-ago-2026): se le añadió **Coste: 2 de Furor**, que
 en el Excel no tiene. Sus stats (5/5/7 = 17) están al nivel de Xanadu, Valafar o Zoe calcinante, y
