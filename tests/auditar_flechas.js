@@ -178,3 +178,12 @@ if (malas.length) {
 
 console.log(`\nTOTAL: ${filas.length} cartas · ${conFlecha.length} con flecha · ${noProcede.length} no procede · ${sinFlecha.length} POR DECIDIR`);
 if (malas.length) { console.log('\nHAY MARCAJES INCOHERENTES.'); process.exit(1); }
+// DEJA DE SER INFORMATIVA (Toto, 27-ago-2026): "eso es muy importante que lo haga cada carta con
+// Requisito o Coste, a menos que decidamos en algún caso concreto que no". O sea: la flecha es la
+// NORMA y la excepción hay que declararla arriba, en NO_PROCEDE, con su motivo. Una carta nueva
+// que se olvide de marcar su coste pone la pasada en rojo, que es justo lo que no pasaba antes.
+if (sinFlecha.length) {
+    console.log('\nHAY COSTES/REQUISITOS SIN FLECHA. Marca la carta (esCoste / esRequisito /');
+    console.log('requisitoVisible) o, si de verdad no procede, añádela a NO_PROCEDE con su motivo.');
+    process.exit(1);
+}

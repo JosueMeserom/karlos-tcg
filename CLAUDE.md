@@ -40,6 +40,9 @@ La batería histórica (r1–r23 + humo) se perdió con los transcripts de chat 
 
 ## Metodología (INNEGOCIABLE)
 0. **Copiar una carta hermana NO exime de repasar sus normas.** El origen de casi todos los fallos repetidos de esta fase es replicar un patrón y heredar de paso un flag que apaga una norma. Al reusar una carta como plantilla, leer QUÉ hace cada campo que se copia; las auditorías (`auditar_costes`, `auditar_presenta`, `auditar_llegadas`…) están para cazar justo eso, así que pasarlas TODAS es lo que cierra el agujero, no la buena memoria.
+0.ter. **Toda carta con Coste o Requisito lanza su flecha al presentarse** (`esCoste` /
+   `esRequisito` en el efecto, o `requisitoVisible` en la plantilla). La excepción se declara en
+   la lista `NO_PROCEDE` de `tests/auditar_flechas.js`, que **ya no es informativa: falla**.
 0.bis. **Una marca temporal que decide algo de un turno futuro TIENE QUE VERSE**: chapa en la
    carta (`badge`; las de `pierdeSuTurno` la llevan de oficio) y su línea en el detalle
    (`tempEffectText` en la plantilla de quien la pone). Lo vigila `node tests/auditar_marcas.js`,

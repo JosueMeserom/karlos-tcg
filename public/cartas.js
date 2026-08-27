@@ -7435,10 +7435,14 @@ const CARD_DB = [
                     { campo: "exhausted", op: "truthy" },
                     { campo: "paralizado", op: "truthy" },
                     { campo: "status.sueno.duration", op: ">=", valor: 1 } ],
-                  titulo: "AGUIJÓN ONÍRICO: elige al enemigo indefenso",
+                  titulo: "AGUIJÓN ONÍRICO: elige al enemigo indefenso", esRequisito: true,
                   efectos: [
                     // El pagador es el aliado que la empuña: suyo es el golpe, suya la acción.
-                    { op: "MARCAR", target: { quien: "PAGADOR" }, campo: "exhausted", valor: true,
+                    // Su ACCIÓN es lo que cuesta, así que lleva flecha de coste al presentarse
+                    // (§14.bis). `esCoste` en un efecto con `target` no lo ve
+                    // _marcarCostesDeclarados -que mira los que van al objetivo de la Ayuda-, así
+                    // que se marca aquí, que es el mismo aliado.
+                    { op: "MARCAR", target: { quien: "PAGADOR" }, campo: "exhausted", valor: true, esCoste: true,
                       log: "{carta} bebe de los sueños: {objetivo} deja de poder actuar este turno." },
                     { op: "ATACAR", especial: true, atacante: { quien: "PAGADOR" },
                       siMuere: [
@@ -9228,6 +9232,9 @@ const DSL = {
             // carta en vez de fijarlo — mismo criterio que el `delta` ya añadido a MARCAR_JUGADOR.
             if (typeof e.delta === 'number') target[e.campo] = (target[e.campo] || 0) + e.delta;
             else target[e.campo] = e.valor;
+            // `esCoste`/`esRequisito` también aquí (27-ago-2026): hay costes que no son Furor
+            // -gastar la acción de un aliado- y su flecha se declara igual que las demás.
+            if (e.esCoste || e.esRequisito) DSL._marcarCoste(game, [target], e.esRequisito ? 'requisito' : 'coste');
             if (e.log) game.logMsg(DSL._fill(e.log, { carta: DSL._nombre(game, sourceCard), objetivo: DSL._nombre(game, target) }), e.logTipo || 'ability');
             return true;
         }

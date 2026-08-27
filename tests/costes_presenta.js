@@ -689,6 +689,26 @@ async function montar(esc) {
             !(g._costesPresenta || []).some(m => m.zonaSel), JSON.stringify(g._costesPresenta || []));
     }
 
+    console.log('\n--- Aguijón onírico: la acción del aliado es COSTE y el enemigo indefenso, REQUISITO ---');
+    {
+        // Su coste no es Furor: es la ACCIÓN de un aliado. Y su requisito no es tener algo en el
+        // campo, es que el enemigo esté indefenso. Las dos flechas tienen que salir igual
+        // (Toto, 27-ago-2026: "es muy importante que lo haga cada carta con Requisito o Coste").
+        const { ctx, g, marcas } = await montar({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'Karlos' }], mano: ['Aguijón onírico'] },
+            p2: { vanguardia: [{ carta: 'Mini-tigre', vida: 9, campos: { maxHp: 9, exhausted: true } }] },
+        });
+        await ejecutarPaso(ctx, g, { jugar: 'Aguijón onírico' });
+        await ejecutarPaso(ctx, g, { elegir: ['Karlos'] });
+        await ejecutarPaso(ctx, g, { elegir: ['Mini-tigre'] });
+        await asentar(ctx);
+        check('el aliado que la empuña sale con flecha de COSTE',
+            marcas.some(m => m.nombre === 'Karlos' && m.tipo === 'coste'), JSON.stringify(marcas));
+        check('...y el enemigo indefenso, con la de REQUISITO',
+            marcas.some(m => m.nombre === 'Mini-tigre' && m.tipo === 'requisito'), JSON.stringify(marcas));
+    }
+
     console.log('');
     if (fallos) { console.log(`SUITE costes_presenta: ${fallos} FALLOS de ${total} comprobaciones`); process.exit(1); }
     console.log(`SUITE costes_presenta: ${total}/${total} comprobaciones — COSTES Y REQUISITOS CORRECTOS`);

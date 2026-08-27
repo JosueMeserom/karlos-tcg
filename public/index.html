@@ -10360,11 +10360,15 @@
                 // preguntar por ella entra otra vez, dispara otra vez su AL_MORIR y, si ese
                 // AL_MORIR hace daño, se realimenta. Una carta se muere UNA vez.
                 // Dos condiciones, y las dos hacen falta: `_procesandoMuerte` cubre la re-entrada
-                // MIENTRAS se procesa, y estar ya en el descarte cubre la llamada tardía (el
-                // `checkDeath` que el flujo de ataque hace al terminar, cuando la carta ya se fue).
-                // Ninguna de las dos estorba a una carta que RESUCITA: al volver al campo su
-                // `location` deja de ser 'discard' y la bandera se limpia sola en el `finally`.
-                if (card._procesandoMuerte || card.location === 'discard') return;
+                // MIENTRAS se procesa, y estar ya EN LA PILA de descartes cubre la llamada tardía
+                // (el `checkDeath` que el flujo de ataque hace al terminar, cuando la carta ya se
+                // fue). Se mira la PILA y no `card.location`: hay cartas que ponen el `location` a
+                // mano ANTES de llamar aquí para que la muerte se resuelva en la zona correcta
+                // -Meca EBA con su piloto- y mirando solo el campo se saltaba el proceso entero,
+                // así que el piloto no llegaba a la pila (27-ago-2026, lo cazó tests/meca_fusion).
+                // Ninguna de las dos estorba a una carta que RESUCITA: sale de la pila al volver.
+                const _plM = this.players && this.players[card.owner];
+                if (card._procesandoMuerte || (_plM && (_plM.discard || []).some(c => c.instanceId === card.instanceId))) return;
                 card._procesandoMuerte = true;
                 try {
                     if (card.currentHp <= 0) {
