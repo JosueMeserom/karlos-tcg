@@ -40,7 +40,11 @@ La batería histórica (r1–r23 + humo) se perdió con los transcripts de chat 
 
 ## Metodología (INNEGOCIABLE)
 0. **Copiar una carta hermana NO exime de repasar sus normas.** El origen de casi todos los fallos repetidos de esta fase es replicar un patrón y heredar de paso un flag que apaga una norma. Al reusar una carta como plantilla, leer QUÉ hace cada campo que se copia; las auditorías (`auditar_costes`, `auditar_presenta`, `auditar_llegadas`…) están para cazar justo eso, así que pasarlas TODAS es lo que cierra el agujero, no la buena memoria.
-1. Tras CUALQUIER cambio en `cartas.js` o el intérprete: pasada estricta de TODAS las suites (`for f in tests/regresion*.js tests/humo.js; do node "$f"; done`, más las de aserción: `nuevas*`, `modales_pilas`, `badge_furor_forzado`, `picker_mano`, `capas_cliente`, `costes_presenta` y **`online`**), exigiendo el mensaje de éxito explícito de cada una. No vale "parece que pasa".
+0.bis. **Una marca temporal que decide algo de un turno futuro TIENE QUE VERSE**: chapa en la
+   carta (`badge`; las de `pierdeSuTurno` la llevan de oficio) y su línea en el detalle
+   (`tempEffectText` en la plantilla de quien la pone). Lo vigila `node tests/auditar_marcas.js`,
+   que además comprueba que esa línea LLEGA de verdad -no basta con declararla-.
+1. Tras CUALQUIER cambio en `cartas.js` o el intérprete: pasada estricta de TODAS las suites (`for f in tests/regresion*.js tests/humo.js; do node "$f"; done`, más las de aserción: `nuevas*`, `modales_pilas`, `badge_furor_forzado`, `picker_mano`, `capas_cliente`, `costes_presenta`, `auditar_marcas` y **`online`**), exigiendo el mensaje de éxito explícito de cada una. No vale "parece que pasa".
 2. `node --check` tras editar cualquier `.js`.
 3. `index.html` es CRLF: conservar los finales de línea al editar.
 4. Nunca inventar archivos ni rutas no confirmados por el árbol de directorios o por Toto.

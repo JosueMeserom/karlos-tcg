@@ -1406,7 +1406,7 @@ const CARD_DB = [
         avisoNoJugable: "El Escudo mágico es una carta de reacción. Déjala en tu mano.",
     },
     { 
-        id: 27, name: "Atomización", type: "Ayuda", subtype: "Técnica", tags: ["Consumible"], rarity: "B", text: "Elige un aliado no agotado. Gasta su acción para quitar 2 de VIDA a un enemigo (ignora DEF). Si lo mata, vuelve a la mano.", cost: 0,
+        id: 27, name: "Atomización", type: "Ayuda", subtype: "Técnica", tags: ["Consumible"], rarity: "B", text: "Elige un aliado de tu vanguardia no agotado. Gasta su acción para quitar 2 de VIDA a un enemigo (ignora DEF). Si lo mata, vuelve a la mano.", cost: 0,
         // Migrada (31-jul-2026). Se creía irreducible por sus dos inputState propios del motor
         // (SELECT_ATOM_ALLY / SELECT_ATOM_ENEMY); leyéndola de cerca resultó ser el patrón de
         // Granada de maná -pagador + objetivo- más un "si lo mata". Los dos estados a medida
@@ -1417,7 +1417,7 @@ const CARD_DB = [
         // onExecuteAyuda, ya con el enemigo elegido).
         abilities: [
             { trigger: "JUGAR", requisitos: [
-                { count: { filtros: [
+                { count: { zona: "VANGUARDIA", filtros: [
                     { campo: "exhausted", op: "falsy" },
                     { o: [ [ { campo: "type", op: "==", valor: "Personaje" } ], [ { campo: "type", op: "==", valor: "Esbirro" } ] ] } ] },
                   op: ">=", valor: 1, msg: "No tienes aliados activos para gastar su acción." },
@@ -1427,6 +1427,10 @@ const CARD_DB = [
               efectos: [
                 { op: "ELEGIR", de: "ALIADOS",
                   filtros: [
+                    // De VANGUARDIA (Toto, 27-ago-2026, §26 de la rúbrica): quien gasta su acción
+                    // tiene que poder gastarla de verdad. Antes valía cualquiera, y el texto no lo
+                    // decía ni en un sentido ni en otro.
+                    { campo: "location", op: "==", valor: "vanguard" },
                     { campo: "exhausted", op: "falsy" },
                     { o: [ [ { campo: "type", op: "==", valor: "Personaje" } ], [ { campo: "type", op: "==", valor: "Esbirro" } ] ] } ],
                   cantidad: 1, guardaEn: "atomizador",
@@ -4053,6 +4057,10 @@ const CARD_DB = [
         ],
     },
     {
+        // `sinTextoMarca` (27-ago-2026): su marca es la CUENTA ATRÁS de la evolución, y eso ya se
+        // ve -contador propio con su número, y el bono de stats en su línea-. No hay nada oculto
+        // que explicar. Lo mira tests/auditar_marcas.js.
+        sinTextoMarca: true,
         name: "Súper Evolución", type: "Ayuda", subtype: "Técnica", tags: ["Equipable"], rarity: "B", cost: 4, series: 1,
         // tempEffectSinLinea (31-jul-2026, betasteo de Toto): sin esto, "Efectos actuales" de
         // Súper Evolución mostraba una segunda línea "Súper Evolución, objetivo: X" además de los
@@ -4254,6 +4262,8 @@ const CARD_DB = [
     },
     {
         name: "Achmay", hp: 8, def: 2, atk: 0, type: "Personaje", subtype: "Ser mágico", tags: ["Cosa"], gender: "M", rarity: "S", cost: 3, series: 1,
+        // Lo que la provocación le hace al provocado, para su detalle (la chapa la pone el op).
+        tempEffectText: "{genero?Provocado|Provocada}: deberá atacar a quien le insultó en su próximo turno",
         text: "P: YOLOLO: No puede atacar. Todos los ataques normales enemigos deben ir dirigidos a él. Si recibe un ataque normal, quita 1 VIDA al atacante. A: PÉGAME, PERRA (2F): Obliga a un enemigo a realizar un ataque normal hacia Achmay en su próximo turno (si puede). Esta habilidad no gasta la acción de Achmay.",
         passiveName: "YOLOLO", activeName: "PÉGAME, PERRA", activeCost: 2,
         
@@ -4652,6 +4662,9 @@ const CARD_DB = [
         }
     },
     {
+        // `sinTextoMarca`: ídem, su marca es el temporizador de un turno que ya cuenta su
+        // `notaEfecto` ("además devuelve al portador a la mano").
+        sinTextoMarca: true,
         name: "Poder Legado", type: "Ayuda", subtype: "Técnica", tags: ["Equipable"], rarity: "S", cost: 1, series: 2,
         // Requisito visible: a quién señala la flecha lima al presentarse (§14.bis).
         requisitoVisible: [ { quien: "ALIADO", zona: "vanguardia", filtros: [ { campo: "name", op: "contieneTexto", valor: "Karlos" }, { campo: "currentHp", op: "<=", valor: 1 } ], uno: true } ],
@@ -10025,7 +10038,10 @@ const DSL = {
             // Una marca con chapa tiene que VERSE en cuanto se pone, no en el siguiente repintado
             // que caiga por otro motivo (Toto, 21-ago-2026: "no aparece la chapa cuando se aplica
             // el estado; sale al empezar el turno del rival").
-            if (e.badge && typeof game.render === 'function') game.render();
+            // `marca.badge`, no `e.badge`: hay chapas que pone el propio op y no la carta (la de
+            // `pierdeSuTurno`), y mirando solo lo declarado no se repintaba por ellas — aparecían
+            // en el siguiente render que cayera por otro motivo, o al recargar (Toto, 27-ago-2026).
+            if (marca.badge && typeof game.render === 'function') game.render();
             return true;
         }
         // QUITAR_MARCA (21-ago-2026): retira del objetivo las marcas que puso ESTA carta. Es la
@@ -11733,7 +11749,11 @@ const DSL = {
         // propia carta).
         const preview = abs.find(a => a.trigger === 'PREVIEW');
         if (preview && typeof tmpl.onGetPreviewEffects !== 'function') {
-            tmpl.onGetPreviewEffects = function (card, game) {
+            tmpl.onGetPreviewEffects = function (card, game, eff) {
+                // Con `eff` la pregunta NO es por esta carta: es el detalle de OTRA que lleva una
+                // marca puesta por ella, y de eso responde el generador de `tempEffectText`. Aquí
+                // se contesta lo propio (los rastros de la carta) y punto.
+                if (eff) return [];
                 const out = [];
                 const _hab = preview.nombre || tmpl.passiveName || null;
                 const _mesa = [...game.players.p1.vanguard, ...game.players.p1.rearguard,
@@ -11757,6 +11777,7 @@ const DSL = {
                 });
                 return out;
             };
+            tmpl.onGetPreviewEffects.__dslPreview = true;
         }
 
         // ANTES_DE_RECIBIR_DAÑO -> onBeforeTakeDamage: el último punto en el que se puede tocar
@@ -12425,9 +12446,17 @@ const DSL = {
                     return false;
                 };
             }
-            if (tmpl.tempEffectText && typeof tmpl.onGetPreviewEffects !== 'function') {
+            // OJO CON EL HUECO COMPARTIDO (Toto, 27-ago-2026). `onGetPreviewEffects` lo usan DOS
+            // cosas distintas: las líneas PROPIAS de una carta (trigger PREVIEW) y lo que una
+            // marca suya le cuenta a la carta MARCADA (esto). Cada generador se guardaba con un
+            // `typeof !== 'function'`, así que el primero en llegar dejaba mudo al segundo: Hornet
+            // declaraba su `tempEffectText` y el enemigo atado no veía NADA en su detalle. Ahora
+            // se encadenan (y una carta que escriba el hook A MANO sigue mandando, como siempre).
+            const _prevPreview = (typeof tmpl.onGetPreviewEffects === 'function' && tmpl.onGetPreviewEffects.__dslPreview)
+                ? tmpl.onGetPreviewEffects : null;
+            if (tmpl.tempEffectText && (typeof tmpl.onGetPreviewEffects !== 'function' || _prevPreview)) {
                 tmpl.onGetPreviewEffects = function (card, game, eff) {
-                    if (!eff) return [];
+                    if (!eff) return _prevPreview ? (_prevPreview.call(this, card, game) || []) : [];
                     // La carta origen (Ayuda/Evento que dejó la marca) puede estar ya en descartes:
                     // se busca por instanceId y, si no aparece, queda su nombre como respaldo.
                     const src = (eff.sourceInstanceId && typeof game.findCard === 'function') ? game.findCard(eff.sourceInstanceId) : null;

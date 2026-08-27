@@ -827,7 +827,11 @@ console.log('\n--- chapas de marca temporal ---');
     check('los periódicos repintan al terminar, una sola vez',
           /if \(await tmpl\.onPeriodico\(card, game, fase, momento, activePid\)\) algo = true;/.test(srcDsl)
           && /if \(algo && typeof game\.render === 'function'\) game\.render\(\);/.test(srcDsl));
-    check('una marca con chapa se ve en cuanto se pone', /if \(e\.badge && typeof game\.render === 'function'\) game\.render\(\)/.test(srcDsl));
+    // `marca.badge` y no `e.badge` (27-ago-2026): hay chapas que pone el propio op y no la carta
+    // -la de `pierdeSuTurno`-, y mirando solo lo declarado no se repintaba por ellas.
+    check('una marca con chapa se ve en cuanto se pone', /if \(marca\.badge && typeof game\.render === 'function'\) game\.render\(\)/.test(srcDsl));
+    check('...y las marcas que quitan el turno llevan chapa aunque no la declaren',
+          /if \(e\.pierdeSuTurno && !marca\.badge\) marca\.badge = \{ icono: '⏸️'/.test(srcDsl));
     // `ANTES` es antes de lo que la FASE HACE, no antes de su cartel (Toto, 21-ago-2026,
     // corrigiéndome: "ANTES es antes de los demás efectos, no antes del cartel"). Para lo que
     // ocurre nada más empezar el turno está la fase INICIO DEL TURNO, que corre al despachar el
