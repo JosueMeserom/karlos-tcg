@@ -3,7 +3,7 @@
 Lo que queda por hacer, con su porqué. Se actualiza al cerrar cada cosa: lo que Toto no rebate
 después de hacerlo se da por bueno y se quita de aquí.
 
-> Última revisión: 27-ago-2026 · 175 cartas en CARD_DB · 117 suites en verde
+> Última revisión: 27-ago-2026 · 176 cartas en CARD_DB · 117 suites en verde
 
 ---
 
@@ -30,10 +30,13 @@ Además, el motor aprendió que un EVENTO también está "en mesa" para sus pasi
 salía por el guard de vanguardia/retaguardia y no corrían nunca) y que el robo de la fase se puede
 saltar (`_saltarRobo`) cuando algo ya se ha llevado una carta en su lugar.
 
-Queda UNA de la serie:
-- **Aguijón onírico** (Ayuda): targeting en dos pasos con condiciones distintas (un aliado que aún
-  no haya gastado su acción; un enemigo que no pueda actuar o esté dormido), el aliado gasta su
-  acción, ataque especial, +4 de Furor al que pega y otros +4 a un tercero si el enemigo muere.
+**Tanda 5 (27-ago-2026): CROSSOVER CERRADO.** **Aguijón onírico** entra con tres piezas más —
+`atacante` en el op ATACAR (el golpe lo da OTRO: la Ayuda se la das a un aliado y pega él),
+`siMuere` como hermano de `siExito`, y `excluirPagador` en ELEGIR ("otro aliado DIFERENTE"). Más
+el campo computado `paralizado` (lleva una marca que le hace saltarse el turno), que es lo que
+permite filtrar "un enemigo que no pueda actuar".
+
+**Las 9 cartas de la serie HK están hechas** (`tests/hollow_knight.js`, 63 comprobaciones).
 
 **Ajuste de equilibrio en Hollow Knight** (26-ago-2026): se le añadió **Coste: 2 de Furor**, que
 en el Excel no tiene. Sus stats (5/5/7 = 17) están al nivel de Xanadu, Valafar o Zoe calcinante, y

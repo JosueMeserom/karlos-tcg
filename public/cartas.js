@@ -7386,6 +7386,52 @@ const CARD_DB = [
                   siExito: [ { op: "MARCAR_JUGADOR", campo: "_saltarRobo", valor: true } ] } ] }
         ],
     },
+
+    {
+        // La última del crossover. No hace daño por sí sola: le da el golpe a OTRO -a un aliado
+        // que aún no haya actuado- y solo contra alguien que ya no puede defenderse ni responder.
+        // Es la carta que convierte una atadura o un Sueño en una ejecución, y de paso llena de
+        // energía a los tuyos.
+        id: 2017, name: "Aguijón onírico", type: "Ayuda", subtype: "Arma", tags: ["Consumible"],
+        rarity: "A", cost: 0, series: "HK",
+        text: "Requisito: un aliado que no haya gastado su acción y un enemigo agotado, sin turno o con Sueño. Gasta la acción de ese aliado: hace un ataque especial a ese enemigo y gana 4 de Furor. Si lo mata, otro aliado que elijas gana otros 4.",
+        abilities: [
+            { trigger: "JUGAR", requisitos: [
+                { count: { filtros: [ { campo: "exhausted", op: "falsy" } ] }, op: ">=", valor: 1,
+                  msg: "Ninguno de tus aliados tiene ya acción que gastar." },
+                { count: { quien: "ENEMIGO", algunFiltro: [
+                    { campo: "exhausted", op: "truthy" },
+                    { campo: "paralizado", op: "truthy" },
+                    { campo: "status.sueno.duration", op: ">=", valor: 1 } ] }, op: ">=", valor: 1,
+                  msg: "No hay ningún enemigo indefenso al que clavarle el aguijón." } ] },
+            // El aliado se elige con la Ayuda en la mano (reborde verde, como Espada V): es quien
+            // la empuña y quien paga con su acción.
+            { trigger: "AL_USAR_AYUDA",
+              requisitosObjetivo: [
+                { campo: "exhausted", op: "falsy", msg: "{objetivo} ya ha gastado su acción este turno." } ],
+              efectos: [
+                { op: "ELEGIR", de: "ENEMIGOS", cantidad: 1,
+                  algunFiltro: [
+                    { campo: "exhausted", op: "truthy" },
+                    { campo: "paralizado", op: "truthy" },
+                    { campo: "status.sueno.duration", op: ">=", valor: 1 } ],
+                  titulo: "AGUIJÓN ONÍRICO: elige al enemigo indefenso",
+                  efectos: [
+                    // El pagador es el aliado que la empuña: suyo es el golpe, suya la acción.
+                    { op: "MARCAR", target: { quien: "PAGADOR" }, campo: "exhausted", valor: true,
+                      log: "{carta} bebe de los sueños: {objetivo} deja de poder actuar este turno." },
+                    { op: "ATACAR", especial: true, atacante: { quien: "PAGADOR" },
+                      siMuere: [
+                        { op: "ELEGIR", de: "ALIADOS", cantidad: 1, opcional: true,
+                          excluirPagador: true,
+                          titulo: "El sueño se rompe: elige a otro aliado que gane 4 de Furor",
+                          efectos: [
+                            { op: "MODIFICAR_STAT", stat: "furor", delta: 4,
+                              log: "El eco del sueño llena de energía a {objetivo}." } ] } ] },
+                    { op: "MODIFICAR_STAT", target: { quien: "PAGADOR" }, stat: "furor", delta: 4,
+                      log: "{objetivo} se llena de energía onírica." } ] } ] }
+        ],
+    },
 ];
 
 // ===================================================================
@@ -7575,6 +7621,9 @@ const DSL = {
         // atkBase/defBase: lo que dice la PLANTILLA, sin buffs ni equipos (Silhouette copia
         // "stats base", no el Atq de este instante). 'atk'/'def' a secas siguen siendo el actual.
         if (k === 'atkBase' || k === 'defBase') { const t = DSL._tmpl(c.id) || {}; return k === 'atkBase' ? t.atk : t.def; }
+        // `paralizado`: lleva encima una marca que le hace saltarse su turno (el PEM, la ATADURA
+        // DE AGUJA de Hornet). Campo computado, como dotActivo: así se puede filtrar por él.
+        if (k === 'paralizado') return !!(Array.isArray(c.tempEffects) && c.tempEffects.some(t => t && t.pierdeSuTurno));
         if (k === 'dotActivo') return !!(c.status && c.status.dot && c.status.dot.duration > 0); // campo computado: ¿tiene Daño por Tiempo activo?
         // Ruta con puntos (Karlitos, 31-jul-2026): "counters.karlitos_entrenamiento.count".
         // Los contadores viven anidados, así que sin esto no se podía condicionar por su valor.
@@ -8637,9 +8686,12 @@ const DSL = {
             return true;
         }
         if (e.op === 'ATACAR') {
+            // `atacante`: quien pega puede NO ser la carta fuente (Aguijón onírico es una Ayuda:
+            // el ataque especial lo hace el aliado al que se la das). Por defecto, la de siempre.
+            const _agr = e.atacante ? (DSL._pool(ownerId, game, e.atacante, sourceCard)[0] || sourceCard) : sourceCard;
             const startHp = target.currentHp;
             const bono = DSL._value(ownerId, game, e.bonoAtq, sourceCard, ctx) || 0;
-            if (bono) sourceCard.currentAtk += bono;
+            if (bono) _agr.currentAtk += bono;
             if (e.especial !== undefined) {
                 // Ataque DIRECTO (Toto, 27/28-jul-2026): NO pasa por performAttack (ese es el
                 // pipeline de ataque NORMAL — reacciones de moneda, etc.). Reproduce fielmente
@@ -8659,24 +8711,24 @@ const DSL = {
                 // internamente para el ataque normal); otras (Hechicero, Lolita) nunca lo
                 // hicieron. Opt-in para no cambiar a las que no lo pedían. Si falla, la carta se
                 // agota igual que en el ataque normal.
-                if (e.chequearEstado && typeof game.checkAttackStatus === 'function' && !(await game.checkAttackStatus(sourceCard, target))) {
-                    sourceCard.exhausted = true;
+                if (e.chequearEstado && typeof game.checkAttackStatus === 'function' && !(await game.checkAttackStatus(_agr, target))) {
+                    _agr.exhausted = true;
                 } else {
                     const defTpl = DSL._tmpl(target.id);
                     let dodged = false;
                     if (defTpl && typeof defTpl.onBeforeDefend === 'function') {
-                        dodged = await defTpl.onBeforeDefend(target, sourceCard, game, habilidad || sourceCard.name, !!e.especial);
+                        dodged = await defTpl.onBeforeDefend(target, _agr, game, habilidad || _agr.name, !!e.especial);
                     }
                     if (!dodged) {
                         // ignorarDefensa (Eris, TIRO FINAL): el daño es el Atq puro, sin restar
                         // Def. El suelo 0.5/1 sigue aplicando si el Atq es <= 0.
-                        let dmg = e.ignorarDefensa ? sourceCard.currentAtk : sourceCard.currentAtk - target.currentDef;
-                        if (dmg <= 0) dmg = (sourceCard.type === 'Esbirro' && target.type === 'Personaje') ? 0.5 : 1;
+                        let dmg = e.ignorarDefensa ? _agr.currentAtk : _agr.currentAtk - target.currentDef;
+                        if (dmg <= 0) dmg = (_agr.type === 'Esbirro' && target.type === 'Personaje') ? 0.5 : 1;
                         // `minimoDano` (Hollow Knight, RECORDAR): el golpe nunca baja de ahí, aunque
                         // el cálculo dé menos. No es lo mismo que FIJAR_DAÑO (que ignora el
                         // cálculo entero): aquí un golpe grande sigue siendo grande.
                         if (typeof e.minimoDano === 'number' && dmg < e.minimoDano) dmg = e.minimoDano;
-                        await game.dealDamage(sourceCard, target, dmg, !!e.especial);
+                        await game.dealDamage(_agr, target, dmg, !!e.especial);
                         await game.checkDeath(target);
                     }
                 }
@@ -8694,12 +8746,20 @@ const DSL = {
                 // Furor. Se restaura el contexto tras cada performAttack para que el RESTO de la
                 // lista de efectos (el 2º ATACAR) siga viendo la Activa en curso.
                 const _ctxPrevio = game.abilityContext;
-                await game.performAttack(sourceCard, target);
+                await game.performAttack(_agr, target);
                 game.abilityContext = _ctxPrevio;
             }
-            if (bono) { if (typeof game.updatePassives === 'function') game.updatePassives(); else sourceCard.currentAtk -= bono; }
-            const exito = target.currentHp < startHp && target.currentHp > 0; // dañó y sigue vivo
+            if (bono) { if (typeof game.updatePassives === 'function') game.updatePassives(); else _agr.currentAtk -= bono; }
+            // MURIÓ: no vale mirar solo la Vida. `resetCard` (dentro de checkDeath) le devuelve
+            // sus stats de plantilla al mandarla al descarte, así que para cuando llegamos aquí
+            // una carta muerta puede tener la Vida llena otra vez; lo que no cambia es dónde
+            // está (27-ago-2026, escribiendo el Aguijón onírico).
+            const murio = target.currentHp <= 0 || target.location === 'discard';
+            const exito = !murio && target.currentHp < startHp; // dañó y sigue vivo
             if (exito && Array.isArray(e.siExito)) await DSL._runEffectList(e.siExito, sourceCard, game, ownerId, [target], habilidad);
+            // `siMuere`: el golpe lo MATÓ. Hermano de `siExito` (que es "le dio y sigue en pie"),
+            // porque hay cartas que premian justo lo contrario (Aguijón onírico, 27-ago-2026).
+            if (murio && Array.isArray(e.siMuere)) await DSL._runEffectList(e.siMuere, sourceCard, game, ownerId, [target], habilidad);
             return true;
         }
         if (e.op === 'MONEDA') {
@@ -9698,6 +9758,12 @@ const DSL = {
             // la incluiría por defecto si no se filtra explícitamente (Toto, 27-jul-2026).
             // anexadoASelf: mismo filtro que en _pool (zombificar solo a quien no lo está,
             // soltar solo a quien sí). ELEGIR se construye su propio pool, así que va aquí también.
+            // excluirPagador: fuera quien ya pagó/empuñó esta Ayuda, para los "OTRO aliado
+            // diferente" (Aguijón onírico premia a un tercero, no al que acaba de pegar).
+            if (e.excluirPagador) {
+                const _pg = ((DSL._vars || {})[sourceCard.instanceId] || {}).__pagador;
+                if (_pg) pool = pool.filter(x => x.instanceId !== _pg);
+            }
             // noContadoEn: fuera los que ya están en un mapa de CONTAR_OBJETIVO de esta carta
             // ("no se puede usar con los enemigos en los que ya se usó").
             if (e.noContadoEn) pool = pool.filter(x => !((sourceCard[e.noContadoEn] || {})[x.instanceId]));
@@ -10766,7 +10832,13 @@ const DSL = {
                     let val;
                     if (r.count) {
                         const _rival = game.players[card.owner === 'p1' ? 'p2' : 'p1'];
-                        let pool = r.count.de === 'ENEMIGOS' ? [..._rival.vanguard, ..._rival.rearguard] : [...p.vanguard, ...p.rearguard];
+                        // `de: "ENEMIGOS"` y `quien: "ENEMIGO"` valen igual aquí (27-ago-2026).
+                        // Este motor de requisitos es una copia a mano del de _count, y solo
+                        // entendía `de`: un `quien: "ENEMIGO"` -que es como se escribe en TODO el
+                        // resto del DSL- se leía como "los míos" y contaba el campo equivocado,
+                        // sin decir nada. Le pasó al Aguijón onírico.
+                        const _esEnemigo = r.count.de === 'ENEMIGOS' || r.count.quien === 'ENEMIGO';
+                        let pool = _esEnemigo ? [..._rival.vanguard, ..._rival.rearguard] : [...p.vanguard, ...p.rearguard];
                         // La zona, en cualquier caja: el resto del DSL acepta 'vanguardia' y
                         // 'VANGUARDIA' (ver _zone), y aquí solo valía en mayúsculas — una
                         // minúscula colaba el requisito al pool por defecto SIN avisar, contando

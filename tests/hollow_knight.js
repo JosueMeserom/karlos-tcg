@@ -364,6 +364,58 @@ const enCampo = (g, pid, n) => !!buscar(g, pid, n);
             'mazo ' + mazoAntes + ' -> ' + g.players.p1.deck.length);
     }
 
+    console.log('\n--- Aguijón onírico: la ejecución ---');
+    {
+        // El enemigo agotado es objetivo válido; el otro no.
+        const { g, paso, ctx } = await mesa({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'Karlos' }, { carta: 'Kyle' }], mano: ['Aguijón onírico'] },
+            p2: { vanguardia: [{ carta: 'Mini-tigre', vida: 9, campos: { maxHp: 9, exhausted: true } },
+                               { carta: 'Oso con armadura' }] },
+        });
+        const karlos = buscar(g, 'p1', 'Karlos'), tigre = buscar(g, 'p2', 'Mini-tigre');
+        const vida0 = tigre.currentHp;
+        await paso({ jugar: 'Aguijón onírico' });
+        await paso({ elegir: ['Karlos'] });        // quién lo empuña
+        // El pool de la elección lleva SOLO al enemigo indefenso: el Oso, que está entero, no
+        // se puede señalar (el arnés protesta si se intenta, que es lo que se comprueba).
+        const _pool = (ctx.pendientes[0] || {}).pool || [];
+        check('solo se ofrece el enemigo indefenso',
+            _pool.length === 1 && _pool[0].name === 'Mini-tigre', _pool.map(c => c.name).join(','));
+        await paso({ elegir: ['Mini-tigre'] });
+        check('el aliado gasta su acción', karlos.exhausted === true);
+        check('...le clava un especial (ATQ 5 - DEF 3 = 2)', tigre.currentHp === vida0 - 2, 'vida=' + tigre.currentHp);
+        check('...y gana 4 de Furor', karlos.furor === 4, 'furor=' + karlos.furor);
+    }
+    {
+        // Y si el golpe MATA, otro aliado distinto gana otros 4.
+        const { g, paso } = await mesa({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'Karlos' }, { carta: 'Kyle' }], mano: ['Aguijón onírico'] },
+            p2: { vanguardia: [{ carta: 'Mini-tigre', vida: 1, campos: { exhausted: true } },
+                               { carta: 'Oso con armadura' }] },
+        });
+        const karlos = buscar(g, 'p1', 'Karlos'), kyle = buscar(g, 'p1', 'Kyle');
+        await paso({ jugar: 'Aguijón onírico' });
+        await paso({ elegir: ['Karlos'] });
+        await paso({ elegir: ['Mini-tigre'] });
+        check('el enemigo muere', !enCampo(g, 'p2', 'Mini-tigre'));
+        await paso({ elegir: ['Kyle'] });
+        check('...y OTRO aliado distinto gana 4 de Furor', kyle.furor === 4, 'furor=' + kyle.furor);
+        check('...además de los 4 del que atacó', karlos.furor === 4, 'furor=' + karlos.furor);
+    }
+    {
+        // Sin nadie indefenso enfrente, la Ayuda ni se juega.
+        const { g, paso } = await mesa({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'Karlos' }], mano: ['Aguijón onírico'] },
+            p2: { vanguardia: [{ carta: 'Mini-tigre' }] },
+        });
+        await paso({ jugar: 'Aguijón onírico' });
+        check('sin enemigos indefensos no se puede jugar',
+            g.players.p1.hand.some(c => c.name === 'Aguijón onírico'));
+    }
+
     console.log('');
     if (fallos) { console.log(`SUITE hollow_knight: ${fallos} FALLOS de ${comprobaciones} comprobaciones`); process.exit(1); }
     console.log(`SUITE hollow_knight: ${comprobaciones}/${comprobaciones} comprobaciones — LA TANDA HK CUMPLE`);
