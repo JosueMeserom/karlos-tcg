@@ -20,3 +20,6 @@ docs/apuntes-tecnicos.md
 # El primer README, redactado por Claude en su estilo: se conserva como material de consulta
 # (tiene los mismos datos), pero el bueno es el que escribe Toto.
 README_full_Claude.md
+
+# Secreto de firma de las cookies de sesión: se genera solo en cada máquina
+.session-secret

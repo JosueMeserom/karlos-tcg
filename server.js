@@ -4,6 +4,8 @@ const session = require('express-session');
 const SQLiteStore = require('connect-sqlite3')(session);
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+const fs = require('fs');
+const crypto = require('crypto');
 const http = require('http');
 const { Server } = require('socket.io'); 
 
@@ -17,10 +19,19 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public'), { index: false, setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') })); // no-cache: el navegador revalida siempre (adiós JS rancio al editar en caliente)
 
+// El secreto de sesión NO va en el código (el repo es público): se lee de SESSION_SECRET, y si no
+// existe se genera un fichero .session-secret (ignorado por git) la primera vez. Así sobrevive a los
+// reinicios de pm2 sin tener que enredar con variables de entorno.
+const FICHERO_SECRETO = path.join(__dirname, '.session-secret');
+if (!process.env.SESSION_SECRET && !fs.existsSync(FICHERO_SECRETO)) {
+    fs.writeFileSync(FICHERO_SECRETO, crypto.randomBytes(32).toString('hex'), { mode: 0o600 });
+}
+const SESSION_SECRET = process.env.SESSION_SECRET || fs.readFileSync(FICHERO_SECRETO, 'utf8').trim();
+
 // --- SESIONES PERSISTENTES ---
 app.use(session({
     store: new SQLiteStore({ db: 'sessions.sqlite', dir: __dirname }), // <--- Cambiado a __dirname
-    secret: 'karlos_tcg_super_secret_key_2026', 
+    secret: SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
     cookie: { 
