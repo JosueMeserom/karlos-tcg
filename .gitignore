@@ -14,3 +14,6 @@ docs/Cartas KG.xlsx
 docs/.cartas-kg.url
 docs/~$*
 docs/.Cartas KG.csv.anterior
+# Apuntes tecnicos de Toto para estudiar (CI, tests, git...): notas personales, no documentacion
+# del proyecto. Se quedan en el servidor a proposito.
+docs/apuntes-tecnicos.md
