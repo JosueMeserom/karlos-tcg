@@ -47,7 +47,11 @@ La batería histórica (r1–r23 + humo) se perdió con los transcripts de chat 
    carta (`badge`; las de `pierdeSuTurno` la llevan de oficio) y su línea en el detalle
    (`tempEffectText` en la plantilla de quien la pone). Lo vigila `node tests/auditar_marcas.js`,
    que además comprueba que esa línea LLEGA de verdad -no basta con declararla-.
-1. Tras CUALQUIER cambio en `cartas.js` o el intérprete: pasada estricta de TODAS las suites (`for f in tests/regresion*.js tests/humo.js; do node "$f"; done`, más las de aserción: `nuevas*`, `modales_pilas`, `badge_furor_forzado`, `picker_mano`, `capas_cliente`, `costes_presenta`, `auditar_marcas` y **`online`**), exigiendo el mensaje de éxito explícito de cada una. No vale "parece que pasa".
+1. Tras CUALQUIER cambio en `cartas.js` o el intérprete: **`npm test`** (o `node tools/pasada.js`),
+   que corre TODAS las suites y sale con error si alguna falla. Acepta un filtro para trabajar
+   (`npm test -- oculto`), pero antes de commitear se pasa entera. El criterio es el CÓDIGO DE
+   SALIDA, no leer por encima: "parece que pasa" no vale. Dos ficheros son censos informativos y
+   no tumban la pasada (`familias_textos`, `auditar_imperativas`); están declarados en el runner.
 2. `node --check` tras editar cualquier `.js`.
 3. `index.html` es CRLF: conservar los finales de línea al editar.
 4. Nunca inventar archivos ni rutas no confirmados por el árbol de directorios o por Toto.

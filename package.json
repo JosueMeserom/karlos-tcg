@@ -3,12 +3,12 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node tools/pasada.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "Karlos TCG - juego de cartas coleccionables online (Node + Socket.IO) con motor de cartas declarativo propio",
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "connect-sqlite3": "^0.9.16",

@@ -1,0 +1,36 @@
+# La batería de regresión, en cada push y en cada PR.
+#
+# NO HAY `npm ci` A PROPÓSITO. Las dependencias del `package.json` son las del SERVIDOR (express,
+# socket.io, sqlite3) y la batería no importa ni una: las suites solo usan `fs`, `path` y `vm`, que
+# vienen con Node. Instalarlas aquí serían un par de minutos de compilar `sqlite3` nativo -y un
+# paso más que se puede romper- a cambio de nada.
+#
+# Node 20 porque es el que corre el servidor de verdad: un CI que prueba en otra versión distinta
+# de la de producción avisa tarde y a veces miente.
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  bateria:
+    name: Batería de regresión
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # `node --check` sobre lo que se puede parsear suelto: un error de sintaxis en el motor
+      # dejaría a TODAS las suites en rojo con el mismo mensaje ilegible, así que se caza antes.
+      - name: Sintaxis
+        run: |
+          node --check public/cartas.js
+          node --check public/reglas.js
+          node --check tools/pasada.js
+
+      - name: Pasada estricta
+        run: npm test

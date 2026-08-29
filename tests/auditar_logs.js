@@ -111,3 +111,12 @@ for (const [tipo, lista] of Object.entries(porTipo)) {
     console.log();
 }
 console.log(`TOTAL: ${hallazgos.length} logs que nombran algo sin decir de quién es`);
+// DEJA DE SER INFORMATIVA (27-ago-2026, al montar el CI). La norma del nombre con dueño está
+// cerrada desde hace tiempo y hoy se cumple en las 176 cartas: lo que quedaba de "censo" ya no
+// existe, así que un hallazgo nuevo es una regresión y tiene que poner la pasada en rojo. Mismo
+// camino que hizo auditar_flechas.
+if (hallazgos.length) {
+    console.log('\nUn log que nombra una carta dice DE QUIÉN es: usa getCardNameWithOwner()');
+    console.log('(o {carta}/{objetivo} en el DSL, que ya lo hacen).');
+    process.exit(1);
+}
