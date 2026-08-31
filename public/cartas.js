@@ -357,7 +357,7 @@ const CARD_DB = [
         },
     },
     { 
-        id: 3, name: "Kyle", hp: 4, def: 4, atk: 3, type: "Personaje", subtype: "Ser vivo", tags: ['Usuario de VP', 'estudioso'], gender: 'M', rarity: "A",
+        id: 3, name: "Kyle", hp: 4, def: 4, atk: 3, type: "Personaje", subtype: "Ser vivo", tags: ['Usuario de VP', 'Estudioso'], gender: 'M', rarity: "A",
         text: "P: ENTEREZA DEL INGENUO: Mientras tenga 4 o más de VIDA, su DEF y su ATQ aumentan en 2. A: REPARACIÓN MOLECULAR (1F): Cura 2 de VIDA a un aliado.", 
         passiveName: "ENTEREZA DEL INGENUO", activeName: "REPARACIÓN MOLECULAR", activeCost: 1, series: 1,
 
@@ -770,7 +770,7 @@ const CARD_DB = [
         }
     },
     { 
-        id: 9, name: "Mill", hp: 4, def: 5, atk: 6, type: "Personaje", subtype: "Ser vivo", tags: ['Traje protector', 'científico', 'Usuario de VP'], gender: 'M', rarity: "A", 
+        id: 9, name: "Mill", hp: 4, def: 5, atk: 6, type: "Personaje", subtype: "Ser vivo", tags: ['Traje protector', 'Científico', 'Usuario de VP'], gender: 'M', rarity: "A", 
         text: "P: CAMUFLAJE ÓPTICO: Si no ataca, gana Oculto durante el turno rival. El daño lo revela. A: MOTOCICLETA (3F): Cambia a Mill y 1 aliado de vanguardia por 2 de retaguardia.", 
         passiveName: "CAMUFLAJE ÓPTICO", activeName: "MOTOCICLETA", activeCost: 3, series: 1,
 
@@ -2392,7 +2392,7 @@ const CARD_DB = [
         }
     },
     {
-        name: "Diego Antonio", hp: 7, def: 9, atk: 9, type: "Personaje", subtype: "Ser vivo", tags: ["Usuario de VP", "mafia"], gender: "M", rarity: "S", series: 1,
+        name: "Diego Antonio", hp: 7, def: 9, atk: 9, type: "Personaje", subtype: "Ser vivo", tags: ["Usuario de VP", "Mafia"], gender: "M", rarity: "S", series: 1,
         // Requisito visible: a quién señala la flecha lima al presentarse (§14.bis).
         requisitoVisible: [ { quien: "TODOS", zona: "evento", filtros: [ { campo: "name", op: "==", valor: "Una buena razón" } ], uno: true } ],
         text: "Requisito: 'Una buena razón' activo en cualquier campo. P: CÓLERA INFINITA: Al colocar: +1 de Furor y 3 Contadores; en vanguardia pierde 1 por turno y a 0 muere. No puede retirarse de forma normal. Al recibir un ataque normal invierte el cálculo: no sufre daño y daña al atacante. A: PACIFISMO (3F): Este turno no baja su contador.",
@@ -2454,7 +2454,7 @@ const CARD_DB = [
         },
     },
     {
-        name: "Silhouette", hp: 7, def: 1, atk: 1, type: "Personaje", subtype: "Ser vivo", tags: ["Draconiana", "otaku", "usuaria de VP"], gender: "F", rarity: "S", series: 1,
+        name: "Silhouette", hp: 7, def: 1, atk: 1, type: "Personaje", subtype: "Ser vivo", tags: ["Draconiana", "Otaku", "Usuaria de VP"], gender: "F", rarity: "S", series: 1,
         // Requisito visible: a quién señala la flecha lima al presentarse (§14.bis).
         requisitoVisible: [ { quien: "TODOS", zona: "evento", filtros: [ { campo: "name", op: "==", valor: "Una buena razón" } ], uno: true } ],
         text: "Requisito: 'Una buena razón' activo en cualquier campo. P: REINA DEL COSPLAY: Al inicio de tu turno, cura 2 VIDA. A: PONTE TRAJE (1F): Elige cualquier aliado o enemigo en el campo. Copias sus stats base (ATQ y DEF).",
@@ -3067,7 +3067,7 @@ const CARD_DB = [
         ]
     },
     {
-        name: "Simon", hp: 5, def: 5, atk: 5, type: "Personaje", subtype: "Ser vivo", tags: ["Draconiano", "cyborg"], gender: "M", rarity: "A", cost: 0, series: 1,
+        name: "Simon", hp: 5, def: 5, atk: 5, type: "Personaje", subtype: "Ser vivo", tags: ["Draconiano", "Cyborg"], gender: "M", rarity: "A", cost: 0, series: 1,
         canAttackStealth: true,
         immuneToApagon: true,
         text: "P: OJO BIÓNICO: Puede atacar a enemigos Ocultos de vanguardia. Inmune a 'Apagón'. A: ÚLTIMA RESISTENCIA (3F): Ataca normal. Tras atacar, marca al resto de tu vanguardia. Estará Oculta durante el próximo turno del rival.",
@@ -3618,7 +3618,7 @@ const CARD_DB = [
         ],
     },
     {
-        name: "Edrielle", hp: 3, def: 3, atk: 5, type: "Personaje", subtype: "Ser mágico", tags: ["Invocación", "diosa"], gender: "F", rarity: "B", cost: 1, series: 1,
+        name: "Edrielle", hp: 3, def: 3, atk: 5, type: "Personaje", subtype: "Ser mágico", tags: ["Invocación", "Diosa"], gender: "F", rarity: "B", cost: 1, series: 1,
         text: "Coste: 4 de Furor. P: BELLEZA INCOMPARABLE: Oculta permanentemente. A: TORMENTA PERFECTA (4F): Quita 2 de VIDA (daño verdadero) a TODOS los enemigos.",
         passiveName: "BELLEZA INCOMPARABLE", activeName: "TORMENTA PERFECTA", activeCost: 4,
         
@@ -5715,11 +5715,11 @@ const CARD_DB = [
         abilities: [
             { trigger: "AL_JUGAR", log: "¡Empieza la Feria del Cómic! Hay demasiado ruido para concentrarse..." },
             { trigger: "AURA", quien: "CUALQUIERA",
-              filtros: [ { no: true, campo: "tags", op: "includes", valor: "Otaku" }, { no: true, campo: "tags", op: "includes", valor: "otaku" } ],
+              filtros: [ { no: true, campo: "tags", op: "includes", valor: "Otaku" } ],
               marcar: { campo: "isSilenced", valor: true } },
             { trigger: "PREVIEW_GLOBAL", lineas: [
                 { quien: "CUALQUIERA", soloTipos: ["Personaje", "Esbirro"],
-                  filtros: [ { no: true, campo: "tags", op: "includes", valor: "Otaku" }, { no: true, campo: "tags", op: "includes", valor: "otaku" } ],
+                  filtros: [ { no: true, campo: "tags", op: "includes", valor: "Otaku" } ],
                   texto: "{genero?Silenciado|Silenciada}" } ] },
             { trigger: "FIN_TURNO", resumenFase: "Moneda: con cara, busca una carta con etiqueta 'Otaku' en su mazo", soloTurnoPropio: true, log: "Feria del cómic: Buscando merchandising exclusivo...", logTipo: "system",
               efectos: [
@@ -5727,7 +5727,7 @@ const CARD_DB = [
                   logCara: { msg: "Moneda: CARA - ¡{jugador} ha encontrado algo genial en la Feria!", tipo: "ability" },
                   cara: [
                     { op: "BUSCAR", en: "MAZO", cantidad: 1, destino: "MANO",
-                      algunFiltro: [ { campo: "tags", op: "includes", valor: "Otaku" }, { campo: "tags", op: "includes", valor: "otaku" } ],
+                      algunFiltro: [ { campo: "tags", op: "includes", valor: "Otaku" } ],
                       preguntarSiempre: true,
                       confirmar: { titulo: "FERIA DEL CÓMIC", si: "COMPRAR MERCHANDISING (BUSCAR OTAKU)", no: "NO COMPRAR" },
                       titulo: "COMPRAR CARTA OTAKU",
@@ -5763,7 +5763,7 @@ const CARD_DB = [
             { trigger: "AL_CADUCAR", resumenFase: "Al expirar, ambos jugadores pueden buscar una carta con etiqueta 'Mafia' en su mazo", log: "¡La Deuda ha sido saldada! Ambos jugadores pueden contactar a la Mafia.",
               efectos: [
                 { op: "BUSCAR", en: "MAZO", deQuien: "AMBOS", cantidad: 1, destino: "MANO",
-                  algunFiltro: [ { campo: "tags", op: "includes", valor: "Mafia" }, { campo: "tags", op: "includes", valor: "mafia" } ],
+                  algunFiltro: [ { campo: "tags", op: "includes", valor: "Mafia" } ],
                   preguntarSiempre: true,
                   confirmar: { titulo: "{jugador}: COBRAR FAVOR A LA MAFIA", si: "BUSCAR MAFIA EN EL MAZO", no: "NO BUSCAR" },
                   titulo: "{jugador}: Llama a un contacto",
@@ -6831,7 +6831,7 @@ const CARD_DB = [
     },
     {
         name: "Neo", hp: 3, def: 8, atk: 6, type: "Personaje", subtype: "Ser vivo",
-        tags: ["Usuaria de semblanza", "mafia"], gender: "F", rarity: "A", series: "R",
+        tags: ["Usuaria de semblanza", "Mafia"], gender: "F", rarity: "A", series: "R",
         // "Requisito: ..." al inicio (Toto, 31-jul-2026): el cliente ya sabe formatear ese prefijo
         // en su propia caja tipo stats (misma norma Coste/Requisito de siempre) — no hace falta
         // nada nuevo, solo escribirlo. Es un REQUISITO y no un Coste porque no se paga/pierde
