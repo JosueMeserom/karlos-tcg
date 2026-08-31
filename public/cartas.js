@@ -6416,7 +6416,11 @@ const CARD_DB = [
     },
     {
         name: "Lolita", hp: 2, def: 2, atk: 2, type: "Esbirro", subtype: "Ser vivo", tags: ["Otaku"], rarity: "A", cost: 1, series: 2,
-        isToken: true, // Esto le quita la retribución al morir automáticamente en checkDeath
+        // PRESTIGIO es una PASIVA, no un token: Lolita es una carta que el jugador tiene y juega.
+        // Llevaba `isToken` solo para heredar el "no da retribución" de checkDeath, y con él se
+        // colaba el efecto secundario de verdad: isToken la escondía del catálogo del constructor
+        // y de los mazos aleatorios, o sea que NADIE podía jugarla (Toto, 31-ago-2026).
+        sinRetribucionAlMorir: true,
         text: "P: PRESTIGIO: Esta carta no te otorga retribución cuando su VIDA llega a 0. A: NOCIONES DE OCULTISMO (1F): Ataque especial con +2 de ATQ durante el golpe.",
         passiveName: "PRESTIGIO", activeName: "NOCIONES DE OCULTISMO", activeCost: 1,
         // Migrada por completo (27/28-jul-2026, tanda de volumen #2). Mismo patrón que
@@ -6772,6 +6776,7 @@ const CARD_DB = [
     },
     // ===== CARTAS DECLARATIVAS DE PRUEBA (motor híbrido / DSL) =====
     {
+        noColeccionable: true,  // carta de prueba: fuera del constructor, de los aleatorios y de los sobres
         id: 990, name: "Bersérker de prueba", hp: 5, def: 4, atk: 3, type: "Esbirro", subtype: "Ser vivo", tags: ["Prueba"], rarity: "B", cost: 1, series: 1,
         text: "P: FURIA: +3 ATQ mientras su VIDA sea <= 3.",
         passiveName: "FURIA",
@@ -6782,6 +6787,7 @@ const CARD_DB = [
         ]
     },
     {
+        noColeccionable: true,  // carta de prueba: fuera del constructor, de los aleatorios y de los sobres
         id: 991, name: "Tótem de prueba", hp: 6, def: 5, atk: 1, type: "Esbirro", subtype: "Ser vivo", tags: ["Prueba"], rarity: "B", cost: 1, series: 1,
         text: "P: COMUNIÓN: +1 ATQ y +1 DEF por cada aliado con etiqueta 'Prueba' en mesa (máx 3).",
         passiveName: "COMUNIÓN",
@@ -6794,6 +6800,7 @@ const CARD_DB = [
         ]
     },
     {
+        noColeccionable: true,  // carta de prueba: fuera del constructor, de los aleatorios y de los sobres
         id: 992, name: "Meteorito de prueba", type: "Evento", rarity: "C", cost: 0, duration: 1, series: 1,
         text: "1 turno. Al colocarla, inflige 2 de daño a cada enemigo de vanguardia.",
         abilities: [
@@ -6802,6 +6809,7 @@ const CARD_DB = [
         ]
     },
     {
+        noColeccionable: true,  // carta de prueba: fuera del constructor, de los aleatorios y de los sobres
         id: 993, name: "Biblioteca de prueba", type: "Evento", rarity: "C", cost: 0, duration: 2, series: 1,
         text: "2 turnos. Al expirar, robas 2 cartas.",
         abilities: [
@@ -6810,6 +6818,7 @@ const CARD_DB = [
         ]
     },
     {
+        noColeccionable: true,  // carta de prueba: fuera del constructor, de los aleatorios y de los sobres
         id: 994, name: "Maldición de prueba", type: "Evento", rarity: "C", cost: 0, duration: 2, series: 1,
         text: "2 turnos. Al colocarla, aplica Daño por tiempo (2 turnos) y un contador de Maldición a cada enemigo de vanguardia.",
         abilities: [
@@ -12665,6 +12674,19 @@ const DSL = {
         return true;
     }
 };
+
+// ── QUÉ CARTAS PUEDE TENER UN JUGADOR ────────────────────────────────────────────────
+// Antes esto era un solo flag haciendo dos trabajos distintos, y por eso Lolita era injugable:
+//   · `isToken`         -> NO es una carta: la crea otra en mesa (los Clones). No se roba, no se
+//                          colecciona, y no da retribución al morir.
+//   · `noColeccionable` -> es una carta de verdad, pero no debe salir de las herramientas: las
+//                          cinco "de prueba".
+// Todo lo que reparte cartas a un jugador (catálogo del constructor, mazos aleatorios, relleno y,
+// el día que existan, los sobres) pregunta AQUÍ. El debug y los códigos de escenario no preguntan
+// a propósito: son justo la puerta por la que Toto quiere poder meterlas.
+function esColeccionable(carta) {
+    return !!carta && !carta.isToken && !carta.noColeccionable;
+}
 
 // Compilar todas las cartas declarativas al cargar.
 (function () {

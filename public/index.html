@@ -4534,10 +4534,10 @@
             loadDecksFromStorage() {
                 const generateRandomDeck = () => {
                     const deck = [];
-                    // Filtramos las cartas para ignorar los Tokens (isToken: true)
-                    let personajesPool = CARD_DB.filter(c => c.type === 'Personaje' && !c.isToken);
+                    // Solo cartas que un jugador puede tener (fuera tokens y cartas de prueba)
+                    let personajesPool = CARD_DB.filter(c => c.type === 'Personaje' && esColeccionable(c));
                     this.shuffle(personajesPool);
-                    const otrosPool = CARD_DB.filter(c => c.type !== 'Personaje' && !c.isToken);
+                    const otrosPool = CARD_DB.filter(c => c.type !== 'Personaje' && esColeccionable(c));
                     
                     const numPersonajes = Math.min(personajesPool.length, Math.floor(Math.random() * 4) + 4);
                     for(let i = 0; i < numPersonajes; i++) deck.push(personajesPool[i].id);
@@ -4557,12 +4557,17 @@
                             if (Array.isArray(parsedIds) && parsedIds.length >= 40) ids = parsedIds;
                         } catch(e) {}
                     }
+                    // Guard único: pase por donde pase (mazo guardado, aleatorio o relleno), aquí
+                    // se cae todo lo que el jugador no puede tener. Un mazo antiguo con cartas de
+                    // prueba dentro se queda corto y se rellena, en vez de colarlas en la partida.
+                    ids = ids.filter(id => esColeccionable(CARD_DB.find(c => c.id === id)));
                     if (ids.length < 40) ids = generateRandomDeck();
                     
                     let deck = ids.map(id => this.createCardInstance(id, playerId)).filter(c => c != null);
                     
+                    const relleno = CARD_DB.filter(esColeccionable);
                     while(deck.length < 40) {
-                        const randomCard = CARD_DB[Math.floor(Math.random() * CARD_DB.length)];
+                        const randomCard = relleno[Math.floor(Math.random() * relleno.length)];
                         deck.push(this.createCardInstance(randomCard.id, playerId));
                     }
                     return deck;
@@ -10491,8 +10496,9 @@
                             try { await template.onDeathAfter(card, this); } catch (eDA) { console.error(eDA); }
                         }
 
-                        // Si la carta tiene la etiqueta isToken, JAMÁS dará premio
-                        if (triggerRetribution && !card.isToken) {
+                        // Un token JAMÁS da premio, y una carta con `sinRetribucionAlMorir`
+                        // tampoco: es su Pasiva la que lo dice (PRESTIGIO, de Lolita).
+                        if (triggerRetribution && !card.isToken && !card.sinRetribucionAlMorir) {
                             await this.processRetribution(card.owner);
                         }
 

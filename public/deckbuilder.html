@@ -258,7 +258,7 @@
             grid.innerHTML = '';
 
             CARD_DB.forEach(card => {
-                if (card.isToken) return; // <--- Oculta los clones y tokens del catálogo
+                if (!esColeccionable(card)) return; // clones, tokens y cartas de prueba: fuera del catálogo
                 if (currentFilter !== 'All' && card.type !== currentFilter) return;
                 const matchName = card.name.toLowerCase().includes(search);
                 const matchText = (card.text || '').toLowerCase().includes(search);

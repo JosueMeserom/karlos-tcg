@@ -569,7 +569,9 @@
             const results = document.getElementById('tp-results-' + seat);
             const renderResults = () => {
                 const q = (input.value || '').toLowerCase();
-                const matches = CARD_DB.filter(c => !c.isToken && c.name && c.name.toLowerCase().includes(q)).slice(0, 12);
+                // El panel de debug las enseña TODAS a propósito (tokens y cartas de prueba incluidas):
+                // es la puerta por la que se meten en una mesa de pruebas.
+                const matches = CARD_DB.filter(c => c.name && c.name.toLowerCase().includes(q)).slice(0, 12);
                 results.innerHTML = matches.map(c => `<button data-pick="${c.id}" style="display:block; width:100%; text-align:left; background:#1e293b; color:#e2e8f0; border:none; border-bottom:1px solid #334155; padding:4px 6px; font-size:0.74rem; cursor:pointer;">${c.name} <span style="color:#64748b;">(${c.type})</span></button>`).join('') || '<div style="color:#64748b; font-size:0.72rem; padding:4px;">Sin resultados</div>';
                 results.querySelectorAll('[data-pick]').forEach(b => b.onclick = () => {
                     testCfg.forcedHands[seat].push(parseInt(b.getAttribute('data-pick')));
@@ -750,8 +752,8 @@
                 }
 
                 if (!deckCards) {
-                    const personajes = CARD_DB.filter(c => c.type === 'Personaje').map(c => c.id);
-                    const otros = CARD_DB.filter(c => c.type !== 'Personaje').map(c => c.id);
+                    const personajes = CARD_DB.filter(c => c.type === 'Personaje' && esColeccionable(c)).map(c => c.id);
+                    const otros = CARD_DB.filter(c => c.type !== 'Personaje' && esColeccionable(c)).map(c => c.id);
                     
                     for(let i = personajes.length - 1; i > 0; i--) { 
                         const j = Math.floor(Math.random()*(i+1)); 
