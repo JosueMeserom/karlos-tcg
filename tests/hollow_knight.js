@@ -3,7 +3,9 @@
 // Cuatro cartas nuevas, así que aquí no hay "viejo contra nuevo" que comparar: la base congelada
 // no las tiene. Son aserciones directas sobre lo que cada una promete en su texto.
 //   · Cáscara violenta      — al morir, 1 de daño a TODO el campo.
-//   · Gran cáscara centinela — tributo 2 al entrar, y niega un ataque normal por 2 de Furor.
+//   · Gran cáscara centinela - tributo 2 al entrar, y niega un ataque normal por 2 de Furor.
+//     (5/3/4 desde el 31-ago-2026: tenía 6 de ATQ, y en su franja de precio los que traen una
+//     habilidad de verdad viven en 12 de stats; ella tenía además la mejor del grupo.)
 //   · The Knight            — se cura 3 si no hace nada; su Activa da a elegir entre dos ramas y
 //                             sube stats PERMANENTEMENTE, hasta 4 veces.
 //   · Hollow Knight         — entra en ESTASIS y despierta a las 3 retribuciones; RECORDAR se

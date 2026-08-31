@@ -7128,7 +7128,7 @@ const CARD_DB = [
     {
         // La muralla: cara de colocar y capaz de comerse un ataque normal entero si tiene Furor
         // guardado. Hermana declarada de REPULSIÓN ABSOLUTA (Xanadu), con el mismo trigger.
-        id: 2010, name: "Gran cáscara centinela", hp: 5, def: 3, atk: 6, type: "Esbirro", subtype: "Ser mágico",
+        id: 2010, name: "Gran cáscara centinela", hp: 5, def: 3, atk: 4, type: "Esbirro", subtype: "Ser mágico",
         tags: ["Animal salvaje"], gender: "F", rarity: "B", series: "HK",
         text: "Coste: 2 de Furor. P: GUARDIA DE ÉLITE: Al recibir un ataque normal, puede pagar 2 de Furor para negarlo con todos sus efectos.",
         passiveName: "GUARDIA DE ÉLITE",
