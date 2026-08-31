@@ -34,8 +34,9 @@ app.use(session({
     secret: SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-    cookie: { 
-        secure: false, 
+    cookie: {
+        secure: 'auto',      // sola se pone en true si la conexion es HTTPS; en HTTP local sigue funcionando
+        sameSite: 'lax',     // el navegador no manda esta cookie en peticiones que nazcan en OTRA web (anti-CSRF)
         maxAge: 30 * 24 * 60 * 60 * 1000 // <--- Recuerda el login durante 30 días
     } 
 }));
@@ -73,8 +74,21 @@ db.serialize(() => {
 
 const bcrypt = require('bcryptjs');
 
+// Freno de fuerza bruta para las rutas de credenciales: 10 intentos por IP cada cuarto de hora.
+// Techo asumido: vive en memoria, o sea que es por proceso y se olvida al reiniciar pm2. Para un
+// servidor de una sola instancia sobra; si algun dia hay varias, esto se muda a la base de datos.
+const intentosAuth = new Map(); // ip -> { n, hasta }
+function frenoAuth(req, res, next) {
+    const ahora = Date.now();
+    const e = intentosAuth.get(req.ip);
+    if (!e || ahora > e.hasta) intentosAuth.set(req.ip, { n: 1, hasta: ahora + 15 * 60 * 1000 });
+    else if (++e.n > 10) return res.status(429).json({ error: 'demasiados intentos, prueba dentro de unos minutos' });
+    if (intentosAuth.size > 500) for (const [ip, v] of intentosAuth) if (ahora > v.hasta) intentosAuth.delete(ip);
+    next();
+}
+
 // --- RUTAS DE AUTENTICACIÓN ---
-app.post('/api/register', async (req, res) => {
+app.post('/api/register', frenoAuth, async (req, res) => {
     const { username, password } = req.body;
     if (!username || !password) return res.status(400).json({ error: 'faltan datos' });
 
@@ -92,7 +106,7 @@ app.post('/api/register', async (req, res) => {
     }
 });
 
-app.post('/api/login', (req, res) => {
+app.post('/api/login', frenoAuth, (req, res) => {
     const { username, password } = req.body;
     db.get(`SELECT * FROM users WHERE username = ?`, [username], async (err, user) => {
         if (err || !user) return res.status(400).json({ error: 'usuario no encontrado' });

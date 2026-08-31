@@ -3545,7 +3545,6 @@
                     const first = s.indexOf(tok);
                     if (first !== -1) s = s.slice(0, first + tok.length) + s.slice(first + tok.length).split(` (${tok})`).join('');
                 }
-                const escRe = t => t.replace(/[-/^$*+?.()|[{}]/g, x => '\\' + x).replace(/]/g, '\\]');
                 if (!this._nombresCartas) this._nombresCartas = CARD_DB.map(c => c.name).sort((a, b) => b.length - a.length);
                 for (const n of this._nombresCartas) {
                     if (s.indexOf(n) === -1) continue;
