@@ -325,6 +325,18 @@ for (const c of CARTAS) {
         }
     }
 
+    // --- §3 El pagador genérico del tributo NO se escribe (Toto, 31-ago-2026) ---
+    // El tributo de colocación SIEMPRE sale de un aliado que eliges: decirlo en cada carta es
+    // repetir la regla del juego quince veces. La forma canónica es "Coste: N de Furor." a secas,
+    // y "de <alguien>" se reserva para cuando el pagador está RESTRINGIDO y por tanto informa
+    // ("Coste: 4 de Furor de Sadame, Aniceto o Hawke."). Nació de encontrar las dos formas
+    // conviviendo: 13 cartas cortas contra 2 largas, mismo mecanismo.
+    // Solo la caja de Coste, y solo si NADA califica a ese aliado: "de un aliado 'Draconiano/a'"
+    // (Furia berserker) sí informa, y la prosa de Gárgola no es una caja de coste.
+    if (/Coste:[^.]*\bde Furor de (?:un|una) aliad[oa]\s*\./i.test(t)) {
+        add('VOCABULARIO', c, '§3: "de Furor de un aliado" -> "de Furor" a secas; el pagador solo se nombra si está restringido');
+    }
+
     // --- §6 Tipografía ---
     if (/[—–]/.test(t)) add('TIPOGRAFIA', c, 'usa guion largo (—/–); la norma es guion corto');
 

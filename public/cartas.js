@@ -7213,7 +7213,7 @@ const CARD_DB = [
         // era la única que entraba gratis, y encima protegida mientras esperaba.
         id: 2012, name: "Hollow Knight", hp: 5, def: 5, atk: 7, type: "Personaje", subtype: "Ser mágico",
         tags: ["Animal salvaje", "Poder heredado"], gender: "M", rarity: "S", series: "HK",
-        text: "Coste: 1 de Furor de un aliado. P: SELLO DEL HUEVO NEGRO: Al colocar: queda en Estasis. Cada vez que alguien coge una retribución, gana 1 Contador; con 3, el sello se rompe. A: RECORDAR (1F): Coste: 2 de VIDA propia. Ataque especial que nunca quita menos de 3 de VIDA.",
+        text: "Coste: 1 de Furor. P: SELLO DEL HUEVO NEGRO: Al colocar: queda en Estasis. Cada vez que alguien coge una retribución, gana 1 Contador; con 3, el sello se rompe. A: RECORDAR (1F): Coste: 2 de VIDA propia. Ataque especial que nunca quita menos de 3 de VIDA.",
         passiveName: "SELLO DEL HUEVO NEGRO", activeName: "RECORDAR", activeCost: 1,
         abilities: [
             { trigger: "COSTE_COLOCACION", furor: 1 },
@@ -7380,7 +7380,7 @@ const CARD_DB = [
         // El mapa que lo cambia todo: dejas de robar a ciegas y encima ves lo que tiene el otro.
         // No hace daño ni sube stats; lo que da es INFORMACIÓN, que en este juego es media partida.
         id: 2016, name: "Mapa de Cornifer", type: "Evento", rarity: "B", cost: 0, duration: 3, series: "HK",
-        text: "Coste: 1 de Furor de un aliado. 3 turnos. Mientras esté en juego, en tu fase de robo miras las 3 primeras cartas de tu mazo y te quedas una en lugar de robar, barajando después; y la mano de tu rival está siempre visible para ti.",
+        text: "Coste: 1 de Furor. 3 turnos. Mientras esté en juego, en tu fase de robo miras las 3 primeras cartas de tu mazo y te quedas una en lugar de robar, barajando después; y la mano de tu rival está siempre visible para ti.",
         abilities: [
             { trigger: "COSTE_COLOCACION", furor: 1 },
             // La mano rival, a la vista. Se reimpone en cada pasada (es un campo del JUGADOR, no

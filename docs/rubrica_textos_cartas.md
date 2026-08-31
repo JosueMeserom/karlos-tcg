@@ -105,6 +105,13 @@ puede adivinar si un efecto le va a preguntar o le va a ocurrir.
   `Coste: 4 de Furor de Sadame, Aniceto o Hawke.` · `Sus ataques normales cuestan 1 de Furor.`
 - **`N Furor`** a secas — **prohibido**. Era la tercera forma, sin criterio, y se elimina.
 
+**El pagador genérico no se escribe** [Toto, 31-ago-2026]: el tributo de colocación sale SIEMPRE
+de un aliado que eliges, así que `Coste: 2 de Furor.` a secas es la forma canónica; poner "de un
+aliado" es repetir una regla del juego en quince cartas. El pagador solo se nombra cuando está
+**restringido**, porque entonces informa: `Coste: 4 de Furor de Sadame, Aniceto o Hawke.` o
+`Coste: 2 de Furor de un aliado 'Draconiano/a'.`. Lo vigila `auditar_textos` sobre la caja de
+`Coste:`; la prosa de una carta (Gárgola) puede decirlo con sus palabras.
+
 Si una Activa tiene coste, la plantilla **debe** declarar `activeCost` además de escribirlo en el
 texto. Hay lógica genérica del motor que lee ese campo; una carta que solo lo diga en la prosa y
 lo cobre a mano por su cuenta funciona hoy pero es invisible para cualquier cosa que se añada
