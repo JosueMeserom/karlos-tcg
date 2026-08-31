@@ -146,7 +146,8 @@ const enCampo = (g, pid, n) => !!buscar(g, pid, n);
         await paso({ jugar: 'Hollow Knight' });
         await paso({ elegir: ['Mini-tigre'] });
         const hk = buscar(g, 'p1', 'Hollow Knight');
-        check('entra pagando 2 de Furor', !!hk && buscar(g, 'p1', 'Mini-tigre').furor === 0);
+        // Tributo de 1 (Toto lo bajó de 2 en su Excel, 31-ago-2026): al Mini-tigre le queda 1.
+        check('entra tributando 1 de Furor de un aliado', !!hk && buscar(g, 'p1', 'Mini-tigre').furor === 1);
         check('...y entra en ESTASIS', g._enEstasis(hk));
         check('...así que está agotado y es intocable', hk.exhausted === true
             && /ESTASIS/.test(g.motivoNoAtacable(buscar(g, 'p2', 'Oso con armadura'), hk) || ''));

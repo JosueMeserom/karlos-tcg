@@ -7213,10 +7213,10 @@ const CARD_DB = [
         // era la única que entraba gratis, y encima protegida mientras esperaba.
         id: 2012, name: "Hollow Knight", hp: 5, def: 5, atk: 7, type: "Personaje", subtype: "Ser mágico",
         tags: ["Animal salvaje", "Poder heredado"], gender: "M", rarity: "S", series: "HK",
-        text: "Coste: 2 de Furor. P: SELLO DEL HUEVO NEGRO: Al colocar: queda en Estasis. Cada vez que alguien coge una retribución, gana 1 Contador; con 3, el sello se rompe. A: RECORDAR (1F): Coste: 2 de VIDA propia. Ataque especial que nunca quita menos de 3 de VIDA.",
+        text: "Coste: 1 de Furor de un aliado. P: SELLO DEL HUEVO NEGRO: Al colocar: queda en Estasis. Cada vez que alguien coge una retribución, gana 1 Contador; con 3, el sello se rompe. A: RECORDAR (1F): Coste: 2 de VIDA propia. Ataque especial que nunca quita menos de 3 de VIDA.",
         passiveName: "SELLO DEL HUEVO NEGRO", activeName: "RECORDAR", activeCost: 1,
         abilities: [
-            { trigger: "COSTE_COLOCACION", furor: 2 },
+            { trigger: "COSTE_COLOCACION", furor: 1 },
             { trigger: "AL_JUGAR", nombre: "SELLO DEL HUEVO NEGRO",
               efectos: [
                 { op: "APLICAR_ESTADO", target: { quien: "SELF" }, estado: "estasis", duracion: 900,
