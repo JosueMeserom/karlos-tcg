@@ -4104,6 +4104,19 @@
                 return k;
             }
 
+            // `fijarStats.hp` (TERROR NOCTURNO) baja la Vida al poner la marca y se la devuelve al
+            // quitarla, sin pasar del techo y sin resucitar a nadie: el daño recibido durante la
+            // ventana se queda hecho. Vive aquí, en el motor, porque las marcas se retiran por dos
+            // caminos distintos (el tick del DSL y este filtro de fin de turno) y la devolución no
+            // puede depender de por cuál se hayan ido.
+            _devolverVidaPrestada(card, eff) {
+                if (!eff || !(eff.hpDevolver > 0) || !card || card.currentHp <= 0) return;
+                const hueco = Math.max(0, (card.maxHp || 0) - card.currentHp);
+                const dev = Math.min(eff.hpDevolver, hueco);
+                eff.hpDevolver = 0;
+                if (dev > 0) this.modifyStat(card, 'currentHp', dev, 0, null);
+            }
+
             applyStatus(card, type, duration, sourceCard, sourceAbility) {
                 if (getCardTemplate(card.id).isAvatar) return; 
                 // En Estasis no le entra ningún estado nuevo (es inmune a los efectos de las
@@ -7598,12 +7611,36 @@
                         card.tempEffects = card.tempEffects.filter(eff => {
                             const tempTemplate = getCardTemplate(eff.sourceId);
                             if (typeof tempTemplate.onEndTurnTempEffect === 'function') {
-                                return tempTemplate.onEndTurnTempEffect(card, eff, this, this.activePlayerId);
+                                const sigue = tempTemplate.onEndTurnTempEffect(card, eff, this, this.activePlayerId);
+                                if (!sigue) this._devolverVidaPrestada(card, eff);
+                                return sigue;
                             }
                             return true;
                         });
                     }
                 });
+
+                // Y las marcas que puso EL JUGADOR ACTIVO en cartas del RIVAL y caducan al final
+                // de su propio turno (TERROR NOCTURNO). El bucle de arriba solo recorre las cartas
+                // del activo, así que sin esto una marca sobre un enemigo no se retiraba jamás.
+                // Acotado a ese flag a propósito: no dispara los hooks de plantilla, que están
+                // escritos contando con que solo se les llama para las cartas de quien tiene turno.
+                {
+                    const _riv = this.players[this.activePlayerId === 'p1' ? 'p2' : 'p1'];
+                    let _algo = false;
+                    [..._riv.vanguard, ..._riv.rearguard].forEach(card => {
+                        if (!card || !card.tempEffects) return;
+                        card.tempEffects = card.tempEffects.filter(eff => {
+                            if (!(eff.hastaFinTurnoLanzador && eff.ownerId === this.activePlayerId)) return true;
+                            const _t = getCardTemplate(eff.sourceId);
+                            if (_t && _t.tempEffectExpiraLog) this.logMsg(_t.tempEffectExpiraLog.split('{objetivo}').join(this.getCardNameWithOwner(card)), 'system');
+                            this._devolverVidaPrestada(card, eff);
+                            _algo = true;
+                            return false;
+                        });
+                    });
+                    if (_algo) this.updatePassives();
+                }
 
                 let myEvent = p.activeEvent;
                 if (myEvent && getCardTemplate(myEvent.id).onEndTurn) {

@@ -7508,6 +7508,41 @@ const CARD_DB = [
                   log: "El sueño se hace más real: las cartas del Mundo onírico crecen." } ] }
         ],
     },
+    {
+        // La pareja de Morfeo. Entra gratis si ya hay alguien dormido -que es justo lo que Morfeo
+        // deja al llegar- y si no, paga 1 de Furor como cualquier Esbirro pequeño.
+        // TERROR NOCTURNO es la lectura LITERAL de su texto: las tres stats vuelven al final de
+        // TU turno, así que lo que abre es una ventana para rematarlo, no un "déjalo a 1 y ya".
+        id: 2019, name: "Comedor de sueños", hp: 4, def: 3, atk: 2, type: "Esbirro", subtype: "Ser mágico",
+        tags: ["Mundo onírico"], gender: "M", rarity: "B", cost: 1, series: 2,
+        text: "Requisito: un aliado con Sueño o bien Coste: 1 de Furor. A: TERROR NOCTURNO (1F): Elige un enemigo con Sueño: su VIDA, DEF y ATQ pasan a 1 hasta el final de tu turno.",
+        activeName: "TERROR NOCTURNO", activeCost: 1,
+        tempEffectText: "VIDA, DEF y ATQ a 1 hasta el final del turno de quien lo devoró",
+        abilities: [
+            // El "o bien" del compilador: la rama gratis va PRIMERA porque no cuesta nada, así
+            // que el jugador no tiene que elegir entre gratis y pagando (que no es una elección).
+            { trigger: "COSTE_COLOCACION", alternativas: [
+                { requisito: { algunFiltro: [ { campo: "status.sueno.duration", op: ">=", valor: 1 } ] },
+                  log: "{carta} se cuela por el sueño de un aliado dormido." },
+                { furor: 1, titulo: "COMEDOR DE SUEÑOS: ELIGE TRIBUTO (-1 FUROR)",
+                  msgSinPagador: "Necesitas un aliado dormido o un aliado con 1 de Furor que tributar." } ] },
+            { trigger: "ACTIVA", nombre: "TERROR NOCTURNO", coste: { furor: 1 },
+              requisitos: [
+                { count: { quien: "ENEMIGO", filtros: [ { campo: "status.sueno.duration", op: ">=", valor: 1 } ] },
+                  op: ">=", valor: 1, msg: "No hay ningún enemigo dormido al que devorarle el sueño." } ],
+              sinObjetivo: true,
+              efectos: [
+                { op: "ELEGIR", de: "ENEMIGOS", cantidad: 1,
+                  filtros: [ { campo: "status.sueno.duration", op: ">=", valor: 1 } ],
+                  titulo: "TERROR NOCTURNO: ¿de quién te comes el sueño?",
+                  efectos: [
+                    { op: "MARCAR_TEMPORAL", conOwner: true, actualizaPasivas: true,
+                      fijarStats: { hp: 1, def: 1, atk: 1 }, hastaFinTurnoLanzador: true,
+                      badge: { icono: "😱", color: "#4338ca" },
+                      floating: { texto: "TERROR NOCTURNO", estilo: "ft-ability", offset: -40 },
+                      log: "¡TERROR NOCTURNO! {objetivo} se queda en nada dentro de su propia pesadilla." } ] } ] }
+        ],
+    },
 ];
 
 // ===================================================================
@@ -8063,6 +8098,7 @@ const DSL = {
         if (eff.turnApplied === game.turn) return true;
         eff.duration = (eff.duration || 0) - 1;
         if (eff.duration > 0) return true;
+        if (typeof game._devolverVidaPrestada === 'function') game._devolverVidaPrestada(card, eff);
         const tmpl = DSL._tmpl(eff.sourceId) || {};
         if (tmpl.tempEffectExpiraLog) {
             game.logMsg(DSL._fill(tmpl.tempEffectExpiraLog, { objetivo: DSL._nombre(game, card), genero: card.gender }), 'system');
@@ -10049,6 +10085,19 @@ const DSL = {
             // el compilador wire uno genérico más abajo (ver el guard "MARCAR_TEMPORAL" en
             // JSON.stringify(abs)) cuando ninguna otra cosa lo haya declarado ya.
             if (e.stats) marca.stats = e.stats;
+            // fijarStats (Comedor de sueños, TERROR NOCTURNO, 31-ago-2026): hermano de `stats`,
+            // pero DEJA EN un valor en vez de sumar. ATQ y DEF se reimponen en cada pasada (el
+            // mismo onUpdateTempEffect genérico), y la VIDA no puede: lleva el daño acumulado
+            // dentro, así que se resta una vez al poner la marca y se devuelve al quitarla, con
+            // el techo de la VIDA máxima. Así el daño que reciba MIENTRAS dure se queda hecho:
+            // bajarle la Vida a 1 abre una ventana para rematarlo, no le cura lo que le pegues.
+            if (e.fijarStats) {
+                marca.fijarStats = e.fijarStats;
+                if (e.fijarStats.hp !== undefined && typeof target.currentHp === 'number') {
+                    marca.hpDevolver = Math.max(0, target.currentHp - e.fijarStats.hp);
+                    if (marca.hpDevolver > 0) game.modifyStat(target, 'currentHp', -marca.hpDevolver, 0, sourceCard);
+                }
+            }
             // vetoAtaqueNormal (Clarise, PESANTEZ MUTUA, 28-jul-2026): mientras la marca dure,
             // la carta marcada no puede hacer ataques NORMALES (sí Habilidades que no ataquen).
             // Simétrico de `stats`: aquel es un bono continuo, este un veto continuo. El
@@ -10059,6 +10108,7 @@ const DSL = {
             // turno del rival. Distinto de `hastaFinDeTurnoPropio`, que mira al dueño de la
             // carta MARCADA y caduca al final de su turno.
             if (e.hastaInicioTurnoLanzador) marca.hastaInicioTurnoLanzador = true;
+            if (e.hastaFinTurnoLanzador) marca.hastaFinTurnoLanzador = true;
             if (e.caduca) marca.caduca = e.caduca;   // cuándo se descuenta (ver DSL._tickMarca)
             // `badge`: chapa visible en la carta marcada. `true` para la de por defecto, o un
             // objeto { icono, color } para la suya. El número lo pone la cuenta atrás si la marca
@@ -12359,7 +12409,14 @@ const DSL = {
             if (typeof tmpl.onEndTurnTempEffect !== 'function') {
                 // Las marcas con hastaFinDeTurnoPropio caducan al terminar el turno del dueño de la carta marcada
                 tmpl.onEndTurnTempEffect = function (card, eff, game, activePid) {
-                    if (!(eff.hastaFinDeTurnoPropio && card.owner === activePid)) return true;
+                    // Dos formas de decir "hasta el final del turno", y no son la misma:
+                    //   · hastaFinDeTurnoPropio  -> el turno del dueño de la carta MARCADA
+                    //   · hastaFinTurnoLanzador  -> el turno de QUIEN PUSO la marca (exige conOwner),
+                    //     que es lo que quiere decir "hasta el final de TU turno" en una Activa que
+                    //     marca a un enemigo (TERROR NOCTURNO).
+                    const _mia = (eff.hastaFinDeTurnoPropio && card.owner === activePid)
+                              || (eff.hastaFinTurnoLanzador && eff.ownerId === activePid);
+                    if (!_mia) return true;
                     // Y lo ANUNCIA, con el mismo campo de plantilla que usa la caducidad por
                     // inicio de turno. Sin esto, la marca se iba en silencio y las cartas que
                     // querían decirlo (LIDERAZGO del Capitán) tenían que escribir el hook entero
@@ -12391,9 +12448,16 @@ const DSL = {
                     // Sin `ownerId` (marca sin `conOwner`) se aplica siempre: no hay de quién
                     // medir el turno y quitarlo sería peor que dejarlo.
                     if (eff.oculto && (!eff.ownerId || (game && game.activePlayerId !== eff.ownerId))) card.stealth = true;
-                    if (!eff.stats) return;
-                    if (eff.stats.atk) card.currentAtk += eff.stats.atk;
-                    if (eff.stats.def) card.currentDef += eff.stats.def;
+                    if (eff.stats) {
+                        if (eff.stats.atk) card.currentAtk += eff.stats.atk;
+                        if (eff.stats.def) card.currentDef += eff.stats.def;
+                    }
+                    if (eff.fijarStats) {
+                        // DEJA EN, no suma: se reimpone en cada pasada igual que `stats`, porque
+                        // updatePassives recalcula ATQ y DEF desde la base en cada una.
+                        if (eff.fijarStats.atk !== undefined) card.currentAtk = eff.fijarStats.atk;
+                        if (eff.fijarStats.def !== undefined) card.currentDef = eff.fijarStats.def;
+                    }
                 };
             }
             // vetoAtaqueNormal (Clarise, PESANTEZ MUTUA, 28-jul-2026): la carta marcada no puede

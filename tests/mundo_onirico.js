@@ -113,6 +113,52 @@ const duerme = (c) => !!(c && c.status && c.status.sueno && c.status.sueno.durat
         check('pero el resto de su vanguardia sí lo habría hecho', duerme(buscar(g, 'p1', 'Mini-tigre')));
     }
 
+    console.log('\n--- Comedor de sueños: entra por la puerta que le abre Morfeo ---');
+    {
+        const { g, paso } = await mesa({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'Mini-tigre', furor: 0 }], mano: ['Comedor de sueños'] },
+            p2: { vanguardia: ['Oso con armadura'] },
+        });
+        // Sin nadie dormido y sin Furor que tributar, no puede entrar.
+        await paso({ jugar: 'Comedor de sueños' });
+        check('sin aliado dormido y sin Furor, no entra', !buscar(g, 'p1', 'Comedor de sueños'));
+        // Con un aliado dormido entra GRATIS: nadie paga Furor.
+        const tigre = buscar(g, 'p1', 'Mini-tigre');
+        g.applyStatus(tigre, 'sueno', 2, null, null);
+        await paso({ jugar: 'Comedor de sueños' });
+        check('con un aliado dormido entra gratis', !!buscar(g, 'p1', 'Comedor de sueños'));
+        check('...y no le cuesta Furor a nadie', tigre.furor === 0);
+    }
+
+    console.log('\n--- TERROR NOCTURNO: una ventana, no una ejecución ---');
+    {
+        const { g, paso } = await mesa({
+            turno: 2, turnoDe: 'p1', empieza: 'p2',
+            p1: { vanguardia: [{ carta: 'Comedor de sueños', furor: 1 }] },
+            p2: { vanguardia: ['Agah'] },
+        });
+        const comedor = buscar(g, 'p1', 'Comedor de sueños');
+        const agah = buscar(g, 'p2', 'Agah');
+        const vida0 = agah.currentHp;
+        // Sin Sueño encima no se puede usar.
+        await paso({ habilidad: 'Comedor de sueños' });
+        check('sin enemigos dormidos no se puede usar', comedor.furor === 1);
+        g.applyStatus(agah, 'sueno', 2, null, null);
+        await paso({ habilidad: 'Comedor de sueños' }); await paso({ confirmar: true });
+        await paso({ elegir: ['Agah'] });
+        check('la VIDA se le queda en 1', agah.currentHp === 1, 'vida=' + agah.currentHp);
+        check('...la DEF también', agah.currentDef === 1, 'def=' + agah.currentDef);
+        check('...y el ATQ también', agah.currentAtk === 1, 'atq=' + agah.currentAtk);
+        g.updatePassives();
+        check('y aguantan una pasada de pasivas', agah.currentDef === 1 && agah.currentAtk === 1);
+        // Al terminar TU turno vuelve a ser el que era: es una ventana, no un asesinato.
+        await paso({ finTurno: true });
+        check('al acabar tu turno recupera la VIDA', agah.currentHp === vida0, 'vida=' + agah.currentHp);
+        check('...y las otras dos', agah.currentDef > 1 && agah.currentAtk > 1,
+            `${agah.currentDef}/${agah.currentAtk}`);
+    }
+
     console.log('\n--- La raíz: una subida PERMANENTE de stat sobrevive a la pasada ---');
     {
         // El +1 de DEF del Gólem multielemental no hacía NADA desde que se escribió: subía su base
