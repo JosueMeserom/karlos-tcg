@@ -3,7 +3,7 @@
 Lo que queda por hacer, con su porqué. Se actualiza al cerrar cada cosa: lo que Toto no rebate
 después de hacerlo se da por bueno y se quita de aquí.
 
-> Última revisión: 27-ago-2026 · 176 cartas en CARD_DB · 117 suites en verde
+> Última revisión: 31-ago-2026 · 178 cartas en CARD_DB · 120 suites en verde
 
 ---
 
@@ -49,7 +49,25 @@ las cuatro que hay por encima (Diego Antonio, Némesis, Garret, Kami) pagan toda
 por entrar. Era la única de ese escalón que entraba gratis, y encima protegida por su propia
 Estasis mientras esperaba. Los stats se dejan como están.
 
-**153 filas de `docs/Cartas KG.csv` sin implementar.** Es lo único grande que le queda al juego.
+**MUNDO ONÍRICO, tanda hecha el 31-ago-2026** (`tests/mundo_onirico.js`, 26 comprobaciones):
+**Morfeo** (2018) y **Comedor de sueños** (2019). Morfeo es la primera carta con etiqueta **'Dios'**
+en masculino -Alabanza y Rezo en grupo la consultaban desde siempre sin encontrar a nadie- y llena
+la etiqueta 'Mundo onírico', que llevaba Grimm solo. Piezas nuevas: `inmuneA` (inmunidad a UN
+estado), `nombreEstado()` en el cliente, `fijarStats` en MARCAR_TEMPORAL (deja en un valor en vez
+de sumar, con la VIDA prestada y devuelta) y `hastaFinTurnoLanzador`.
+
+Decisiones mías al escribirlas, por si Toto las rebate: el Sueño de Morfeo dura **1 turno** y su
+rareza es **A**; el Comedor es **B**. El Excel no trae ni duración ni rareza para ninguna de las dos.
+
+**ORNN, apuntado y sin hacer**: la otra carta con etiqueta 'Dios' (4/6/3, serie L, League of
+Legends). Se queda para la tanda del crossover de LoL, que Toto prefiere hacer entera y aparte
+aunque sea menos eficiente. Su Pasiva pide una pieza que no existe: interceptar CUALQUIER subida
+permanente de VIDA o DEF para amplificarla, o sea un trigger hermano de `ANTES_DE_RECIBIR_DAÑO`
+pero para cambios de stat propios.
+
+**147 filas de `docs/Cartas KG.csv` sin implementar.** Es lo único grande que le queda al juego.
+Los bloques gordos que quedan son crossovers enteros: Touhou/Gensokyo (11), RWBY (13), Grimm de
+RWBY (7) y League of Legends (2, con Ornn).
 
 Criterio que funcionó: mirar qué **etiquetas están huérfanas** y llenar esos huecos primero, en vez
 de seguir el orden del CSV. Hoy sigue sin ninguna carta la etiqueta **'Dios'** en masculino (solo
@@ -158,6 +176,25 @@ Cuando se retome, además de ponerlo al día, Toto quiere:
 Norma a partir de ahora: cada pieza nueva del DSL entra también en el editor.
 
 ---
+
+## 4.bis. Deuda: un bono continuo de VIDA no existe (31-ago-2026)
+
+`DSL._applyPassive` solo sabe aplicar ATQ y DEF dentro de una `PASIVA_CONTINUA`, así que **tres
+cartas tienen media Pasiva sin implementar** y nadie se había enterado porque no da ningún error:
+
+| Carta | Lo que dice | Lo que hace |
+|---|---|---|
+| **Fanático** | +1 de VIDA, DEF y ATQ por cada 'Monstruo' | solo DEF y ATQ |
+| **Gladiador** | +1 de VIDA, DEF y ATQ mientras la unión dure | solo DEF y ATQ |
+| **Grimm** | pierde 2 de VIDA y 2 de ATQ para siempre | solo el ATQ, o sea a su favor |
+
+Y es una decisión de diseño, no un arreglo mecánico: una `PASIVA_CONTINUA` se **recalcula entera**
+en cada pasada, y la VIDA no se puede recalcular así porque lleva el daño acumulado dentro. Habría
+que definirla como "sube el techo mientras se cumpla la condición y lo baja cuando deje de
+cumplirse", que es otra mecánica y toca el texto de las tres cartas.
+
+Lo vigila `tests/auditar_efectos_mudos.js`: las tres están declaradas como deuda con su motivo, y
+**una carta NUEVA que caiga en lo mismo pone la pasada en rojo**. Comprobado que falla de verdad.
 
 ## 5. Limitaciones conocidas de la batería
 
