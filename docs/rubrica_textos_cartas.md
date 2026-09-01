@@ -119,6 +119,33 @@ mañana.
 
 ---
 
+## 3.bis. Permanente por defecto: la temporalidad SE DICE [Toto, 31-ago-2026]
+
+Un bono o una merma **sin marca de temporalidad ni de condición es PERMANENTE**: las
+estadísticas base efectivas de la carta pasan a ser otras y no se vuelven a revisar, aunque la
+carta siga sabiendo cuáles eran las suyas. *"Aumenta todas sus estadísticas en 1"* es permanente;
+*"+2 de ATQ durante ese ataque"*, *"mientras la lleve"*, *"mientras esté en juego"* o *"3 turnos"*
+no lo son, porque **lo dicen**.
+
+Escribir *"permanentemente"* es entonces redundante y solo se conserva donde ya está (no es un
+fallo, es inconsistencia de redacción). Lo que **sí** es un fallo es lo contrario: dar por
+temporal algo que el texto no acota.
+
+**En el DSL** la distinción no es cosmética, son dos mecanismos distintos:
+
+| | Cómo se escribe | Cómo se declara |
+|---|---|---|
+| **Permanente** | sin acotar | `MODIFICAR_STAT` de una vez, **fuera** de una `PASIVA_CONTINUA`, sobre `maxHp` / `def` / `atk` (la base) |
+| **Condicional o temporal** | *"mientras…"*, *"si…"*, *"durante N turnos"* | dentro de una `PASIVA_CONTINUA` (se recalcula en cada pasada) o con una marca temporal |
+
+Un apunte para no asustarse leyendo el intérprete: **una `PASIVA_CONTINUA` sí puede tocar la
+VIDA**, aunque el camino sea distinto. ATQ y DEF se resetean en cada pasada y se vuelven a sumar;
+la VIDA no se resetea (lleva el daño acumulado dentro), así que el compilador guarda cuánto aportó
+la pasada anterior y aplica solo la **diferencia**, con suelo de 1. Funciona desde siempre y lo
+usan Fanático, Gladiador y Grimm.
+
+---
+
 ## 4. Nada de abreviaturas
 
 [Toto, 5-ago-2026] Siempre la forma larga, sin excepciones por espacio:

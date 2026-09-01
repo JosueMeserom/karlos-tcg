@@ -177,25 +177,6 @@ Norma a partir de ahora: cada pieza nueva del DSL entra también en el editor.
 
 ---
 
-## 4.bis. Deuda: un bono continuo de VIDA no existe (31-ago-2026)
-
-`DSL._applyPassive` solo sabe aplicar ATQ y DEF dentro de una `PASIVA_CONTINUA`, así que **tres
-cartas tienen media Pasiva sin implementar** y nadie se había enterado porque no da ningún error:
-
-| Carta | Lo que dice | Lo que hace |
-|---|---|---|
-| **Fanático** | +1 de VIDA, DEF y ATQ por cada 'Monstruo' | solo DEF y ATQ |
-| **Gladiador** | +1 de VIDA, DEF y ATQ mientras la unión dure | solo DEF y ATQ |
-| **Grimm** | pierde 2 de VIDA y 2 de ATQ para siempre | solo el ATQ, o sea a su favor |
-
-Y es una decisión de diseño, no un arreglo mecánico: una `PASIVA_CONTINUA` se **recalcula entera**
-en cada pasada, y la VIDA no se puede recalcular así porque lleva el daño acumulado dentro. Habría
-que definirla como "sube el techo mientras se cumpla la condición y lo baja cuando deje de
-cumplirse", que es otra mecánica y toca el texto de las tres cartas.
-
-Lo vigila `tests/auditar_efectos_mudos.js`: las tres están declaradas como deuda con su motivo, y
-**una carta NUEVA que caiga en lo mismo pone la pasada en rojo**. Comprobado que falla de verdad.
-
 ## 5. Limitaciones conocidas de la batería
 
 - **`tests/online.js` no ve bloqueos de la cola de acciones**: no modela que sea FIFO y bloqueante,
