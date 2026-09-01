@@ -4091,6 +4091,19 @@
             }
             _categoriaEstado(type) { return Game.CATEGORIA_ESTADO[type] || 'alteracion'; }
 
+            // El nombre de un estado tal y como lo ve el jugador. Estaba escrito tres veces (dos
+            // cadenas de ifs en el detalle y, al añadir la inmunidad de Morfeo, casi una cuarta),
+            // y una clave interna que se escapa al log es un fallo que ya ha pasado antes.
+            nombreEstado(k, card) {
+                if (k === 'dot') return 'Daño por tiempo';
+                if (k === 'confusion') return 'Confusión';
+                if (k === 'ceguera') return 'Ceguera';
+                if (k === 'sueno') return 'Sueño';
+                if (k === 'estasis') return 'Estasis';
+                if (k === 'oculto') return card ? this.generoTexto(card, 'Oculto', 'Oculta') : 'Oculto';
+                return k;
+            }
+
             applyStatus(card, type, duration, sourceCard, sourceAbility) {
                 if (getCardTemplate(card.id).isAvatar) return; 
                 // En Estasis no le entra ningún estado nuevo (es inmune a los efectos de las
@@ -4103,6 +4116,13 @@
                 // comprobarlo en cada carta que los aplica seria dejarse la mitad.
                 if (card.inmuneAEstados) {
                     this.logMsg(`${this.getCardNameWithOwner(card)} es inmune a los estados alterados.`, 'system');
+                    return;
+                }
+                // Y la inmunidad a UN estado concreto (Morfeo, inmune al Sueño). Va justo aquí, al
+                // lado de las otras dos, por el mismo motivo: es el único sitio por el que pasan
+                // todos los estados alterados, vengan de una Pasiva, de un Evento o de una Ayuda.
+                if (Array.isArray(card.inmuneA) && card.inmuneA.includes(type)) {
+                    this.logMsg(`${this.getCardNameWithOwner(card)} es inmune a ${this.nombreEstado(type, card)}.`, 'system');
                     return;
                 }
 
@@ -5516,13 +5536,7 @@
                     if (card.status) {
                         for (const [key, val] of Object.entries(card.status)) {
                             if (val && val.duration > 0) {
-                                let name = key;
-                                if (key === 'dot') name = 'Daño por tiempo';
-                                else if (key === 'confusion') name = 'Confusión';
-                                else if (key === 'ceguera') name = 'Ceguera';
-                                else if (key === 'sueno') name = 'Sueño';
-                                else if (key === 'oculto') name = this.generoTexto(card, 'Oculto', 'Oculta');
-                                else if (key === 'estasis') name = 'Estasis';
+                                const name = this.nombreEstado(key, card);
                                 const _fu = this.refFuente(val.sourceInstanceId, val.source || val.sourceName, card);
                                 effects.push(this.lineaEfecto(name, { turnos: val.duration, habilidad: val.sourceAbility, ref: _fu }));
                             }
@@ -5731,7 +5745,7 @@
                         const _obj = this.refCarta(otra); // misma sintaxis que "fuente:", pero como destino
                         if (otra.status) for (const [k, v2] of Object.entries(otra.status)) {
                             if (v2 && v2.duration > 0 && ((v2.sourceInstanceId && v2.sourceInstanceId === card.instanceId) || v2.sourceName === card.name || v2.source === card.name)) {
-                                const nm = k === 'dot' ? 'Daño por tiempo' : k === 'confusion' ? 'Confusión' : k === 'ceguera' ? 'Ceguera' : k === 'sueno' ? 'Sueño' : k === 'oculto' ? this.generoTexto(otra, 'Oculto', 'Oculta') : k === 'estasis' ? 'Estasis' : k;
+                                const nm = this.nombreEstado(k, otra);
                                 _salientes.push(this.lineaEfecto(nm, { turnos: v2.duration, habilidad: v2.sourceAbility, ref: _obj, comoObjetivo: true }));
                             }
                         }
@@ -7714,8 +7728,15 @@
                 ['p1', 'p2'].forEach(pid => {
                     [...this.players[pid].vanguard, ...this.players[pid].rearguard].forEach(card => {
                         const template = getCardTemplate(card.id);
-                        card.currentAtk = template.atk;
-                        card.currentDef = template.def;
+                        // Se recalcula desde la BASE DE LA CARTA, no de la plantilla. Son lo mismo
+                        // el 99% del tiempo (la instancia nace de un spread de la plantilla), y se
+                        // separan justo cuando algo sube o baja un stat PARA SIEMPRE
+                        // (`MODIFICAR_STAT` con stat 'atk'/'def', fuera de una PASIVA_CONTINUA).
+                        // Leyendo la plantilla, esa subida permanente se pisaba en la siguiente
+                        // pasada y no llegaba a existir: el +1 de DEF del Gólem multielemental no
+                        // hacía nada desde que se escribió (Toto, 31-ago-2026).
+                        card.currentAtk = (typeof card.atk === 'number') ? card.atk : template.atk;
+                        card.currentDef = (typeof card.def === 'number') ? card.def : template.def;
                         card.isSilenced = false; // se resetea aquí; las Auras lo reimponen después
                         // ESTASIS: agotada SIEMPRE, cada pasada. No es que "se agote al entrar":
                         // es que mientras dure no puede actuar, así que se reimpone igual que se

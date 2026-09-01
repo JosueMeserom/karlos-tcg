@@ -7465,6 +7465,49 @@ const CARD_DB = [
                       log: "{objetivo} se llena de energía onírica." } ] } ] }
         ],
     },
+
+    // ===============================================================================
+    //  MUNDO ONÍRICO — el arquetipo que Grimm llevaba esperando solo
+    // ===============================================================================
+    // La etiqueta 'Mundo onírico' existía desde Grimm y no la llevaba nadie más, así que su
+    // sinergia era teórica. Estas dos la estrenan, y de paso Morfeo es la primera carta con
+    // etiqueta 'Dios' en masculino: Alabanza y Rezo en grupo la consultaban desde siempre y
+    // hasta hoy no encontraban a nadie (lo tenía declarado auditar_etiquetas).
+    {
+        // Su cuerpo (11) es de los flojos del juego a propósito: lo que se paga es la entrada.
+        // Dormir las DOS vanguardias de golpe es un efecto de tablero, y quien lo juega elige
+        // el momento -con los suyos ya gastados, el Sueño se le va antes de volver a actuar-.
+        id: 2018, name: "Morfeo", hp: 6, def: 3, atk: 2, type: "Personaje", subtype: "Ser mágico",
+        tags: ["Mundo onírico", "Dios"], gender: "M", rarity: "A", cost: 2, series: 2,
+        text: "P: REY DE LA IMAGINACIÓN: Inmune al Sueño. Al colocar: infunde Sueño 1 turno a todos los aliados y enemigos de la vanguardia. A: ORIGEN (2F): +1 de VIDA, DEF y ATQ permanentes a cada carta con etiqueta 'Mundo onírico'.",
+        passiveName: "REY DE LA IMAGINACIÓN", activeName: "ORIGEN", activeCost: 2,
+        // Inmunidad a UN estado, no a todos (lo de Hagoromo es `inmuneAEstados`). Se comprueba en
+        // applyStatus, que es el único sitio por el que pasan todos los estados alterados.
+        inmuneA: ["sueno"],
+        abilities: [
+            { trigger: "AL_JUGAR", nombre: "REY DE LA IMAGINACIÓN",
+              log: "¡REY DE LA IMAGINACIÓN! {carta} arrastra el campo entero a su sueño.",
+              efectos: [
+                { op: "APLICAR_ESTADO", target: { quien: "TODOS", zona: "VANGUARDIA" },
+                  estado: "sueno", duracion: 1 } ] },
+            // Las tres son subidas de stat BASE (el camino genérico de modifyStat que estrenó el
+            // Gólem multielemental), no marcas: una subida permanente se ve en la cara de la
+            // carta y sobrevive a updatePassives sin tener que reaplicarse cada pasada.
+            { trigger: "ACTIVA", nombre: "ORIGEN", coste: { furor: 2 }, sinObjetivo: true,
+              requisitos: [
+                { count: { quien: "TODOS", filtros: [ { campo: "tags", op: "includes", valor: "Mundo onírico" } ] },
+                  op: ">=", valor: 1, msg: "No hay ninguna carta del Mundo onírico en el campo." } ],
+              log: "¡ORIGEN! {carta} da forma a todo lo que nace del sueño.",
+              efectos: [
+                { op: "MODIFICAR_STAT", target: { quien: "TODOS", filtros: [ { campo: "tags", op: "includes", valor: "Mundo onírico" } ] },
+                  stat: "maxHp", delta: 1 },
+                { op: "MODIFICAR_STAT", target: { quien: "TODOS", filtros: [ { campo: "tags", op: "includes", valor: "Mundo onírico" } ] },
+                  stat: "def", delta: 1 },
+                { op: "MODIFICAR_STAT", target: { quien: "TODOS", filtros: [ { campo: "tags", op: "includes", valor: "Mundo onírico" } ] },
+                  stat: "atk", delta: 1,
+                  log: "El sueño se hace más real: las cartas del Mundo onírico crecen." } ] }
+        ],
+    },
 ];
 
 // ===================================================================

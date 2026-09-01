@@ -39,7 +39,7 @@ const CARTAS = vm.runInContext('CARD_DB', sandbox).filter(Boolean);
 // motivo: una consulta a una etiqueta inexistente casi siempre es una errata, y las pocas que son
 // legítimas apuntan a trabajo pendiente.
 const SIN_CARTA_TODAVIA = {
-    'Dios': "las dos cartas con etiqueta 'Dios' del Excel están sin implementar (Morfeo y Ornn); Alabanza y Rezo en grupo ya las esperan",
+    // (vacío desde el 31-ago-2026: Morfeo trajo la etiqueta 'Dios', que era la única pendiente)
 };
 
 const problemas = [];
