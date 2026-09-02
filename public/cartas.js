@@ -7522,7 +7522,10 @@ const CARD_DB = [
         tags: ["Mundo onírico"], gender: "M", rarity: "B", cost: 1, series: 2,
         text: "Requisito: un aliado con Sueño o bien Coste: 1 de Furor. A: TERROR NOCTURNO (1F): Elige un enemigo con Sueño: su VIDA, DEF y ATQ pasan a 1 hasta el final de tu turno.",
         activeName: "TERROR NOCTURNO", activeCost: 1,
-        tempEffectText: "VIDA, DEF y ATQ a 1 hasta el final del turno de quien lo devoró",
+        // Sin `tempEffectText` a propósito (Toto, 1-sep-2026): la línea automática de stats ya
+        // dice "-N DEF y -N ATQ por TERROR NOCTURNO" con su fuente, así que una línea escrita a
+        // mano encima solo repetía lo mismo con otras palabras.
+        sinTextoMarca: true,
         abilities: [
             // El "o bien" del compilador: la rama gratis va PRIMERA porque no cuesta nada, así
             // que el jugador no tiene que elegir entre gratis y pagando (que no es una elección).
