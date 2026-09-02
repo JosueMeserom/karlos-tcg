@@ -7479,7 +7479,7 @@ const CARD_DB = [
         // el momento -con los suyos ya gastados, el Sueño se le va antes de volver a actuar-.
         id: 2018, name: "Morfeo", hp: 6, def: 3, atk: 2, type: "Personaje", subtype: "Ser mágico",
         tags: ["Mundo onírico", "Dios"], gender: "M", rarity: "A", cost: 2, series: 2,
-        text: "P: REY DE LA IMAGINACIÓN: Inmune al Sueño. Al colocar: infunde Sueño 1 turno a todos los aliados y enemigos de la vanguardia. A: ORIGEN (2F): +1 de VIDA, DEF y ATQ permanentes a cada carta con etiqueta 'Mundo onírico'.",
+        text: "P: REY DE LA IMAGINACIÓN: Inmune al Sueño. Al colocar: infunde Sueño a todos los aliados y enemigos de la vanguardia. A: ORIGEN (2F): +1 de VIDA, DEF y ATQ permanentes a cada carta con etiqueta 'Mundo onírico'.",
         passiveName: "REY DE LA IMAGINACIÓN", activeName: "ORIGEN", activeCost: 2,
         // Inmunidad a UN estado, no a todos (lo de Hagoromo es `inmuneAEstados`). Se comprueba en
         // applyStatus, que es el único sitio por el que pasan todos los estados alterados.
@@ -7488,8 +7488,13 @@ const CARD_DB = [
             { trigger: "AL_JUGAR", nombre: "REY DE LA IMAGINACIÓN",
               log: "¡REY DE LA IMAGINACIÓN! {carta} arrastra el campo entero a su sueño.",
               efectos: [
+                // SIN CUENTA (Toto, 1-sep-2026): un estado alterado al que no se le pone número
+                // de turnos NO caduca solo. En el Sueño eso no está roto, es el diseño: para
+                // actuar con esa carta hay que echar una moneda cada vez, y solo con cara se
+                // quita el estado y la acción sigue. 900 es la marca del motor para "sin cuenta"
+                // (Game.DURACION_SIN_CUENTA), la misma que usa la Estasis.
                 { op: "APLICAR_ESTADO", target: { quien: "TODOS", zona: "VANGUARDIA" },
-                  estado: "sueno", duracion: 1 } ] },
+                  estado: "sueno", duracion: 900 } ] },
             // Las tres son subidas de stat BASE (el camino genérico de modifyStat que estrenó el
             // Gólem multielemental), no marcas: una subida permanente se ve en la cara de la
             // carta y sobrevive a updatePassives sin tener que reaplicarse cada pasada.

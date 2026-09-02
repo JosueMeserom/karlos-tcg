@@ -4083,6 +4083,11 @@
             // -Infinity no sobrevive a un JSON, y todo el estado viaja por la red-, es un número
             // grande y redondo que ninguna carta va a usar de verdad.
             static get DURACION_SIN_CUENTA() { return 900; }
+            // Un estado SIN número de turnos no caduca solo: se quita por lo que diga la carta que
+            // lo puso, o -en el Sueño- sacando cara. Se marca con una duración enorme para no
+            // inventar un centinela, y se pregunta SIEMPRE por aquí: si no, la cuenta atrás lo
+            // baja a 899 y deja de reconocerse (Toto, 1-sep-2026).
+            static sinCuenta(d) { return typeof d === 'number' && d >= Game.DURACION_SIN_CUENTA; }
 
             static get CATEGORIA_ESTADO() {
                 return { dot: 'alteracion', confusion: 'alteracion', ceguera: 'alteracion',
@@ -5551,7 +5556,7 @@
                             if (val && val.duration > 0) {
                                 const name = this.nombreEstado(key, card);
                                 const _fu = this.refFuente(val.sourceInstanceId, val.source || val.sourceName, card);
-                                effects.push(this.lineaEfecto(name, { turnos: val.duration, habilidad: val.sourceAbility, ref: _fu }));
+                                effects.push(this.lineaEfecto(name, { turnos: Game.sinCuenta(val.duration) ? null : val.duration, habilidad: val.sourceAbility, ref: _fu }));
                             }
                         }
                     }
@@ -5759,7 +5764,7 @@
                         if (otra.status) for (const [k, v2] of Object.entries(otra.status)) {
                             if (v2 && v2.duration > 0 && ((v2.sourceInstanceId && v2.sourceInstanceId === card.instanceId) || v2.sourceName === card.name || v2.source === card.name)) {
                                 const nm = this.nombreEstado(k, otra);
-                                _salientes.push(this.lineaEfecto(nm, { turnos: v2.duration, habilidad: v2.sourceAbility, ref: _obj, comoObjetivo: true }));
+                                _salientes.push(this.lineaEfecto(nm, { turnos: Game.sinCuenta(v2.duration) ? null : v2.duration, habilidad: v2.sourceAbility, ref: _obj, comoObjetivo: true }));
                             }
                         }
                         if (otra.counters) for (const [k, d] of Object.entries(otra.counters)) {
@@ -7585,22 +7590,22 @@
                 [...p.vanguard, ...p.rearguard].forEach(card => {
                     // 1. Gestión de Estados Alterados base
                     if (card.status) {
-                        if (card.status.confusion && card.status.confusion.duration > 0) {
+                        if (card.status.confusion && card.status.confusion.duration > 0 && !Game.sinCuenta(card.status.confusion.duration)) {
                             card.status.confusion.duration--;
                             if (card.status.confusion.duration <= 0) delete card.status.confusion;
                         }
-                        if (card.status.ceguera && card.status.ceguera.duration > 0) {
+                        if (card.status.ceguera && card.status.ceguera.duration > 0 && !Game.sinCuenta(card.status.ceguera.duration)) {
                             card.status.ceguera.duration--;
                             if (card.status.ceguera.duration <= 0) delete card.status.ceguera;
                         }
-                        if (card.status.sueno && card.status.sueno.duration > 0) {
+                        if (card.status.sueno && card.status.sueno.duration > 0 && !Game.sinCuenta(card.status.sueno.duration)) {
                             card.status.sueno.duration--;
                             if (card.status.sueno.duration <= 0) delete card.status.sueno;
                         }
                         // El Oculto cuenta igual que los demás desde que es un estado con
                         // categoría propia (21-ago-2026). Cuando se agota, `stealth` se apaga solo
                         // en la siguiente pasada de pasivas, porque se deriva de aquí.
-                        if (card.status.oculto && card.status.oculto.duration > 0) {
+                        if (card.status.oculto && card.status.oculto.duration > 0 && !Game.sinCuenta(card.status.oculto.duration)) {
                             card.status.oculto.duration--;
                             if (card.status.oculto.duration <= 0) { delete card.status.oculto; this._derivarOculto(card); }
                         }
@@ -12696,10 +12701,10 @@
                         return badge;
                     };
 
-                    if (card.status.dot && card.status.dot.duration > 0) el.appendChild(createBadge('🔥', card.status.dot.duration, '#f97316', 'dot'));
-                    if (card.status.confusion && card.status.confusion.duration > 0) el.appendChild(createBadge('🌀', card.status.confusion.duration, '#d946ef', 'confusion'));
-                    if (card.status.ceguera && card.status.ceguera.duration > 0) el.appendChild(createBadge('🌫️', card.status.ceguera.duration, '#4b5563', 'ceguera'));
-                    if (card.status.sueno && card.status.sueno.duration > 0) el.appendChild(createBadge('💤', card.status.sueno.duration, '#0ea5e9', 'sueno'));
+                    if (card.status.dot && card.status.dot.duration > 0) el.appendChild(createBadge('🔥', Game.sinCuenta(card.status.dot.duration) ? null : card.status.dot.duration, '#f97316', 'dot'));
+                    if (card.status.confusion && card.status.confusion.duration > 0) el.appendChild(createBadge('🌀', Game.sinCuenta(card.status.confusion.duration) ? null : card.status.confusion.duration, '#d946ef', 'confusion'));
+                    if (card.status.ceguera && card.status.ceguera.duration > 0) el.appendChild(createBadge('🌫️', Game.sinCuenta(card.status.ceguera.duration) ? null : card.status.ceguera.duration, '#4b5563', 'ceguera'));
+                    if (card.status.sueno && card.status.sueno.duration > 0) el.appendChild(createBadge('💤', Game.sinCuenta(card.status.sueno.duration) ? null : card.status.sueno.duration, '#0ea5e9', 'sueno'));
                     
                     // --- Silencio ---
                     if (card.status && card.status.silencio && card.status.silencio.duration > 0) el.appendChild(createBadge('🤐', card.status.silencio.duration, '#6b7280', 'silencio'));

@@ -52,6 +52,14 @@ const duerme = (c) => !!(c && c.status && c.status.sueno && c.status.sueno.durat
         check('duerme a los enemigos', duerme(buscar(g, 'p2', 'Oso con armadura')) && duerme(buscar(g, 'p2', 'Hechicero')));
         check('...y también a los tuyos, que es el precio', duerme(buscar(g, 'p1', 'Mini-tigre')) && duerme(buscar(g, 'p1', 'Guardia')));
         check('...pero a él no le entra: es inmune al Sueño', !duerme(morfeo));
+        // SIN CUENTA: el Sueño de Morfeo no lleva número de turnos, así que no caduca solo. Se
+        // sale echando una moneda y sacando cara, que es la regla del estado.
+        const tigre = buscar(g, 'p1', 'Mini-tigre');
+        check('el Sueño entra sin cuenta atrás', g.constructor.sinCuenta(tigre.status.sueno.duration),
+            'duracion=' + tigre.status.sueno.duration);
+        await paso({ finTurno: true });
+        check('...y no se le va al terminar el turno', duerme(tigre),
+            'duracion=' + (tigre.status.sueno ? tigre.status.sueno.duration : 'sin estado'));
         check('y el log lo dice con el nombre del estado, no con la clave interna',
             g.logHistory.some(e => /inmune a Sueño/.test(e.msg)) , 'sin línea de inmunidad');
     }
