@@ -3711,7 +3711,18 @@
                 arr.push(entry);
             }
 
-            lineaEfecto(afeccion, { turnos, habilidad, ref, comoObjetivo, nota } = {}) {
+            // Cuándo se va una marca, dicho para el jugador. Se DERIVA de cómo caduca, no lo
+            // declara cada carta: así una marca nueva lo cuenta sola. Solo para las que no
+            // llevan cuenta atrás; con turnos, mandan los turnos.
+            _hastaDeMarca(eff) {
+                if (!eff) return null;
+                if (eff.hastaFinTurnoLanzador) return 'el final de este turno';
+                if (eff.hastaFinDeTurnoPropio) return 'el final de su turno';
+                if (eff.hastaInicioTurnoLanzador) return 'el próximo turno de quien la puso';
+                return null;
+            }
+
+            lineaEfecto(afeccion, { turnos, habilidad, ref, comoObjetivo, nota, hasta } = {}) {
                 // "(N turnos restantes)" (Toto, 27-jul-2026): igual para estados alterados y
                 // efectos temporales; con la cuenta atrás ya se sobreentiende que es temporal,
                 // así que sustituye también al antiguo "(efecto temporal)".
@@ -3723,6 +3734,11 @@
                 const _sinCuenta = typeof turnos === 'number' && turnos >= Game.DURACION_SIN_CUENTA;
                 const t = (turnos !== undefined && turnos !== null && turnos !== '' && !_sinCuenta)
                     ? ` (${turnos} turno${turnos === 1 ? '' : 's'} restante${turnos === 1 ? '' : 's'})` : '';
+                // `hasta` (Toto, 1-sep-2026): mismo hueco que los turnos restantes, para lo que
+                // caduca por un momento concreto en vez de por una cuenta atrás. Sin esto, un
+                // efecto temporal sin número de turnos se leía como permanente. Los turnos
+                // mandan si están: son más precisos.
+                const t2 = t || (hasta ? ` (hasta ${hasta})` : '');
                 const h = habilidad ? ` por ${habilidad}` : '';
                 // `nota` (Toto, 31-jul-2026): coletilla OPCIONAL entre la parte automática y el
                 // ", fuente:". La línea automática solo sabe de stats, así que una carta cuyo
@@ -3735,7 +3751,7 @@
                 // dónde acaba el efecto y empieza la coletilla — ni al leer ni al maquetar
                 // (_htmlLineaEfecto la pinta en su propio renglón).
                 const n = nota ? ` · ${nota}` : '';
-                return `${afeccion}${t}${h}${n}, ${comoObjetivo ? 'objetivo' : 'fuente'}: ${ref}`;
+                return `${afeccion}${t2}${h}${n}, ${comoObjetivo ? 'objetivo' : 'fuente'}: ${ref}`;
             }
 
             // Maqueta UNA línea ya construida (por lineaEfecto o escrita a mano por una carta) en
@@ -5672,7 +5688,7 @@
                             // (Toto, 27-jul-2026 — encontrado con Karolina: dos contribuciones a DEF
                             // de la MISMA fuente/habilidad -el bono y el techo- salían como "+5 DEF y
                             // -2 DEF" en vez de netear a "+3 DEF").
-                            if (!porFuente.has(clave)) porFuente.set(clave, { netPorStat: new Map(), fuente: _fm, habilidad: m.habilidad, turnos: m.turnos, srcId: m.srcId });
+                            if (!porFuente.has(clave)) porFuente.set(clave, { netPorStat: new Map(), fuente: _fm, habilidad: m.habilidad, turnos: m.turnos, hasta: m.hasta, srcId: m.srcId });
                             const _np = porFuente.get(clave).netPorStat;
                             _np.set(m.stat, (_np.get(m.stat) || 0) + m.delta);
                         });
@@ -5685,7 +5701,7 @@
                                 .map(([stat, v]) => `${v > 0 ? '+' : ''}${v} ${stat}`);
                             if (!partes.length) return;
                             const txt = partes.length > 1 ? partes.slice(0, -1).join(', ') + ' y ' + partes[partes.length - 1] : partes[0];
-                            effects.push(this.lineaEfecto(txt, { habilidad: g.habilidad, turnos: g.turnos, ref: g.fuente, nota: this._notaDeFuente(g.srcId) }));
+                            effects.push(this.lineaEfecto(txt, { habilidad: g.habilidad, turnos: g.turnos, hasta: g.hasta, ref: g.fuente, nota: this._notaDeFuente(g.srcId) }));
                         });
                         // Residuo que el registro no explica (p. ej. valores arrastrados en cartas fuera de mesa)
                         const resA = (card.currentAtk - base.atk) - acumA;
@@ -7734,7 +7750,7 @@
                 // origen) se guardan POR SEPARADO, no fusionados en un texto: el panel de detalle
                 // los recompone con la sintaxis estándar (ver lineaEfecto). `fuente` queda solo
                 // como respaldo textual para orígenes que no son una carta (p. ej. el límite 0-9).
-                const _anota = (antes, fuente, srcId, srcAltId, srcZone, habilidad, srcCard, turnos) => {
+                const _anota = (antes, fuente, srcId, srcAltId, srcZone, habilidad, srcCard, turnos, hasta) => {
                     const ref = srcCard ? this.refCarta(srcCard) : fuente;
                     _mesa().forEach(c => {
                         const b = antes[c.instanceId];
@@ -7742,7 +7758,7 @@
                         const dA = c.currentAtk - b[0], dD = c.currentDef - b[1];
                         if (!dA && !dD && !(!b[2] && c.stealth) && !(!b[3] && c.isSilenced)) return;
                         const arr = this._statMods[c.instanceId] = this._statMods[c.instanceId] || [];
-                        const meta = { fuente, ref, habilidad: habilidad || null, turnos: (turnos !== undefined ? turnos : null), srcId, srcAltId, srcZone };
+                        const meta = { fuente, ref, habilidad: habilidad || null, turnos: (turnos !== undefined ? turnos : null), hasta: hasta || null, srcId, srcAltId, srcZone };
                         // Orden VIDA/DEF/ATQ (Toto, 23-jul-2026): así se muestran los stats en la
                         // propia carta; DEF va antes que ATQ en "Afectado por:" para ser consistente.
                         if (dD) arr.push(Object.assign({ stat: 'DEF', delta: dD }, meta));
@@ -7860,7 +7876,7 @@
                                             if (_hit) { _srcTemp = _hit; break; }
                                         }
                                     }
-                                    _anota(antes, template.name, eff.sourceInstanceId || null, null, null, eff.habilidad || null, _srcTemp, eff.duration);
+                                    _anota(antes, template.name, eff.sourceInstanceId || null, null, null, eff.habilidad || null, _srcTemp, eff.duration, this._hastaDeMarca(eff));
                                 }
                             });
                         }

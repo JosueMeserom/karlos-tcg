@@ -283,6 +283,7 @@ pasa a ser `objetivo:`.
 |---|---|---|
 | **afección** | siempre | Modificador de stat (`+2 ATQ`), estado alterado (`Daño por tiempo`), contador o texto libre de la carta. Varios stats de una misma fuente van **en una sola línea**. |
 | **(N turnos restantes)** | solo si tiene duración | Se **omite** en auras y efectos permanentes. Vale igual para estados alterados y efectos temporales: con la cuenta atrás ya se sobreentiende que es temporal (por eso no existe un "(efecto temporal)"). Singular/plural automático. |
+| **(hasta …)** | solo si caduca por un MOMENTO, no por una cuenta | Mismo hueco que los turnos restantes, y los turnos mandan si están. Es para lo que se va en un instante concreto en vez de gastar turnos: *"(hasta el final de este turno)"* de TERROR NOCTURNO. La frase **se deriva de cómo caduca la marca** (`_hastaDeMarca`), no la escribe cada carta. Sin esto, un efecto temporal sin cuenta atrás se leía como permanente. |
 | **por HABILIDAD** | solo si lo causa una **Pasiva o Activa** | Se **omite** si el origen es un **Evento** o una **Ayuda**: ahí basta con la carta. |
 | **referencia** | siempre | Ver 13.2. |
 

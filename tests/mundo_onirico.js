@@ -160,6 +160,15 @@ const duerme = (c) => !!(c && c.status && c.status.sueno && c.status.sueno.durat
         check('...y el ATQ también', agah.currentAtk === 1, 'atq=' + agah.currentAtk);
         g.updatePassives();
         check('y aguantan una pasada de pasivas', agah.currentDef === 1 && agah.currentAtk === 1);
+        // El detalle tiene que decir HASTA CUÁNDO. La línea automática de stats solo sabía de
+        // números, así que un efecto temporal sin cuenta atrás se leía como permanente.
+        const mods = (g._statMods || {})[agah.instanceId] || [];
+        check('el detalle dice hasta cuándo dura', mods.some(m => m.hasta === 'el final de este turno'),
+            mods.map(m => m.stat + ':' + m.hasta).join(' '));
+        check('...y la línea sale bien montada',
+            /\(hasta el final de este turno\) por TERROR NOCTURNO, fuente: Comedor de sueños/.test(
+                g.lineaEfecto('-6 DEF y -6 ATQ', { habilidad: 'TERROR NOCTURNO', hasta: 'el final de este turno',
+                    ref: g.refCarta(buscar(g, 'p1', 'Comedor de sueños')) })));
         // Al terminar TU turno vuelve a ser el que era: es una ventana, no un asesinato.
         await paso({ finTurno: true });
         check('al acabar tu turno recupera la VIDA', agah.currentHp === vida0, 'vida=' + agah.currentHp);
