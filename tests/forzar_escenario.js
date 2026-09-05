@@ -70,6 +70,12 @@ const srv = fs.readFileSync(path.join(RAIZ, 'server.js'), 'utf8');
 check('el lobby pregunta al MISMO validador', /validarEscenario\(/.test(lobby));
 check('el lobby pinta el panel del escenario', /📋 Escenario/.test(lobby) && /'sc-head'/.test(lobby));
 check('...con su botón de Pegar', /'sc-paste'/.test(lobby) && /pegarEscenario/.test(lobby));
+check('el botón de Pegar contesta al clic sin cambiar de tamaño',
+    /function feedbackPegar/.test(lobby) && /minWidth = Math\.round/.test(lobby) && /'🔁'/.test(lobby));
+check('...y con su avisillo, que no es una notificación del navegador',
+    /function avisillo/.test(lobby) && /Mismo escenario/.test(lobby) && !/new Notification/.test(lobby));
+check('el cuadro de texto llena el panel (sin doble borde ni scroll de más)',
+    /flex:1; min-height:90px; resize:vertical/.test(lobby));
 check('...que flota por encima en vez de empujar la columna',
     /id="tp-ovl"/.test(lobby) && /function colocarFlotante/.test(lobby) && !/overflow-y: auto; min-height: 0;/.test(lobby));
 check('...y su cuadro de texto', /id="sc-text"/.test(lobby));

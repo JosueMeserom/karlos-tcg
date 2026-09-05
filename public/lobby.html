@@ -578,7 +578,7 @@
             // a otra no se note) y debajo su cuerpo.
             return cuerpo + `<div id="tp-ovl" style="position:absolute; z-index:40; box-sizing:border-box; display:flex; flex-direction:column; overflow:hidden; border-radius:8px; background:#0f172a; border:1px solid #475569; box-shadow:0 -6px 24px rgba(0,0,0,.55);">`
                 + `<div style="flex:none;">${renderCabecera(cual, true)}</div>`
-                + `<div id="tp-ovl-body" style="flex:1; min-height:0; overflow-y:auto;">${cual === 'opc' ? cuerpoOpciones() : cuerpoEscenario()}</div>`
+                + `<div id="tp-ovl-body" style="flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column;">${cual === 'opc' ? cuerpoOpciones() : cuerpoEscenario()}</div>`
                 + `</div>`;
         }
         // Coloca y anima el flotante. Arranca clavado sobre su cabecera y termina ocupando desde
@@ -639,7 +639,7 @@
                 const chips = list.map((id, i) => `<span style="display:inline-flex; align-items:center; gap:4px; background:#334155; border-radius:12px; padding:2px 8px; margin:2px; font-size:0.72rem; color:#e2e8f0;">${tpCardName(id)} <span data-rm="${seat}:${i}" style="cursor:pointer; color:#f87171;">✕</span></span>`).join('');
                 return `<div style="margin-top:6px;"><div style="font-size:0.72rem; color:#94a3b8; margin-bottom:2px;">Mano forzada ${seat === 'p1' ? 'J1' : 'J2'} (máx. 6):</div><div>${chips || '<span style="color:#64748b; font-size:0.72rem;">- ninguna -</span>'}</div><button data-add="${seat}" style="margin-top:4px; background:#1e293b; color:#cbd5e1; border:1px dashed #475569; border-radius:6px; padding:3px 8px; font-size:0.72rem; cursor:pointer;">＋ Añadir carta</button><div id="tp-picker-${seat}" style="display:none; margin-top:4px;"></div></div>`;
             };
-            return `<div style="background:#0f172a; border:1px solid #475569; border-top:none; border-radius:0 0 8px 8px; padding:10px 12px; "><label style="display:flex; align-items:center; gap:8px; font-size:0.8rem; color:#e2e8f0; cursor:pointer;"><input type="checkbox" id="tp-fast" ${testCfg.fastStart ? 'checked' : ''}> Inicio rápido (saltar apartar 3 cartas)</label><div style="margin-top:8px; font-size:0.8rem; color:#e2e8f0;">Empieza: <select id="tp-start" style="margin-left:6px; width:auto; display:inline-block;"><option value="random" ${testCfg.startingPlayer === 'random' ? 'selected' : ''}>🎲 Aleatorio</option><option value="p1" ${testCfg.startingPlayer === 'p1' ? 'selected' : ''}>J1</option><option value="p2" ${testCfg.startingPlayer === 'p2' ? 'selected' : ''}>J2</option></select></div>${seatBlock('p1')}${seatBlock('p2')}<button id="tp-reset" style="margin-top:10px; background:#7f1d1d; color:#fecaca; border:none; border-radius:6px; padding:4px 10px; font-size:0.72rem; cursor:pointer;">Restablecer a por defecto</button></div>`;
+            return `<div style="background:#0f172a; padding:10px 12px; flex:1; min-height:0; box-sizing:border-box;"><label style="display:flex; align-items:center; gap:8px; font-size:0.8rem; color:#e2e8f0; cursor:pointer;"><input type="checkbox" id="tp-fast" ${testCfg.fastStart ? 'checked' : ''}> Inicio rápido (saltar apartar 3 cartas)</label><div style="margin-top:8px; font-size:0.8rem; color:#e2e8f0;">Empieza: <select id="tp-start" style="margin-left:6px; width:auto; display:inline-block; padding:3px 8px; font-size:0.8rem; height:auto; margin-bottom:0; border-radius:6px;"><option value="random" ${testCfg.startingPlayer === 'random' ? 'selected' : ''}>🎲 Aleatorio</option><option value="p1" ${testCfg.startingPlayer === 'p1' ? 'selected' : ''}>J1</option><option value="p2" ${testCfg.startingPlayer === 'p2' ? 'selected' : ''}>J2</option></select></div>${seatBlock('p1')}${seatBlock('p2')}<button id="tp-reset" style="margin-top:10px; background:#7f1d1d; color:#fecaca; border:none; border-radius:6px; padding:4px 10px; font-size:0.72rem; cursor:pointer;">Restablecer a por defecto</button></div>`;
         }
         let _scenAcabaDeAbrirse = false;
         function cuerpoEscenario() {
@@ -647,13 +647,52 @@
             const aviso = est.luz === 'malo'
                 ? `<div id="sc-error" style="margin-top:7px; color:#fca5a5; font-size:0.72rem; line-height:1.35;">⚠️ ${est.motivo}</div>`
                 : (est.luz === 'ok' ? `<div style="margin-top:7px; color:#86efac; font-size:0.72rem;">✔️ Escenario válido. Anula las opciones de prueba.</div>` : '');
-            const body = `<div style="background:#0f172a; border:1px solid #475569; border-top:none; border-radius:0 0 8px 8px; padding:10px 12px;">`
-                + `<textarea id="sc-text" spellcheck="false" placeholder='{"turno":2,"turnoDe":"p1","empieza":"p2","p1":{...},"p2":{...}}' style="width:100%; box-sizing:border-box; height:120px; resize:vertical; background:#020617; color:#e2e8f0; border:1px solid #334155; border-radius:6px; padding:6px 8px; font-family:monospace; font-size:0.72rem; line-height:1.4;">${(testCfg.escenario || '').replace(/</g, '&lt;')}</textarea>`
-                + aviso
+            const body = `<div style="background:#0f172a; padding:10px 12px; flex:1; min-height:0; box-sizing:border-box; display:flex; flex-direction:column;">`
+                + `<textarea id="sc-text" spellcheck="false" placeholder='{"turno":2,"turnoDe":"p1","empieza":"p2","p1":{...},"p2":{...}}' style="width:100%; box-sizing:border-box; flex:1; min-height:90px; resize:vertical; background:#020617; color:#e2e8f0; border:1px solid #334155; border-radius:6px; padding:6px 8px; font-family:monospace; font-size:0.72rem; line-height:1.4;">${(testCfg.escenario || '').replace(/</g, '&lt;')}</textarea>`
+                + aviso.replace('margin-top:7px', 'margin-top:7px; flex:none')
                 + `<button id="sc-clear" style="margin-top:8px; background:#7f1d1d; color:#fecaca; border:none; border-radius:6px; padding:4px 10px; font-size:0.72rem; cursor:pointer;">Quitar escenario</button>`
                 + `</div>`;
             return body;
         }
+        // Un aviso diminuto y efímero pegado al botón: lo justo para saber que el clic hizo algo.
+        // Nada de notificaciones del navegador, que para esto son un cañonazo.
+        function avisillo(texto) {
+            const wrap = document.getElementById('test-panel-wrap');
+            const btn = document.querySelector('#test-panel-wrap [data-pegar]');
+            if (!wrap || !btn) return;
+            const viejo = document.getElementById('sc-avisillo');
+            if (viejo) viejo.remove();
+            const rW = wrap.getBoundingClientRect(), rB = btn.getBoundingClientRect();
+            const d = document.createElement('div');
+            d.id = 'sc-avisillo';
+            d.textContent = texto;
+            d.style.cssText = 'position:absolute; z-index:60; pointer-events:none; background:#1e293b;'
+                + ' border:1px solid #475569; color:#e2e8f0; font-size:0.7rem; padding:3px 8px;'
+                + ' border-radius:6px; white-space:nowrap; box-shadow:0 2px 10px rgba(0,0,0,.5);'
+                + ' opacity:0; transform:translateY(3px); transition:opacity 140ms ease, transform 140ms ease;';
+            d.style.left = Math.round(rB.left - rW.left) + 'px';
+            d.style.top = Math.round(rB.bottom - rW.top + 6) + 'px';
+            wrap.appendChild(d);
+            requestAnimationFrame(() => { d.style.opacity = '1'; d.style.transform = 'translateY(0)'; });
+            setTimeout(() => { d.style.opacity = '0'; d.style.transform = 'translateY(3px)'; setTimeout(() => d.remove(), 200); }, 1100);
+        }
+        // El botón enseña el resultado sin cambiar de tamaño: se le congela el ancho ANTES de
+        // tocarle el texto, y vuelve a "Pegar" con un fundido.
+        function feedbackPegar(icono, texto) {
+            document.querySelectorAll('#test-panel-wrap [data-pegar]').forEach(b => {
+                if (b._volver) { clearTimeout(b._volver); b._volver = null; }
+                if (!b.style.minWidth) b.style.minWidth = Math.round(b.getBoundingClientRect().width) + 'px';
+                b.style.transition = 'opacity 200ms ease';
+                b.style.opacity = '1';
+                b.textContent = icono;
+                b._volver = setTimeout(() => {
+                    b.style.opacity = '0';
+                    setTimeout(() => { b.textContent = 'Pegar'; b.style.opacity = '1'; }, 200);
+                }, 450);
+            });
+            if (texto) avisillo(texto);
+        }
+
         function ponEscenario(txt, avisar) {
             const est = estadoEscenario(txt);
             if (est.luz === 'malo') { if (avisar) alert('⚠️ Ese escenario no vale: ' + est.motivo); return false; }
@@ -676,8 +715,9 @@
                 return;
             }
             // Pegado con éxito: no se abre el panel, que el caso normal es pegar y jugar. La
-            // lucecita de la cabecera ya dice si vale.
-            ponEscenario(txt, true);
+            // lucecita de la cabecera ya dice si vale. El botón contesta al clic él solo.
+            const mismo = String(txt).trim() === (testCfg.escenario || '').trim();
+            if (ponEscenario(txt, true)) feedbackPegar(mismo ? '🔁' : '✔️', mismo ? 'Mismo escenario' : 'Correcto');
         }
         function wireEscenarioPanel() {
             const ta = document.getElementById('sc-text');
