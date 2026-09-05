@@ -68,10 +68,12 @@ const idx = fs.readFileSync(path.join(RAIZ, 'public/index.html'), 'utf8');
 const srv = fs.readFileSync(path.join(RAIZ, 'server.js'), 'utf8');
 
 check('el lobby pregunta al MISMO validador', /validarEscenario\(/.test(lobby));
-check('el lobby pinta el panel de Forzar escenario', /Forzar escenario/.test(lobby) && /id="sc-head"/.test(lobby));
-check('...con su botón de Pegar', /id="sc-paste"/.test(lobby) && /pegarEscenario/.test(lobby));
+check('el lobby pinta el panel del escenario', /📋 Escenario/.test(lobby) && /'sc-head'/.test(lobby));
+check('...con su botón de Pegar', /'sc-paste'/.test(lobby) && /pegarEscenario/.test(lobby));
+check('...que flota por encima en vez de empujar la columna',
+    /id="tp-ovl"/.test(lobby) && /function colocarFlotante/.test(lobby) && !/overflow-y: auto; min-height: 0;/.test(lobby));
 check('...y su cuadro de texto', /id="sc-text"/.test(lobby));
-check('el botón de Pegar no despliega el panel (para el clic)', /sc-paste'\);[\s\S]{0,120}stopPropagation/.test(lobby));
+check('el botón de Pegar no despliega el panel (para el clic)', /data-pegar\][\s\S]{0,180}stopPropagation/.test(lobby));
 check('las opciones se marcan en rojo si el escenario las pisa', /hayEscenarioValido\(testCfg\)/.test(lobby) && /#f87171/.test(lobby));
 check('a quien no es admin se le dice sin detalles', /El anfitrión forzó un escenario/.test(lobby));
 check('restablecer las opciones NO borra el escenario', /_esc = testCfg\.escenario/.test(lobby));

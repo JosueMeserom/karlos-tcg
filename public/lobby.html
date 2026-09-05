@@ -214,7 +214,7 @@
                     </div>
                 </div>
                 
-                <div class="online-col" style="background: transparent; border: none; padding: 0; gap: 10px; overflow-y: auto; min-height: 0;">
+                <div class="online-col" id="room-col" style="background: transparent; border: none; padding: 0; gap: 10px; position: relative;">
                     <div class="player-box" style="border-top: 4px solid #3b82f6;">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <span class="p1-title" id="room-p1-name" style="font-size: 1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 130px;">Esperando...</span>
@@ -236,7 +236,7 @@
                         <div id="room-spectators-list" style="font-size: 0.85rem; color: #cbd5e1;">Ninguno</div>
                     </div>
 
-                    <div id="test-panel-wrap" style="width:100%;"></div>
+                    <div id="test-panel-wrap" style="width:100%; position:relative;"></div>
 
                     <div style="width: 100%;">
                         <div id="rematch-area" style="width:100%; text-align:center; margin-bottom:10px;"></div>
@@ -558,55 +558,92 @@
         // Dos columnas: las opciones de siempre y el escenario forzado, que las pisa. Se ven a la
         // vez a propósito, porque la relación entre las dos (una anula a la otra) es justo lo que
         // hay que poder leer de un vistazo: verde aquí = rojo allí.
+        // Las dos cabeceras viven SIEMPRE en su sitio, una al lado de la otra. Al abrir una, se
+        // pinta encima un panel flotante que arranca justo donde está esa cabecera, se estira a
+        // lo ancho y luego crece HACIA ARRIBA hasta el borde superior de la columna, tapando lo
+        // que haya debajo. Así el despliegue no empuja nada y la columna no necesita scroll (que
+        // era lo que sacaba las dos barras al pasar el ratón por ¡ESTOY LISTO!).
+        function panelAbierto() {
+            if (localStorage.getItem('karlos_test_panel_open') === '1') return 'opc';
+            if (localStorage.getItem('karlos_scen_panel_open') === '1') return 'esc';
+            return null;
+        }
         function renderAdminPanel() {
-            // Desplegado, el panel abierto se queda con TODO el ancho y el otro baja a su cabecera:
-            // en media columna, la lista de cartas forzadas y el cuadro de texto quedan ilegibles.
-            const abrOpc = localStorage.getItem('karlos_test_panel_open') === '1';
-            const abrEsc = localStorage.getItem('karlos_scen_panel_open') === '1';
-            const cols = (abrOpc || abrEsc) ? '1fr' : '1fr 1fr';
-            // El abierto va PRIMERO: así el que se acaba de desplegar no salta de sitio.
-            const orden = abrEsc && !abrOpc
-                ? [renderPanelEscenario(), renderPanelOpciones()]
-                : [renderPanelOpciones(), renderPanelEscenario()];
-            return `<div style="display:grid; grid-template-columns:${cols}; gap:8px; align-items:start;">`
-                 + orden.map(h => `<div style="min-width:0;">${h}</div>`).join('') + `</div>`;
+            const cuerpo = `<div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; align-items:start;">`
+                + `<div style="min-width:0;">${renderCabecera('opc')}</div>`
+                + `<div style="min-width:0;">${renderCabecera('esc')}</div></div>`;
+            const cual = panelAbierto();
+            if (!cual) return cuerpo;
+            // El flotante repite la cabecera dentro (misma que la de abajo, para que el paso de una
+            // a otra no se note) y debajo su cuerpo.
+            return cuerpo + `<div id="tp-ovl" style="position:absolute; z-index:40; box-sizing:border-box; display:flex; flex-direction:column; overflow:hidden; border-radius:8px; background:#0f172a; border:1px solid #475569; box-shadow:0 -6px 24px rgba(0,0,0,.55);">`
+                + `<div style="flex:none;">${renderCabecera(cual, true)}</div>`
+                + `<div id="tp-ovl-body" style="flex:1; min-height:0; overflow-y:auto;">${cual === 'opc' ? cuerpoOpciones() : cuerpoEscenario()}</div>`
+                + `</div>`;
         }
-        function renderPanelOpciones() {
-            const open = localStorage.getItem('karlos_test_panel_open') === '1';
-            const nd = isTestNonDefault(testCfg);
-            const pisado = hayEscenarioValido(testCfg);
-            // Roja cuando hay un escenario válido al lado: lo que haya configurado aquí NO se va a
-            // aplicar, y eso tiene que verse sin desplegar nada.
-            const luz = pisado ? ' <span style="color:#f87171;" title="Un escenario forzado anula estas opciones">●</span>'
-                     : (nd ? ' <span style="color:#4ade80;">●</span>' : '');
-            const head = `<div id="tp-head" style="display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:34px; box-sizing:border-box; cursor:pointer; background:#0f172a; border:1px solid #475569; border-radius:8px; padding:6px 12px;"><span style="font-size:0.78rem; color:#fbbf24; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">⚙️ Opciones de prueba${luz}</span><span style="color:#94a3b8; font-size:0.9rem;">${open ? '▾' : '▸'}</span></div>`;
-            if (!open) return head;
-            const seatBlock = (seat) => {
-                const list = testCfg.forcedHands[seat] || [];
-                const chips = list.map((id, i) => `<span style="display:inline-flex; align-items:center; gap:4px; background:#334155; border-radius:12px; padding:2px 8px; margin:2px; font-size:0.72rem; color:#e2e8f0;">${tpCardName(id)} <span data-rm="${seat}:${i}" style="cursor:pointer; color:#f87171;">✕</span></span>`).join('');
-                return `<div style="margin-top:6px;"><div style="font-size:0.72rem; color:#94a3b8; margin-bottom:2px;">Mano forzada ${seat === 'p1' ? 'J1' : 'J2'} (máx. 6):</div><div>${chips || '<span style="color:#64748b; font-size:0.72rem;">- ninguna -</span>'}</div><button data-add="${seat}" style="margin-top:4px; background:#1e293b; color:#cbd5e1; border:1px dashed #475569; border-radius:6px; padding:3px 8px; font-size:0.72rem; cursor:pointer;">＋ Añadir carta</button><div id="tp-picker-${seat}" style="display:none; margin-top:4px;"></div></div>`;
-            };
-            const body = `<div style="background:#0f172a; border:1px solid #475569; border-top:none; border-radius:0 0 8px 8px; padding:10px 12px; max-height:200px; overflow-y:auto;"><label style="display:flex; align-items:center; gap:8px; font-size:0.8rem; color:#e2e8f0; cursor:pointer;"><input type="checkbox" id="tp-fast" ${testCfg.fastStart ? 'checked' : ''}> Inicio rápido (saltar apartar 3 cartas)</label><div style="margin-top:8px; font-size:0.8rem; color:#e2e8f0;">Empieza: <select id="tp-start" style="margin-left:6px; width:auto; display:inline-block;"><option value="random" ${testCfg.startingPlayer === 'random' ? 'selected' : ''}>🎲 Aleatorio</option><option value="p1" ${testCfg.startingPlayer === 'p1' ? 'selected' : ''}>J1</option><option value="p2" ${testCfg.startingPlayer === 'p2' ? 'selected' : ''}>J2</option></select></div>${seatBlock('p1')}${seatBlock('p2')}<button id="tp-reset" style="margin-top:10px; background:#7f1d1d; color:#fecaca; border:none; border-radius:6px; padding:4px 10px; font-size:0.72rem; cursor:pointer;">Restablecer a por defecto</button></div>`;
-            return head + body;
+        // Coloca y anima el flotante. Arranca clavado sobre su cabecera y termina ocupando desde
+        // el borde superior de la columna hasta el borde inferior de la zona de paneles.
+        function colocarFlotante(cual, cerrando, alTerminar, alInstante) {
+            const ovl = document.getElementById('tp-ovl');
+            const wrap = document.getElementById('test-panel-wrap');
+            const col = document.getElementById('room-col');
+            const cab = document.getElementById(cual === 'opc' ? 'tp-head' : 'sc-head');
+            if (!ovl || !wrap || !col || !cab) return;
+            const rW = wrap.getBoundingClientRect(), rC = col.getBoundingClientRect(), rH = cab.getBoundingClientRect();
+            const desde = { left: Math.round(rH.left - rW.left), width: Math.round(rH.width), height: Math.round(rH.height) };
+            const hasta = { left: 0, width: Math.round(rW.width), height: Math.round(rW.bottom - rC.top) };
+            const a = cerrando ? hasta : desde, b = cerrando ? desde : hasta;
+            const suave = !alInstante && (!window.matchMedia || !window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+            const poner = (e) => { ovl.style.left = e.left + 'px'; ovl.style.width = e.width + 'px'; ovl.style.height = e.height + 'px'; };
+            ovl.style.bottom = '0px';
+            ovl.style.transition = 'none';
+            poner(a);
+            if (!suave) { poner(b); if (alTerminar) alTerminar(); return; }
+            // Primero a lo ancho y luego a lo alto: la altura espera a que el ancho vaya por la
+            // mitad, que es lo que hace que se lea como "se estira y entonces sube".
+            void ovl.offsetWidth;
+            ovl.style.transition = 'left 170ms cubic-bezier(.22,.61,.36,1), width 170ms cubic-bezier(.22,.61,.36,1), height 220ms cubic-bezier(.22,.61,.36,1) 90ms';
+            requestAnimationFrame(() => {
+                poner(b);
+                if (alTerminar) setTimeout(alTerminar, 330);
+            });
         }
-        // ── FORZAR ESCENARIO ──────────────────────────────────────────────────────────────
-        // Mismo formato que los escenarios del harness y del cargador de debug. La diferencia es
-        // el momento: aquí se deja preparado ANTES de empezar, y la partida arranca ya montada en
-        // cuanto los dos den a Listo, en vez de tener que cargarlo a mano con la mesa puesta.
-        let _scenAcabaDeAbrirse = false;
-        function renderPanelEscenario() {
-            const open = localStorage.getItem('karlos_scen_panel_open') === '1';
+        // Las cabeceras y los cuerpos, separados: la cabecera se pinta DOS veces (en su sitio de
+        // siempre y dentro del flotante) y el cuerpo solo dentro del flotante.
+        function renderCabecera(cual, enFlotante) {
+            const open = panelAbierto() === cual;
+            const flecha = `<span style="color:#94a3b8; font-size:0.9rem;">${open ? '▾' : '▸'}</span>`;
+            if (cual === 'opc') {
+                const nd = isTestNonDefault(testCfg);
+                const pisado = hayEscenarioValido(testCfg);
+                // Roja cuando hay un escenario válido al lado: lo que haya configurado aquí NO se
+                // va a aplicar, y eso tiene que verse sin desplegar nada.
+                const luz = pisado ? ' <span style="color:#f87171;" title="Un escenario forzado anula estas opciones">●</span>'
+                         : (nd ? ' <span style="color:#4ade80;">●</span>' : '');
+                return `<div id="${enFlotante ? 'tp-head-ovl' : 'tp-head'}" data-cab="opc" style="display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:34px; box-sizing:border-box; cursor:pointer; background:#0f172a; border:1px solid #475569; border-radius:8px; padding:6px 12px;"><span style="font-size:0.78rem; color:#fbbf24; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">⚙️ Opciones de prueba${luz}</span><span style="color:#94a3b8; font-size:0.9rem;">${open ? '▾' : '▸'}</span></div>`;
+            }
             const est = estadoEscenario(testCfg.escenario);
             const luz = est.luz === 'ok' ? ' <span style="color:#4ade80;">●</span>'
                       : est.luz === 'malo' ? ` <span style="color:#f87171;" title="${(est.motivo || '').replace(/"/g, '&quot;')}">●</span>` : '';
             // El botón de Pegar vive en la CABECERA, no dentro: el caso normal es pegar y jugar,
             // sin desplegar nada. Por eso para el clic (si no, abriría y cerraría el panel).
-            const head = `<div id="sc-head" style="display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:34px; box-sizing:border-box; cursor:pointer; background:#0f172a; border:1px solid #475569; border-radius:8px; padding:6px 12px;">`
-                + `<span style="font-size:0.78rem; color:#c084fc; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">📋 Forzar escenario${luz}</span>`
+            return `<div id="${enFlotante ? 'sc-head-ovl' : 'sc-head'}" data-cab="esc" style="display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:34px; box-sizing:border-box; cursor:pointer; background:#0f172a; border:1px solid #475569; border-radius:8px; padding:6px 12px;">`
+                + `<span style="font-size:0.78rem; color:#c084fc; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">📋 Escenario${luz}</span>`
                 + `<span style="display:flex; align-items:center; gap:8px;">`
-                + `<button id="sc-paste" title="Pegar el escenario del portapapeles" style="background:#7c3aed; color:#fff; border:none; border-radius:6px; padding:3px 10px; font-size:0.8rem; cursor:pointer; white-space:nowrap;">Pegar</button>`
-                + `<span style="color:#94a3b8; font-size:0.9rem;">${open ? '▾' : '▸'}</span></span></div>`;
-            if (!open) return head;
+                + `<button id="${enFlotante ? 'sc-paste-ovl' : 'sc-paste'}" data-pegar="1" title="Pegar el escenario del portapapeles" style="background:#7c3aed; color:#fff; border:none; border-radius:6px; padding:3px 10px; font-size:0.8rem; cursor:pointer; white-space:nowrap;">Pegar</button>`
+                + `<span style="color:#94a3b8; font-size:0.9rem;">${open ? '▾' : '▸'}</span></span></div>`;;
+        }
+        function cuerpoOpciones() {
+            const seatBlock = (seat) => {
+                const list = testCfg.forcedHands[seat] || [];
+                const chips = list.map((id, i) => `<span style="display:inline-flex; align-items:center; gap:4px; background:#334155; border-radius:12px; padding:2px 8px; margin:2px; font-size:0.72rem; color:#e2e8f0;">${tpCardName(id)} <span data-rm="${seat}:${i}" style="cursor:pointer; color:#f87171;">✕</span></span>`).join('');
+                return `<div style="margin-top:6px;"><div style="font-size:0.72rem; color:#94a3b8; margin-bottom:2px;">Mano forzada ${seat === 'p1' ? 'J1' : 'J2'} (máx. 6):</div><div>${chips || '<span style="color:#64748b; font-size:0.72rem;">- ninguna -</span>'}</div><button data-add="${seat}" style="margin-top:4px; background:#1e293b; color:#cbd5e1; border:1px dashed #475569; border-radius:6px; padding:3px 8px; font-size:0.72rem; cursor:pointer;">＋ Añadir carta</button><div id="tp-picker-${seat}" style="display:none; margin-top:4px;"></div></div>`;
+            };
+            return `<div style="background:#0f172a; border:1px solid #475569; border-top:none; border-radius:0 0 8px 8px; padding:10px 12px; "><label style="display:flex; align-items:center; gap:8px; font-size:0.8rem; color:#e2e8f0; cursor:pointer;"><input type="checkbox" id="tp-fast" ${testCfg.fastStart ? 'checked' : ''}> Inicio rápido (saltar apartar 3 cartas)</label><div style="margin-top:8px; font-size:0.8rem; color:#e2e8f0;">Empieza: <select id="tp-start" style="margin-left:6px; width:auto; display:inline-block;"><option value="random" ${testCfg.startingPlayer === 'random' ? 'selected' : ''}>🎲 Aleatorio</option><option value="p1" ${testCfg.startingPlayer === 'p1' ? 'selected' : ''}>J1</option><option value="p2" ${testCfg.startingPlayer === 'p2' ? 'selected' : ''}>J2</option></select></div>${seatBlock('p1')}${seatBlock('p2')}<button id="tp-reset" style="margin-top:10px; background:#7f1d1d; color:#fecaca; border:none; border-radius:6px; padding:4px 10px; font-size:0.72rem; cursor:pointer;">Restablecer a por defecto</button></div>`;
+        }
+        let _scenAcabaDeAbrirse = false;
+        function cuerpoEscenario() {
+            const est = estadoEscenario(testCfg.escenario);
             const aviso = est.luz === 'malo'
                 ? `<div id="sc-error" style="margin-top:7px; color:#fca5a5; font-size:0.72rem; line-height:1.35;">⚠️ ${est.motivo}</div>`
                 : (est.luz === 'ok' ? `<div style="margin-top:7px; color:#86efac; font-size:0.72rem;">✔️ Escenario válido. Anula las opciones de prueba.</div>` : '');
@@ -615,7 +652,7 @@
                 + aviso
                 + `<button id="sc-clear" style="margin-top:8px; background:#7f1d1d; color:#fecaca; border:none; border-radius:6px; padding:4px 10px; font-size:0.72rem; cursor:pointer;">Quitar escenario</button>`
                 + `</div>`;
-            return head + body;
+            return body;
         }
         function ponEscenario(txt, avisar) {
             const est = estadoEscenario(txt);
@@ -632,29 +669,17 @@
             try { if (navigator.clipboard && navigator.clipboard.readText) txt = await navigator.clipboard.readText(); }
             catch (e) { txt = null; }
             if (txt === null || txt === undefined || !String(txt).trim()) {
-                localStorage.setItem('karlos_scen_panel_open', '1');
-                _scenAcabaDeAbrirse = true;
-                renderTestPanel(_tpLastRoom);
+                if (panelAbierto() !== 'esc') alternarPanel('esc');
                 const ta = document.getElementById('sc-text');
                 if (ta) { ta.focus(); ta.select(); }
                 if (txt === null) alert('Tu navegador no deja leer el portapapeles sin HTTPS.\nTe he abierto el cuadro: pega ahí con Ctrl+V.');
                 return;
             }
-            if (ponEscenario(txt, true)) {
-                localStorage.setItem('karlos_scen_panel_open', '1');
-                renderTestPanel(_tpLastRoom);
-            }
+            // Pegado con éxito: no se abre el panel, que el caso normal es pegar y jugar. La
+            // lucecita de la cabecera ya dice si vale.
+            ponEscenario(txt, true);
         }
         function wireEscenarioPanel() {
-            const head = document.getElementById('sc-head');
-            if (head) head.onclick = () => {
-                const open = localStorage.getItem('karlos_scen_panel_open') === '1';
-                localStorage.setItem('karlos_scen_panel_open', open ? '0' : '1');
-                _scenAcabaDeAbrirse = !open;
-                renderTestPanel(_tpLastRoom);
-            };
-            const paste = document.getElementById('sc-paste');
-            if (paste) paste.onclick = (ev) => { ev.stopPropagation(); pegarEscenario(); };
             const ta = document.getElementById('sc-text');
             if (ta) {
                 // Se guarda al salir del cuadro, no en cada tecla: si no, cada letra emitiría al
@@ -667,13 +692,39 @@
             if (clear) clear.onclick = () => { testCfg.escenario = ''; pushTestCfg(); renderTestPanel(_tpLastRoom); };
         }
 
+        let _ovlAnimando = false;
+        // Abrir/cerrar con su animación. Las cabeceras de abajo y la del flotante hacen lo mismo,
+        // por eso se cablean por `data-cab` y no por id: hay dos de cada cuando está abierto.
+        function alternarPanel(cual) {
+            if (_ovlAnimando) return;
+            if (panelAbierto() === cual) {
+                _ovlAnimando = true;
+                colocarFlotante(cual, true, () => {
+                    localStorage.setItem('karlos_test_panel_open', '0');
+                    localStorage.setItem('karlos_scen_panel_open', '0');
+                    _ovlAnimando = false;
+                    renderTestPanel(_tpLastRoom);
+                });
+                return;
+            }
+            localStorage.setItem('karlos_test_panel_open', cual === 'opc' ? '1' : '0');
+            localStorage.setItem('karlos_scen_panel_open', cual === 'esc' ? '1' : '0');
+            _scenAcabaDeAbrirse = (cual === 'esc');
+            _ovlAnimando = true;
+            renderTestPanel(_tpLastRoom);
+            colocarFlotante(cual, false, () => { _ovlAnimando = false; });
+        }
         function wireAdminPanel() {
-            const head = document.getElementById('tp-head');
-            if (head) head.onclick = () => {
-                const open = localStorage.getItem('karlos_test_panel_open') === '1';
-                localStorage.setItem('karlos_test_panel_open', open ? '0' : '1');
-                renderTestPanel(_tpLastRoom);
-            };
+            document.querySelectorAll('#test-panel-wrap [data-cab]').forEach(el => {
+                el.onclick = () => alternarPanel(el.getAttribute('data-cab'));
+            });
+            document.querySelectorAll('#test-panel-wrap [data-pegar]').forEach(el => {
+                el.onclick = (ev) => { ev.stopPropagation(); pegarEscenario(); };
+            });
+            // Un repintado con el panel ya abierto (marcar una casilla, añadir una carta) recrea el
+            // flotante: se recoloca al instante y SIN animación, que si no parpadearía en cada clic.
+            const _cual = panelAbierto();
+            if (_cual && !_ovlAnimando && document.getElementById('tp-ovl')) colocarFlotante(_cual, false, null, true);
             const fast = document.getElementById('tp-fast');
             if (fast) fast.onchange = () => { testCfg.fastStart = fast.checked; pushTestCfg(); renderTestPanel(_tpLastRoom); };
             const start = document.getElementById('tp-start');
