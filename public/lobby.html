@@ -471,7 +471,7 @@
         }
 
         // ===== PANEL DE PRUEBAS (ADMIN) =====
-        const DEFAULT_TEST_CONFIG = { fastStart: false, startingPlayer: 'random', forcedHands: { p1: [], p2: [] } };
+        const DEFAULT_TEST_CONFIG = { fastStart: false, startingPlayer: 'random', forcedHands: { p1: [], p2: [] }, escenario: '' };
         let testCfg = loadTestCfg();
         let _tpLastRoom = null;
 
@@ -485,7 +485,8 @@
                         forcedHands: {
                             p1: Array.isArray(c.forcedHands && c.forcedHands.p1) ? c.forcedHands.p1.slice(0, 6) : [],
                             p2: Array.isArray(c.forcedHands && c.forcedHands.p2) ? c.forcedHands.p2.slice(0, 6) : []
-                        }
+                        },
+                        escenario: typeof c.escenario === 'string' ? c.escenario : ''
                     };
                 }
             } catch (e) {}
@@ -501,6 +502,19 @@
             if (_tpLastRoom) _tpLastRoom.testConfig = JSON.parse(JSON.stringify(testCfg)); // optimista: ya queda reflejado en la sala local
             if (currentRoom) socket.emit('setTestConfig', { roomCode: currentRoom, config: testCfg });
         }
+        // Estado del escenario pegado: '' (no hay), 'ok' o 'malo' con su motivo. El criterio es
+        // `validarEscenario` de cartas.js, el MISMO que usa la partida al montarlo: la lucecita
+        // verde de aquí y que la mesa arranque tienen que ser la misma pregunta.
+        function estadoEscenario(txt) {
+            const t = (txt || '').trim();
+            if (!t) return { luz: '', motivo: '' };
+            let spec;
+            try { spec = JSON.parse(t); }
+            catch (e) { return { luz: 'malo', motivo: 'no es JSON válido: ' + e.message }; }
+            const r = (typeof validarEscenario === 'function') ? validarEscenario(spec) : { ok: true };
+            return r.ok ? { luz: 'ok', motivo: '' } : { luz: 'malo', motivo: r.motivo };
+        }
+        function hayEscenarioValido(cfg) { return estadoEscenario(cfg && cfg.escenario).luz === 'ok'; }
         function tpCardName(id) { const c = CARD_DB.find(x => x.id == id); return c ? c.name : ('#' + id); }
 
         function renderTestPanel(room) {
@@ -513,6 +527,9 @@
             const inGame = room && room.status && room.status !== 'waiting';
             if (isAdmin && !inGame) { wrap.innerHTML = renderAdminPanel(); wireAdminPanel(); return; }
             const cfg = (room && room.testConfig) ? room.testConfig : null;
+            // Un escenario forzado se anuncia SIN detalles: la lista de cartas de cada zona no
+            // cabe en ese recuadro, y saberla tampoco le sirve de nada a quien no puede tocarla.
+            if (hayEscenarioValido(cfg)) { wrap.innerHTML = renderReadonlyEscenario(); return; }
             wrap.innerHTML = isTestNonDefault(cfg) ? renderReadonlySummary(cfg) : '';
         }
         function summaryLines(cfg) {
@@ -524,13 +541,28 @@
             if (cfg.forcedHands && cfg.forcedHands.p2 && cfg.forcedHands.p2.length) lines.push('Mano J2: ' + cfg.forcedHands.p2.map(tpCardName).join(', '));
             return lines;
         }
+        function renderReadonlyEscenario() {
+            return `<div style="background:#1f2937; border:1px solid #f59e0b; border-radius:8px; padding:8px 12px; font-size:0.78rem; color:#fcd34d;">📋 <b>El anfitrión forzó un escenario</b></div>`;
+        }
         function renderReadonlySummary(cfg) {
             return `<div style="background:#1f2937; border:1px solid #f59e0b; border-radius:8px; padding:8px 12px; font-size:0.78rem; color:#fcd34d;">⚙️ <b>El anfitrión activó opciones de prueba:</b><br>${summaryLines(cfg).map(l => '• ' + l).join('<br>')}</div>`;
         }
+        // Dos columnas: las opciones de siempre y el escenario forzado, que las pisa. Se ven a la
+        // vez a propósito, porque la relación entre las dos (una anula a la otra) es justo lo que
+        // hay que poder leer de un vistazo: verde aquí = rojo allí.
         function renderAdminPanel() {
+            return `<div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; align-items:start;">`
+                 + `<div>${renderPanelOpciones()}</div><div>${renderPanelEscenario()}</div></div>`;
+        }
+        function renderPanelOpciones() {
             const open = localStorage.getItem('karlos_test_panel_open') === '1';
             const nd = isTestNonDefault(testCfg);
-            const head = `<div id="tp-head" style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; background:#0f172a; border:1px solid #475569; border-radius:8px; padding:7px 12px;"><span style="font-size:0.82rem; color:#fbbf24; font-weight:bold;">⚙️ Opciones de prueba${nd ? ' <span style="color:#4ade80;">●</span>' : ''}</span><span style="color:#94a3b8; font-size:0.9rem;">${open ? '▾' : '▸'}</span></div>`;
+            const pisado = hayEscenarioValido(testCfg);
+            // Roja cuando hay un escenario válido al lado: lo que haya configurado aquí NO se va a
+            // aplicar, y eso tiene que verse sin desplegar nada.
+            const luz = pisado ? ' <span style="color:#f87171;" title="Un escenario forzado anula estas opciones">●</span>'
+                     : (nd ? ' <span style="color:#4ade80;">●</span>' : '');
+            const head = `<div id="tp-head" style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; background:#0f172a; border:1px solid #475569; border-radius:8px; padding:7px 12px;"><span style="font-size:0.82rem; color:#fbbf24; font-weight:bold;">⚙️ Opciones de prueba${luz}</span><span style="color:#94a3b8; font-size:0.9rem;">${open ? '▾' : '▸'}</span></div>`;
             if (!open) return head;
             const seatBlock = (seat) => {
                 const list = testCfg.forcedHands[seat] || [];
@@ -540,6 +572,84 @@
             const body = `<div style="background:#0f172a; border:1px solid #475569; border-top:none; border-radius:0 0 8px 8px; padding:10px 12px; max-height:240px; overflow-y:auto;"><label style="display:flex; align-items:center; gap:8px; font-size:0.8rem; color:#e2e8f0; cursor:pointer;"><input type="checkbox" id="tp-fast" ${testCfg.fastStart ? 'checked' : ''}> Inicio rápido (saltar apartar 3 cartas)</label><div style="margin-top:8px; font-size:0.8rem; color:#e2e8f0;">Empieza: <select id="tp-start" style="margin-left:6px; width:auto; display:inline-block;"><option value="random" ${testCfg.startingPlayer === 'random' ? 'selected' : ''}>🎲 Aleatorio</option><option value="p1" ${testCfg.startingPlayer === 'p1' ? 'selected' : ''}>J1</option><option value="p2" ${testCfg.startingPlayer === 'p2' ? 'selected' : ''}>J2</option></select></div>${seatBlock('p1')}${seatBlock('p2')}<button id="tp-reset" style="margin-top:10px; background:#7f1d1d; color:#fecaca; border:none; border-radius:6px; padding:4px 10px; font-size:0.72rem; cursor:pointer;">Restablecer a por defecto</button></div>`;
             return head + body;
         }
+        // ── FORZAR ESCENARIO ──────────────────────────────────────────────────────────────
+        // Mismo formato que los escenarios del harness y del cargador de debug. La diferencia es
+        // el momento: aquí se deja preparado ANTES de empezar, y la partida arranca ya montada en
+        // cuanto los dos den a Listo, en vez de tener que cargarlo a mano con la mesa puesta.
+        let _scenAcabaDeAbrirse = false;
+        function renderPanelEscenario() {
+            const open = localStorage.getItem('karlos_scen_panel_open') === '1';
+            const est = estadoEscenario(testCfg.escenario);
+            const luz = est.luz === 'ok' ? ' <span style="color:#4ade80;">●</span>'
+                      : est.luz === 'malo' ? ` <span style="color:#f87171;" title="${(est.motivo || '').replace(/"/g, '&quot;')}">●</span>` : '';
+            // El botón de Pegar vive en la CABECERA, no dentro: el caso normal es pegar y jugar,
+            // sin desplegar nada. Por eso para el clic (si no, abriría y cerraría el panel).
+            const head = `<div id="sc-head" style="display:flex; align-items:center; justify-content:space-between; gap:8px; cursor:pointer; background:#0f172a; border:1px solid #475569; border-radius:8px; padding:7px 12px;">`
+                + `<span style="font-size:0.82rem; color:#c084fc; font-weight:bold; white-space:nowrap;">📋 Forzar escenario${luz}</span>`
+                + `<span style="display:flex; align-items:center; gap:8px;">`
+                + `<button id="sc-paste" title="Pegar el escenario del portapapeles" style="background:#4c1d95; color:#ddd6fe; border:1px solid #6d28d9; border-radius:6px; padding:2px 9px; font-size:0.72rem; cursor:pointer;">Pegar</button>`
+                + `<span style="color:#94a3b8; font-size:0.9rem;">${open ? '▾' : '▸'}</span></span></div>`;
+            if (!open) return head;
+            const aviso = est.luz === 'malo'
+                ? `<div id="sc-error" style="margin-top:7px; color:#fca5a5; font-size:0.72rem; line-height:1.35;">⚠️ ${est.motivo}</div>`
+                : (est.luz === 'ok' ? `<div style="margin-top:7px; color:#86efac; font-size:0.72rem;">✔️ Escenario válido. Anula las opciones de prueba.</div>` : '');
+            const body = `<div style="background:#0f172a; border:1px solid #475569; border-top:none; border-radius:0 0 8px 8px; padding:10px 12px;">`
+                + `<textarea id="sc-text" spellcheck="false" placeholder='{"turno":2,"turnoDe":"p1","empieza":"p2","p1":{...},"p2":{...}}' style="width:100%; box-sizing:border-box; height:120px; resize:vertical; background:#020617; color:#e2e8f0; border:1px solid #334155; border-radius:6px; padding:6px 8px; font-family:monospace; font-size:0.72rem; line-height:1.4;">${(testCfg.escenario || '').replace(/</g, '&lt;')}</textarea>`
+                + aviso
+                + `<button id="sc-clear" style="margin-top:8px; background:#7f1d1d; color:#fecaca; border:none; border-radius:6px; padding:4px 10px; font-size:0.72rem; cursor:pointer;">Quitar escenario</button>`
+                + `</div>`;
+            return head + body;
+        }
+        function ponEscenario(txt, avisar) {
+            const est = estadoEscenario(txt);
+            if (est.luz === 'malo') { if (avisar) alert('⚠️ Ese escenario no vale: ' + est.motivo); return false; }
+            testCfg.escenario = (txt || '').trim();
+            pushTestCfg(); renderTestPanel(_tpLastRoom);
+            return true;
+        }
+        async function pegarEscenario() {
+            let txt = null;
+            // El portapapeles solo se puede LEER en contexto seguro (HTTPS o localhost), y esto se
+            // sirve por HTTP en la red de casa, así que casi siempre caemos en el plan B: abrir el
+            // cuadro y que lo pegue él con Ctrl+V. Se dice, en vez de fallar en silencio.
+            try { if (navigator.clipboard && navigator.clipboard.readText) txt = await navigator.clipboard.readText(); }
+            catch (e) { txt = null; }
+            if (txt === null || txt === undefined || !String(txt).trim()) {
+                localStorage.setItem('karlos_scen_panel_open', '1');
+                _scenAcabaDeAbrirse = true;
+                renderTestPanel(_tpLastRoom);
+                const ta = document.getElementById('sc-text');
+                if (ta) { ta.focus(); ta.select(); }
+                if (txt === null) alert('Tu navegador no deja leer el portapapeles sin HTTPS.\nTe he abierto el cuadro: pega ahí con Ctrl+V.');
+                return;
+            }
+            if (ponEscenario(txt, true)) {
+                localStorage.setItem('karlos_scen_panel_open', '1');
+                renderTestPanel(_tpLastRoom);
+            }
+        }
+        function wireEscenarioPanel() {
+            const head = document.getElementById('sc-head');
+            if (head) head.onclick = () => {
+                const open = localStorage.getItem('karlos_scen_panel_open') === '1';
+                localStorage.setItem('karlos_scen_panel_open', open ? '0' : '1');
+                _scenAcabaDeAbrirse = !open;
+                renderTestPanel(_tpLastRoom);
+            };
+            const paste = document.getElementById('sc-paste');
+            if (paste) paste.onclick = (ev) => { ev.stopPropagation(); pegarEscenario(); };
+            const ta = document.getElementById('sc-text');
+            if (ta) {
+                // Se guarda al salir del cuadro, no en cada tecla: si no, cada letra emitiría al
+                // servidor y el panel se repintaría debajo del cursor.
+                ta.onblur = () => { if ((ta.value || '').trim() !== (testCfg.escenario || '')) { testCfg.escenario = (ta.value || '').trim(); pushTestCfg(); renderTestPanel(_tpLastRoom); } };
+                if (_scenAcabaDeAbrirse && (ta.value || '').trim()) { ta.focus(); ta.select(); }
+                _scenAcabaDeAbrirse = false;
+            }
+            const clear = document.getElementById('sc-clear');
+            if (clear) clear.onclick = () => { testCfg.escenario = ''; pushTestCfg(); renderTestPanel(_tpLastRoom); };
+        }
+
         function wireAdminPanel() {
             const head = document.getElementById('tp-head');
             if (head) head.onclick = () => {
@@ -557,8 +667,11 @@
             });
             document.querySelectorAll('#test-panel-wrap [data-add]').forEach(el => el.onclick = () => openCardPicker(el.getAttribute('data-add')));
             const reset = document.getElementById('tp-reset');
-            if (reset) reset.onclick = () => { testCfg = JSON.parse(JSON.stringify(DEFAULT_TEST_CONFIG)); pushTestCfg(); renderTestPanel(_tpLastRoom); };
+            // Restablece SOLO esta columna: el escenario forzado tiene su propio botón de quitar.
+            if (reset) reset.onclick = () => { const _esc = testCfg.escenario || ''; testCfg = JSON.parse(JSON.stringify(DEFAULT_TEST_CONFIG)); testCfg.escenario = _esc; pushTestCfg(); renderTestPanel(_tpLastRoom); };
+            wireEscenarioPanel();
         }
+
         function openCardPicker(seat) {
             const box = document.getElementById('tp-picker-' + seat);
             if (!box) return;

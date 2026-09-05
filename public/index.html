@@ -4559,6 +4559,13 @@
                 this.applyForcedHands(); // cartas forzadas en mano inicial (config del anfitrión)
                 banner.style.display = 'none';
 
+                // ESCENARIO FORZADO (config del anfitrión, panel del lobby). Anula lo demás: la
+                // mesa se monta entera desde el spec. Lo aplica UN SOLO cliente -el de p1- y el
+                // resto lo recibe por el mismo HARD_SYNC que los save-states, que es la vía ya
+                // probada del cargador de debug; si lo montaran los dos por su cuenta, cualquier
+                // diferencia de orden en los instanceId dejaría dos tableros distintos.
+                if (this.aplicarEscenarioForzado()) return;
+
                 // --- JUGADOR INICIAL: forzado por el anfitrión o moneda sincronizada ---
                 const forcedStart = (this._testConfig && (this._testConfig.startingPlayer === 'p1' || this._testConfig.startingPlayer === 'p2')) ? this._testConfig.startingPlayer : null;
                 if (forcedStart) {
@@ -4714,7 +4721,8 @@
                         forcedHands: {
                             p1: Array.isArray(c.forcedHands && c.forcedHands.p1) ? c.forcedHands.p1 : [],
                             p2: Array.isArray(c.forcedHands && c.forcedHands.p2) ? c.forcedHands.p2 : []
-                        }
+                        },
+                        escenario: typeof c.escenario === 'string' ? c.escenario : ''
                     };
                 } catch (e) { return null; }
             }
@@ -4725,6 +4733,33 @@
                 c.location = 'hand';
                 return c;
             }
+            aplicarEscenarioForzado() {
+                const txt = this._testConfig && this._testConfig.escenario;
+                if (!txt || !String(txt).trim()) return false;
+                let spec;
+                try { spec = JSON.parse(txt); }
+                catch (e) { this.logError('El escenario forzado por el anfitrión no es JSON válido: ' + e.message); return false; }
+                // Mismo validador que enseña la lucecita en el lobby: si allí salió verde, aquí
+                // monta; si por lo que sea llega roto, se dice y se juega la partida normal.
+                if (typeof validarEscenario === 'function') {
+                    const v = validarEscenario(spec);
+                    if (!v.ok) { this.logError('El escenario forzado no vale: ' + v.motivo); return false; }
+                }
+                if (this.myPlayerId !== 'p1') {
+                    this.logMsg('El anfitrión forzó un escenario: esperando el tablero...', 'system');
+                    return true;
+                }
+                try {
+                    this.loadBoardScenario(spec);   // termina llamando a syncDebugState()
+                    this.logMsg('Partida iniciada en el escenario forzado por el anfitrión.', 'system');
+                    return true;
+                } catch (e) {
+                    console.error(e);
+                    this.logError('No se pudo montar el escenario forzado: ' + e.message);
+                    return false;
+                }
+            }
+
             applyForcedHands() {
                 const cfg = this._testConfig;
                 if (!cfg || !cfg.forcedHands) return;

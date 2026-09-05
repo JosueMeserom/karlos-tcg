@@ -430,7 +430,7 @@ io.on('connection', (socket) => {
             host: data.username || 'Invitado',
             leader: 'p1',
             graceMs: 60000,
-            testConfig: { fastStart: false, startingPlayer: 'random', forcedHands: { p1: [], p2: [] } },
+            testConfig: { fastStart: false, startingPlayer: 'random', forcedHands: { p1: [], p2: [] }, escenario: '' },
             allowSpectators: data.allowSpectators !== undefined ? data.allowSpectators : true, 
             omniscient: data.omniscient !== undefined ? data.omniscient : true, 
             players: { p1: { id: socket.id, name: data.username || 'Jugador 1', ready: false, deck: null, connected: true, setupComplete: false, inIndexHtml: false, exhausted: false, graceUntil: null }, p2: null },
@@ -512,7 +512,11 @@ io.on('connection', (socket) => {
             forcedHands: {
                 p1: Array.isArray(c.forcedHands && c.forcedHands.p1) ? c.forcedHands.p1.slice(0, 6).map(Number).filter(n => !isNaN(n)) : [],
                 p2: Array.isArray(c.forcedHands && c.forcedHands.p2) ? c.forcedHands.p2.slice(0, 6).map(Number).filter(n => !isNaN(n)) : []
-            }
+            },
+            // El escenario forzado viaja como TEXTO y sin mirarlo: quien lo valida es el cliente
+            // (validarEscenario, en cartas.js), que es el único que conoce las cartas. Aquí solo
+            // se acota el tamaño para que nadie llene la memoria de la sala con un pegote.
+            escenario: (typeof c.escenario === 'string' ? c.escenario : '').slice(0, 20000)
         };
         room.testConfig = sane;
         io.to(data.roomCode).emit('roomUpdate', room);

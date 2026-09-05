@@ -12790,6 +12790,72 @@ const DSL = {
     }
 };
 
+// ── VALIDAR UN ESCENARIO DE TABLERO ──────────────────────────────────────────────────
+// El mismo formato del harness de tests y del cargador de debug. Vive aquí, y no en cada
+// página, porque lo preguntan DOS sitios que tienen que decir exactamente lo mismo: la
+// lucecita del lobby (¿es válido lo que hay pegado?) y la partida antes de montarlo. Si
+// cada uno tuviera su criterio, el lobby enseñaría verde y la mesa reventaría al empezar.
+//
+// Devuelve { ok: true } o { ok: false, motivo: "<en cristiano>" }. El motivo se le enseña
+// a Toto tal cual, así que dice QUÉ está mal y DÓNDE, no "escenario inválido".
+const ESCENARIO_ZONAS = {
+    vanguardia: 'vanguard', vanguard: 'vanguard',
+    retaguardia: 'rearguard', rearguard: 'rearguard',
+    mano: 'hand', hand: 'hand',
+    mazo: 'deck', deck: 'deck',
+    descartes: 'discard', discard: 'discard',
+    retribucion: 'retribution', retribution: 'retribution',
+};
+function validarEscenario(spec) {
+    const mal = (motivo) => ({ ok: false, motivo });
+    if (!spec || typeof spec !== 'object' || Array.isArray(spec)) return mal('el escenario tiene que ser un objeto JSON.');
+    if (!spec.p1 && !spec.p2) return mal('falta "p1" y "p2": el escenario no monta a nadie.');
+    if (spec.turno !== undefined && (typeof spec.turno !== 'number' || spec.turno < 1)) return mal('"turno" tiene que ser un número mayor que 0.');
+    // Turno 1 es una trampa conocida: ahí no se puede atacar ni usar Activas, así que un
+    // escenario para probar una carta y con turno 1 no prueba nada. Se avisa como error para
+    // que no se descubra jugando.
+    if (spec.turno === 1) return mal('"turno": 1 no sirve para probar: en el primer turno no se puede atacar ni usar Habilidades. Pon 2.');
+    for (const k of ['turnoDe', 'empieza']) {
+        if (spec[k] !== undefined && spec[k] !== 'p1' && spec[k] !== 'p2') return mal(`"${k}" tiene que ser "p1" o "p2".`);
+    }
+    const nombres = new Map();
+    CARD_DB.forEach(c => { if (c && c.name) nombres.set(c.name, (nombres.get(c.name) || 0) + 1); });
+    const ids = new Set(CARD_DB.map(c => c && c.id));
+    for (const pid of ['p1', 'p2']) {
+        const cfg = spec[pid];
+        if (cfg === undefined) continue;
+        if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg)) return mal(`"${pid}" tiene que ser un objeto.`);
+        for (const clave of Object.keys(cfg)) {
+            if (clave === 'hp' || clave === 'evento') continue;
+            if (!ESCENARIO_ZONAS[clave]) return mal(`"${pid}" tiene una zona que no existe: "${clave}".`);
+            if (!Array.isArray(cfg[clave])) return mal(`"${pid}.${clave}" tiene que ser una lista.`);
+        }
+        const cartas = [];
+        Object.keys(cfg).forEach(k => { if (ESCENARIO_ZONAS[k]) cartas.push(...cfg[k].map(c => [k, c])); });
+        if (cfg.evento !== undefined) cartas.push(['evento', cfg.evento]);
+        for (const [zona, c] of cartas) {
+            const ref = (c && typeof c === 'object') ? c.carta : c;
+            if (typeof ref === 'number') { if (!ids.has(ref)) return mal(`en "${pid}.${zona}": no hay ninguna carta con id ${ref}.`); continue; }
+            if (typeof ref !== 'string' || !ref) return mal(`en "${pid}.${zona}": cada carta es un nombre, un id o un objeto con "carta".`);
+            const n = nombres.get(ref) || 0;
+            if (n === 0) return mal(`en "${pid}.${zona}": no existe la carta "${ref}".`);
+            if (n > 1) return mal(`en "${pid}.${zona}": "${ref}" está repetida en la base; usa su id numérico.`);
+        }
+        const van = (cfg.vanguardia || cfg.vanguard || []);
+        if (van.length > 4) return mal(`"${pid}" tiene ${van.length} cartas en vanguardia y el límite son 4.`);
+        const pers = van.filter(c => {
+            const ref = (c && typeof c === 'object') ? c.carta : c;
+            const t = CARD_DB.find(x => x && (x.name === ref || x.id === ref));
+            return t && t.type === 'Personaje';
+        }).length;
+        if (pers > 2) return mal(`"${pid}" tiene ${pers} Personajes en vanguardia y el límite son 2.`);
+        if ((cfg.retaguardia || cfg.rearguard || []).length && van.length < 4) {
+            return mal(`"${pid}" tiene retaguardia con la vanguardia a medias: solo se coloca atrás con las 4 de delante puestas.`);
+        }
+    }
+    return { ok: true };
+}
+
 // ── QUÉ CARTAS PUEDE TENER UN JUGADOR ────────────────────────────────────────────────
 // Antes esto era un solo flag haciendo dos trabajos distintos, y por eso Lolita era injugable:
 //   · `isToken`         -> NO es una carta: la crea otra en mesa (los Clones). No se roba, no se
