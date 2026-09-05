@@ -72,6 +72,11 @@ check('el lobby pinta el panel del escenario', /📋 Escenario/.test(lobby) && /
 check('...con su botón de Pegar', /'sc-paste'/.test(lobby) && /pegarEscenario/.test(lobby));
 check('el botón de Pegar contesta al clic sin cambiar de tamaño',
     /function feedbackPegar/.test(lobby) && /minWidth = Math\.round/.test(lobby) && /'🔁'/.test(lobby));
+// El aviso lo mataba el `roomUpdate` que llega justo después de guardar: por eso el estado vive
+// fuera del DOM y se repinta en cada render, y el avisillo cuelga de la COLUMNA, no del panel.
+check('...y el aviso sobrevive al repintado del roomUpdate',
+    /pintarPegar\(\);\s*\/\/ el aviso del botón sobrevive/.test(lobby)
+    && /function avisillo[\s\S]{0,200}getElementById\('room-col'\)[\s\S]{0,1400}col\.appendChild\(d\)/.test(lobby));
 check('...y con su avisillo, que no es una notificación del navegador',
     /function avisillo/.test(lobby) && /Mismo escenario/.test(lobby) && !/new Notification/.test(lobby));
 check('el cuadro de texto llena el panel (sin doble borde ni scroll de más)',

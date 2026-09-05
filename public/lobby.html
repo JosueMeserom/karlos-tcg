@@ -656,41 +656,52 @@
         }
         // Un aviso diminuto y efímero pegado al botón: lo justo para saber que el clic hizo algo.
         // Nada de notificaciones del navegador, que para esto son un cañonazo.
+        //
+        // OJO CON EL SITIO (Toto, 2-sep-2026): esto vive colgado de la COLUMNA, no del panel.
+        // `pushTestCfg` emite al servidor, el servidor contesta con un `roomUpdate` a los pocos
+        // milisegundos y ese repintado recrea el panel entero: metido dentro, el aviso duraba lo
+        // que tardaba en llegar la respuesta, o sea el parpadeo que se veía.
+        let _pegarEstado = null;   // { icono, fin }
+        let _pegarT1 = null, _pegarT2 = null;
         function avisillo(texto) {
-            const wrap = document.getElementById('test-panel-wrap');
+            const col = document.getElementById('room-col');
             const btn = document.querySelector('#test-panel-wrap [data-pegar]');
-            if (!wrap || !btn) return;
+            if (!col || !btn || !texto) return;
             const viejo = document.getElementById('sc-avisillo');
             if (viejo) viejo.remove();
-            const rW = wrap.getBoundingClientRect(), rB = btn.getBoundingClientRect();
+            const rC = col.getBoundingClientRect(), rB = btn.getBoundingClientRect();
             const d = document.createElement('div');
             d.id = 'sc-avisillo';
             d.textContent = texto;
             d.style.cssText = 'position:absolute; z-index:60; pointer-events:none; background:#1e293b;'
-                + ' border:1px solid #475569; color:#e2e8f0; font-size:0.7rem; padding:3px 8px;'
+                + ' border:1px solid #475569; color:#e2e8f0; font-size:0.72rem; padding:3px 9px;'
                 + ' border-radius:6px; white-space:nowrap; box-shadow:0 2px 10px rgba(0,0,0,.5);'
-                + ' opacity:0; transform:translateY(3px); transition:opacity 140ms ease, transform 140ms ease;';
-            d.style.left = Math.round(rB.left - rW.left) + 'px';
-            d.style.top = Math.round(rB.bottom - rW.top + 6) + 'px';
-            wrap.appendChild(d);
+                + ' opacity:0; transform:translateY(4px); transition:opacity 150ms ease, transform 150ms ease;';
+            d.style.left = Math.round(rB.left - rC.left) + 'px';
+            d.style.top = Math.round(rB.bottom - rC.top + 6) + 'px';
+            col.appendChild(d);
             requestAnimationFrame(() => { d.style.opacity = '1'; d.style.transform = 'translateY(0)'; });
-            setTimeout(() => { d.style.opacity = '0'; d.style.transform = 'translateY(3px)'; setTimeout(() => d.remove(), 200); }, 1100);
+            setTimeout(() => { d.style.opacity = '0'; d.style.transform = 'translateY(4px)'; setTimeout(() => d.remove(), 220); }, 1300);
         }
-        // El botón enseña el resultado sin cambiar de tamaño: se le congela el ancho ANTES de
-        // tocarle el texto, y vuelve a "Pegar" con un fundido.
-        function feedbackPegar(icono, texto) {
+        // El botón enseña el resultado sin cambiar de tamaño. El estado vive FUERA del DOM y se
+        // vuelve a pintar en cada repintado (ver wireAdminPanel), que si no se lo come el
+        // `roomUpdate` que llega justo después de guardar.
+        function pintarPegar() {
             document.querySelectorAll('#test-panel-wrap [data-pegar]').forEach(b => {
-                if (b._volver) { clearTimeout(b._volver); b._volver = null; }
                 if (!b.style.minWidth) b.style.minWidth = Math.round(b.getBoundingClientRect().width) + 'px';
                 b.style.transition = 'opacity 200ms ease';
-                b.style.opacity = '1';
-                b.textContent = icono;
-                b._volver = setTimeout(() => {
-                    b.style.opacity = '0';
-                    setTimeout(() => { b.textContent = 'Pegar'; b.style.opacity = '1'; }, 200);
-                }, 450);
+                if (!_pegarEstado) { b.textContent = 'Pegar'; b.style.opacity = '1'; return; }
+                b.textContent = _pegarEstado.icono;
+                b.style.opacity = _pegarEstado.fundiendo ? '0' : '1';
             });
-            if (texto) avisillo(texto);
+        }
+        function feedbackPegar(icono, texto) {
+            clearTimeout(_pegarT1); clearTimeout(_pegarT2);
+            _pegarEstado = { icono, fundiendo: false };
+            pintarPegar();
+            avisillo(texto);
+            _pegarT1 = setTimeout(() => { if (_pegarEstado) { _pegarEstado.fundiendo = true; pintarPegar(); } }, 550);
+            _pegarT2 = setTimeout(() => { _pegarEstado = null; pintarPegar(); }, 760);
         }
 
         function ponEscenario(txt, avisar) {
@@ -763,6 +774,7 @@
             });
             // Un repintado con el panel ya abierto (marcar una casilla, añadir una carta) recrea el
             // flotante: se recoloca al instante y SIN animación, que si no parpadearía en cada clic.
+            pintarPegar();   // el aviso del botón sobrevive a los repintados
             const _cual = panelAbierto();
             if (_cual && !_ovlAnimando && document.getElementById('tp-ovl')) colocarFlotante(_cual, false, null, true);
             const fast = document.getElementById('tp-fast');
