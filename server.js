@@ -432,6 +432,10 @@ io.on('connection', (socket) => {
     socket.on('globalChat', (data) => io.emit('globalChat', data));
 
     socket.on('adminCloseRoom', (roomCode) => {
+        // Antes se creía lo que dijera el navegador (un flag de localStorage). Ahora que la sesión
+        // viaja con el socket, se comprueba de verdad: cerrar la sala de otros no puede depender
+        // de una línea en la consola del cliente.
+        if (!esAdminDelSocket(socket)) return;
         if (rooms[roomCode]) {
             io.to(roomCode).emit('roomError', 'Un administrador ha cerrado esta sala de forma forzosa.');
             delete rooms[roomCode];

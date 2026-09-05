@@ -209,7 +209,7 @@
 
         <div id="online-room-view" style="display: none; flex-direction: column; gap: 15px; text-align: left; height: 500px;">
             <div style="display: flex; justify-content: space-between; align-items: center; background: #0f172a; padding: 10px 20px; border-radius: 8px; border: 1px dashed #4ade80; height: 50px; box-sizing: border-box;">
-                <div style="font-size: 1.2rem; color: #4ade80; font-weight: bold;">SALA: <span id="current-room-code" style="letter-spacing: 2px; font-size: 1.5rem; color: white;">----</span></div>
+                <div style="display:flex; align-items:center; gap:10px; font-size: 1.2rem; color: #4ade80; font-weight: bold;">SALA: <span id="current-room-code" style="letter-spacing: 2px; font-size: 1.5rem; color: white;">----</span><button id="btn-copiar-sala" title="Copiar el enlace de la sala" onclick="copiarEnlaceSala()" style="background:#166534; color:#dcfce7; border:none; border-radius:6px; padding:0 10px; height:26px; line-height:1; display:inline-flex; align-items:center; justify-content:center; box-sizing:border-box; font-size:0.78rem; cursor:pointer; white-space:nowrap;">🔗 Copiar enlace</button></div>
                 <div id="grace-control" style="display:none; align-items:center; gap:4px;"></div>
                 <button class="back-btn" style="margin: 0; padding: 0; color: #f87171;" onclick="leaveRoomView()">Abandonar sala</button>
             </div>
@@ -277,7 +277,9 @@
         let isReadyLocal = false;
         
         const urlParams = new URLSearchParams(window.location.search);
-        const gameMode = urlParams.get('mode') || 'local';
+        // Con `?sala=` el modo se sobreentiende: un enlace a una sala es online por definición, y
+        // así el enlace sigue funcionando aunque alguien le quite el `mode` al copiarlo a mano.
+        const gameMode = urlParams.get('mode') || (urlParams.get('sala') ? 'online' : 'local');
 
         async function init() {
             try {
@@ -306,6 +308,13 @@
                     document.getElementById('online-lobby-view').style.display = 'flex';
                 }
                 initSockets();
+                // Enlace directo: se entra en cuanto el socket esté listo. El guardián ya ha
+                // decidido antes que no hay partida en curso (si la hubiera, no llegamos aquí sin
+                // que él pregunte primero).
+                const _sala = salaDeLaURL();
+                if (_sala && !localStorage.getItem('karlos_partida_en_curso') && !localStorage.getItem('karlos_return_room')) {
+                    socket.on('connect', () => joinRoomByCode(_sala));
+                }
             } else if (gameMode === 'ai') { // VISTA DE IA
                 document.getElementById('mode-subtitle').innerText = "Jugar contra la IA";
                 document.getElementById('ai-view').style.display = 'flex';
@@ -483,7 +492,13 @@
                 window.location.href = 'index.html';
             });
 
-            socket.on('roomError', (msg) => { alert("⚠️ " + msg); location.reload(); });
+            socket.on('roomError', (msg) => {
+                alert("⚠️ " + msg);
+                // Si veníamos por enlace directo hay que QUITAR el parámetro antes de recargar:
+                // con él puesto, recargar volvería a intentar entrar, fallar y recargar otra vez.
+                if (salaDeLaURL()) location.replace(location.pathname + '?mode=online');
+                else location.reload();
+            });
         }
 
         // ===== PANEL DE PRUEBAS (ADMIN) =====
@@ -677,13 +692,18 @@
         // que tardaba en llegar la respuesta, o sea el parpadeo que se veía.
         let _pegarEstado = null;   // { icono, fin }
         let _pegarT1 = null, _pegarT2 = null;
-        function avisillo(texto) {
-            const col = document.getElementById('room-col');
-            const btn = document.querySelector('#test-panel-wrap [data-pegar]');
+        function avisillo(texto, ancla) {
+            const btn = ancla || document.querySelector('#test-panel-wrap [data-pegar]');
+            // Se cuelga del contenedor posicionado más cercano que NO se repinte; si no hay
+            // ninguno, del body, que siempre está.
+            const col = (btn && btn.closest && btn.closest('#room-col')) || document.body;
             if (!col || !btn || !texto) return;
             const viejo = document.getElementById('sc-avisillo');
             if (viejo) viejo.remove();
-            const rC = col.getBoundingClientRect(), rB = btn.getBoundingClientRect();
+            const rC = (col === document.body)
+                ? { left: -window.scrollX, top: -window.scrollY }
+                : col.getBoundingClientRect();
+            const rB = btn.getBoundingClientRect();
             const d = document.createElement('div');
             d.id = 'sc-avisillo';
             d.textContent = texto;
@@ -1010,6 +1030,50 @@
                 allowSpectators: allowSpec, 
                 omniscient: isOmni 
             }); 
+        }
+
+        // ── ENLACE DIRECTO A LA SALA ──────────────────────────────────────────────────────
+        // `lobby.html?sala=A4X9` entra solo en esa sala. Solo si el guardián NO ha visto una
+        // partida en curso: si la hay, manda él, que para eso está (te preguntará si reconectar o
+        // abandonar antes de dejarte ir a ningún lado).
+        function salaDeLaURL() {
+            try {
+                const c = (new URLSearchParams(location.search).get('sala') || '').trim().toUpperCase();
+                return /^[A-Z0-9]{4}$/.test(c) ? c : null;
+            } catch (e) { return null; }
+        }
+        function enlaceDeSala(code) {
+            return location.origin + location.pathname + '?mode=online&sala=' + encodeURIComponent(code);
+        }
+        function copiarEnlaceSala() {
+            const btn = document.getElementById('btn-copiar-sala');
+            if (!currentRoom) { avisillo('Todavía no estás en una sala', btn); return; }
+            const url = enlaceDeSala(currentRoom);
+            const ok = () => avisillo('¡Enlace copiado!', btn);
+            // writeText necesita contexto seguro (HTTPS), y esto se sirve por HTTP en la red de
+            // casa, así que el camino normal es el de abajo: un input de usar y tirar con
+            // execCommand, que sigue funcionando sin HTTPS.
+            if (navigator.clipboard && navigator.clipboard.writeText && window.isSecureContext) {
+                navigator.clipboard.writeText(url).then(ok).catch(() => copiarAPelo(url, btn));
+                return;
+            }
+            copiarAPelo(url, btn);
+        }
+        function copiarAPelo(texto, btn) {
+            try {
+                const t = document.createElement('textarea');
+                t.value = texto;
+                t.setAttribute('readonly', '');
+                t.style.cssText = 'position:fixed; top:-1000px; opacity:0;';
+                document.body.appendChild(t);
+                t.select(); t.setSelectionRange(0, texto.length);
+                const bien = document.execCommand('copy');
+                t.remove();
+                avisillo(bien ? '¡Enlace copiado!' : 'No he podido copiarlo', btn);
+            } catch (e) {
+                avisillo('No he podido copiarlo', btn);
+                prompt('Copia el enlace a mano:', texto);
+            }
         }
 
         function joinRoomByCode(code, asSpectator = false) {
