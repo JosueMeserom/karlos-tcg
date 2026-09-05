@@ -46,6 +46,11 @@ check('el hueco está reservado SIEMPRE, haya botón o no',
 check('...también en los dos asientos de jugador',
     /id="room-p1-kick"/.test(lobby) && /id="room-p2-kick"/.test(lobby));
 check('solo se ve al pasar por encima de su fila', /\.fila-kick:hover \.kick-btn/.test(lobby));
+// Centrado óptico, no geométrico: en las filas de jugador el nombre es de 1rem y deja hueco de
+// descendentes, así que el botón centrado en la caja se ve por encima de las letras.
+check('en las filas de jugador se baja un par de píxeles',
+    /\.fila-kick--jugador \.kick-btn \{ top: 2px; \}/.test(lobby)
+    && (lobby.match(/fila-kick fila-kick--jugador/g) || []).length === 2);
 check('y pregunta antes de echar a nadie', /confirm\(`¿Expulsar a \$\{nombre\} de la sala\?`\)/.test(lobby));
 
 console.log(`\nSUITE expulsar_sala: ${fallos ? fallos + ' FALLOS de ' : comprobaciones + '/'}${comprobaciones} comprobaciones` +

@@ -90,7 +90,12 @@
         .kick-slot { flex: none; width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; }
         .kick-btn { visibility: hidden; opacity: 0; transition: opacity 120ms ease; background: none; border: none;
                     padding: 0; margin: 0; width: 18px; height: 18px; line-height: 1; font-size: 0.82rem;
-                    cursor: pointer; color: #f87171; border-radius: 4px; }
+                    cursor: pointer; color: #f87171; border-radius: 4px; position: relative; }
+        /* Centrado geométrico != centrado ÓPTICO: una línea de texto deja hueco de descendentes
+           debajo, así que un botón centrado en la caja se ve por encima de las letras. El empujón
+           va solo en las filas de jugador, donde el nombre es de 1rem; en espectadores (0.85rem)
+           el desajuste no se aprecia y moverlo lo empeoraría. Si aun así baila, es este número. */
+        .fila-kick--jugador .kick-btn { top: 2px; }
         .fila-kick:hover .kick-btn, .kick-btn:focus-visible { visibility: visible; opacity: 1; }
         .kick-btn:hover { background: #7f1d1d; }
         @media (prefers-reduced-motion: reduce) { .kick-btn { transition: none; } }
@@ -209,7 +214,7 @@
 
         <div id="online-room-view" style="display: none; flex-direction: column; gap: 15px; text-align: left; height: 500px;">
             <div style="display: flex; justify-content: space-between; align-items: center; background: #0f172a; padding: 10px 20px; border-radius: 8px; border: 1px dashed #4ade80; height: 50px; box-sizing: border-box;">
-                <div style="display:flex; align-items:center; gap:10px; font-size: 1.2rem; color: #4ade80; font-weight: bold;">SALA: <span id="current-room-code" style="letter-spacing: 2px; font-size: 1.5rem; color: white;">----</span><button id="btn-copiar-sala" title="Copiar el enlace de la sala" onclick="copiarEnlaceSala()" style="background:#166534; color:#dcfce7; border:none; border-radius:6px; padding:0 10px; height:26px; line-height:1; display:inline-flex; align-items:center; justify-content:center; box-sizing:border-box; font-size:0.78rem; cursor:pointer; white-space:nowrap;">🔗 Copiar enlace</button></div>
+                <div style="display:flex; align-items:center; gap:10px; font-size: 1.2rem; color: #4ade80; font-weight: bold;">SALA: <span id="current-room-code" style="letter-spacing: 2px; font-size: 1.5rem; color: white;">----</span><button id="btn-copiar-sala" title="Copiar el enlace de la sala" onclick="copiarEnlaceSala()" style="background:#166534; color:#dcfce7; border:none; border-radius:6px; padding:3px 10px 1px; height:26px; line-height:1; display:inline-flex; align-items:center; justify-content:center; box-sizing:border-box; font-size:0.78rem; cursor:pointer; white-space:nowrap;">🔗 Copiar enlace</button></div>
                 <div id="grace-control" style="display:none; align-items:center; gap:4px;"></div>
                 <button class="back-btn" style="margin: 0; padding: 0; color: #f87171;" onclick="leaveRoomView()">Abandonar sala</button>
             </div>
@@ -226,13 +231,13 @@
                 
                 <div class="online-col" id="room-col" style="background: transparent; border: none; padding: 0; gap: 10px; position: relative;">
                     <div class="player-box" style="border-top: 4px solid #3b82f6;">
-                        <div class="fila-kick" style="display: flex; justify-content: space-between; align-items: center; gap: 6px;">
+                        <div class="fila-kick fila-kick--jugador" style="display: flex; justify-content: space-between; align-items: center; gap: 6px;">
                             <span class="p1-title" id="room-p1-name" style="font-size: 1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 130px;">Esperando...</span><span class="kick-slot" id="room-p1-kick"></span>
                             <span id="room-p1-status" style="color: #94a3b8; font-size: 0.8rem; text-align: right;">⏳ Eligiendo mazo</span>
                         </div>
                     </div>
                     <div class="player-box" style="border-top: 4px solid #ef4444;">
-                        <div class="fila-kick" style="display: flex; justify-content: space-between; align-items: center; gap: 6px;">
+                        <div class="fila-kick fila-kick--jugador" style="display: flex; justify-content: space-between; align-items: center; gap: 6px;">
                             <span class="p2-title" id="room-p2-name" style="font-size: 1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 130px;">Esperando rival...</span><span class="kick-slot" id="room-p2-kick"></span>
                             <span id="room-p2-status" style="color: #94a3b8; font-size: 0.8rem; text-align: right;">---</span>
                         </div>
