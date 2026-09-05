@@ -3,7 +3,7 @@
 Lo que queda por hacer, con su porqué. Se actualiza al cerrar cada cosa: lo que Toto no rebate
 después de hacerlo se da por bueno y se quita de aquí.
 
-> Última revisión: 31-ago-2026 · 178 cartas en CARD_DB · 120 suites en verde
+> Última revisión: 1-sep-2026 · 182 cartas en CARD_DB · 121 suites en verde
 
 ---
 
@@ -65,7 +65,14 @@ aunque sea menos eficiente. Su Pasiva pide una pieza que no existe: interceptar 
 permanente de VIDA o DEF para amplificarla, o sea un trigger hermano de `ANTES_DE_RECIBIR_DAÑO`
 pero para cambios de stat propios.
 
-**147 filas de `docs/Cartas KG.csv` sin implementar.** Es lo único grande que le queda al juego.
+**TANDA SIN SERIE, hecha el 1-sep-2026** (`tests/tanda_sin_serie.js`): **Espectro** y **Mimo**
+(dos Monstruos, que le dan a quién abrazar a Fanático, Dáedra y Fusión de planos), **Maxi-tigre**
+(que por fin le da sentido al Mini-tigre, con el "o bien" de entrada y un bono contado por NOMBRE)
+y **Robot espía XR** (el camuflaje de Mill, pero pagando 1 de Furor). Ninguna necesitó piezas
+nuevas del intérprete. El **Mimo** es el que más vigilaría en las primeras partidas: contraataca
+ANTES de encajar el golpe, o sea que devuelve el hostión aunque lo maten.
+
+**143 filas de `docs/Cartas KG.csv` sin implementar.** Es lo único grande que le queda al juego.
 Los bloques gordos que quedan son crossovers enteros: Touhou/Gensokyo (11), RWBY (13), Grimm de
 RWBY (7) y League of Legends (2, con Ornn).
 
@@ -176,6 +183,37 @@ Cuando se retome, además de ponerlo al día, Toto quiere:
 Norma a partir de ahora: cada pieza nueva del DSL entra también en el editor.
 
 ---
+
+## 4.ter. Un requisito no sabe contar cartas en una PILA (1-sep-2026)
+
+`DSL._pool` solo entiende el CAMPO. Un `count: { zona: "DESCARTES" }` **no cuenta el descarte**:
+devuelve el pool de campo por defecto y el número sale de ahí. No da error, claro.
+
+Lo encontré al escribir el **Robot de limpieza CM** (descarta una carta para recuperar una Ayuda
+del descarte), que se quedó **sin implementar** por esto: su requisito "hay una Ayuda en tus
+descartes" no se puede expresar hoy, y publicarla con un guard que miente es peor que no tenerla.
+
+⚠️ Y hay una carta ya publicada con el mismo problema: **Nigromántica**, cuyo requisito
+`count: { zona: "DESCARTES", ... }` está contando aliados en el campo. Pasa de casualidad casi
+siempre (cualquier aliado 'Ser vivo' lo cumple), así que nadie lo ha notado, pero con el campo
+vacío de 'Ser vivo' te deja usar la Activa sin nada que resucitar. Habría que:
+1. Enseñar a `_pool` las zonas de pila (`MANO`, `MAZO`, `DESCARTES`, `RETRIBUCION`), con su
+   `quien` para poder mirar también las del rival.
+2. Arreglar Nigromántica y meter el Robot de limpieza CM.
+3. Auditar todos los `count`/`_pool` que declaren una `zona` que no sea de campo.
+
+## 4.quater. Rarezas pendientes de repartir
+
+Cartas ya implementadas **sin rareza**, porque el Excel no la trae: **Maxi-tigre** y
+**Robot espía XR**. Se decidirán junto con una revisión general, no una a una.
+
+La norma que quiere Toto: dentro de cada serie, y salvo excepciones, **muchas más C que B, más B
+que A, y más A que S**. O sea que la rareza se reparte mirando la serie ENTERA, no carta a carta:
+asignarlas según llegan garantiza que la proporción salga torcida. Al hacerlo hay que:
+- decidir la proporción concreta (algo como 50/30/15/5) y escribirla aquí;
+- repasar las rarezas YA puestas y cambiar las que no encajen;
+- tener presente que la rareza mide **lo poco común**, no la potencia, aunque a más rareza más
+  buscada debería ser una carta (ver el hallazgo 4 del ranking de tiers).
 
 ## 5. Limitaciones conocidas de la batería
 

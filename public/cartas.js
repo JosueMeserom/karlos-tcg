@@ -7551,6 +7551,109 @@ const CARD_DB = [
                       log: "¡TERROR NOCTURNO! {objetivo} se queda en nada dentro de su propia pesadilla." } ] } ] }
         ],
     },
+
+    // ===============================================================================
+    //  TANDA SIN SERIE (1-sep-2026) — cinco del Excel que rellenan familias existentes
+    // ===============================================================================
+    // Dos Monstruos (que dan a quién abrazar a Fanático, Dáedra y Fusión de planos), dos
+    // Máquinas 'Controlable' (que le dan objetivos a PEM y a Overclock) y el Maxi-tigre, que
+    // por fin le da sentido al Mini-tigre. Ninguna necesita piezas nuevas del intérprete.
+    {
+        id: 2020, name: "Espectro", hp: 3, def: 2, atk: 3, type: "Esbirro", subtype: "Ser mágico",
+        tags: ["Monstruo"], gender: "M", rarity: "C", cost: 1, series: 2,
+        text: "A: APARICIÓN (1F): Ataque especial. Moneda - Cara: Confusión 2 turnos al enemigo atacado.",
+        activeName: "APARICIÓN", activeCost: 1,
+        abilities: [
+            { trigger: "ACTIVA", nombre: "APARICIÓN", coste: { furor: 1 }, sinObjetivo: true,
+              requisitos: [
+                { count: { quien: "ENEMIGO", zona: "VANGUARDIA" }, op: ">=", valor: 1,
+                  msg: "No hay enemigos en la vanguardia a los que aparecerse." } ],
+              efectos: [
+                { op: "ELEGIR", de: "ENEMIGOS", zona: "VANGUARDIA", cantidad: 1,
+                  titulo: "APARICIÓN: ¿a quién se te aparece?",
+                  efectos: [
+                    { op: "ATACAR", especial: true },
+                    // `ifObjetivo`: si el ataque lo mató, no se le confunde un cadáver.
+                    { op: "MONEDA", ifObjetivo: { campo: "currentHp", op: ">", valor: 0 },
+                      cara: [ { op: "APLICAR_ESTADO", estado: "confusion", duracion: 2,
+                                log: "Moneda: CARA - ¡la aparición deja {objetivo} fuera de sí!" } ],
+                      cruz: [ { op: "LOG", texto: "Moneda: CRUZ - la aparición se desvanece sin más.", tipo: "system" } ] } ] } ] }
+        ],
+    },
+    {
+        // El contraataque va en ANTES_DE_DEFENDER y no en TRAS_DEFENDER, y la diferencia es la
+        // carta entera: su texto dice "antes de recibir daño", así que devuelve el golpe AUNQUE
+        // el que va a recibir lo mate. Ahí `{objetivo}` es el atacante y `{defensor}` es él.
+        id: 2021, name: "Mimo", hp: 2, def: 4, atk: 3, type: "Esbirro", subtype: "Ser mágico",
+        tags: ["Monstruo"], gender: "M", rarity: "B", cost: 1, series: 2,
+        text: "P: FARSA: Al ser objetivo de un ataque normal, antes de recibir el daño contraataca con un ataque normal a quien le atacó.",
+        passiveName: "FARSA",
+        abilities: [
+            { trigger: "ANTES_DE_DEFENDER", nombre: "FARSA", soloAtaqueNormal: true,
+              efectos: [
+                { op: "FLOTANTE", target: { quien: "SELF" }, texto: "¡FARSA!", estilo: "ft-ability", offset: -40 },
+                { op: "ATACAR", log: "¡FARSA! {defensor} devuelve el golpe a {objetivo} antes de encajarlo." } ] }
+        ],
+    },
+    {
+        // La entrada es el "o bien" del compilador: gratis con un Mini-tigre delante, y si no,
+        // tributando 1. Y el bono de ATQ se cuenta por NOMBRE, que es lo que dice el texto: vale
+        // para cualquier carta futura que se llame "algo-tigre" sin tener que tocar esta.
+        id: 2022, name: "Maxi-tigre", hp: 4, def: 4, atk: 4, type: "Esbirro", subtype: "Ser vivo",
+        tags: ["Animal salvaje"], gender: "M", cost: 1, series: 2,
+        text: "Requisito: un Mini-tigre en tu campo o bien Coste: 1 de Furor. P: ESTIRPE: +1 de ATQ por cada otra carta de tu campo cuyo nombre contenga \"tigre\". A: EMBESTIDA (1F): Ataque normal. Si tiene éxito, Confusión 1 turno.",
+        passiveName: "ESTIRPE", activeName: "EMBESTIDA", activeCost: 1,
+        abilities: [
+            { trigger: "COSTE_COLOCACION", alternativas: [
+                { requisito: { algunFiltro: [ { campo: "name", op: "==", valor: "Mini-tigre" } ] },
+                  log: "{carta} llega siguiendo el rastro de los suyos." },
+                { furor: 1, titulo: "MAXI-TIGRE: ELIGE TRIBUTO (-1 FUROR)",
+                  msgSinPagador: "Necesitas un Mini-tigre en el campo o un aliado con 1 de Furor que tributar." } ] },
+            { trigger: "PASIVA_CONTINUA", nombre: "ESTIRPE",
+              then: [
+                { op: "MODIFICAR_STAT", stat: "atk",
+                  delta: { COUNT: { quien: "ALIADO", excludeSelf: true,
+                                    filtros: [ { campo: "name", op: "contieneTexto", valor: "tigre" } ] } } } ] },
+            { trigger: "ACTIVA", nombre: "EMBESTIDA", coste: { furor: 1 }, sinObjetivo: true, ataqueNormal: true,
+              requisitos: [
+                { count: { quien: "ENEMIGO", zona: "VANGUARDIA" }, op: ">=", valor: 1,
+                  msg: "No hay enemigos en la vanguardia a los que embestir." } ],
+              efectos: [
+                { op: "ELEGIR", de: "ENEMIGOS", zona: "VANGUARDIA", cantidad: 1,
+                  titulo: "EMBESTIDA: ¿a quién embistes?",
+                  efectos: [
+                    { op: "ATACAR",
+                      siExito: [ { op: "APLICAR_ESTADO", estado: "confusion", duracion: 1,
+                                   log: "¡La embestida deja {objetivo} dando vueltas!" } ] } ] } ] }
+        ],
+    },
+    {
+        // Mismo mecanismo que el CAMUFLAJE ÓPTICO de Mill, con peaje: Mill se esconde gratis y
+        // este necesita tener 1 de Furor guardado. El aviso (la marca) es lo que significa "no
+        // ha atacado todavía": si ataca, se le quita y el Oculto del turno del rival no llega.
+        id: 2023, name: "Robot espía XR", hp: 3, def: 3, atk: 2, type: "Esbirro", subtype: "Máquina",
+        tags: ["Controlable"], gender: "N/A", cost: 1, series: 2,
+        text: "P: CAMUFLAJE ROBÓTICO: Con al menos 1 de Furor, si no ataca en tu turno queda Oculto durante el próximo turno del rival. El daño lo revela.",
+        passiveName: "CAMUFLAJE ROBÓTICO",
+        tempEffectText: "Camuflaje listo: estará {genero?Oculto|Oculta} durante el próximo turno del rival",
+        abilities: [
+            { trigger: "PERIODICO", fase: "INICIO DEL TURNO", momento: "NORMAL", deQuien: "PROPIO",
+              nombre: "CAMUFLAJE ROBÓTICO",
+              efectos: [
+                { op: "LIMPIAR_ESTADOS", estados: ["oculto"], soloObjetivo: true, target: { quien: "SELF" } },
+                { op: "QUITAR_MARCA", target: { quien: "SELF" } },
+                { op: "MARCAR_TEMPORAL", if: { campo: "furor", op: ">=", valor: 1 },
+                  badge: { icono: "🫥", color: "#4f46e5" } } ] },
+            { trigger: "TRAS_ATACAR", nombre: "CAMUFLAJE ROBÓTICO",
+              efectos: [ { op: "QUITAR_MARCA", target: { quien: "SELF" } } ] },
+            { trigger: "PERIODICO", fase: "INICIO DEL TURNO", momento: "NORMAL", deQuien: "RIVAL",
+              nombre: "CAMUFLAJE ROBÓTICO",
+              efectos: [
+                { op: "APLICAR_ESTADO", estado: "oculto", duracion: 1,
+                  target: { quien: "ALIADO", conMarcaTemporalPropia: true } },
+                { op: "QUITAR_MARCA", target: { quien: "ALIADO", conMarcaTemporalPropia: true } } ] }
+        ],
+    },
 ];
 
 // ===================================================================
