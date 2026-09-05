@@ -85,6 +85,11 @@ check('...que flota por encima en vez de empujar la columna',
     /id="tp-ovl"/.test(lobby) && /function colocarFlotante/.test(lobby) && !/overflow-y: auto; min-height: 0;/.test(lobby));
 check('...y su cuadro de texto', /id="sc-text"/.test(lobby));
 check('el botón de Pegar no despliega el panel (para el clic)', /data-pegar\][\s\S]{0,180}stopPropagation/.test(lobby));
+// Con una imagen en el portapapeles, readText devuelve cadena vacía y NO un error: antes caía en
+// la rama de "no puedo leer" y desplegaba el panel sin decir nada, pareciendo que no hacía nada.
+check('un portapapeles sin texto se dice, y no despliega el panel',
+    /if \(!String\(txt\)\.trim\(\)\) \{[\s\S]{0,160}El portapapeles no tiene texto/.test(lobby));
+check('el botón no cambia de alto al llevar emoji', /height:24px; line-height:1; display:inline-flex/.test(lobby));
 check('las opciones se marcan en rojo si el escenario las pisa', /hayEscenarioValido\(testCfg\)/.test(lobby) && /#f87171/.test(lobby));
 check('a quien no es admin se le dice sin detalles', /El anfitrión forzó un escenario/.test(lobby));
 check('restablecer las opciones NO borra el escenario', /_esc = testCfg\.escenario/.test(lobby));
