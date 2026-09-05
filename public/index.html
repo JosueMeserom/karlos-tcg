@@ -4411,6 +4411,28 @@
                 banner.style.display = 'block';
 
                 this._testConfig = this.readTestConfig();
+
+                // ESCENARIO FORZADO (panel del lobby): la mesa se monta entera desde el spec, así
+                // que TODA la preparación sobra -apartar 3, mulligan, barajado sincronizado, manos
+                // forzadas y la moneda del jugador inicial-. Se corta aquí, no al final: hacer la
+                // preparación para pisarla después es justo lo que hacía que "Inicio rápido"
+                // siguiera notándose con un escenario cargado (Toto, 1-sep-2026).
+                if (this.hayEscenarioForzado() && !ignorarInicioRapido) {
+                    banner.style.display = 'none';
+                    this.logMsg('El anfitrión forzó un escenario: se salta la preparación.', 'system');
+                    // Por si el spec no dice quién empieza: sin esto se quedaría en null.
+                    this.startingPlayerId = this.startingPlayerId || 'p1';
+                    this.activePlayerId = this.activePlayerId || this.startingPlayerId;
+                    this.aplicarEscenarioForzado();
+                    localStorage.setItem('karlos_partida_en_curso', this.roomCode);
+                    if (this.myPlayerId !== 'spectator') {
+                        this.socket.emit('setupComplete', { roomCode: this.roomCode, role: this.myPlayerId });
+                        this.showTurnOverlay();
+                    }
+                    if (this.myPlayerId === 'p1') this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'NOTIFY_SETUP_COMPLETE' });
+                    return;
+                }
+
                 const fastStart = !ignorarInicioRapido && !!(this._testConfig && this._testConfig.fastStart);
 
                 if (this.myPlayerId === 'spectator') {
@@ -4559,12 +4581,6 @@
                 this.applyForcedHands(); // cartas forzadas en mano inicial (config del anfitrión)
                 banner.style.display = 'none';
 
-                // ESCENARIO FORZADO (config del anfitrión, panel del lobby). Anula lo demás: la
-                // mesa se monta entera desde el spec. Lo aplica UN SOLO cliente -el de p1- y el
-                // resto lo recibe por el mismo HARD_SYNC que los save-states, que es la vía ya
-                // probada del cargador de debug; si lo montaran los dos por su cuenta, cualquier
-                // diferencia de orden en los instanceId dejaría dos tableros distintos.
-                if (this.aplicarEscenarioForzado()) return;
 
                 // --- JUGADOR INICIAL: forzado por el anfitrión o moneda sincronizada ---
                 const forcedStart = (this._testConfig && (this._testConfig.startingPlayer === 'p1' || this._testConfig.startingPlayer === 'p2')) ? this._testConfig.startingPlayer : null;
@@ -4733,6 +4749,18 @@
                 c.location = 'hand';
                 return c;
             }
+            // ¿Hay un escenario forzado Y es válido? Se pregunta antes de preparar nada, así que
+            // vive aparte de la aplicación.
+            hayEscenarioForzado() {
+                const txt = this._testConfig && this._testConfig.escenario;
+                if (!txt || !String(txt).trim()) return false;
+                try {
+                    const spec = JSON.parse(txt);
+                    if (typeof validarEscenario === 'function') return !!validarEscenario(spec).ok;
+                    return true;
+                } catch (e) { return false; }
+            }
+
             aplicarEscenarioForzado() {
                 const txt = this._testConfig && this._testConfig.escenario;
                 if (!txt || !String(txt).trim()) return false;

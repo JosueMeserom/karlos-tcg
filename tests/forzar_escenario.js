@@ -77,7 +77,12 @@ check('a quien no es admin se le dice sin detalles', /El anfitrión forzó un es
 check('restablecer las opciones NO borra el escenario', /_esc = testCfg\.escenario/.test(lobby));
 check('el servidor deja pasar el escenario, acotado', /escenario: \(typeof c\.escenario === 'string'/.test(srv) && /slice\(0, 20000\)/.test(srv));
 check('el cliente lo lee de la config activa', /escenario: typeof c\.escenario === 'string'/.test(idx));
-check('...y lo monta al terminar la preparación', /if \(this\.aplicarEscenarioForzado\(\)\) return;/.test(idx));
+// Y lo hace ANTES de preparar nada: montar la mesa y luego pisarla dejaba viva la
+// preparación (con "Inicio rápido" notándose aunque hubiera escenario), y encima se saltaba
+// el cierre del setup.
+check('...y se salta la preparación entera', /if \(this\.hayEscenarioForzado\(\) && !ignorarInicioRapido\) \{/.test(idx));
+check('...cerrando el setup igual que el camino normal',
+    /hayEscenarioForzado\(\) && !ignorarInicioRapido[\s\S]{0,900}setupComplete[\s\S]{0,300}NOTIFY_SETUP_COMPLETE/.test(idx));
 check('...validándolo otra vez antes de montarlo', /aplicarEscenarioForzado\(\)[\s\S]{0,900}validarEscenario\(spec\)/.test(idx));
 check('...y lo monta UN solo cliente, el resto lo recibe sincronizado',
     /aplicarEscenarioForzado\(\)[\s\S]{0,900}this\.myPlayerId !== 'p1'/.test(idx));

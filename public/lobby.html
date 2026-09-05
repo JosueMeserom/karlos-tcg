@@ -214,7 +214,7 @@
                     </div>
                 </div>
                 
-                <div class="online-col" style="background: transparent; border: none; padding: 0; gap: 10px;">
+                <div class="online-col" style="background: transparent; border: none; padding: 0; gap: 10px; overflow-y: auto; min-height: 0;">
                     <div class="player-box" style="border-top: 4px solid #3b82f6;">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <span class="p1-title" id="room-p1-name" style="font-size: 1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 130px;">Esperando...</span>
@@ -238,7 +238,7 @@
 
                     <div id="test-panel-wrap" style="width:100%;"></div>
 
-                    <div style="margin-top: auto; width: 100%;">
+                    <div style="width: 100%;">
                         <div id="rematch-area" style="width:100%; text-align:center; margin-bottom:10px;"></div>
                         <select id="online-deck-select" style="margin-bottom: 10px;"><option value="random">🎲 Mazo aleatorio</option></select>
                         <button class="start-btn" id="btn-ready" style="background: #f59e0b; color: black; margin: 0;" onclick="toggleReady()">¡ESTOY LISTO!</button>
@@ -438,7 +438,9 @@
                 updateRoomUI(data.roomData);
                 // Solo un admin publica su config de pruebas guardada, y solo si la sala está por defecto (no pisa la de otro admin).
                 const _saved = loadTestCfg();
-                if (localStorage.getItem('karlos_is_admin') === '1' && isTestNonDefault(_saved) && !isTestNonDefault(data.roomData.testConfig)) {
+                const _hayGuardado = isTestNonDefault(_saved) || !!(_saved.escenario || '').trim();
+                const _salaTocada = isTestNonDefault(data.roomData.testConfig) || !!((data.roomData.testConfig || {}).escenario || '').trim();
+                if (localStorage.getItem('karlos_is_admin') === '1' && _hayGuardado && !_salaTocada) {
                     testCfg = _saved; pushTestCfg();
                 }
             });
@@ -521,7 +523,13 @@
             const wrap = document.getElementById('test-panel-wrap');
             if (!wrap) return;
             // El config vivo es el de la sala: así, si hay varios admins, todos lo ven sincronizado en tiempo real.
-            if (room && room.testConfig) testCfg = JSON.parse(JSON.stringify(room.testConfig));
+            // El config vivo manda, pero conservando el escenario guardado si la sala aún no trae
+            // ninguno: al crear sala nueva llega vacía y, sin esto, se perdía lo último pegado.
+            if (room && room.testConfig) {
+                const _esc = testCfg.escenario || '';
+                testCfg = JSON.parse(JSON.stringify(room.testConfig));
+                if (!(testCfg.escenario || '').trim() && _esc.trim()) testCfg.escenario = _esc;
+            }
             // El panel EDITABLE es exclusivo de admins (mismo criterio que el botón de debug en partida).
             const isAdmin = localStorage.getItem('karlos_is_admin') === '1';
             const inGame = room && room.status && room.status !== 'waiting';
@@ -551,8 +559,17 @@
         // vez a propósito, porque la relación entre las dos (una anula a la otra) es justo lo que
         // hay que poder leer de un vistazo: verde aquí = rojo allí.
         function renderAdminPanel() {
-            return `<div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; align-items:start;">`
-                 + `<div>${renderPanelOpciones()}</div><div>${renderPanelEscenario()}</div></div>`;
+            // Desplegado, el panel abierto se queda con TODO el ancho y el otro baja a su cabecera:
+            // en media columna, la lista de cartas forzadas y el cuadro de texto quedan ilegibles.
+            const abrOpc = localStorage.getItem('karlos_test_panel_open') === '1';
+            const abrEsc = localStorage.getItem('karlos_scen_panel_open') === '1';
+            const cols = (abrOpc || abrEsc) ? '1fr' : '1fr 1fr';
+            // El abierto va PRIMERO: así el que se acaba de desplegar no salta de sitio.
+            const orden = abrEsc && !abrOpc
+                ? [renderPanelEscenario(), renderPanelOpciones()]
+                : [renderPanelOpciones(), renderPanelEscenario()];
+            return `<div style="display:grid; grid-template-columns:${cols}; gap:8px; align-items:start;">`
+                 + orden.map(h => `<div style="min-width:0;">${h}</div>`).join('') + `</div>`;
         }
         function renderPanelOpciones() {
             const open = localStorage.getItem('karlos_test_panel_open') === '1';
@@ -562,14 +579,14 @@
             // aplicar, y eso tiene que verse sin desplegar nada.
             const luz = pisado ? ' <span style="color:#f87171;" title="Un escenario forzado anula estas opciones">●</span>'
                      : (nd ? ' <span style="color:#4ade80;">●</span>' : '');
-            const head = `<div id="tp-head" style="display:flex; align-items:center; justify-content:space-between; cursor:pointer; background:#0f172a; border:1px solid #475569; border-radius:8px; padding:7px 12px;"><span style="font-size:0.82rem; color:#fbbf24; font-weight:bold;">⚙️ Opciones de prueba${luz}</span><span style="color:#94a3b8; font-size:0.9rem;">${open ? '▾' : '▸'}</span></div>`;
+            const head = `<div id="tp-head" style="display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:34px; box-sizing:border-box; cursor:pointer; background:#0f172a; border:1px solid #475569; border-radius:8px; padding:6px 12px;"><span style="font-size:0.78rem; color:#fbbf24; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">⚙️ Opciones de prueba${luz}</span><span style="color:#94a3b8; font-size:0.9rem;">${open ? '▾' : '▸'}</span></div>`;
             if (!open) return head;
             const seatBlock = (seat) => {
                 const list = testCfg.forcedHands[seat] || [];
                 const chips = list.map((id, i) => `<span style="display:inline-flex; align-items:center; gap:4px; background:#334155; border-radius:12px; padding:2px 8px; margin:2px; font-size:0.72rem; color:#e2e8f0;">${tpCardName(id)} <span data-rm="${seat}:${i}" style="cursor:pointer; color:#f87171;">✕</span></span>`).join('');
                 return `<div style="margin-top:6px;"><div style="font-size:0.72rem; color:#94a3b8; margin-bottom:2px;">Mano forzada ${seat === 'p1' ? 'J1' : 'J2'} (máx. 6):</div><div>${chips || '<span style="color:#64748b; font-size:0.72rem;">- ninguna -</span>'}</div><button data-add="${seat}" style="margin-top:4px; background:#1e293b; color:#cbd5e1; border:1px dashed #475569; border-radius:6px; padding:3px 8px; font-size:0.72rem; cursor:pointer;">＋ Añadir carta</button><div id="tp-picker-${seat}" style="display:none; margin-top:4px;"></div></div>`;
             };
-            const body = `<div style="background:#0f172a; border:1px solid #475569; border-top:none; border-radius:0 0 8px 8px; padding:10px 12px; max-height:240px; overflow-y:auto;"><label style="display:flex; align-items:center; gap:8px; font-size:0.8rem; color:#e2e8f0; cursor:pointer;"><input type="checkbox" id="tp-fast" ${testCfg.fastStart ? 'checked' : ''}> Inicio rápido (saltar apartar 3 cartas)</label><div style="margin-top:8px; font-size:0.8rem; color:#e2e8f0;">Empieza: <select id="tp-start" style="margin-left:6px; width:auto; display:inline-block;"><option value="random" ${testCfg.startingPlayer === 'random' ? 'selected' : ''}>🎲 Aleatorio</option><option value="p1" ${testCfg.startingPlayer === 'p1' ? 'selected' : ''}>J1</option><option value="p2" ${testCfg.startingPlayer === 'p2' ? 'selected' : ''}>J2</option></select></div>${seatBlock('p1')}${seatBlock('p2')}<button id="tp-reset" style="margin-top:10px; background:#7f1d1d; color:#fecaca; border:none; border-radius:6px; padding:4px 10px; font-size:0.72rem; cursor:pointer;">Restablecer a por defecto</button></div>`;
+            const body = `<div style="background:#0f172a; border:1px solid #475569; border-top:none; border-radius:0 0 8px 8px; padding:10px 12px; max-height:200px; overflow-y:auto;"><label style="display:flex; align-items:center; gap:8px; font-size:0.8rem; color:#e2e8f0; cursor:pointer;"><input type="checkbox" id="tp-fast" ${testCfg.fastStart ? 'checked' : ''}> Inicio rápido (saltar apartar 3 cartas)</label><div style="margin-top:8px; font-size:0.8rem; color:#e2e8f0;">Empieza: <select id="tp-start" style="margin-left:6px; width:auto; display:inline-block;"><option value="random" ${testCfg.startingPlayer === 'random' ? 'selected' : ''}>🎲 Aleatorio</option><option value="p1" ${testCfg.startingPlayer === 'p1' ? 'selected' : ''}>J1</option><option value="p2" ${testCfg.startingPlayer === 'p2' ? 'selected' : ''}>J2</option></select></div>${seatBlock('p1')}${seatBlock('p2')}<button id="tp-reset" style="margin-top:10px; background:#7f1d1d; color:#fecaca; border:none; border-radius:6px; padding:4px 10px; font-size:0.72rem; cursor:pointer;">Restablecer a por defecto</button></div>`;
             return head + body;
         }
         // ── FORZAR ESCENARIO ──────────────────────────────────────────────────────────────
@@ -584,10 +601,10 @@
                       : est.luz === 'malo' ? ` <span style="color:#f87171;" title="${(est.motivo || '').replace(/"/g, '&quot;')}">●</span>` : '';
             // El botón de Pegar vive en la CABECERA, no dentro: el caso normal es pegar y jugar,
             // sin desplegar nada. Por eso para el clic (si no, abriría y cerraría el panel).
-            const head = `<div id="sc-head" style="display:flex; align-items:center; justify-content:space-between; gap:8px; cursor:pointer; background:#0f172a; border:1px solid #475569; border-radius:8px; padding:7px 12px;">`
-                + `<span style="font-size:0.82rem; color:#c084fc; font-weight:bold; white-space:nowrap;">📋 Forzar escenario${luz}</span>`
+            const head = `<div id="sc-head" style="display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:34px; box-sizing:border-box; cursor:pointer; background:#0f172a; border:1px solid #475569; border-radius:8px; padding:6px 12px;">`
+                + `<span style="font-size:0.78rem; color:#c084fc; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">📋 Forzar escenario${luz}</span>`
                 + `<span style="display:flex; align-items:center; gap:8px;">`
-                + `<button id="sc-paste" title="Pegar el escenario del portapapeles" style="background:#4c1d95; color:#ddd6fe; border:1px solid #6d28d9; border-radius:6px; padding:2px 9px; font-size:0.72rem; cursor:pointer;">Pegar</button>`
+                + `<button id="sc-paste" title="Pegar el escenario del portapapeles" style="background:#7c3aed; color:#fff; border:none; border-radius:6px; padding:3px 10px; font-size:0.8rem; cursor:pointer; white-space:nowrap;">Pegar</button>`
                 + `<span style="color:#94a3b8; font-size:0.9rem;">${open ? '▾' : '▸'}</span></span></div>`;
             if (!open) return head;
             const aviso = est.luz === 'malo'
