@@ -29,7 +29,11 @@ if (!process.env.SESSION_SECRET && !fs.existsSync(FICHERO_SECRETO)) {
 const SESSION_SECRET = process.env.SESSION_SECRET || fs.readFileSync(FICHERO_SECRETO, 'utf8').trim();
 
 // --- SESIONES PERSISTENTES ---
-app.use(session({
+// Se guarda en una constante para poder dársela TAMBIÉN a socket.io (abajo): sin eso el servidor
+// solo sabe qué socket es cuál, y no quién hay detrás, así que no puede comprobar por su cuenta si
+// alguien es administrador. Hasta ahora eso se resolvía creyéndose lo que dijera el cliente
+// (`adminCloseRoom`), que para expulsar gente no vale.
+const sessionMiddleware = session({
     store: new SQLiteStore({ db: 'sessions.sqlite', dir: __dirname }), // <--- Cambiado a __dirname
     secret: SESSION_SECRET,
     resave: false,
@@ -39,7 +43,18 @@ app.use(session({
         sameSite: 'lax',     // el navegador no manda esta cookie en peticiones que nazcan en OTRA web (anti-CSRF)
         maxAge: 30 * 24 * 60 * 60 * 1000 // <--- Recuerda el login durante 30 días
     } 
-}));
+});
+app.use(sessionMiddleware);
+// El handshake de socket.io es una petición HTTP normal, así que el mismo middleware le deja la
+// sesión en `socket.request.session`. Va envuelto porque un fallo aquí tumbaría TODAS las
+// conexiones, y esto solo sirve para un permiso: si no hay sesión, no eres admin y ya.
+io.engine.use((req, res, next) => {
+    try { sessionMiddleware(req, res, next); } catch (e) { console.error('[sesión socket]', e); next(); }
+});
+function esAdminDelSocket(socket) {
+    try { return !!(socket.request && socket.request.session && socket.request.session.isAdmin); }
+    catch (e) { return false; }
+}
 
 // --- BASE DE DATOS (SQLite) ---
 const db = new sqlite3.Database('./database.sqlite', (err) => {
@@ -422,6 +437,50 @@ io.on('connection', (socket) => {
             delete rooms[roomCode];
             broadcastRoomList();
         }
+    });
+
+    // EXPULSAR DE LA SALA. Puede el anfitrión (el líder) y puede un administrador, aunque no esté
+    // sentado. `quien` es 'p1' | 'p2' | el id de socket de un espectador.
+    socket.on('kickFromRoom', (data) => {
+        const room = rooms[data && data.roomCode];
+        if (!room) return;
+        const senderSeat = (room.players.p1 && room.players.p1.id === socket.id) ? 'p1' :
+                           (room.players.p2 && room.players.p2.id === socket.id) ? 'p2' : null;
+        const admin = esAdminDelSocket(socket);
+        if (!admin && (!senderSeat || senderSeat !== room.leader)) return;
+        const quien = data.quien;
+        if (!quien) return;
+        // Nadie se expulsa a sí mismo: para eso está salir de la sala.
+        if (quien === senderSeat) return;
+
+        let idFuera = null, nombreFuera = null;
+        if (quien === 'p1' || quien === 'p2') {
+            const pl = room.players[quien];
+            if (!pl) return;
+            idFuera = pl.id; nombreFuera = pl.name;
+            room.players[quien] = null;
+            // Si echas al líder, el liderazgo pasa al otro asiento ocupado (si lo hay).
+            if (room.leader === quien) {
+                const otro = quien === 'p1' ? 'p2' : 'p1';
+                if (room.players[otro]) room.leader = otro;
+            }
+        } else {
+            const i = room.spectators.findIndex(e => e.id === quien);
+            if (i === -1) return;
+            idFuera = room.spectators[i].id; nombreFuera = room.spectators[i].name;
+            room.spectators.splice(i, 1);
+        }
+
+        const sockFuera = io.sockets.sockets.get(idFuera);
+        if (sockFuera) {
+            sockFuera.emit('roomError', admin && senderSeat !== room.leader
+                ? 'Un administrador te ha expulsado de la sala.'
+                : 'El anfitrión te ha expulsado de la sala.');
+            sockFuera.leave(data.roomCode);
+        }
+        roomMsg(data.roomCode, { username: 'Sistema', msg: `🚪 ${nombreFuera} ha sido ${admin && senderSeat !== room.leader ? 'expulsado por un administrador' : 'expulsado por el anfitrión'}.` });
+        io.to(data.roomCode).emit('roomUpdate', room);
+        broadcastRoomList();
     });
 
     socket.on('createRoom', (data) => {

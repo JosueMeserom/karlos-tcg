@@ -85,6 +85,16 @@
         .btn-spectate { background: #64748b; padding: 6px 12px; font-size: 0.8rem; border:none; border-radius:4px; color:white; cursor:pointer; transition: 0.2s;}
         .btn-spectate:hover { background: #475569; transform: scale(1.05); }
 
+        /* Expulsar: el hueco se reserva siempre (18px) para que enseñarlo u ocultarlo no mueva
+           ni un píxel de la fila; lo que cambia es la visibilidad, no el sitio. */
+        .kick-slot { flex: none; width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; }
+        .kick-btn { visibility: hidden; opacity: 0; transition: opacity 120ms ease; background: none; border: none;
+                    padding: 0; margin: 0; width: 18px; height: 18px; line-height: 1; font-size: 0.82rem;
+                    cursor: pointer; color: #f87171; border-radius: 4px; }
+        .fila-kick:hover .kick-btn, .kick-btn:focus-visible { visibility: visible; opacity: 1; }
+        .kick-btn:hover { background: #7f1d1d; }
+        @media (prefers-reduced-motion: reduce) { .kick-btn { transition: none; } }
+
         .online-col {
             flex: 1; display: flex; flex-direction: column; background: #1e293b; 
             border-radius: 8px; border: 1px solid #475569; padding: 15px;
@@ -216,14 +226,14 @@
                 
                 <div class="online-col" id="room-col" style="background: transparent; border: none; padding: 0; gap: 10px; position: relative;">
                     <div class="player-box" style="border-top: 4px solid #3b82f6;">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <span class="p1-title" id="room-p1-name" style="font-size: 1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 130px;">Esperando...</span>
+                        <div class="fila-kick" style="display: flex; justify-content: space-between; align-items: center; gap: 6px;">
+                            <span class="p1-title" id="room-p1-name" style="font-size: 1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 130px;">Esperando...</span><span class="kick-slot" id="room-p1-kick"></span>
                             <span id="room-p1-status" style="color: #94a3b8; font-size: 0.8rem; text-align: right;">⏳ Eligiendo mazo</span>
                         </div>
                     </div>
                     <div class="player-box" style="border-top: 4px solid #ef4444;">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <span class="p2-title" id="room-p2-name" style="font-size: 1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 130px;">Esperando rival...</span>
+                        <div class="fila-kick" style="display: flex; justify-content: space-between; align-items: center; gap: 6px;">
+                            <span class="p2-title" id="room-p2-name" style="font-size: 1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 130px;">Esperando rival...</span><span class="kick-slot" id="room-p2-kick"></span>
                             <span id="room-p2-status" style="color: #94a3b8; font-size: 0.8rem; text-align: right;">---</span>
                         </div>
                     </div>
@@ -847,7 +857,18 @@
                 return { txt: '🟡 En la sala', col: '#f59e0b' };
             };
 
+            // Expulsar: el anfitrión de la sala (el líder) y cualquier administrador. El servidor
+            // lo vuelve a comprobar por su cuenta -mira la sesión, no lo que diga el cliente-, así
+            // que esto de aquí es solo la parte visible.
+            const puedoExpulsar = (localStorage.getItem('karlos_is_admin') === '1') || (myRole && room.leader === myRole);
+            const botonExpulsar = (quien, nombre) => {
+                if (!puedoExpulsar || quien === myRole) return '';
+                const n = String(nombre || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+                return `<button class="kick-btn" title="Expulsar a ${n}" data-kick="${String(quien).replace(/"/g, '&quot;')}" data-kick-nombre="${n}">✖</button>`;
+            };
             const renderSeat = (pl, nameEl, statusEl, seat) => {
+                const kickEl = document.getElementById('room-' + seat + '-kick');
+                if (kickEl) kickEl.innerHTML = pl ? botonExpulsar(seat, pl.name) : '';
                 if (!pl) {
                     nameEl.innerText = "Asiento libre";
                     const outOfGame = (room.status === 'waiting' || room.status === 'finished');
@@ -877,11 +898,26 @@
                 specsList.innerHTML = room.spectators.map(s => {
                     const n = String(s.name == null ? '' : s.name);
                     const esc = n.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-                    return `<span title="${esc}" style="width:33.333%; flex:none; box-sizing:border-box; padding-right:8px; line-height:1.45; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc}</span>`;
+                    // La celda reserva su hueco de expulsar SIEMPRE, tenga botón o no: así las tres
+                    // columnas quedan alineadas entre sí y con la vista de quien no es anfitrión.
+                    return `<span class="fila-kick" style="width:33.333%; flex:none; box-sizing:border-box; padding-right:8px;`
+                        + ` line-height:1.45; display:inline-flex; align-items:center; gap:4px;">`
+                        + `<span title="${esc}" style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc}</span>`
+                        + `<span class="kick-slot">${botonExpulsar(s.id, n)}</span></span>`;
                 }).join('');
             } else {
                 specsList.innerHTML = "Ninguno";
             }
+
+            document.querySelectorAll('[data-kick]').forEach(b => {
+                b.onclick = (ev) => {
+                    ev.stopPropagation();
+                    const quien = b.getAttribute('data-kick');
+                    const nombre = b.getAttribute('data-kick-nombre') || 'a esa persona';
+                    if (!confirm(`¿Expulsar a ${nombre} de la sala?`)) return;
+                    socket.emit('kickFromRoom', { roomCode: currentRoom, quien });
+                };
+            });
 
             const btnToSpec = document.getElementById('btn-to-spectators');
             if (btnToSpec) {
