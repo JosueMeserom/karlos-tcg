@@ -28,6 +28,17 @@ if (!process.env.SESSION_SECRET && !fs.existsSync(FICHERO_SECRETO)) {
 }
 const SESSION_SECRET = process.env.SESSION_SECRET || fs.readFileSync(FICHERO_SECRETO, 'utf8').trim();
 
+// HAY UN PROXY INVERSO DELANTE (2-sep-2026). El juego se sirve por HTTPS en
+// tcg.ultrak.dynu.net, pero quien habla TLS es el proxy: a node le llega HTTP por el 4000. Sin
+// esto, Express cree que toda la gente del mundo es el proxy, y dos cosas se rompen en silencio:
+//   · `cookie.secure: 'auto'` mira la conexión que ve node -HTTP- y NO marca la cookie como
+//     segura, aunque el navegador esté en HTTPS;
+//   · `req.ip` es la IP del proxy para TODOS, así que el freno de fuerza bruta de /api/login
+//     contaba los intentos de todo el mundo juntos: diez fallos de cualquiera dejaban a TODOS
+//     fuera durante quince minutos.
+// El 1 es "confía en un salto": el proxy que corre en esta misma máquina, y solo en él.
+app.set('trust proxy', 1);
+
 // --- SESIONES PERSISTENTES ---
 // Se guarda en una constante para poder dársela TAMBIÉN a socket.io (abajo): sin eso el servidor
 // solo sabe qué socket es cuál, y no quién hay detrás, así que no puede comprobar por su cuenta si
@@ -236,7 +247,7 @@ function closeFinishedRoom(roomCode) {
     clearCloseTimer(roomCode);
     if (!rooms[roomCode]) return;
     io.to(roomCode).emit('finishedRoomClosed', { msg: 'La sala se ha cerrado: la partida terminó y ya no queda nadie dentro.' });
-    delete rooms[roomCode];
+    delete rooms[roomCode]; delete roomPass[roomCode];
     broadcastRoomList();
 }
 
@@ -389,7 +400,7 @@ function freeSeat(roomCode, seat) {
         const specIds = (room.spectators || []).map(s => s.id);
         io.to(roomCode).emit('finishedRoomClosed', { msg: closeMsg });
         specIds.forEach(id => io.to(id).emit('finishedRoomClosed', { msg: closeMsg })); // por si algún espectador no seguía en la sala socket
-        delete rooms[roomCode];
+        delete rooms[roomCode]; delete roomPass[roomCode];
     } else {
         if (room.status === 'waiting') {
             if (room.players.p1) room.players.p1.ready = false;
@@ -402,13 +413,33 @@ function freeSeat(roomCode, seat) {
 
 // ===== PASO C: REVANCHA — reaprovechar una sala terminada para una partida nueva (sin recrearla) =====
 
+// CONTRASEÑAS DE SALA. El hash vive AQUÍ y no dentro de `room` a propósito: el objeto de la sala
+// se emite entero a los clientes en varios sitios (roomJoined, roomUpdate...), así que cualquier
+// cosa metida ahí acaba en el navegador de todos. Lo único que sale de aquí es un booleano.
+// Qué protege esto y qué no: hashear evita que la contraseña quede en claro en un volcado de
+// memoria o en un log. La sala es efímera y su contraseña también: mueren con el proceso.
+const roomPass = {};
+function ponerPassword(code, pass) {
+    const p = String(pass == null ? '' : pass).slice(0, 64);
+    if (!p) { delete roomPass[code]; if (rooms[code]) rooms[code].tienePassword = false; return; }
+    roomPass[code] = bcrypt.hashSync(p, 10);
+    if (rooms[code]) rooms[code].tienePassword = true;
+}
+function passwordCorrecta(code, intento) {
+    const h = roomPass[code];
+    if (!h) return true;
+    try { return bcrypt.compareSync(String(intento == null ? '' : intento), h); }
+    catch (e) { return false; }
+}
+
 function broadcastRoomList() {
     const availableRooms = Object.keys(rooms).map(code => ({
         code: code,
         host: rooms[code].host,
         status: rooms[code].status, 
         playersCount: (rooms[code].players.p1 ? 1 : 0) + (rooms[code].players.p2 ? 1 : 0),
-        spectatorsCount: rooms[code].spectators.length
+        spectatorsCount: rooms[code].spectators.length,
+        conPassword: !!roomPass[code]
     }));
     io.emit('roomListUpdate', availableRooms);
 }
@@ -438,7 +469,7 @@ io.on('connection', (socket) => {
         if (!esAdminDelSocket(socket)) return;
         if (rooms[roomCode]) {
             io.to(roomCode).emit('roomError', 'Un administrador ha cerrado esta sala de forma forzosa.');
-            delete rooms[roomCode];
+            delete rooms[roomCode]; delete roomPass[roomCode];
             broadcastRoomList();
         }
     });
@@ -487,6 +518,20 @@ io.on('connection', (socket) => {
         broadcastRoomList();
     });
 
+    // Poner, cambiar o quitar la contraseña de una sala ya creada. Anfitrión o administrador.
+    socket.on('setRoomPassword', (data) => {
+        const room = rooms[data && data.roomCode];
+        if (!room) return;
+        const senderSeat = (room.players.p1 && room.players.p1.id === socket.id) ? 'p1' :
+                           (room.players.p2 && room.players.p2.id === socket.id) ? 'p2' : null;
+        if (!esAdminDelSocket(socket) && (!senderSeat || senderSeat !== room.leader)) return;
+        ponerPassword(data.roomCode, data.password);
+        roomMsg(data.roomCode, { username: 'Sistema', msg: roomPass[data.roomCode]
+            ? '🔒 La sala pasa a tener contraseña.' : '🔓 La sala se queda sin contraseña.' });
+        io.to(data.roomCode).emit('roomUpdate', room);
+        broadcastRoomList();
+    });
+
     socket.on('createRoom', (data) => {
         const roomCode = Math.random().toString(36).substring(2, 6).toUpperCase();
         rooms[roomCode] = {
@@ -499,8 +544,10 @@ io.on('connection', (socket) => {
             players: { p1: { id: socket.id, name: data.username || 'Jugador 1', ready: false, deck: null, connected: true, setupComplete: false, inIndexHtml: false, exhausted: false, graceUntil: null }, p2: null },
             spectators: [],
             status: 'waiting',
-            seqByRole: { p1: 0, p2: 0 }
+            seqByRole: { p1: 0, p2: 0 },
+            tienePassword: false
         };
+        ponerPassword(roomCode, data.password);
         socket.join(roomCode);
         socket.emit('roomJoined', { roomCode, role: 'p1', roomData: rooms[roomCode] });
         broadcastRoomList();
@@ -510,6 +557,11 @@ io.on('connection', (socket) => {
         const roomCode = data.code.toUpperCase();
         const room = rooms[roomCode];
         if (!room) return socket.emit('roomError', 'La sala no existe.');
+        // LA PUERTA. Va lo PRIMERO, antes de tocar asientos o de mandar nada: quien no acierta no
+        // llega a ver ni quién está dentro. Se salta solo si este socket ya está en la sala.
+        if (!socket.rooms.has(roomCode) && !passwordCorrecta(roomCode, data.password)) {
+            return socket.emit('roomLocked', { code: roomCode, fallo: data.password !== undefined && data.password !== null });
+        }
         const username = data.username || 'Invitado';
 
         // Re-enganche: si ya tenías asiento en esta sala (p. ej. volviendo del cartel de fin), lo recuperas
@@ -1046,7 +1098,7 @@ io.on('connection', (socket) => {
                     if (room.players.p2.inIndexHtml && (!room.players.p1.setupComplete || !room.players.p2.setupComplete)) {
                         io.to(roomCode).emit('roomError', 'El rival se ha desconectado durante la preparación inicial. Partida cancelada.');
                         clearGraceTimer(roomCode, 'p1'); clearGraceTimer(roomCode, 'p2');
-                        delete rooms[roomCode];
+                        delete rooms[roomCode]; delete roomPass[roomCode];
                         broadcastRoomList();
                     } else if (room.players.p2.inIndexHtml) {
                         // Corte en mitad del juego real -> arranca la GRACIA de ese asiento
@@ -1070,7 +1122,7 @@ io.on('connection', (socket) => {
                     if (room.players.p1.inIndexHtml && (!room.players.p1.setupComplete || p2Incomplete)) {
                         io.to(roomCode).emit('roomError', 'El anfitrión se ha desconectado durante la preparación inicial. Partida cancelada.');
                         clearGraceTimer(roomCode, 'p1'); clearGraceTimer(roomCode, 'p2');
-                        delete rooms[roomCode];
+                        delete rooms[roomCode]; delete roomPass[roomCode];
                         broadcastRoomList();
                     } else if (room.players.p1.inIndexHtml) {
                         // Corte en mitad del juego real -> arranca la GRACIA de ese asiento

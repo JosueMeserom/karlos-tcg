@@ -80,9 +80,9 @@
             display: flex; flex-direction: column; gap: 5px;
         }
         .chat-msg { font-size: 0.9rem; color: #cbd5e1; word-wrap: break-word; text-align: left; }
-        .room-item { background: #334155; padding: 10px; border-radius: 5px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;}
+        .room-item { background: #334155; padding: 6px 10px; border-radius: 5px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;}
         
-        .btn-spectate { background: #64748b; padding: 6px 12px; font-size: 0.8rem; border:none; border-radius:4px; color:white; cursor:pointer; transition: 0.2s;}
+        .btn-spectate { background: #64748b; padding: 4px 11px; font-size: 0.78rem; border:none; border-radius:4px; color:white; cursor:pointer; transition: 0.2s;}
         .btn-spectate:hover { background: #475569; transform: scale(1.05); }
 
         /* Expulsar: el hueco se reserva siempre (18px) para que enseñarlo u ocultarlo no mueva
@@ -187,14 +187,25 @@
                 </div>
             </div>
             <div class="online-col" style="background: transparent; border: none; padding: 0;">
-                <div style="margin-top: 15px; margin-bottom: 15px; display: flex; flex-direction: column; align-items: center; gap: 8px;">
-                    <label style="cursor: pointer; color: #fbbf24; font-size: 0.9rem;">
-                        <input type="checkbox" id="allow-spec-check" checked> 
-                        Permitir espectadores
+                <!-- Las tres opciones en UNA línea: cada una en dos filas gastaba el sitio que le
+                     hace falta a la lista de salas, que a las cuatro ya pedía scroll. El campo de
+                     la contraseña no existe hasta que se marca su casilla: es lo que menos se usa
+                     y no tiene por qué ocupar sitio el resto del tiempo. -->
+                <div style="margin: 12px 0 10px; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 14px;">
+                    <label style="cursor: pointer; color: #fbbf24; font-size: 0.85rem; white-space: nowrap;" title="Permitir que entre gente a mirar">
+                        <input type="checkbox" id="allow-spec-check" checked> Espectadores
                     </label>
-                    <label style="cursor: pointer; color: #fbbf24; font-size: 0.9rem;">
-                        <input type="checkbox" id="omni-check" checked> 
-                        Espectador omnisciente (ve todo)
+                    <label style="cursor: pointer; color: #fbbf24; font-size: 0.85rem; white-space: nowrap;" title="Los espectadores ven las manos de los dos jugadores">
+                        <input type="checkbox" id="omni-check" checked> Omnisciente
+                    </label>
+                    <label style="cursor: pointer; color: #fbbf24; font-size: 0.85rem; white-space: nowrap;" title="Hará falta una contraseña para entrar">
+                        <input type="checkbox" id="pass-check" onchange="togglePassCrear()"> Contraseña
+                    </label>
+                </div>
+                <div id="pass-crear-fila" style="display: none; margin: 0 0 10px; gap: 8px; align-items: center; width: 100%;">
+                    <input type="password" id="pass-crear" maxlength="64" placeholder="Contraseña de la sala" style="margin: 0; flex: 1; min-width: 0;">
+                    <label style="cursor: pointer; color: #94a3b8; font-size: 0.8rem; white-space: nowrap;">
+                        <input type="checkbox" id="pass-crear-ver" onchange="verPassCrear()"> Mostrar
                     </label>
                 </div>
                 <div style="display: flex; gap: 10px; flex-direction: column; align-items: center; width: 100%;">
@@ -214,7 +225,7 @@
 
         <div id="online-room-view" style="display: none; flex-direction: column; gap: 15px; text-align: left; height: 500px;">
             <div style="display: flex; justify-content: space-between; align-items: center; background: #0f172a; padding: 10px 20px; border-radius: 8px; border: 1px dashed #4ade80; height: 50px; box-sizing: border-box;">
-                <div style="display:flex; align-items:center; gap:10px; font-size: 1.2rem; color: #4ade80; font-weight: bold;">SALA: <span id="current-room-code" style="letter-spacing: 2px; font-size: 1.5rem; color: white;">----</span><button id="btn-copiar-sala" title="Copiar el enlace de la sala" onclick="copiarEnlaceSala()" style="background:#166534; color:#dcfce7; border:none; border-radius:6px; padding:3px 10px 1px; height:26px; line-height:1; display:inline-flex; align-items:center; justify-content:center; box-sizing:border-box; font-size:0.78rem; cursor:pointer; white-space:nowrap;">🔗 Copiar enlace</button></div>
+                <div style="display:flex; align-items:center; gap:10px; font-size: 1.2rem; color: #4ade80; font-weight: bold;">SALA: <span id="current-room-code" style="letter-spacing: 2px; font-size: 1.5rem; color: white;">----</span><button id="btn-candado-sala" title="Contraseña de la sala" onclick="abrirCandado(event)" style="display:none; background:#334155; color:#e2e8f0; border:none; border-radius:6px; padding:4px 10px 0; height:26px; line-height:1; align-items:center; justify-content:center; box-sizing:border-box; font-size:0.9rem; cursor:pointer;">🔓</button><button id="btn-copiar-sala" title="Copiar el enlace de la sala" onclick="copiarEnlaceSala()" style="background:#166534; color:#dcfce7; border:none; border-radius:6px; padding:4px 10px 0; height:26px; line-height:1; display:inline-flex; align-items:center; justify-content:center; box-sizing:border-box; font-size:0.78rem; cursor:pointer; white-space:nowrap;">🔗 Copiar enlace</button></div>
                 <div id="grace-control" style="display:none; align-items:center; gap:4px;"></div>
                 <button class="back-btn" style="margin: 0; padding: 0; color: #f87171;" onclick="leaveRoomView()">Abandonar sala</button>
             </div>
@@ -397,7 +408,7 @@
                     const adminBtn = isAdmin ? `<button class="btn-spectate" style="background:#ef4444;" title="Forzar Cierre" onclick="adminCloseRoom('${r.code}')">🗑️</button>` : '';
 
                     div.innerHTML = `
-                        <span style="color: white; font-weight:bold; font-size:0.9rem;">${r.host} <span style="color:#fbbf24; font-size:0.8rem; font-weight:normal;">(${r.playersCount}/2)</span></span>
+                        <span style="color: white; font-weight:bold; font-size:0.9rem;">${r.conPassword ? '<span title="Necesita contraseña" style="margin-right:4px;">🔒</span>' : ''}${r.host} <span style="color:#fbbf24; font-size:0.8rem; font-weight:normal;">(${r.playersCount}/2)</span></span>
                         <div style="display:flex; gap:5px;">
                             ${r.status === 'waiting' && r.playersCount < 2 ? `<button class="btn-spectate" style="background:#10b981;" onclick="joinRoomByCode('${r.code}', false)">Unirse</button>` : ''}
                             <button class="btn-spectate" title="Espectar" onclick="joinRoomByCode('${r.code}', true)">👁️</button>
@@ -495,6 +506,19 @@
                 localStorage.setItem('karlos_p2_name', data.p2Name);
                 
                 window.location.href = 'index.html';
+            });
+
+            // Sala con contraseña: el servidor no ha mandado NADA de ella, solo que hace falta.
+            socket.on('roomLocked', (data) => {
+                const p = prompt(data && data.fallo
+                    ? '🔒 Contraseña incorrecta. Prueba otra vez:'
+                    : '🔒 Esta sala tiene contraseña:');
+                if (p === null) {                    // se arrepintió
+                    if (salaDeLaURL()) location.replace(location.pathname + '?mode=online');
+                    return;
+                }
+                const t = _ultimoIntento || { code: (data && data.code) || '', asSpectator: false };
+                joinRoomByCode(t.code, t.asSpectator, p);
             });
 
             socket.on('roomError', (msg) => {
@@ -985,6 +1009,7 @@
             const rmArea = document.getElementById('rematch-area');
             if (rmArea) rmArea.innerHTML = ''; // (rework) sin estado de revancha
 
+            pintarCandado(room);
             renderTestPanel(room);
         }
 
@@ -1029,12 +1054,28 @@
             const allowSpec = document.getElementById('allow-spec-check').checked;
             const isOmni = document.getElementById('omni-check').checked;
 
+            const pass = document.getElementById('pass-check').checked
+                ? (document.getElementById('pass-crear').value || '').trim() : '';
+            if (document.getElementById('pass-check').checked && !pass) {
+                return alert('Has marcado Contraseña pero la has dejado vacía.');
+            }
             // Lo enviamos todo al servidor
             socket.emit('createRoom', { 
                 username: myUsername, 
                 allowSpectators: allowSpec, 
-                omniscient: isOmni 
+                omniscient: isOmni,
+                password: pass
             }); 
+        }
+        function togglePassCrear() {
+            const on = document.getElementById('pass-check').checked;
+            document.getElementById('pass-crear-fila').style.display = on ? 'flex' : 'none';
+            if (on) document.getElementById('pass-crear').focus();
+            else document.getElementById('pass-crear').value = '';
+        }
+        function verPassCrear() {
+            const c = document.getElementById('pass-crear-ver').checked;
+            document.getElementById('pass-crear').type = c ? 'text' : 'password';
         }
 
         // ── ENLACE DIRECTO A LA SALA ──────────────────────────────────────────────────────
@@ -1050,6 +1091,37 @@
         function enlaceDeSala(code) {
             return location.origin + location.pathname + '?mode=online&sala=' + encodeURIComponent(code);
         }
+        // ── EL CANDADO DE LA SALA ─────────────────────────────────────────────────────────
+        // Un solo botón en la cabecera en vez de un cuarto elemento con su campo: dice el estado
+        // de un vistazo (🔒/🔓) y al clicarlo abre lo justo para cambiarlo. Solo el anfitrión y
+        // los administradores pueden abrirlo; los demás ven el estado y ya.
+        function pintarCandado(room) {
+            const b = document.getElementById('btn-candado-sala');
+            if (!b) return;
+            const puedo = (localStorage.getItem('karlos_is_admin') === '1') || (myRole && room && room.leader === myRole);
+            const con = !!(room && room.tienePassword);
+            b.style.display = 'inline-flex';
+            b.textContent = con ? '🔒' : '🔓';
+            b.title = con
+                ? (puedo ? 'La sala tiene contraseña - clic para cambiarla o quitarla' : 'La sala tiene contraseña')
+                : (puedo ? 'Sin contraseña - clic para ponerle una' : 'Sala sin contraseña');
+            b.style.cursor = puedo ? 'pointer' : 'default';
+            b.style.background = con ? '#3f2d1a' : '#334155';
+            b.dataset.puedo = puedo ? '1' : '';
+        }
+        function abrirCandado(ev) {
+            const b = document.getElementById('btn-candado-sala');
+            if (!b || !b.dataset.puedo) return;
+            if (ev) ev.stopPropagation();
+            const con = b.textContent === '🔒';
+            const p = prompt(con
+                ? 'Contraseña de la sala (déjala vacía para quitarla):'
+                : 'Contraseña para esta sala (vacía = sin contraseña):', '');
+            if (p === null) return;
+            socket.emit('setRoomPassword', { roomCode: currentRoom, password: p.trim() });
+            avisillo(p.trim() ? '🔒 Contraseña puesta' : '🔓 Contraseña quitada', b);
+        }
+
         function copiarEnlaceSala() {
             const btn = document.getElementById('btn-copiar-sala');
             if (!currentRoom) { avisillo('Todavía no estás en una sala', btn); return; }
@@ -1081,14 +1153,16 @@
             }
         }
 
-        function joinRoomByCode(code, asSpectator = false) {
+        function joinRoomByCode(code, asSpectator = false, password) {
             code = code || document.getElementById('room-code-input').value.trim().toUpperCase();
             if (code.length !== 4) return alert("El código debe tener 4 caracteres.");
             
             localStorage.setItem('karlos_username', myUsername); // <--- Evita el null
-            
-            socket.emit('joinRoom', { code, username: myUsername, asSpectator });
+            // Se recuerda el último intento para poder repetirlo si el servidor pide contraseña.
+            _ultimoIntento = { code, asSpectator };
+            socket.emit('joinRoom', { code, username: myUsername, asSpectator, password });
         }
+        let _ultimoIntento = null;
 
         function toggleReady() {
             try {
