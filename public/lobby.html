@@ -38,14 +38,28 @@
         .p1-title { color: #60a5fa; font-weight: bold; font-size: 1.2rem; }
         .p2-title { color: #f87171; font-weight: bold; font-size: 1.2rem; }
         
-        select, input[type="text"] {
+        select, input[type="text"], input[type="password"] {
             padding: 10px; border-radius: 5px; border: 1px solid #475569;
             background: #0f172a; color: white; font-size: 1rem; outline: none;
             width: 100%; box-sizing: border-box; text-align: center; margin: 0;
         }
         select { cursor: pointer; }
-        input[type="text"] { cursor: text; }
-        select:focus, input[type="text"]:focus { border-color: #fbbf24; }
+        input[type="text"], input[type="password"] { cursor: text; }
+        select:focus, input[type="text"]:focus, input[type="password"]:focus { border-color: #fbbf24; }
+        /* El autorrelleno del navegador pinta el campo de blanco con su propio fondo, y no hay
+           forma de quitarlo con `background`: se tapa con una sombra interior enorme del color
+           que toca. Sin esto, en cuanto existe un campo de contraseña en la página el navegador
+           cree que hay un formulario de login y deja el chat blanco con tu nombre dentro. */
+        input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:focus,
+        textarea:-webkit-autofill, select:-webkit-autofill {
+            -webkit-box-shadow: 0 0 0 1000px #0f172a inset !important;
+            -webkit-text-fill-color: #fff !important;
+            caret-color: #fff;
+            transition: background-color 9999s ease-in-out 0s;
+        }
+        /* La contraseña, más baja que un campo normal y alineada a la izquierda: va en una fila
+           compartida y con el centrado heredado parecía otra cosa. */
+        #pass-crear { padding: 6px 10px; font-size: 0.85rem; text-align: left; }
         
         /* BOTONES ORIGINALES INTACTOS */
         .start-btn {
@@ -80,13 +94,19 @@
             display: flex; flex-direction: column; gap: 5px;
         }
         .chat-msg { font-size: 0.9rem; color: #cbd5e1; word-wrap: break-word; text-align: left; }
-        .room-item { background: #334155; padding: 6px 10px; border-radius: 5px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;}
+        /* Sin `margin-bottom`: el contenedor ya separa con `gap`, y las dos cosas juntas eran el hueco de más. */
+        .room-item { background: #334155; padding: 5px 10px; border-radius: 5px; display: flex; justify-content: space-between; align-items: center; }
         
         .btn-spectate { background: #64748b; padding: 4px 11px; font-size: 0.78rem; border:none; border-radius:4px; color:white; cursor:pointer; transition: 0.2s;}
         .btn-spectate:hover { background: #475569; transform: scale(1.05); }
 
         /* Expulsar: el hueco se reserva siempre (18px) para que enseñarlo u ocultarlo no mueva
            ni un píxel de la fila; lo que cambia es la visibilidad, no el sitio. */
+        /* LOS DOS BOTONES DE LA CABECERA VERDE (candado y copiar enlace). Están centrados en su
+           caja, pero al lado de un texto grande el centrado geométrico se ve alto. Este `top` es
+           el mando: súbelo o bájalo hasta que te cuadre a ojo. */
+        .btn-cabecera-sala { position: relative; top: 2px; }
+
         .kick-slot { flex: none; width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; }
         .kick-btn { visibility: hidden; opacity: 0; transition: opacity 120ms ease; background: none; border: none;
                     padding: 0; margin: 0; width: 18px; height: 18px; line-height: 1; font-size: 0.82rem;
@@ -182,7 +202,7 @@
                 <h3 style="margin-top: 0; color: #60a5fa;">💬 Chat global</h3>
                 <div id="global-chat-box" class="chat-box"></div>
                 <div style="display: flex; gap: 5px;">
-                    <input type="text" id="global-chat-input" style="text-align:left;" placeholder="Mensaje..." onkeypress="if(event.key==='Enter') sendGlobalChat()">
+                    <input type="text" id="global-chat-input" autocomplete="off" data-lpignore="true" style="text-align:left;" placeholder="Mensaje..." onkeypress="if(event.key==='Enter') sendGlobalChat()">
                     <button class="start-btn" style="width: auto; padding: 10px 14px; margin: 0; font-size: 1rem;" onclick="sendGlobalChat()">➤</button>
                 </div>
             </div>
@@ -192,18 +212,18 @@
                      la contraseña no existe hasta que se marca su casilla: es lo que menos se usa
                      y no tiene por qué ocupar sitio el resto del tiempo. -->
                 <div style="margin: 12px 0 10px; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 14px;">
-                    <label style="cursor: pointer; color: #fbbf24; font-size: 0.85rem; white-space: nowrap;" title="Permitir que entre gente a mirar">
-                        <input type="checkbox" id="allow-spec-check" checked> Espectadores
+                    <label style="cursor: pointer; color: #fbbf24; font-size: 0.85rem; white-space: nowrap;" title="Permitir que entre gente a mirar la partida">
+                        <input type="checkbox" id="allow-spec-check" checked onchange="toggleEspectadores()"> Espectadores
                     </label>
-                    <label style="cursor: pointer; color: #fbbf24; font-size: 0.85rem; white-space: nowrap;" title="Los espectadores ven las manos de los dos jugadores">
-                        <input type="checkbox" id="omni-check" checked> Omnisciente
+                    <label id="lbl-omni" style="cursor: pointer; color: #fbbf24; font-size: 0.85rem; white-space: nowrap;" title="Quien mire verá también las manos de los dos jugadores">
+                        <input type="checkbox" id="omni-check" checked> ...y ven las manos
                     </label>
                     <label style="cursor: pointer; color: #fbbf24; font-size: 0.85rem; white-space: nowrap;" title="Hará falta una contraseña para entrar">
                         <input type="checkbox" id="pass-check" onchange="togglePassCrear()"> Contraseña
                     </label>
                 </div>
                 <div id="pass-crear-fila" style="display: none; margin: 0 0 10px; gap: 8px; align-items: center; width: 100%;">
-                    <input type="password" id="pass-crear" maxlength="64" placeholder="Contraseña de la sala" style="margin: 0; flex: 1; min-width: 0;">
+                    <input type="password" id="pass-crear" name="sala-clave" autocomplete="new-password" data-lpignore="true" maxlength="64" placeholder="Contraseña de la sala" style="margin: 0; flex: 1; min-width: 0;">
                     <label style="cursor: pointer; color: #94a3b8; font-size: 0.8rem; white-space: nowrap;">
                         <input type="checkbox" id="pass-crear-ver" onchange="verPassCrear()"> Mostrar
                     </label>
@@ -212,20 +232,20 @@
                     <button class="start-btn btn-create" style="margin-bottom: 0;" onclick="createOnlineRoom()">Crear partida</button>
                     <div style="color: #94a3b8; font-weight: bold;">- O -</div>
                     <div style="display: flex; width: 100%; gap: 10px;">
-                        <input type="text" id="room-code-input" placeholder="CÓDIGO (EJ: A4X9)" maxlength="4" style="text-transform: uppercase;">
+                        <input type="text" id="room-code-input" autocomplete="off" data-lpignore="true" placeholder="CÓDIGO (EJ: A4X9)" maxlength="4" style="text-transform: uppercase;">
                         <button class="start-btn btn-join" style="margin: 0; width: auto; padding: 12px 20px;" onclick="joinRoomByCode(null, false)">Unirse</button>
                         <button class="start-btn" style="background: #64748b; margin: 0; width: auto; padding: 12px 15px;" title="Espectar" onclick="joinRoomByCode(null, true)">👁️</button>
                     </div>
                 </div>
                 
                 <h3 style="margin-top: 20px; margin-bottom: 10px; color: #fbbf24; border-bottom: 1px solid #475569; padding-bottom: 5px;">Salas activas</h3>
-                <div id="rooms-list" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; border: 1px solid #334155; padding: 10px; border-radius: 5px; background: #0f172a;"></div>
+                <div id="rooms-list" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; border: 1px solid #334155; padding: 10px; border-radius: 5px; background: #0f172a;"></div>
             </div>
         </div>
 
         <div id="online-room-view" style="display: none; flex-direction: column; gap: 15px; text-align: left; height: 500px;">
             <div style="display: flex; justify-content: space-between; align-items: center; background: #0f172a; padding: 10px 20px; border-radius: 8px; border: 1px dashed #4ade80; height: 50px; box-sizing: border-box;">
-                <div style="display:flex; align-items:center; gap:10px; font-size: 1.2rem; color: #4ade80; font-weight: bold;">SALA: <span id="current-room-code" style="letter-spacing: 2px; font-size: 1.5rem; color: white;">----</span><button id="btn-candado-sala" title="Contraseña de la sala" onclick="abrirCandado(event)" style="display:none; background:#334155; color:#e2e8f0; border:none; border-radius:6px; padding:4px 10px 0; height:26px; line-height:1; align-items:center; justify-content:center; box-sizing:border-box; font-size:0.9rem; cursor:pointer;">🔓</button><button id="btn-copiar-sala" title="Copiar el enlace de la sala" onclick="copiarEnlaceSala()" style="background:#166534; color:#dcfce7; border:none; border-radius:6px; padding:4px 10px 0; height:26px; line-height:1; display:inline-flex; align-items:center; justify-content:center; box-sizing:border-box; font-size:0.78rem; cursor:pointer; white-space:nowrap;">🔗 Copiar enlace</button></div>
+                <div style="display:flex; align-items:center; gap:10px; font-size: 1.2rem; color: #4ade80; font-weight: bold;">SALA: <span id="current-room-code" style="letter-spacing: 2px; font-size: 1.5rem; color: white;">----</span><button id="btn-candado-sala" class="btn-cabecera-sala" title="Contraseña de la sala" onclick="abrirCandado(event)" style="display:none; background:#334155; color:#e2e8f0; border:none; border-radius:6px; padding:4px 10px 0; height:26px; line-height:1; align-items:center; justify-content:center; box-sizing:border-box; font-size:0.9rem; cursor:pointer;">🔓</button><button id="btn-copiar-sala" class="btn-cabecera-sala" title="Copiar el enlace de la sala" onclick="copiarEnlaceSala()" style="background:#166534; color:#dcfce7; border:none; border-radius:6px; padding:4px 10px 0; height:26px; line-height:1; display:inline-flex; align-items:center; justify-content:center; box-sizing:border-box; font-size:0.78rem; cursor:pointer; white-space:nowrap;">🔗 Copiar enlace</button></div>
                 <div id="grace-control" style="display:none; align-items:center; gap:4px;"></div>
                 <button class="back-btn" style="margin: 0; padding: 0; color: #f87171;" onclick="leaveRoomView()">Abandonar sala</button>
             </div>
@@ -235,7 +255,7 @@
                     <h3 style="margin-top: 0; color: #fbbf24;">💬 Chat privado</h3>
                     <div id="room-chat-box" class="chat-box"></div>
                     <div style="display: flex; gap: 5px;">
-                        <input type="text" id="room-chat-input" style="text-align:left;" placeholder="Escribe..." onkeypress="if(event.key==='Enter') sendRoomChat()">
+                        <input type="text" id="room-chat-input" autocomplete="off" data-lpignore="true" style="text-align:left;" placeholder="Escribe..." onkeypress="if(event.key==='Enter') sendRoomChat()">
                         <button class="start-btn" style="width: auto; padding: 10px 14px; margin: 0; font-size: 1rem;" onclick="sendRoomChat()">➤</button>
                     </div>
                 </div>
@@ -323,6 +343,7 @@
                 if (!localStorage.getItem('karlos_return_room')) {
                     document.getElementById('online-lobby-view').style.display = 'flex';
                 }
+                toggleEspectadores();
                 initSockets();
                 // Enlace directo: se entra en cuanto el socket esté listo. El guardián ya ha
                 // decidido antes que no hay partida en curso (si la hubiera, no llegamos aquí sin
@@ -678,17 +699,17 @@
                 // va a aplicar, y eso tiene que verse sin desplegar nada.
                 const luz = pisado ? ' <span style="color:#f87171;" title="Un escenario forzado anula estas opciones">●</span>'
                          : (nd ? ' <span style="color:#4ade80;">●</span>' : '');
-                return `<div id="${enFlotante ? 'tp-head-ovl' : 'tp-head'}" data-cab="opc" style="display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:34px; box-sizing:border-box; cursor:pointer; background:#0f172a; border:1px solid #475569; border-radius:8px; padding:6px 12px;"><span style="font-size:0.78rem; color:#fbbf24; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">⚙️ Opciones de prueba${luz}</span><span style="color:#94a3b8; font-size:0.9rem;">${open ? '▾' : '▸'}</span></div>`;
+                return `<div id="${enFlotante ? 'tp-head-ovl' : 'tp-head'}" data-cab="opc" style="display:flex; align-items:center; justify-content:space-between; gap:8px; height:34px; box-sizing:border-box; cursor:pointer; background:#0f172a; border:1px solid #475569; border-radius:8px; padding:6px 12px;"><span style="font-size:0.78rem; color:#fbbf24; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">⚙️ Opciones de prueba${luz}</span><span style="color:#94a3b8; font-size:0.9rem;">${open ? '▾' : '▸'}</span></div>`;
             }
             const est = estadoEscenario(testCfg.escenario);
             const luz = est.luz === 'ok' ? ' <span style="color:#4ade80;">●</span>'
                       : est.luz === 'malo' ? ` <span style="color:#f87171;" title="${(est.motivo || '').replace(/"/g, '&quot;')}">●</span>` : '';
             // El botón de Pegar vive en la CABECERA, no dentro: el caso normal es pegar y jugar,
             // sin desplegar nada. Por eso para el clic (si no, abriría y cerraría el panel).
-            return `<div id="${enFlotante ? 'sc-head-ovl' : 'sc-head'}" data-cab="esc" style="display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:34px; box-sizing:border-box; cursor:pointer; background:#0f172a; border:1px solid #475569; border-radius:8px; padding:6px 12px;">`
+            return `<div id="${enFlotante ? 'sc-head-ovl' : 'sc-head'}" data-cab="esc" style="display:flex; align-items:center; justify-content:space-between; gap:8px; height:34px; box-sizing:border-box; cursor:pointer; background:#0f172a; border:1px solid #475569; border-radius:8px; padding:6px 12px;">`
                 + `<span style="font-size:0.78rem; color:#c084fc; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">📋 Escenario${luz}</span>`
                 + `<span style="display:flex; align-items:center; gap:8px;">`
-                + `<button id="${enFlotante ? 'sc-paste-ovl' : 'sc-paste'}" data-pegar="1" title="Pegar el escenario del portapapeles" style="background:#7c3aed; color:#fff; border:none; border-radius:6px; padding:0 10px; height:24px; line-height:1; display:inline-flex; align-items:center; justify-content:center; box-sizing:border-box; font-size:0.8rem; cursor:pointer; white-space:nowrap;">Pegar</button>`
+                + `<button id="${enFlotante ? 'sc-paste-ovl' : 'sc-paste'}" data-pegar="1" title="Pegar el escenario del portapapeles" style="background:#7c3aed; color:#fff; border:none; border-radius:6px; padding:0 10px; height:22px; line-height:1; display:inline-flex; align-items:center; justify-content:center; box-sizing:border-box; font-size:0.8rem; cursor:pointer; white-space:nowrap;">Pegar</button>`
                 + `<span style="color:#94a3b8; font-size:0.9rem;">${open ? '▾' : '▸'}</span></span></div>`;;
         }
         function cuerpoOpciones() {
@@ -1067,6 +1088,20 @@
                 password: pass
             }); 
         }
+        // "Omnisciente" no se entiende si no lo sabes ya, y encima seguía tocándose con los
+        // espectadores desactivados, que es una opción sobre gente que no va a entrar. Ahora se
+        // lee como continuación de la casilla anterior, y se apaga con ella.
+        function toggleEspectadores() {
+            const on = document.getElementById('allow-spec-check').checked;
+            const omni = document.getElementById('omni-check');
+            const lbl = document.getElementById('lbl-omni');
+            omni.disabled = !on;
+            lbl.style.opacity = on ? '1' : '0.4';
+            lbl.style.cursor = on ? 'pointer' : 'default';
+            lbl.title = on ? 'Quien mire verá también las manos de los dos jugadores'
+                           : 'No hay espectadores a los que enseñarles nada';
+        }
+
         function togglePassCrear() {
             const on = document.getElementById('pass-check').checked;
             document.getElementById('pass-crear-fila').style.display = on ? 'flex' : 'none';
