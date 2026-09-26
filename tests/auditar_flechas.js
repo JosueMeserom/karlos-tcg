@@ -176,8 +176,57 @@ if (malas.length) {
     malas.forEach(f => console.log(`   · ${f.nombre}: ${f.incoherente}`));
 }
 
+// ── EL "O BIEN" TIENE DOS PUERTAS, Y LAS DOS NECESITAN FLECHA ───────────────────────────
+// El agujero que se coló (Toto, 26-sep-2026): una carta con `alternativas` tiene DOS caminos de
+// entrada, y a esta auditoría le bastaba con que UNO estuviera marcado. Como la rama que cobra
+// declara `esCoste`, la carta salía en la lista de buenas mientras la rama GRATIS -la que se
+// cumple con una carta del campo- no dibujaba nada. Maxi-tigre entraba gratis por su Mini-tigre y
+// no salía ninguna flecha; Karlos (KL) llevaba igual desde que se escribió.
+//
+// Se comprueba contra la DECLARACIÓN (el fuente), no contra lo compilado: después de compilar las
+// `alternativas` ya no existen, así que la única forma de saber cuántas ramas gratuitas había es
+// mirar cómo se escribió la carta.
+const ramasSinFlecha = [];
+for (const m of SRC.matchAll(/alternativas: \[/g)) {
+    // Los ejemplos del comentario del compilador no son cartas: si se cuentan, el último bicho
+    // declarado del fichero aparece acusado de algo que no ha hecho.
+    const inicioLinea = SRC.lastIndexOf('\n', m.index) + 1;
+    if (/^\s*\/\//.test(SRC.slice(inicioLinea, m.index))) continue;
+    // El nombre de la carta: la declaración más cercana hacia atrás.
+    const antes = SRC.slice(0, m.index);
+    const nom = [...antes.matchAll(/\n\s+(?:id: \d+, )?name: "([^"]+)"/g)].pop();
+    if (!nom) continue;
+    const nombre = nom[1];
+    // El bloque de alternativas, hasta que se cierran los corchetes.
+    let i = m.index + m[0].length, prof = 1, fin = i;
+    while (i < SRC.length && prof > 0) {
+        const ch = SRC[i];
+        if (ch === '[') prof++;
+        else if (ch === ']') { prof--; if (!prof) fin = i; }
+        i++;
+    }
+    const bloque = SRC.slice(m.index, fin);
+    const gratuitas = (bloque.match(/\brequisito:/g) || []).length;
+    if (!gratuitas) continue;
+    const c = CARD_DB.filter(Boolean).find(x => x.name === nombre);
+    const jugar = c && (c.abilities || []).find(a => a.trigger === 'JUGAR');
+    const marcadas = (jugar && jugar.requisitoVisible) ? jugar.requisitoVisible.length : 0;
+    if (marcadas < gratuitas) {
+        ramasSinFlecha.push(`${nombre}: ${gratuitas} rama(s) de entrada gratuita y solo ${marcadas} con flecha`);
+    }
+}
+if (ramasSinFlecha.length) {
+    console.log('\n## RAMAS "O BIEN" SIN FLECHA (' + ramasSinFlecha.length + ')');
+    ramasSinFlecha.forEach(t => console.log('   · ' + t));
+}
+
 console.log(`\nTOTAL: ${filas.length} cartas · ${conFlecha.length} con flecha · ${noProcede.length} no procede · ${sinFlecha.length} POR DECIDIR`);
 if (malas.length) { console.log('\nHAY MARCAJES INCOHERENTES.'); process.exit(1); }
+if (ramasSinFlecha.length) {
+    console.log('\nUNA RAMA GRATUITA DE "o bien" TAMBIÉN LLEVA FLECHA: el compilador la saca sola de');
+    console.log('`alternativas`, así que si esto falla es que se ha tocado _expandirCosteColocacion.');
+    process.exit(1);
+}
 // DEJA DE SER INFORMATIVA (Toto, 27-ago-2026): "eso es muy importante que lo haga cada carta con
 // Requisito o Coste, a menos que decidamos en algún caso concreto que no". O sea: la flecha es la
 // NORMA y la excepción hay que declararla arriba, en NO_PROCEDE, con su motivo. Una carta nueva

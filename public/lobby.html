@@ -254,7 +254,7 @@
         <div id="online-room-view" style="display: none; flex-direction: column; gap: 15px; text-align: left; height: 500px;">
             <div style="display: flex; justify-content: space-between; align-items: center; background: #0f172a; padding: 10px 20px; border-radius: 8px; border: 1px dashed #4ade80; height: 50px; box-sizing: border-box;">
                 <div style="display:flex; align-items:center; gap:10px; font-size: 1.2rem; color: #4ade80; font-weight: bold;">SALA: <span id="current-room-code" style="letter-spacing: 2px; font-size: 1.5rem; color: white;">----</span><button id="btn-candado-sala" class="btn-cabecera-sala" title="Contraseña de la sala" onclick="abrirCandado(event)" style="display:none; background:#334155; color:#e2e8f0; border:none; border-radius:6px; padding:4px 10px 0; height:26px; line-height:1; align-items:center; justify-content:center; box-sizing:border-box; font-size:0.9rem; cursor:pointer;">🔓</button><button id="btn-copiar-sala" class="btn-cabecera-sala" title="Copiar el enlace de la sala" onclick="copiarEnlaceSala()" style="background:#166534; color:#dcfce7; border:none; border-radius:6px; padding:4px 10px 0; height:26px; line-height:1; display:inline-flex; align-items:center; justify-content:center; box-sizing:border-box; font-size:0.78rem; cursor:pointer; white-space:nowrap;">🔗 Copiar enlace</button></div>
-                <div id="grace-control" style="display:none; align-items:center; gap:4px;"></div>
+                <div id="grace-control" class="btn-cabecera-sala" style="display:none; align-items:center; gap:4px;"></div>
                 <button class="back-btn" style="margin: 0; padding: 0; color: #f87171;" onclick="leaveRoomView()">Abandonar sala</button>
             </div>
             

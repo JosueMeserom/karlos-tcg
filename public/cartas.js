@@ -10817,6 +10817,7 @@ const DSL = {
             // Y la cadena: un `if` por alternativa, en orden. El `si` de cada rama es la condición
             // de ESA alternativa, y su efecto es no hacer nada (gratis) o el tributo de siempre.
             const efectos = [];
+            const _reqVisibles = [];
             _alts.forEach((a, i) => {
                 const previas = _alts.slice(0, i);
                 const _noPrevias = previas.map(pv => ({ no: true, count: { quien: 'ALIADO', algunFiltro: _filtrosDe(pv) }, op: '>=', valor: 1 }));
@@ -10824,6 +10825,13 @@ const DSL = {
                 const cond = _noPrevias.length ? _noPrevias.concat([_mia]) : _mia;
                 if (a.requisito) {
                     if (a.log) efectos.push({ op: 'FLOTANTE', if: cond, target: { quien: 'SELF' }, texto: '', log: a.log, logTipo: a.logTipo || 'ability' });
+                    // LA FLECHA DE LA RAMA GRATIS (Toto, 26-sep-2026). No se cobra nada, pero SÍ
+                    // hay una carta concreta que hace legal la jugada, y la norma es que se vea
+                    // (§0.ter). Se declara como `requisitoVisible`, que es el mecanismo que ya
+                    // existía para esto: marca solo si el pool resuelve, así que cuando esta rama
+                    // no aplica -y se paga el tributo- no dibuja nada y manda la flecha del coste.
+                    // `uno`: basta una carta para cumplirlo; no se llena el tablero de flechas.
+                    _reqVisibles.push({ quien: 'ALIADO', algunFiltro: _filtrosDe(a), uno: true });
                     return;   // gratis: no hay nada que cobrar
                 }
                 const filtros = [{ campo: 'furor', op: '>=', valor: a.furor || 0 }].concat(a.filtros || []);
@@ -10837,6 +10845,12 @@ const DSL = {
             const antes0 = abs.find(a => a.trigger === 'ANTES_DE_JUGAR');
             if (antes0) (antes0.efectos = antes0.efectos || []).unshift(...efectos);
             else abs.push({ trigger: 'ANTES_DE_JUGAR', efectos });
+
+            if (_reqVisibles.length) {
+                const jugarR = abs.find(a => a.trigger === 'JUGAR');
+                if (jugarR) jugarR.requisitoVisible = (jugarR.requisitoVisible || []).concat(_reqVisibles);
+                else abs.push({ trigger: 'JUGAR', requisitoVisible: _reqVisibles });
+            }
 
             tmpl.abilities = abs.filter(a => a.trigger !== 'COSTE_COLOCACION');
             return;
