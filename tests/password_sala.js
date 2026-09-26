@@ -46,6 +46,14 @@ console.log('\n--- El lobby ---');
 check('las tres opciones caben en una línea', /id="pass-check"/.test(lobby) && /flex-wrap: wrap; justify-content: center/.test(lobby));
 check('el campo no existe hasta marcar la casilla', /id="pass-crear-fila" style="display: none/.test(lobby) && /function togglePassCrear/.test(lobby));
 check('...con su "Mostrar"', /id="pass-crear-ver"/.test(lobby) && /function verPassCrear/.test(lobby));
+// El campo NO puede ser type="password": ese tipo es lo que despierta al gestor de contraseñas,
+// que se despliega encima, ofrece guardarla y autorrellena medio lobby. Los puntitos, por CSS.
+check('el campo no se declara como credencial',
+    /<input type="text" id="pass-crear"/.test(lobby)
+    && /#pass-crear \{[^}]*-webkit-text-security: disc/.test(lobby)
+    && /#pass-crear\.visible \{ -webkit-text-security: none/.test(lobby));
+check('...y el gestor no lo autorrellena al cargar',
+    /readonly onfocus="this\.removeAttribute\('readonly'\)"/.test(lobby) && /data-1p-ignore/.test(lobby));
 check('marcar la casilla y dejarla vacía se avisa', /Has marcado Contraseña pero la has dejado vacía/.test(lobby));
 check('las salas con contraseña se ven con candado en la lista', /r\.conPassword \? '<span title="Necesita contraseña"/.test(lobby));
 check('y la sala tiene su candado en la cabecera', /id="btn-candado-sala"/.test(lobby) && /function pintarCandado/.test(lobby));

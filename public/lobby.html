@@ -59,7 +59,15 @@
         }
         /* La contraseña, más baja que un campo normal y alineada a la izquierda: va en una fila
            compartida y con el centrado heredado parecía otra cosa. */
-        #pass-crear { padding: 6px 10px; font-size: 0.85rem; text-align: left; }
+        /* NO es un `type="password"` a propósito: ese tipo es lo que hace que el gestor de
+           contraseñas del navegador se despliegue encima, ofrezca guardarla y autorrellene medio
+           lobby. Los puntitos los pinta el CSS, que da exactamente el mismo aspecto sin declarar
+           "aquí hay una credencial". El `readonly` que se quita al enfocar remata la faena: sin
+           él, algunos gestores autorrellenan igual al cargar la página.
+           `text-security` la entienden Chrome, Edge, Safari y Firefox desde la 119. */
+        #pass-crear { padding: 6px 10px; font-size: 0.85rem; text-align: left;
+                      -webkit-text-security: disc; text-security: disc; }
+        #pass-crear.visible { -webkit-text-security: none; text-security: none; }
         
         /* BOTONES ORIGINALES INTACTOS */
         .start-btn {
@@ -223,7 +231,7 @@
                     </label>
                 </div>
                 <div id="pass-crear-fila" style="display: none; margin: 0 0 10px; gap: 8px; align-items: center; width: 100%;">
-                    <input type="password" id="pass-crear" name="sala-clave" autocomplete="new-password" data-lpignore="true" maxlength="64" placeholder="Contraseña de la sala" style="margin: 0; flex: 1; min-width: 0;">
+                    <input type="text" id="pass-crear" name="sala-clave" autocomplete="off" data-lpignore="true" data-1p-ignore data-bwignore data-form-type="other" readonly onfocus="this.removeAttribute('readonly')" maxlength="64" placeholder="Contraseña de la sala" style="margin: 0; flex: 1; min-width: 0;">
                     <label style="cursor: pointer; color: #94a3b8; font-size: 0.8rem; white-space: nowrap;">
                         <input type="checkbox" id="pass-crear-ver" onchange="verPassCrear()"> Mostrar
                     </label>
@@ -1110,7 +1118,7 @@
         }
         function verPassCrear() {
             const c = document.getElementById('pass-crear-ver').checked;
-            document.getElementById('pass-crear').type = c ? 'text' : 'password';
+            document.getElementById('pass-crear').classList.toggle('visible', c);
         }
 
         // ── ENLACE DIRECTO A LA SALA ──────────────────────────────────────────────────────
