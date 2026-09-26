@@ -62,6 +62,28 @@ app.use(sessionMiddleware);
 io.engine.use((req, res, next) => {
     try { sessionMiddleware(req, res, next); } catch (e) { console.error('[sesión socket]', e); next(); }
 });
+// QUIÉN ERES (Toto, 26-sep-2026). Hasta ahora la identidad en una sala era EL NICK: el
+// re-enganche comparaba `pl.name === username`, o sea que tu asiento era de quien escribiera tu
+// nombre. Se aguantaba porque la sala era abierta y entre amigos; con contraseñas y expulsiones
+// ya no. Y desde que la sesión viaja con el socket no hace falta: un usuario registrado tiene
+// identidad de verdad.
+//   · Registrado -> `uid` estable ("u:7"), y el NOMBRE lo pone el servidor, no el cliente: así
+//     nadie se presenta con el nick de otro.
+//   · Invitado    -> sin uid; se sigue reconociendo por el nick, que es lo único que hay.
+function identidad(socket, nombrePedido) {
+    let sesion = null;
+    try { sesion = socket.request && socket.request.session; } catch (e) { sesion = null; }
+    if (sesion && sesion.userId) return { uid: 'u:' + sesion.userId, nombre: sesion.username || nombrePedido || 'Jugador' };
+    return { uid: null, nombre: nombrePedido || 'Invitado' };
+}
+// ¿Este asiento (o espectador) es de quien pregunta? Con uid manda el uid, y punto: un asiento de
+// usuario registrado NO se recupera escribiendo su nombre. Sin uid por ambas partes, el nick.
+function esSuyo(ocupante, yo) {
+    if (!ocupante) return false;
+    if (ocupante.uid || yo.uid) return !!ocupante.uid && ocupante.uid === yo.uid;
+    return ocupante.name === yo.nombre;
+}
+
 function esAdminDelSocket(socket) {
     try { return !!(socket.request && socket.request.session && socket.request.session.isAdmin); }
     catch (e) { return false; }
@@ -571,15 +593,16 @@ io.on('connection', (socket) => {
     });
 
     socket.on('createRoom', (data) => {
+        const _yo = identidad(socket, data.username);
         const roomCode = Math.random().toString(36).substring(2, 6).toUpperCase();
         rooms[roomCode] = {
-            host: data.username || 'Invitado',
+            host: _yo.nombre,
             leader: 'p1',
             graceMs: 60000,
             testConfig: { fastStart: false, startingPlayer: 'random', forcedHands: { p1: [], p2: [] }, escenario: '' },
             allowSpectators: data.allowSpectators !== undefined ? data.allowSpectators : true, 
             omniscient: data.omniscient !== undefined ? data.omniscient : true, 
-            players: { p1: { id: socket.id, name: data.username || 'Jugador 1', ready: false, deck: null, connected: true, setupComplete: false, inIndexHtml: false, exhausted: false, graceUntil: null }, p2: null },
+            players: { p1: { id: socket.id, uid: _yo.uid, name: _yo.nombre, ready: false, deck: null, connected: true, setupComplete: false, inIndexHtml: false, exhausted: false, graceUntil: null }, p2: null },
             spectators: [],
             status: 'waiting',
             seqByRole: { p1: 0, p2: 0 },
@@ -600,12 +623,13 @@ io.on('connection', (socket) => {
         if (!socket.rooms.has(roomCode) && !passwordCorrecta(roomCode, data.password)) {
             return socket.emit('roomLocked', { code: roomCode, fallo: data.password !== undefined && data.password !== null });
         }
-        const username = data.username || 'Invitado';
+        const _yo = identidad(socket, data.username);
+        const username = _yo.nombre;
 
         // Re-enganche: si ya tenías asiento en esta sala (p. ej. volviendo del cartel de fin), lo recuperas
         for (const st of ['p1', 'p2']) {
             const pl = room.players[st];
-            if (pl && pl.name === username) {
+            if (esSuyo(pl, _yo)) {
                 // Volvías a un asiento que te estaba esperando: se dice. Antes el asiento se
                 // recuperaba en silencio y desde fuera no había forma de saber qué había pasado.
                 const _reservado = !pl.connected;
@@ -628,7 +652,7 @@ io.on('connection', (socket) => {
             // En salas terminadas, el espectador se redirige a index.html y se da de alta en rejoinGame;
             // NO lo añadimos aquí para evitar el alta-baja-alta (pestañeo).
             if (room.status !== 'finished') {
-                room.spectators.push({ id: socket.id, name: username, inIndexHtml: false });
+                room.spectators.push({ id: socket.id, uid: _yo.uid, name: username, inIndexHtml: false });
             }
             socket.join(roomCode);
             socket.emit('roomJoined', { roomCode, role: 'spectator', roomData: room });
@@ -641,7 +665,7 @@ io.on('connection', (socket) => {
 
         // Asiento LIBRE, no siempre p2: si el anfitrión ocupa p2, el que entra va a p1 (antes se sobrescribía p2)
         const seatLibre = !room.players.p1 ? 'p1' : 'p2';
-        room.players[seatLibre] = { id: socket.id, name: username, ready: false, deck: null, connected: true, setupComplete: false, inIndexHtml: false, exhausted: false, graceUntil: null };
+        room.players[seatLibre] = { id: socket.id, uid: _yo.uid, name: username, ready: false, deck: null, connected: true, setupComplete: false, inIndexHtml: false, exhausted: false, graceUntil: null };
         room.status = 'waiting';
         socket.join(roomCode);
         socket.emit('roomJoined', { roomCode, role: seatLibre, roomData: room });
@@ -651,7 +675,9 @@ io.on('connection', (socket) => {
         broadcastRoomList();
     });
 
-    socket.on('roomChat', (data) => roomMsg(data.roomCode, { username: data.username, msg: data.msg }));
+    // El nombre lo pone el SERVIDOR si estás registrado: si no, cualquiera puede hablar en el chat
+    // de la sala con el nick de otro sin más que cambiarlo en su navegador.
+    socket.on('roomChat', (data) => roomMsg(data.roomCode, { username: identidad(socket, data.username).nombre, msg: data.msg }));
     socket.on('getRoomChat', (data) => { const r = rooms[data.roomCode]; socket.emit('roomChatHistory', (r && r.chat) || []); });
 
     // El líder (anfitrión) ajusta la config de pruebas; se guarda en la sala y se reparte a todos.
@@ -817,16 +843,17 @@ io.on('connection', (socket) => {
         clearCloseTimer(data.roomCode);
         socket.join(data.roomCode);
         let role = null;
-        if (room.players.p1 && room.players.p1.name === data.username) role = 'p1';
-        else if (room.players.p2 && room.players.p2.name === data.username) role = 'p2';
+        const _yo = identidad(socket, data.username);
+        if (esSuyo(room.players.p1, _yo)) role = 'p1';
+        else if (esSuyo(room.players.p2, _yo)) role = 'p2';
         if (role) {
             clearSeatRelease(data.roomCode, role);
             room.players[role].id = socket.id;
             room.players[role].connected = true;
             room.players[role].inIndexHtml = false; // está en la sala (lobby), no en el cartel
         } else {
-            const sp = room.spectators.find(s => s.name === data.username);
-            if (sp) sp.id = socket.id; else room.spectators.push({ id: socket.id, name: data.username });
+            const sp = room.spectators.find(x => esSuyo(x, _yo));
+            if (sp) sp.id = socket.id; else room.spectators.push({ id: socket.id, uid: _yo.uid, name: _yo.nombre });
             role = 'spectator';
         }
         socket.emit('returnedToFinishedRoom', { role: role, roomCode: data.roomCode, roomData: room });
@@ -840,13 +867,14 @@ io.on('connection', (socket) => {
         if (!room) return;
         socket.leave(data.roomCode);
         let seat = null;
-        if (room.players.p1 && (room.players.p1.id === socket.id || room.players.p1.name === data.username)) seat = 'p1';
-        else if (room.players.p2 && (room.players.p2.id === socket.id || room.players.p2.name === data.username)) seat = 'p2';
+        const _yo = identidad(socket, data.username);
+        if (room.players.p1 && (room.players.p1.id === socket.id || esSuyo(room.players.p1, _yo))) seat = 'p1';
+        else if (room.players.p2 && (room.players.p2.id === socket.id || esSuyo(room.players.p2, _yo))) seat = 'p2';
         if (seat) {
             roomMsg(data.roomCode, { username: 'Sistema', msg: `🚪 ${room.players[seat].name} ha dejado su asiento.` });
             freeSeat(data.roomCode, seat); // libera el asiento; la sala se cierra solo si ambos quedan vacíos
         } else {
-            const sIdx = room.spectators.findIndex(s => s.id === socket.id || s.name === data.username);
+            const sIdx = room.spectators.findIndex(x => x.id === socket.id || esSuyo(x, _yo));
             if (sIdx !== -1) room.spectators.splice(sIdx, 1);
             io.to(data.roomCode).emit('roomUpdate', room);
             broadcastRoomList();
@@ -879,10 +907,11 @@ io.on('connection', (socket) => {
             return;
         }
         // Caso B: espectador -> asiento
-        const spIdx = room.spectators.findIndex(s => s.id === socket.id || s.name === data.username);
-        const name = data.username || (spIdx !== -1 ? room.spectators[spIdx].name : 'Jugador');
+        const _yo = identidad(socket, data.username);
+        const spIdx = room.spectators.findIndex(x => x.id === socket.id || esSuyo(x, _yo));
+        const name = _yo.nombre || (spIdx !== -1 ? room.spectators[spIdx].name : 'Jugador');
         if (spIdx !== -1) room.spectators.splice(spIdx, 1);
-        room.players[seat] = { id: socket.id, name: name, ready: false, deck: null, connected: true, setupComplete: false, inIndexHtml: false, exhausted: false, graceUntil: null };
+        room.players[seat] = { id: socket.id, uid: _yo.uid, name: name, ready: false, deck: null, connected: true, setupComplete: false, inIndexHtml: false, exhausted: false, graceUntil: null };
         if (!room.players[room.leader]) room.leader = seat; // por si el asiento del líder había quedado vacío
         socket.emit('seatOccupied', { role: seat, roomCode: data.roomCode, roomData: room });
         roomMsg(data.roomCode, { username: 'Sistema', msg: `🪑 ${name} ocupó el asiento de ${seat === 'p1' ? 'Jugador 1' : 'Jugador 2'}.` });
@@ -900,7 +929,8 @@ io.on('connection', (socket) => {
         else if (room.players.p2 && room.players.p2.id === socket.id) seat = 'p2';
         if (!seat) return;
         const name = room.players[seat].name;
-        if (!room.spectators.some(s => s.id === socket.id)) room.spectators.push({ id: socket.id, name: name, inIndexHtml: false });
+        const _uid = room.players[seat].uid || null;   // el mismo de quien deja el asiento
+        if (!room.spectators.some(x => x.id === socket.id)) room.spectators.push({ id: socket.id, uid: _uid, name: name, inIndexHtml: false });
         socket.emit('becameSpectator', { roomCode: data.roomCode });
         roomMsg(data.roomCode, { username: 'Sistema', msg: `👁️ ${name} se pasó a espectador.` });
         freeSeat(data.roomCode, seat); // libera el asiento (traspasa liderazgo / cierra si ambos quedan vacíos)
@@ -970,8 +1000,9 @@ io.on('connection', (socket) => {
                 if (data.role === 'p1' && room.players.p1) { room.players.p1.id = socket.id; room.players.p1.connected = true; room.players.p1.inIndexHtml = true; }
                 if (data.role === 'p2' && room.players.p2) { room.players.p2.id = socket.id; room.players.p2.connected = true; room.players.p2.inIndexHtml = true; }
                 if (data.role === 'spectator') {
-                    const sp = room.spectators.find(s => s.name === data.username);
-                    if (sp) { sp.id = socket.id; sp.inIndexHtml = true; } else room.spectators.push({ id: socket.id, name: data.username, inIndexHtml: true });
+                    const _yo = identidad(socket, data.username);
+                    const sp = room.spectators.find(x => esSuyo(x, _yo));
+                    if (sp) { sp.id = socket.id; sp.inIndexHtml = true; } else room.spectators.push({ id: socket.id, uid: _yo.uid, name: _yo.nombre, inIndexHtml: true });
                 }
                 socket.emit('gameFinished', {
                     winnerRole: room.winner ? room.winner.role : null,
@@ -1016,9 +1047,10 @@ io.on('connection', (socket) => {
                 if (wasInGrace) io.to(data.roomCode).emit('playerReconnected', { seat: 'p2', name: room.players.p2.name });
             }
             if (data.role === 'spectator') {
-                const spec = room.spectators.find(s => s.name === data.username);
+                const _yoE = identidad(socket, data.username);
+                const spec = room.spectators.find(x => esSuyo(x, _yoE));
                 if (spec) { spec.id = socket.id; spec.inIndexHtml = true; }
-                else room.spectators.push({ id: socket.id, name: data.username, inIndexHtml: true });
+                else room.spectators.push({ id: socket.id, uid: _yoE.uid, name: _yoE.nombre, inIndexHtml: true });
                 // Distinguimos la primera entrada al tablero de una reconexión real.
                 if (!room.spectatorsSeen) room.spectatorsSeen = [];
                 if (room.spectatorsSeen.includes(data.username)) {
@@ -1067,7 +1099,8 @@ io.on('connection', (socket) => {
         if (room) {
             // 1. Comprobamos si el que abandona es solo un espectador por su rol
             if (data.role === 'spectator') {
-                const specIndex = room.spectators.findIndex(s => s.name === data.username);
+                const _yoS = identidad(socket, data.username);
+                const specIndex = room.spectators.findIndex(x => x.id === socket.id || esSuyo(x, _yoS));
                 if (specIndex !== -1) room.spectators.splice(specIndex, 1);
                 
                 io.to(data.roomCode).emit('roomUpdate', room);
@@ -1078,8 +1111,9 @@ io.on('connection', (socket) => {
             }
             
             // 2. Es un jugador. Resolvemos según el estado del rival.
-            const me = (room.players.p1 && (room.players.p1.id === socket.id || room.players.p1.name === data.username)) ? 'p1' :
-                       (room.players.p2 && (room.players.p2.id === socket.id || room.players.p2.name === data.username)) ? 'p2' : null;
+            const _yo = identidad(socket, data.username);
+            const me = (room.players.p1 && (room.players.p1.id === socket.id || esSuyo(room.players.p1, _yo))) ? 'p1' :
+                       (room.players.p2 && (room.players.p2.id === socket.id || esSuyo(room.players.p2, _yo))) ? 'p2' : null;
             if (!me) { broadcastRoomList(); return; }
             const other = me === 'p1' ? 'p2' : 'p1';
             const op = room.players[other];
