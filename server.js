@@ -360,9 +360,15 @@ const seatReleaseTimers = {}; // clave: `${roomCode}:${seat}` -> Timeout (margen
 function clearSeatRelease(roomCode, seat) {
     const k = `${roomCode}:${seat}`;
     if (seatReleaseTimers[k]) { clearTimeout(seatReleaseTimers[k]); delete seatReleaseTimers[k]; }
+    const _r = rooms[roomCode];
+    if (_r && _r.players[seat]) _r.players[seat].reservadoHasta = null;
 }
 function scheduleSeatRelease(roomCode, seat, ms) {
     clearSeatRelease(roomCode, seat);
+    // La cuenta atrás se publica: sin ella, desde fuera un asiento reservado y uno ocupado se ven
+    // igual, que es justo lo que desconcertaba.
+    const _r = rooms[roomCode];
+    if (_r && _r.players[seat]) _r.players[seat].reservadoHasta = Date.now() + ms;
     seatReleaseTimers[`${roomCode}:${seat}`] = setTimeout(() => {
         const room = rooms[roomCode];
         if (room && room.players[seat] && !room.players[seat].connected) freeSeat(roomCode, seat);
@@ -413,6 +419,33 @@ function freeSeat(roomCode, seat) {
 
 // ===== PASO C: REVANCHA — reaprovechar una sala terminada para una partida nueva (sin recrearla) =====
 
+// ¿QUIÉN HAY EN LA SALA? (Toto, 26-sep-2026)
+//
+// Convivían TRES ideas de "estar dentro" y nadie las reconciliaba: el asiento asignado
+// (`players[seat] != null`), el socket vivo que lo reclama (`pl.connected`) y estar recibiendo lo
+// que pasa dentro (`socket.rooms`). La lista de salas publicaba la primera, que es el MUEBLE, y
+// se leía como la tercera, que es la PERSONA: por eso una sala vacía se anunciaba como 1/2
+// mientras un asiento esperaba a su dueño.
+//
+// Esto es el punto único de consulta. Quien quiera saber quién hay pregunta aquí y no vuelve a
+// contar por su cuenta, que es como dos sitios acaban diciendo cosas distintas.
+//   · presente  - hay alguien con un socket vivo en ese asiento.
+//   · reservado - el asiento espera a su dueño (se fue hace poco); se libera solo.
+//   · agotado   - su dueño no volvió a tiempo; ya no espera a nadie.
+function presencia(room) {
+    const r = { sentados: 0, presentes: 0, reservados: 0, agotados: 0,
+                espectadores: (room.spectators || []).length, asientos: {} };
+    for (const st of ['p1', 'p2']) {
+        const pl = room.players[st];
+        if (!pl) { r.asientos[st] = 'libre'; continue; }
+        r.sentados++;
+        if (pl.connected) { r.presentes++; r.asientos[st] = 'presente'; }
+        else if (pl.exhausted) { r.agotados++; r.asientos[st] = 'agotado'; }
+        else { r.reservados++; r.asientos[st] = 'reservado'; }
+    }
+    return r;
+}
+
 // CONTRASEÑAS DE SALA. El hash vive AQUÍ y no dentro de `room` a propósito: el objeto de la sala
 // se emite entero a los clientes en varios sitios (roomJoined, roomUpdate...), así que cualquier
 // cosa metida ahí acaba en el navegador de todos. Lo único que sale de aquí es un booleano.
@@ -437,7 +470,12 @@ function broadcastRoomList() {
         code: code,
         host: rooms[code].host,
         status: rooms[code].status, 
+        // `playersCount` se queda: es el que decide si CABE alguien (hay asiento libre). Lo que
+        // se ENSEÑA es la presencia, que es otra cosa.
         playersCount: (rooms[code].players.p1 ? 1 : 0) + (rooms[code].players.p2 ? 1 : 0),
+        presentes: presencia(rooms[code]).presentes,
+        reservados: presencia(rooms[code]).reservados,
+        agotados: presencia(rooms[code]).agotados,
         spectatorsCount: rooms[code].spectators.length,
         conPassword: !!roomPass[code]
     }));
@@ -568,8 +606,14 @@ io.on('connection', (socket) => {
         for (const st of ['p1', 'p2']) {
             const pl = room.players[st];
             if (pl && pl.name === username) {
-                pl.id = socket.id; pl.connected = true; pl.inIndexHtml = false;
+                // Volvías a un asiento que te estaba esperando: se dice. Antes el asiento se
+                // recuperaba en silencio y desde fuera no había forma de saber qué había pasado.
+                const _reservado = !pl.connected;
+                clearSeatRelease(roomCode, st);
+                clearGraceTimer(roomCode, st);
+                pl.id = socket.id; pl.connected = true; pl.inIndexHtml = false; pl.reservadoHasta = null;
                 socket.join(roomCode);
+                if (_reservado) roomMsg(roomCode, { username: 'Sistema', msg: `🪑 ${pl.name} recupera su asiento.` });
                 socket.emit('roomJoined', { roomCode: roomCode, role: st, roomData: room });
                 socket.emit('roomChatHistory', room.chat || []);
                 io.to(roomCode).emit('roomUpdate', room);

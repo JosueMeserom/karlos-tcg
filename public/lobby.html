@@ -437,7 +437,7 @@
                     const adminBtn = isAdmin ? `<button class="btn-spectate" style="background:#ef4444;" title="Forzar Cierre" onclick="adminCloseRoom('${r.code}')">🗑️</button>` : '';
 
                     div.innerHTML = `
-                        <span style="color: white; font-weight:bold; font-size:0.9rem;">${r.conPassword ? '<span title="Necesita contraseña" style="margin-right:4px;">🔒</span>' : ''}${r.host} <span style="color:#fbbf24; font-size:0.8rem; font-weight:normal;">(${r.playersCount}/2)</span></span>
+                        <span style="color: white; font-weight:bold; font-size:0.9rem;">${r.conPassword ? '<span title="Necesita contraseña" style="margin-right:4px;">🔒</span>' : ''}${r.host} <span style="color:#fbbf24; font-size:0.8rem; font-weight:normal;" title="Gente dentro ahora mismo">(${r.presentes !== undefined ? r.presentes : r.playersCount}/2)</span>${r.reservados ? `<span style="color:#94a3b8; font-size:0.75rem; font-weight:normal;" title="Asiento guardado para alguien que acaba de salir; se libera solo"> · ${r.reservados} reservado${r.reservados > 1 ? 's' : ''}</span>` : ''}${r.agotados ? `<span style="color:#64748b; font-size:0.75rem; font-weight:normal;" title="Su ocupante no volvió a tiempo"> · ${r.agotados} agotado${r.agotados > 1 ? 's' : ''}</span>` : ''}</span>
                         <div style="display:flex; gap:5px;">
                             ${r.status === 'waiting' && r.playersCount < 2 ? `<button class="btn-spectate" style="background:#10b981;" onclick="joinRoomByCode('${r.code}', false)">Unirse</button>` : ''}
                             <button class="btn-spectate" title="Espectar" onclick="joinRoomByCode('${r.code}', true)">👁️</button>
@@ -563,6 +563,7 @@
         const DEFAULT_TEST_CONFIG = { fastStart: false, startingPlayer: 'random', forcedHands: { p1: [], p2: [] }, escenario: '' };
         let testCfg = loadTestCfg();
         let _tpLastRoom = null;
+        let _tickReserva = null;
 
         function loadTestCfg() {
             try {
@@ -930,6 +931,10 @@
             const finished = (room.status === 'finished');
             const winRole = (finished && room.winner) ? room.winner.role : null;
             const fStatus = (pl) => {
+                if (pl && !pl.connected && pl.reservadoHasta) {
+                    const seg = Math.max(0, Math.ceil((pl.reservadoHasta - Date.now()) / 1000));
+                    return { txt: `🪑 Asiento reservado (${seg}s)`, col: '#fbbf24' };
+                }
                 if (!pl || !pl.connected) return { txt: '⚪ Fuera de la sala', col: '#64748b' };
                 if (pl.inIndexHtml) return { txt: '🏆 Viendo resultados', col: '#22c55e' };
                 return { txt: '🟡 En la sala', col: '#f59e0b' };
@@ -962,7 +967,11 @@
                 const crown = (winRole === seat) ? ' 👑' : ((!finished && room.leader === seat) ? ' 👑' : '');
                 nameEl.innerText = pl.name + crown;
                 nameEl.title = pl.name;   // el nombre se recorta a 130px con puntos suspensivos; entero, al pasar el ratón
-                if (finished) { const s = fStatus(pl); statusEl.innerText = s.txt; statusEl.style.color = s.col; }
+                // El asiento reservado manda SIEMPRE, no solo en salas terminadas: es justo el caso
+                // en el que un asiento vacío se anunciaba como si su dueño siguiera ahí eligiendo
+                // mazo. Fuera de partida es lo único que explica por qué la sala parece ocupada.
+                if (!pl.connected) { const s = fStatus(pl); statusEl.innerText = s.txt; statusEl.style.color = s.col; }
+                else if (finished) { const s = fStatus(pl); statusEl.innerText = s.txt; statusEl.style.color = s.col; }
                 else if (pl.inIndexHtml) { statusEl.innerText = '👁️ Viendo resultados'; statusEl.style.color = '#fbbf24'; }
                 else { statusEl.innerText = pl.ready ? '✅ LISTO' : '⏳ Eligiendo mazo'; statusEl.style.color = pl.ready ? '#10b981' : '#94a3b8'; }
             };
@@ -1037,6 +1046,29 @@
 
             const rmArea = document.getElementById('rematch-area');
             if (rmArea) rmArea.innerHTML = ''; // (rework) sin estado de revancha
+
+            // Mientras haya un asiento esperando, se repinta cada segundo para que la cuenta atrás
+            // avance de verdad; en cuanto no queda ninguno, se apaga sola.
+            const _hayReserva = ['p1', 'p2'].some(st => room.players[st] && !room.players[st].connected && room.players[st].reservadoHasta);
+            // Toca SOLO los dos textos de estado, no repinta la sala: `updateRoomUI` recrea el panel
+            // de pruebas entero, y hacerlo cada segundo borraría lo que estés escribiendo en el
+            // cuadro del escenario.
+            if (_hayReserva && !_tickReserva) _tickReserva = setInterval(() => {
+                const r = _tpLastRoom;
+                if (!r) return;
+                let queda = false;
+                for (const st of ['p1', 'p2']) {
+                    const pl = r.players[st];
+                    const el = document.getElementById('room-' + st + '-status');
+                    if (!pl || !el || pl.connected || !pl.reservadoHasta) continue;
+                    const seg = Math.max(0, Math.ceil((pl.reservadoHasta - Date.now()) / 1000));
+                    el.innerText = `🪑 Asiento reservado (${seg}s)`;
+                    el.style.color = '#fbbf24';
+                    if (seg > 0) queda = true;
+                }
+                if (!queda) { clearInterval(_tickReserva); _tickReserva = null; }
+            }, 1000);
+            if (!_hayReserva && _tickReserva) { clearInterval(_tickReserva); _tickReserva = null; }
 
             pintarCandado(room);
             renderTestPanel(room);
