@@ -217,3 +217,252 @@
     body:has(.deck-panel) .deck-list { overflow: visible !important; }
     body:has(.deck-panel) .deck-item { min-height: 44px; box-sizing: border-box; }
 }
+
+
+/* ─────────────────────────────── LA PARTIDA ─────────────────────────────── */
+/* El tablero de escritorio necesita ~1100px: pilas de 210px a cada lado y filas de 600. En vertical
+   se reparte de arriba abajo: mano rival en miniatura, retaguardia y vanguardia rivales, una franja
+   con el turno y los botones, tu vanguardia y retaguardia, y tu mano abajo, deslizable. Las pilas
+   se quedan donde siempre -a la izquierda- pero en una columna estrecha de fichas.
+
+   Las cartas se encogen con las MISMAS variables que usa el escritorio (--card-width/height), no
+   con `zoom`: las flechas calculan su anclaje mezclando getBoundingClientRect (que ve el zoom) con
+   offsetHeight (que según el navegador no), y con zoom quedarían desplazadas.
+   Todo va acotado con `body:has(#game-board)`: estas variables no pueden tocar otras páginas.
+
+   Además de los móviles, lo usan las TABLETS en horizontal (táctiles hasta 1279px): ahí el tablero
+   de escritorio no cabe de alto (en 1024x768 medía 929px y cortaba tu mano) y, sin ratón, su detalle
+   no se podía abrir. Este reparto sí cabe en 768px. */
+@media (max-width: 900px), (pointer: coarse) and (max-width: 1279px) {
+    body:has(#game-board) {
+        /* 70px es el máximo que deja caber cuatro cartas por fila en 390px junto a la columna
+           de pilas; el alto sale de la proporción de siempre (90x126). */
+        --card-width: 70px;
+        --card-height: 98px;
+        --stack-offset: 0px;
+        --fila-max: 100%;
+        --movil-pila: 46px;       /* ancho de la columna de pilas */
+        --movil-mano-w: 78px;     /* la mano, más grande que el tablero: hay que leerla para jugar */
+        --movil-mano-h: 109px;
+        height: 100dvh;           /* dvh: la barra del navegador del móvil no se come el tablero */
+    }
+
+    /* Los botones de arriba (DEBUG, REGLAS, volumen) más pequeños, y el área rival se aparta. */
+    body:has(#game-board) #debug-btn-main,
+    body:has(#game-board) #rules-btn-main { padding: 4px 8px !important; font-size: 0.65rem !important; }
+    body:has(#game-board) #volume-control { transform: scale(0.8); transform-origin: top right; }
+    body:has(#game-board) #p2-area { padding-top: 30px !important; }
+
+    /* ── Las cartas del tablero: el mismo diseño, más pequeño ── */
+    body:has(#game-board) .card { font-size: 0.48rem; padding: 2px; }
+    body:has(#game-board) .card-header { height: 14px; }
+    body:has(#game-board) .card-image { font-size: 1rem; margin: 1px 0; }
+    /* El texto de habilidad no se lee a este tamaño: fuera del tablero. Se lee entero en el
+       detalle, manteniendo pulsada la carta. */
+    body:has(#game-board) .zone-row .card-body { display: none; }
+    body:has(#game-board) .stat-label { font-size: 0.34rem; }
+    body:has(#game-board) .stat-val { font-size: 0.62rem; height: 0.85rem; }
+    body:has(#game-board) .furor-container { width: 16px; height: 16px; font-size: 0.6rem; top: -5px; right: -7px; border-width: 1px; }
+    body:has(#game-board) .status-dot { width: 16px; height: 16px; font-size: 0.55rem; top: -5px; left: -8px; border-width: 1px; }
+    body:has(#game-board) .counter-badge { height: 16px; min-width: 16px; right: -10px; bottom: -5px; }
+    body:has(#game-board) .counter-badge span { font-size: 0.6rem; }
+    body:has(#game-board) .stealth-badge { width: 16px; height: 16px; font-size: 0.6rem; left: -8px; bottom: -5px; }
+
+    /* Las etiquetas azules de habilidad (BI-CHOQUE, APARICIÓN...), a la escala de la carta. Su
+       caja invisible mide el 300% de la carta a propósito (truco de centrado del escritorio) y no
+       se toca; lo que se encoge es la etiqueta. Y sin el "crece al pasar el ratón": en táctil el
+       :hover se queda pegado después del toque y la dejaba estirada. */
+    body:has(#game-board) .zone-row .action-btn-container { bottom: 18px; gap: 3px; }
+    body:has(#game-board) .zone-row .action-btn-card { font-size: 0.48rem; padding: 3px 6px; max-width: 64px; border-radius: 8px; }
+    body:has(#game-board) .zone-row .action-btn-card:hover { max-width: 64px; transform: none; }
+    /* El juego ya recorta lo que sobresale (el body va sin scroll); esto lo asegura también dentro
+       del tablero, que en móvil no tiene por qué desplazarse de lado nunca. */
+    body:has(#game-board) #game-board { overflow-x: hidden; }
+
+    /* La ficha del evento en juego: su nombre en letra pequeña y la cuenta atrás, que es lo que
+       importa de un vistazo. */
+    body:has(#game-board) .active-event-card > div:first-child { font-size: 0.38rem !important; line-height: 1; padding: 0 1px; overflow: hidden; max-width: 100%; white-space: nowrap; text-overflow: ellipsis; }
+    body:has(#game-board) .active-event-card > div:last-child { font-size: 0.8rem !important; line-height: 1; }
+
+    /* ── Filas ── */
+    body:has(#game-board) .rows-container {
+        gap: 5px;
+        padding-left: calc(var(--movil-pila) + 8px) !important;   /* sitio para la columna de pilas */
+        padding-right: 4px !important;
+    }
+    /* El hueco entre cartas lo pone la FILA, no la carta. El JS le da a cada carta un margen
+       leyendo el desplazamiento de sus insignias directamente de global.css (16px por el Furor, 32
+       si tiene contadores), pero aquí las insignias son más pequeñas y él no las ve: sus reglas
+       viven dentro de una media query y el JS solo mira las de primer nivel. Con 9px de hueco
+       caben cuatro cartas de 70 y las insignias (que asoman 7-10px) no pisan a la vecina. */
+    body:has(#game-board) .zone-row { width: 100% !important; box-sizing: border-box; gap: 9px; padding: 3px; min-height: calc(var(--card-height) + 6px); }
+    body:has(#game-board) .zone-row > .card { margin: 0 !important; }
+    body:has(#game-board) .zone-label { font-size: 0.9rem; }
+
+    /* ── Las pilas: una columna estrecha de fichas a la izquierda ── */
+    body:has(#game-board) .stacks-container {
+        left: 4px !important; gap: 4px !important;
+        width: var(--movil-pila);
+    }
+    body:has(#game-board) .stack-row { flex-direction: column; gap: 4px; }
+    body:has(#game-board) .stack-card {
+        width: var(--movil-pila) !important; height: 34px !important;
+        font-size: 0.45rem !important; border-width: 1px !important; box-shadow: none !important;
+        overflow: hidden;
+    }
+    body:has(#game-board) .stack-card .count-badge { width: 15px; height: 15px; font-size: 0.55rem; bottom: 1px; right: 1px; }
+    body:has(#game-board) #p2-area .stacks-container { bottom: 4px !important; }
+    body:has(#game-board) #p1-area .stacks-container { top: 4px !important; }
+
+    /* ── Las manos ──
+       La que se ve es una tira que se desliza con el dedo, con las cartas enteras y sin solapar (el
+       solape lo calcula el JS dando por hecho cartas de 90px; aquí no se solapa y listo). La que va
+       en dorsos, en miniatura. Lo decide lo que hay DENTRO y no la posición: en local la mano
+       visible es la de quien juega y cambia con el turno, y en online J2 juega con la de arriba. */
+    body:has(#game-board) .hand-zone {
+        height: calc(var(--movil-mano-h) + 12px) !important;
+        justify-content: flex-start !important; align-items: center !important;
+        overflow-x: auto !important; overflow-y: hidden !important;
+        padding: 6px 8px !important; gap: 6px !important;
+        margin: 0 !important;
+        scroll-snap-type: x proximity;
+        -webkit-overflow-scrolling: touch;
+    }
+    body:has(#game-board) .hand-zone .card {
+        width: var(--movil-mano-w) !important; height: var(--movil-mano-h) !important;
+        margin-right: 0 !important;
+        font-size: 0.5rem; scroll-snap-align: start;
+    }
+    body:has(#game-board) .hand-zone .card-body { height: 22px; font-size: 0.4rem; }
+    body:has(#game-board) .hand-zone .card-back { width: 20px !important; height: 28px !important; }
+    body:has(#game-board) .hand-zone:not(:has(.card:not(.card-back))) {
+        height: 30px !important; padding: 0 8px !important; gap: 2px !important;
+        justify-content: center !important;
+    }
+    body:has(#game-board) .hand-zone:hover .card { transform: none; }
+
+    /* ── Turno y botones: una franja entre los dos campos ── */
+    body:has(#game-board) #ui-layer {
+        position: static !important; top: auto !important; right: auto !important;
+        flex-direction: row !important; align-items: center; justify-content: center;
+        gap: 6px !important; padding: 4px 6px; flex-wrap: wrap;
+        background: rgba(0, 0, 0, 0.35);
+    }
+    body:has(#game-board) #ui-layer > div:first-child { min-width: 0 !important; padding: 2px 8px !important; display: flex; align-items: baseline; gap: 6px; }
+    body:has(#game-board) #ui-layer > div:first-child > div:first-child { display: none; }   /* "TURNO ACTUAL" */
+    body:has(#game-board) #active-player-disp { font-size: 0.85rem !important; }
+    body:has(#game-board) #ui-layer .game-btn { padding: 8px 14px; min-height: 36px; }
+
+    /* ── El detalle: en reposo no se enseña (tapaba el tablero). Se abre manteniendo pulsada
+       una carta, como hoja desde abajo (ver movil.js). ── */
+    body:has(#game-board):not(.movil-detalle) #card-preview { display: none !important; }
+    body.movil-detalle #card-preview {
+        position: fixed !important;
+        left: 0 !important; right: 0 !important; bottom: 0 !important; top: auto !important;
+        width: auto !important; transform: none !important;
+        max-height: 72dvh; overflow-y: auto !important;
+        border-radius: 14px 14px 0 0 !important;
+        pointer-events: auto !important;
+        z-index: 9500 !important;
+        max-width: 640px; margin: 0 auto !important;   /* en una tablet apaisada no ocupa todo el ancho */
+    }
+
+    /* El velo que hay detrás del detalle abierto: tocarlo cierra, y ese toque no hace nada más. */
+    #movil-velo { display: block !important; position: fixed; inset: 0; background: rgba(2, 6, 23, 0.55); z-index: 9450; }
+    body:not(.movil-detalle) #movil-velo { display: none !important; }
+
+    /* La fase actual, en la franja del turno (la cuenta el panel de reposo, que aquí se oculta).
+       Viene de un atributo del contenedor, no de un elemento: ver movil.js. */
+    body:has(#game-board) #ui-layer[data-movil-fase]:not([data-movil-fase=""])::before {
+        content: attr(data-movil-fase);
+        order: -1;
+        color: #fbbf24; font-weight: 900; font-size: 0.72rem; letter-spacing: 1px;
+        text-transform: uppercase; padding: 4px 8px;
+        background: rgba(0, 0, 0, 0.8); border: 1px solid #475569; border-radius: 5px;
+    }
+
+    /* Junto a REGLAS, que está colocada a mano (absolute). En online sin ser admin el juego oculta
+       DEBUG y corre REGLAS a su hueco con un `left: 10px` en línea: entonces se corre también. */
+    #movil-btn-historial { display: inline-block !important; position: absolute; top: 10px; left: 138px; z-index: 7000; padding: 4px 8px !important; font-size: 0.65rem !important; background: #475569; }
+    #rules-btn-main[style*="left: 10px"] + #movil-btn-historial { left: 78px; }
+    #movil-btn-historial.activo { background: #16a34a; }
+
+    /* ── El historial: plegado en un botón (ver movil.js), y a pantalla media al abrirlo ── */
+    /* Con `:not()` y no con dos reglas enfrentadas: la que oculta lleva un id dentro del `:has` y
+       pesaba más que la que abre, así que el botón no abría nada. */
+    body:has(#game-board):not(.movil-historial) #log-container { display: none !important; }
+    body.movil-historial #log-container {
+        display: flex !important;
+        position: fixed !important; left: 0 !important; right: 0 !important; top: auto !important; bottom: 0 !important;
+        width: auto !important; height: 45dvh !important;
+        border-radius: 14px 14px 0 0 !important; z-index: 9400 !important;
+    }
+
+    /* ── Los modales de la partida ──
+       Las opciones de una elección (Zoe, Xanadu, Wolfgang...) iban en fila y con tres se salían por
+       los dos lados: en columna, anchas y fáciles de tocar. El "ELIGE UN TIPO", en rejilla de 2x2. */
+    body:has(#game-board) #choice-title { font-size: 1.4rem !important; padding: 0 12px; }
+    body:has(#game-board) #choice-buttons {
+        flex-direction: column; align-items: stretch;
+        width: min(90vw, 380px); margin-top: 0;
+    }
+    body:has(#game-board) #type-select-modal .type-btn-container {
+        display: grid; grid-template-columns: 1fr 1fr; width: min(90vw, 380px);
+    }
+    body:has(#game-board) .type-btn { padding: 14px 10px; min-height: 48px; }
+    body:has(#game-board) .type-btn:hover { transform: none; }
+    /* El buscador de la mano: el campo, el contador y los dos botones no caben en una línea.
+       El campo arriba a todo lo ancho (a 16px: con menos, el iPhone hace zoom al tocarlo). */
+    body:has(#game-board) .search-modal-content { width: 96% !important; height: 94% !important; padding: 12px !important; }
+    body:has(#game-board) .search-modal-content > h2 { font-size: 1.15rem; margin-bottom: 10px; }
+    body:has(#game-board) .search-modal-content > h2 + div { flex-wrap: wrap; gap: 8px; margin-bottom: 10px !important; }
+    body:has(#game-board) #modal-search-input { flex: 1 1 100%; width: auto !important; font-size: 16px; box-sizing: border-box; }
+    body:has(#game-board) #selection-info { flex: 1; }
+    body:has(#game-board) #search-grid { gap: 10px !important; padding: 10px !important; }
+    /* El panel DEBUG (solo admins): a lo ancho de la pantalla, en una columna y con su propio scroll. */
+    body:has(#game-board) #debug-modal { left: 0 !important; right: 0; top: 40px !important; bottom: 0; overflow-y: auto; align-items: flex-start; }
+    body:has(#game-board) #debug-modal .debug-panel { flex: 1; width: auto !important; max-width: none !important; min-width: 0; margin: 0 6px 12px; }
+    body:has(#game-board) #debug-modal .dbg-grid-2 { grid-template-columns: 1fr; }
+}
+
+/* ── Tablet en vertical: hay sitio de sobra. Las cartas vuelven a su diseño de escritorio (letra,
+   texto de habilidad) y crecen un poco; el resto del reparto es el del móvil. ── */
+@media (min-width: 700px) and (max-width: 900px) and (min-height: 900px) {
+    body:has(#game-board) {
+        --card-width: 100px;
+        --card-height: 140px;
+        --movil-pila: 64px;
+        --movil-mano-w: 100px;
+        --movil-mano-h: 140px;
+    }
+    body:has(#game-board) .card { font-size: 0.6rem; padding: 3px; }
+    body:has(#game-board) .card-header { height: 18px; }
+    body:has(#game-board) .card-image { font-size: 1.5rem; margin: 2px 0; }
+    body:has(#game-board) .zone-row .card-body { display: block; }
+    body:has(#game-board) .stat-label { font-size: 0.4rem; }
+    body:has(#game-board) .stat-val { font-size: 0.65rem; height: 1rem; }
+    body:has(#game-board) .zone-row { gap: 14px; }
+    body:has(#game-board) .zone-row .action-btn-container { bottom: 24px; }
+    body:has(#game-board) .zone-row .action-btn-card { font-size: 0.55rem; max-width: 90px; }
+    body:has(#game-board) .zone-row .action-btn-card:hover { max-width: 90px; }
+    body:has(#game-board) .stack-card { height: 48px !important; font-size: 0.55rem !important; }
+    body:has(#game-board) .hand-zone .card-body { height: 32px; font-size: 0.5rem; }
+    body:has(#game-board) .hand-zone .card-back { width: 28px !important; height: 39px !important; }
+    body:has(#game-board) .hand-zone:not(:has(.card:not(.card-back))) { height: 42px !important; }
+}
+
+/* ── Móvil en horizontal: la partida no cabe. Son cuatro filas de cartas más la mano en ~390px de
+   alto, y a un tamaño que se pueda leer no entran ni con el tablero entero reordenado. Se pide
+   girar el móvil, como hacen la mayoría de juegos de cartas. Solo en pantallas táctiles (`pointer:
+   coarse`): una ventana de escritorio muy apaisada no es un móvil y sigue como siempre. Y solo en la
+   partida: portada, salas y constructor se desplazan con el dedo y se usan bien en horizontal. ── */
+@media (max-height: 500px) and (orientation: landscape) and (pointer: coarse) {
+    body:has(#game-board)::after {
+        content: "\21BB\A Gira el móvil\A La partida se juega en vertical";
+        white-space: pre; text-align: center;
+        position: fixed; inset: 0; z-index: 99999;
+        display: flex; align-items: center; justify-content: center;
+        background: var(--bg-color, #0f172a); color: #e2e8f0;
+        font-size: 1.1rem; font-weight: bold; line-height: 1.8;
+    }
+}

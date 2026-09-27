@@ -38,10 +38,14 @@ const ESCRITORIO = { ancho: 1280, alto: 720 };   // el escritorio más pequeño 
 const peligrosas = [];
 for (const b of bloques) {
     const q = b.prelude.replace(/^@media\s*/i, '');
-    const anchos = [...q.matchAll(/max-width:\s*(\d+)px/g)].map(m => +m[1]);
-    const altos = [...q.matchAll(/max-height:\s*(\d+)px/g)].map(m => +m[1]);
-    const acota = anchos.some(a => a < ESCRITORIO.ancho) || altos.some(a => a < ESCRITORIO.alto);
-    if (!acota) peligrosas.push(q);
+    // Una lista con comas se cumple si se cumple CUALQUIERA de sus alternativas: cada una tiene
+    // que estar acotada por su cuenta, no basta con que lo esté una.
+    for (const alt of q.split(',')) {
+        const anchos = [...alt.matchAll(/max-width:\s*(\d+)px/g)].map(m => +m[1]);
+        const altos = [...alt.matchAll(/max-height:\s*(\d+)px/g)].map(m => +m[1]);
+        const acota = anchos.some(a => a < ESCRITORIO.ancho) || altos.some(a => a < ESCRITORIO.alto);
+        if (!acota) peligrosas.push(alt.trim());
+    }
 }
 check('ninguna media query se activa en un escritorio de 1280x720', peligrosas.length === 0, peligrosas.join(' | '));
 
@@ -56,8 +60,8 @@ for (const f of ['landing.html', 'lobby.html', 'deckbuilder.html', 'index.html']
 // cosa que haga al aplicar sea preguntar por la pantalla, y que pregunte con el mismo corte.
 const js = fs.readFileSync(path.join(RAIZ, 'public/movil.js'), 'utf8');
 check('movil.js se va sin hacer nada si no es móvil', /const aplicar = \(\) => \{\s*if \(!esMovil\(\)\) return;/.test(js));
-const corteJs = (js.match(/const CONSULTA = '\(max-width: (\d+)px\)'/) || [])[1];
-check('...y usa el MISMO corte que movil.css', corteJs && new RegExp('@media \\(max-width: ' + corteJs + 'px\\)').test(css), 'corte ' + corteJs);
+const corteJs = (js.match(/const CONSULTA = '([^']+)'/) || [])[1];
+check('...y usa el MISMO corte que movil.css', !!corteJs && css.includes('@media ' + corteJs + ' {'), 'consulta ' + corteJs);
 check('...y lo que añade nace oculto (solo el CSS de móvil lo enseña)', /barra\.style\.display = 'none';/.test(js));
 check('...y no reescribe funciones de la página, observa', !/window\.(renderDeck|renderCatalog|addCard|removeCard)\s*=/.test(js) && /MutationObserver/.test(js));
 
