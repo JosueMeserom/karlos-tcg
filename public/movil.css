@@ -1,0 +1,128 @@
+/* =====================================================================================
+   movil.css — la versión para móvil y tablet de Karlos TCG
+   =====================================================================================
+
+   LA REGLA DE ESTE FICHERO: **todo va dentro de una media query**. Ni una regla suelta.
+   Así, en una pantalla de escritorio ninguna de estas líneas llega a aplicarse y el juego se ve
+   exactamente igual que antes, por construcción y no por cuidado. Lo vigila
+   tests/movil_sin_fugas.js, que falla si alguien añade aquí una regla fuera de una @media.
+
+   Se carga el ÚLTIMO en cada página, así que a igual especificidad gana. Muchas reglas llevan
+   `!important` a propósito: las páginas usan mucho `style=""` en línea y anchos puestos desde
+   JavaScript (el lobby online se pone a 850px), y contra eso no hay otra forma de ganar.
+
+   Los colores NO se tocan: se reutilizan los de siempre. Esto cambia la DISPOSICIÓN, no el look.
+
+   Cortes:
+     · 900px  - el contenedor del lobby (850px) ya no cabe: todo pasa a fluido.
+     · 640px  - móvil en vertical: las columnas se apilan.
+     · landscape + poco alto - móvil en horizontal: se aprovecha el ancho, se ahorra alto.
+   ===================================================================================== */
+
+
+/* ─────────────────────────────── PORTADA ─────────────────────────────── */
+@media (max-width: 640px) {
+    /* El título a 4rem no cabía en 390px: se partía en dos líneas y se salía por la izquierda. */
+    .logo {
+        font-size: clamp(2.2rem, 11vw, 3rem) !important;
+        text-align: center !important;
+        line-height: 1.05 !important;
+        width: 100% !important;
+        margin-bottom: 18px !important;
+    }
+    /* Los botones del menú ya miden ~50px: son cómodos para el dedo tal cual. */
+}
+
+
+/* ─────────────────────────────── LOBBY (local / IA / online) Y SALA ─────────────────────────────── */
+@media (max-width: 900px) {
+    /* El body centraba en vertical con alto fijo de pantalla: con el contenido apilado eso cortaba
+       por arriba y por abajo. Pasa a crecer con el contenido y a empezar arriba. */
+    /* Y pasa a COLUMNA: en fila, si el body tiene algún otro hijo con ancho, se centra el GRUPO
+       entero y el lobby acaba pegado a la izquierda. En columna cada hijo se centra solo. */
+    body {
+        height: auto !important;
+        min-height: 100vh;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        padding: 56px 0 16px !important;
+        box-sizing: border-box !important;
+    }
+    /* El contenedor tenía 600px fijos (850 en online, puestos desde JS): pasa a ocupar la pantalla. */
+    .lobby-container, #lobby-main {
+        width: calc(100vw - 20px) !important;
+        max-width: 850px !important;
+        padding: 18px 14px !important;
+        box-sizing: border-box !important;
+    }
+    .online-view-container { height: auto !important; }
+    #online-room-view { height: auto !important; }
+    .lobby-title { font-size: 1.6rem !important; }
+    .lobby-subtitle { margin-bottom: 18px !important; }
+}
+
+@media (max-width: 640px) {
+    /* Las dos columnas (jugador 1 / jugador 2, chat / salas, chat / sala) se apilan. */
+    .players-setup, .online-view-container { flex-direction: column !important; }
+    .players-setup .player-box { width: 100% !important; }
+
+    /* Online: primero lo que se usa (crear, unirse, salas) y el chat debajo. */
+    #online-lobby-view .online-col:first-child { order: 2; }
+    #online-lobby-view .online-col:last-child  { order: 1; }
+    /* Con el padre a alto automático, `flex: 1` deja las cajas a cero: se les da un alto útil. */
+    #global-chat-box { min-height: 170px !important; max-height: 38vh; }
+    #rooms-list { min-height: 150px !important; max-height: 42vh; }
+
+    /* La sala: mismo trato, los asientos arriba y el chat debajo. */
+    #online-room-view > div:last-child { flex-direction: column !important; }
+    #online-room-view .online-col:first-child { order: 2; }
+    #online-room-view .online-col:last-child  { order: 1; }
+    #room-chat-box { min-height: 170px !important; max-height: 38vh; }
+
+    /* La cabecera verde (SALA, candado, copiar, gracia, abandonar) no cabe en una línea: se parte
+       en dos, el código y sus botones arriba y lo demás debajo. */
+    #online-room-view > div:first-child {
+        height: auto !important;
+        flex-wrap: wrap !important;
+        gap: 8px 12px !important;
+        padding: 10px 12px !important;
+    }
+    #online-room-view > div:first-child > div:first-child { flex-wrap: wrap; font-size: 1rem !important; }
+    #current-room-code { font-size: 1.25rem !important; }
+
+    /* Controles grandes para el dedo: 44px es el mínimo cómodo que usan iOS y Android. */
+    .start-btn { min-height: 48px; letter-spacing: 1px !important; }
+    select, input[type="text"], input[type="password"] { min-height: 44px; font-size: 16px !important; }
+    /* 16px en los campos NO es estético: por debajo, Safari en iPhone hace zoom al enfocar. */
+
+    /* La fila de "Código + Unirse + 👁️" se queda en fila, pero el campo cede sitio. */
+    #room-code-input { min-width: 0; }
+
+    /* Opciones de la partida local y contra la IA. La casilla se queda en su fila y es el TEXTO
+       el que se parte; y el desplegable de "Jugador inicial" pasa debajo de su etiqueta, a todo el
+       ancho, que en la misma línea cortaba "Aleatorio (lanzar moneda)". */
+    .options-panel .opt-row { flex-wrap: nowrap; align-items: flex-start; text-align: left; }
+    .options-panel .opt-row > span { min-width: 0; }
+    .options-panel .opt-row:has(select) { flex-direction: column; align-items: stretch; gap: 6px; }
+    .options-panel .opt-row:has(select) > select { flex: none !important; width: 100% !important; }
+}
+
+
+/* ─────────────────────────────── REGLAS ─────────────────────────────── */
+@media (max-width: 640px) {
+    /* El manual ocupaba el 80% del ancho con márgenes: en móvil se aprovecha la pantalla entera. */
+    #rules-content-box {
+        width: 100% !important;
+        height: 100% !important;
+        max-height: 100dvh !important;
+        border-radius: 0 !important;
+        border-left: none !important;
+        border-right: none !important;
+    }
+    #rules-body { padding: 16px !important; }
+    #rules-body .rule-text { text-align: left !important; }
+    #rules-body .widget-box { gap: 8px !important; padding: 10px !important; }
+    #rules-body .tutorial-card { transform: scale(0.9) !important; margin: 4px !important; }
+    #rules-body .list-steps { padding: 12px 18px !important; }
+}
