@@ -40,12 +40,16 @@
        por arriba y por abajo. Pasa a crecer con el contenido y a empezar arriba. */
     /* Y pasa a COLUMNA: en fila, si el body tiene algún otro hijo con ancho, se centra el GRUPO
        entero y el lobby acaba pegado a la izquierda. En columna cada hijo se centra solo. */
-    body {
+    /* OJO: acotado a la página del lobby. Sin el `:has`, esta regla le cambiaba el body a TODAS
+       las páginas que cargan movil.css (constructor y partida incluidos). */
+    body:has(#lobby-main) {
         height: auto !important;
         min-height: 100vh;
         flex-direction: column !important;
         align-items: center !important;
-        justify-content: flex-start !important;
+        /* Centrado en vertical si cabe; si no cabe, el body crece con el contenido (su alto es
+           automático), así que nada queda cortado por arriba. */
+        justify-content: center !important;
         padding: 56px 0 16px !important;
         box-sizing: border-box !important;
     }
@@ -58,6 +62,10 @@
     }
     .online-view-container { height: auto !important; }
     #online-room-view { height: auto !important; }
+    /* Sin el alto fijo del contenedor, las cajas que crecían con `flex: 1` se quedan en una raya:
+       se les da un alto útil. En tablet hay sitio de sobra; en móvil se ajusta más abajo. */
+    #global-chat-box, #room-chat-box { min-height: 300px !important; }
+    #rooms-list { min-height: 260px !important; }
     .lobby-title { font-size: 1.6rem !important; }
     .lobby-subtitle { margin-bottom: 18px !important; }
 }
@@ -125,4 +133,87 @@
     #rules-body .widget-box { gap: 8px !important; padding: 10px !important; }
     #rules-body .tutorial-card { transform: scale(0.9) !important; margin: 4px !important; }
     #rules-body .list-steps { padding: 12px 18px !important; }
+}
+
+
+/* ─────────────────────────────── CONSTRUCTOR DE MAZOS ─────────────────────────────── */
+/* En escritorio son dos paneles lado a lado y la página medía 975px: en un móvil la lista del mazo
+   quedaba ENTERA fuera de la pantalla. Aquí pasa a pestañas (Catálogo / Mi mazo), que las pone
+   movil.js; el total del mazo va siempre a la vista en la propia pestaña. */
+@media (max-width: 900px) {
+    body:has(.deck-panel) { height: auto !important; min-height: 100vh; overflow-x: hidden; }
+
+    /* La cabecera: el logo y los botones de ir y venir arriba, y el mazo que editas debajo, a
+       todo el ancho. En una fila no cabía ni la mitad. */
+    /* Tres filas: [logo · Reglas · Menú], [el mazo que editas], [nombre · Guardar · Borrar].
+       `display: contents` en los controles los saca de su caja para poder ordenarlos junto al logo
+       sin tocar el HTML. La cabecera NO se queda fija: ocupaba un tercio de la pantalla y no se
+       usa mientras se busca en el catálogo. Lo que queda fijo son las pestañas. */
+    body:has(.deck-panel) header {
+        flex-wrap: wrap !important;
+        gap: 8px !important;
+        padding: 10px 12px !important;
+    }
+    body:has(.deck-panel) .header-controls { display: contents !important; }
+    body:has(.deck-panel) .logo-mini { font-size: 1.1rem !important; order: 0; flex: 1 1 auto; }
+    body:has(.deck-panel) header .header-btn[onclick^="mostrarReglas"] { order: 1; }
+    body:has(.deck-panel) header .header-btn[onclick*="landing.html"] { order: 2; }
+    body:has(.deck-panel) header .deck-select { order: 3; flex: 1 1 100%; min-height: 44px; font-size: 16px; }
+    body:has(.deck-panel) header #deck-name { order: 4; flex: 1 1 120px; min-width: 0; min-height: 44px; font-size: 16px; box-sizing: border-box; }
+    body:has(.deck-panel) header .header-btn.save { order: 5; }
+    body:has(.deck-panel) header .header-btn.delete { order: 6; }
+    body:has(.deck-panel) header .header-btn { min-height: 44px; }
+    body:has(.deck-panel) #save-status { order: 7; flex: 1 1 100%; margin: 0 !important; text-align: center; }
+    body:has(.deck-panel) #save-status:empty { display: none; }
+
+    /* La barra de pestañas, pegada bajo la cabecera. */
+    #movil-pestanas {
+        display: flex !important;
+        width: 100%;
+        position: sticky; top: 0; z-index: 25;
+        background: #0b1120;
+        border-bottom: 2px solid #3b82f6;
+    }
+    #movil-pestanas button {
+        flex: 1; min-height: 46px; border: none; background: transparent;
+        color: #94a3b8; font-weight: bold; font-size: 0.95rem; cursor: pointer;
+        border-bottom: 3px solid transparent;
+    }
+    #movil-pestanas button.activa { color: #fbbf24; border-bottom-color: #fbbf24; background: #0f172a; }
+    #movil-pestanas .movil-de { color: #64748b; font-weight: normal; }
+    #movil-pestanas button.completo #movil-total { color: #4ade80; }
+    /* Añadir una carta desde el catálogo no se ve en esa pestaña: la del mazo da un latido. */
+    #movil-pestanas button.latido { animation: movilLatido 0.45s ease; }
+    @keyframes movilLatido { 0% { background: transparent; } 35% { background: #1d4ed8; color: #fff; } 100% { background: transparent; } }
+
+    /* Un panel cada vez, a pantalla completa. */
+    body:has(.deck-panel) .main-container { display: block !important; overflow: visible !important; }
+    body:has(.deck-panel) .catalog-panel { border-right: none !important; }
+    body:has(.deck-panel) .deck-panel { min-width: 0 !important; padding: 14px !important; }
+    body.movil-pestana-mazo .catalog-panel { display: none !important; }
+    body:not(.movil-pestana-mazo) .deck-panel { display: none !important; }
+
+    /* Filtros: la búsqueda a todo el ancho y los tipos en una fila que se desliza con el dedo. */
+    body:has(.deck-panel) .filters { flex-wrap: wrap !important; padding: 10px 12px !important; gap: 8px !important; }
+    body:has(.deck-panel) .filters .search-bar { flex: 1 1 100% !important; min-height: 44px; font-size: 16px; box-sizing: border-box; }
+    body:has(.deck-panel) .filter-btn { flex: 1 1 auto; min-height: 38px; }
+
+    /* La rejilla de cartas, fluida: tantas columnas como quepan de 150px (dos en un móvil, cuatro
+       en una tablet en vertical), y la carta crece hasta ocupar su hueco. */
+    body:has(.deck-panel) .card-grid {
+        display: grid !important;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 10px !important;
+        padding: 12px !important;
+        overflow: visible !important;
+    }
+    body:has(.deck-panel) .card-mini { width: auto !important; height: auto !important; aspect-ratio: 140 / 196; }
+    /* Sin ratón no hay "pasar por encima": el salto de la carta solo estorba al hacer scroll. */
+    body:has(.deck-panel) .card-mini:hover { transform: none !important; }
+    body:has(.deck-panel) .c-text { font-size: 0.68rem !important; }
+    body:has(.deck-panel) .c-name { font-size: 0.85rem !important; }
+
+    /* La lista del mazo: filas altas, que se tocan con el dedo. */
+    body:has(.deck-panel) .deck-list { overflow: visible !important; }
+    body:has(.deck-panel) .deck-item { min-height: 44px; box-sizing: border-box; }
 }

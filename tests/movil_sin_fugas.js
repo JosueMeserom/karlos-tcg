@@ -52,5 +52,14 @@ for (const f of ['landing.html', 'lobby.html', 'deckbuilder.html', 'index.html']
     check(`${f} lo carga, al final del <head>`, i > 0 && i < fin && html.slice(i, fin).indexOf('<link') === -1 && html.slice(i, fin).indexOf('<style') === -1);
 }
 
+// movil.js cumple la misma regla que el CSS: en escritorio no hace NADA. Se vigila que la primera
+// cosa que haga al aplicar sea preguntar por la pantalla, y que pregunte con el mismo corte.
+const js = fs.readFileSync(path.join(RAIZ, 'public/movil.js'), 'utf8');
+check('movil.js se va sin hacer nada si no es móvil', /const aplicar = \(\) => \{\s*if \(!esMovil\(\)\) return;/.test(js));
+const corteJs = (js.match(/const CONSULTA = '\(max-width: (\d+)px\)'/) || [])[1];
+check('...y usa el MISMO corte que movil.css', corteJs && new RegExp('@media \\(max-width: ' + corteJs + 'px\\)').test(css), 'corte ' + corteJs);
+check('...y lo que añade nace oculto (solo el CSS de móvil lo enseña)', /barra\.style\.display = 'none';/.test(js));
+check('...y no reescribe funciones de la página, observa', !/window\.(renderDeck|renderCatalog|addCard|removeCard)\s*=/.test(js) && /MutationObserver/.test(js));
+
 console.log(`\nSUITE movil_sin_fugas: ${fallos ? fallos + ' FALLOS de ' : comprobaciones + '/'}${comprobaciones} comprobaciones` + (fallos ? '' : ' — EL ESCRITORIO NO SE TOCA'));
 if (fallos) process.exit(1);
