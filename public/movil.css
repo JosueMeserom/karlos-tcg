@@ -20,6 +20,19 @@
    ===================================================================================== */
 
 
+/* ─────────────────────────────── EL SCROLL ─────────────────────────────── */
+/* global.css le cierra el scroll al body (`height: 100vh; overflow: hidden`) porque el tablero ocupa
+   la pantalla justa. Fuera de la partida, en móvil las páginas miden más que la pantalla y hay que
+   poder desplazarlas: sin esto, la sala y el constructor se veían pero NO se movían con el dedo
+   (las capturas de página completa no lo notaban; lo vio Toto en su Android). */
+@media (max-width: 900px), (pointer: coarse) and (max-width: 1279px) {
+    body:not(:has(#game-board)) { overflow-y: auto !important; }
+}
+/* En un móvil apaisado la portada tampoco cabe de alto: crece con su contenido en vez de cortarse. */
+@media (pointer: coarse) and (max-height: 500px) {
+    body:has(#guest-ui) { height: auto !important; min-height: 100vh; padding: 16px 0; box-sizing: border-box; }
+}
+
 /* ─────────────────────────────── PORTADA ─────────────────────────────── */
 @media (max-width: 640px) {
     /* El título a 4rem no cabía en 390px: se partía en dos líneas y se salía por la izquierda. */
@@ -35,7 +48,7 @@
 
 
 /* ─────────────────────────────── LOBBY (local / IA / online) Y SALA ─────────────────────────────── */
-@media (max-width: 900px) {
+@media (max-width: 900px), (pointer: coarse) and (max-height: 500px) {
     /* El body centraba en vertical con alto fijo de pantalla: con el contenido apilado eso cortaba
        por arriba y por abajo. Pasa a crecer con el contenido y a empezar arriba. */
     /* Y pasa a COLUMNA: en fila, si el body tiene algún otro hijo con ancho, se centra el GRUPO
@@ -131,7 +144,14 @@
     #rules-body { padding: 16px !important; }
     #rules-body .rule-text { text-align: left !important; }
     #rules-body .widget-box { gap: 8px !important; padding: 10px !important; }
-    #rules-body .tutorial-card { transform: scale(0.9) !important; margin: 4px !important; }
+    /* Las cartas de ejemplo, más pequeñas DE VERDAD (con las variables del tamaño de carta): un
+       `scale()` solo las encoge a la vista y su caja sigue midiendo 90px, así que la fila de cuatro
+       de "Ejemplo de vanguardia legal" desbordaba y el manual se movía de lado. */
+    /* Cuatro en fila caben siempre: la cuarta parte de lo que dejan los márgenes (~96px), sin
+       pasar de 68. */
+    #rules-body { --card-width: min(68px, calc((100vw - 96px) / 4)); --card-height: calc(var(--card-width) * 1.4); }
+    #rules-body .tutorial-card { margin: 0 !important; }
+    #rules-body .widget-box > div[style*="display:flex"] { gap: 6px !important; padding: 8px !important; flex-wrap: wrap; justify-content: center; max-width: 100%; box-sizing: border-box; }
     #rules-body .list-steps { padding: 12px 18px !important; }
 }
 
@@ -140,7 +160,7 @@
 /* En escritorio son dos paneles lado a lado y la página medía 975px: en un móvil la lista del mazo
    quedaba ENTERA fuera de la pantalla. Aquí pasa a pestañas (Catálogo / Mi mazo), que las pone
    movil.js; el total del mazo va siempre a la vista en la propia pestaña. */
-@media (max-width: 900px) {
+@media (max-width: 900px), (pointer: coarse) and (max-height: 500px) {
     body:has(.deck-panel) { height: auto !important; min-height: 100vh; overflow-x: hidden; }
 
     /* La cabecera: el logo y los botones de ir y venir arriba, y el mazo que editas debajo, a

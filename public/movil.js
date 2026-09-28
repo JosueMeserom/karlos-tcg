@@ -93,7 +93,9 @@
             velo.id = 'movil-velo';
             velo.style.display = 'none';          // solo lo enseña el propio gesto
             document.body.appendChild(velo);
-            let abierto = false, temporizador = null, x0 = 0, y0 = 0, tragarHasta = 0;
+            // `recienAbierto`: el dedo que ABRIÓ el detalle sigue en la pantalla. Solo el clic de
+            // ESE dedo al soltar se traga; el de cualquier toque posterior (el que cierra) no.
+            let abierto = false, recienAbierto = false, temporizador = null, x0 = 0, y0 = 0, tragarHasta = 0;
             const cerrar = () => {
                 if (!abierto) return;
                 abierto = false;
@@ -102,13 +104,15 @@
                 try { g() && g().cerrarDetalle ? g().cerrarDetalle() : g().stopPreview(); } catch (e) { /* sin partida */ }
             };
             const abrir = (carta) => {
-                abierto = true;
+                abierto = true; recienAbierto = true;
                 carta.dispatchEvent(new MouseEvent('mouseenter'));
                 document.body.classList.add('movil-detalle');
                 velo.style.display = 'block';
                 if (navigator.vibrate) navigator.vibrate(12);
             };
             document.addEventListener('touchstart', (ev) => {
+                // Un dedo nuevo: ya no es el que abrió, y su clic no se traga por rápido que llegue.
+                recienAbierto = false; tragarHasta = 0;
                 if (abierto || !ev.touches || ev.touches.length !== 1) return;
                 const carta = ev.target.closest && ev.target.closest('.card');
                 if (!carta || carta.classList.contains('card-back')) return;
@@ -125,9 +129,15 @@
             document.addEventListener('touchend', () => {
                 if (temporizador) { clearTimeout(temporizador); temporizador = null; }
                 // El clic que algunos navegadores disparan al soltar tras mantener pulsado NO puede
-                // llegar a la carta (la seleccionaría). Solo se traga el de los próximos 400 ms, y
-                // así no se come el toque siguiente, que es el que cierra el detalle.
-                else if (abierto) tragarHasta = Date.now() + 400;
+                // llegar a la carta (la seleccionaría). Solo el de ESE soltar: antes se tragaba
+                // también el del toque que cierra, y el detalle se quedaba abierto para siempre.
+                else if (recienAbierto) { recienAbierto = false; tragarHasta = Date.now() + 400; }
+            }, { passive: true });
+            // Android corta el gesto con un touchcancel (en vez de touchend) cuando mantener
+            // pulsado dispara lo suyo: ese dedo tampoco puede dejar nada pendiente.
+            document.addEventListener('touchcancel', () => {
+                if (temporizador) { clearTimeout(temporizador); temporizador = null; }
+                recienAbierto = false;
             }, { passive: true });
             document.addEventListener('click', (ev) => {
                 if (Date.now() < tragarHasta) { tragarHasta = 0; ev.preventDefault(); ev.stopPropagation(); }
