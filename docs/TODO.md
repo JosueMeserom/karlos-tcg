@@ -184,28 +184,21 @@ Norma a partir de ahora: cada pieza nueva del DSL entra también en el editor.
 
 ---
 
-## 4.ter. Un requisito no sabe contar cartas en una PILA (1-sep-2026)
+## 4.ter. Un requisito no sabe contar cartas en una PILA — HECHO (19-oct-2026)
 
-`DSL._pool` solo entiende el CAMPO. Un `count: { zona: "DESCARTES" }` **no cuenta el descarte**:
-devuelve el pool de campo por defecto y el número sale de ahí. No da error, claro.
-
-Lo encontré al escribir el **Robot de limpieza CM** (descarta una carta para recuperar una Ayuda
-del descarte), que se quedó **sin implementar** por esto: su requisito "hay una Ayuda en tus
-descartes" no se puede expresar hoy, y publicarla con un guard que miente es peor que no tenerla.
-
-⚠️ Y hay una carta ya publicada con el mismo problema: **Nigromántica**, cuyo requisito
-`count: { zona: "DESCARTES", ... }` está contando aliados en el campo. Pasa de casualidad casi
-siempre (cualquier aliado 'Ser vivo' lo cumple), así que nadie lo ha notado, pero con el campo
-vacío de 'Ser vivo' te deja usar la Activa sin nada que resucitar. Habría que:
-1. Enseñar a `_pool` las zonas de pila (`MANO`, `MAZO`, `DESCARTES`, `RETRIBUCION`), con su
-   `quien` para poder mirar también las del rival.
-2. Arreglar Nigromántica y meter el Robot de limpieza CM.
-3. Auditar todos los `count`/`_pool` que declaren una `zona` que no sea de campo.
+`DSL._zone` solo entendía el campo, la mano y el Evento: un `count: { zona: "DESCARTES" }` caía
+al campo sin avisar. Ahora entiende `MAZO`, `DESCARTES` y `RETRIBUCION` (con `quien: "ENEMIGO"`
+para las del rival), `_pool` no aplica a las pilas los filtros de objetivo (Avatar, Estasis,
+inmunidad a Eventos) y entiende `plantillaSin`, y la copia a mano de los requisitos de JUGAR saca
+las pilas del mismo `_zone`.
+- **Nigromántica** ya no deja pagar su Activa con los descartes vacíos.
+- **Robot de limpieza CM** implementado (id 2024).
+- `tests/conteo_pilas.js` audita que toda `zona` de un `count` sea una zona conocida.
 
 ## 4.quater. Rarezas pendientes de repartir
 
-Cartas ya implementadas **sin rareza**, porque el Excel no la trae: **Maxi-tigre** y
-**Robot espía XR**. Se decidirán junto con una revisión general, no una a una.
+Cartas ya implementadas **sin rareza**, porque el Excel no la trae: **Maxi-tigre**,
+**Robot espía XR** y **Robot de limpieza CM**. Se decidirán junto con una revisión general, no una a una.
 
 La norma que quiere Toto: dentro de cada serie, y salvo excepciones, **muchas más C que B, más B
 que A, y más A que S**. O sea que la rareza se reparte mirando la serie ENTERA, no carta a carta:

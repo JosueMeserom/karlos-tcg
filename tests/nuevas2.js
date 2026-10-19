@@ -258,14 +258,17 @@ const buscar = (g, pid, nombre) => [...g.players[pid].vanguard, ...g.players[pid
     }
     {
         // Si en descartes solo hay caídos NO aptos (Xanadu), la Activa no debe cobrar Furor ni
-        // gastar la acción: `costeDiferido` + `abortaSiVacio` cubren este borde.
-        const { g, paso } = await mesa({
+        // gastar la acción. Hasta el 19-oct-2026 lo cubrían `costeDiferido` + `abortaSiVacio`
+        // DESPUÉS de confirmarla, porque el requisito contaba aliados del CAMPO en vez de los
+        // descartes; ahora el requisito la frena antes de preguntar nada.
+        const { ctx, g, paso } = await mesa({
             turno: 2, turnoDe: 'p1', empieza: 'p2',
             p1: { vanguardia: [{ carta: 'Nigromántica', furor: 1 }], descartes: ['Xanadu'] },
             p2: { vanguardia: ['Mini-tigre'] },
         });
         await paso({ habilidad: 'Nigromántica' });
-        await paso({ confirmar: true });
+        check('sin caídos aptos, el requisito la frena: no llega a preguntar', !ctx.pendientes.length,
+            JSON.stringify(ctx.pendientes.map(x => x.tipo || x.titulo)));
         check('sin caídos aptos, NO se cobra Furor', buscar(g, 'p1', 'Nigromántica').furor === 1,
             'furor=' + buscar(g, 'p1', 'Nigromántica').furor);
         check('...ni se agota la carta (la acción no se gasta)', !buscar(g, 'p1', 'Nigromántica').exhausted);

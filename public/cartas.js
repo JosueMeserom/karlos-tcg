@@ -7654,6 +7654,34 @@ const CARD_DB = [
                 { op: "QUITAR_MARCA", target: { quien: "ALIADO", conMarcaTemporalPropia: true } } ] }
         ],
     },
+    {
+        // Recicla: una carta de la mano por una Ayuda de los descartes. Esperaba a que el DSL
+        // supiera contar una PILA (19-oct-2026): su requisito "hay una Ayuda en tus descartes"
+        // contaba el campo. Sin rareza en el Excel, como Maxi-tigre y Robot espía XR.
+        // Orden de la cadena (norma del coste tras elegir): se ELIGE la carta de la mano, que no
+        // cambia nada; se BUSCA en los descartes, cancelable siempre; y solo entonces se descarta
+        // lo elegido y se cobra el Furor. Descartar al final evita además que la carta pagada
+        // aparezca en la búsqueda.
+        id: 2024, name: "Robot de limpieza CM", hp: 2, def: 4, atk: 2, type: "Esbirro", subtype: "Máquina",
+        tags: ["Controlable"], gender: "N/A", cost: 1, series: 1,
+        text: "A: RECOGIDA DE BASURA (1F): Coste: una carta de tu mano. Busca una Ayuda en tu pila de descartes y añádela a tu mano.",
+        activeName: "RECOGIDA DE BASURA", activeCost: 1,
+        abilities: [
+            { trigger: "ACTIVA", nombre: "RECOGIDA DE BASURA", coste: { furor: 1 }, sinObjetivo: true, costeDiferido: true,
+              requisitos: [
+                { count: { zona: "MANO" }, op: ">=", valor: 1, msg: "No tienes cartas en la mano que descartar." },
+                { count: { zona: "DESCARTES", filtros: [ { campo: "type", op: "==", valor: "Ayuda" } ] }, op: ">=", valor: 1,
+                  msg: "No hay ninguna Ayuda en tu pila de descartes." } ],
+              efectos: [
+                { op: "ELEGIR", de: "MANO", cantidad: 1, guardaIdsEnSelf: "robotLimpiezaPago",
+                  titulo: "RECOGIDA DE BASURA: ELIGE LA CARTA QUE DESCARTAS" },
+                { op: "BUSCAR", en: "DESCARTES", cantidad: 1, destino: "MANO",
+                  filtros: [ { campo: "type", op: "==", valor: "Ayuda" } ],
+                  abortaSiCancelas: true, abortaSiVacio: true, titulo: "RECOGIDA DE BASURA: ELIGE UNA AYUDA",
+                  log: "{carta} recupera {objetivo} de los descartes." },
+                { op: "DESCARTAR", target: { selfLista: "robotLimpiezaPago", zona: "MANO" } } ] }
+        ],
+    },
 ];
 
 // ===================================================================
@@ -7887,10 +7915,21 @@ const DSL = {
         if (z === 'vanguardia') return [...p.vanguard];
         if (z === 'retaguardia') return [...p.rearguard];
         if (z === 'mano') return [...p.hand]; // Matón, 31-jul-2026: "¿tengo más copias en la mano?"
+        // Las PILAS (19-oct-2026). Antes cualquier zona que no estuviera aquí caía al campo de
+        // abajo SIN AVISAR: un `count` de `zona: "DESCARTES"` contaba aliados en mesa (le pasó a
+        // Nigromántica, que dejaba pagar su Activa sin nada que revivir). Ver `_esPila`.
+        if (z === 'mazo') return [...p.deck];
+        if (z === 'descartes') return [...p.discard];
+        if (z === 'retribucion' || z === 'retribución') return [...(p.retribution || [])];
         // El Evento activo cuenta como carta del campo: hay cartas cuyo requisito ES un Evento
         // ('Una buena razón' para Xanadu), y la flecha tiene que poder apuntarle.
         if (z === 'evento') return p.activeEvent ? [p.activeEvent] : [];
         return [...p.vanguard, ...p.rearguard];
+    },
+    // ¿Es una zona fuera del campo? Ahí no rigen los filtros de OBJETIVO (Avatar, Estasis,
+    // inmunidad a Eventos): una carta en la mano o en los descartes no está siendo señalada.
+    _esPila(zona) {
+        return ['mano', 'mazo', 'descartes', 'retribucion', 'retribución'].includes(String(zona || '').toLowerCase());
     },
     _pool(ownerId, game, spec, selfCard) {
         if (spec.quien === 'SELF') return selfCard ? [selfCard] : [];
@@ -7970,6 +8009,14 @@ const DSL = {
                  : spec.quien === 'TODOS' ? [...DSL._zone(game, 'p1', spec.zona), ...DSL._zone(game, 'p2', spec.zona)]
                  : DSL._zone(game, ownerId, spec.zona);
         if (spec.excludeSelf && selfCard) pool = pool.filter(c => c.instanceId !== selfCard.instanceId);
+        // `plantillaSin` (hooks que la PLANTILLA no puede tener: "sin coste ni condiciones de
+        // colocación"). Solo lo entendía la copia de requisitos de JUGAR; aquí se ignoraba.
+        if (spec.plantillaSin) pool = pool.filter(x => { const t = getCardTemplate(x.id); return t && !spec.plantillaSin.some(hk => typeof t[hk] === 'function'); });
+        if (DSL._esPila(spec.zona)) {
+            (spec.filtros || []).forEach(f => { pool = pool.filter(c => DSL._match(c, f)); });
+            if (spec.algunFiltro) pool = pool.filter(c => spec.algunFiltro.some(f => DSL._match(c, f)));
+            return pool;
+        }
         if (!spec.permitirAvatar) pool = pool.filter(c => !((getCardTemplate(c.id) || {}).isAvatar)); // Kami: intocable por defecto
         // ESTASIS (26-ago-2026): inmune a los efectos de cualquier carta, así que ni sale como
         // objetivo. Mismo criterio de default-on que el Avatar de la línea de arriba.
@@ -11111,6 +11158,10 @@ const DSL = {
                         // sin decir nada. Le pasó al Aguijón onírico.
                         const _esEnemigo = r.count.de === 'ENEMIGOS' || r.count.quien === 'ENEMIGO';
                         let pool = _esEnemigo ? [..._rival.vanguard, ..._rival.rearguard] : [...p.vanguard, ...p.rearguard];
+                        // Las pilas, del mismo sitio que el resto del DSL (`_zone`), y de quien
+                        // toque: aquí solo se entendían los DESCARTES propios (19-oct-2026).
+                        const _pila = DSL._esPila(r.count.zona);
+                        if (_pila) pool = DSL._zone(game, _esEnemigo ? (card.owner === 'p1' ? 'p2' : 'p1') : card.owner, r.count.zona);
                         // La zona, en cualquier caja: el resto del DSL acepta 'vanguardia' y
                         // 'VANGUARDIA' (ver _zone), y aquí solo valía en mayúsculas — una
                         // minúscula colaba el requisito al pool por defecto SIN avisar, contando
@@ -11118,7 +11169,6 @@ const DSL = {
                         const _z = String(r.count.zona || '').toUpperCase();
                         if (_z === 'VANGUARDIA') pool = [...p.vanguard];
                         else if (_z === 'RETAGUARDIA') pool = [...p.rearguard];
-                        else if (_z === 'DESCARTES') pool = [...p.discard];
                         if (r.count.plantillaSin) pool = pool.filter(x => { const t = getCardTemplate(x.id); return t && !r.count.plantillaSin.some(hk => typeof t[hk] === 'function'); });
                         if (r.count.conAlgunEstado) pool = pool.filter(c => c.status && Object.keys(c.status).length > 0);
                         // Un filtro de TRIBUTO se resuelve ahora, no con el número compilado.
@@ -11129,7 +11179,7 @@ const DSL = {
                         });
                         if (r.count.algunFiltro) pool = pool.filter(c => r.count.algunFiltro.some(f => DSL._match(c, f)));
                         if (r.count.algunEstado) pool = pool.filter(c => c.status && r.count.algunEstado.some(k => c.status[k]));
-                        if (!r.count.permitirAvatar && _z !== 'DESCARTES') pool = pool.filter(x => !((getCardTemplate(x.id) || {}).isAvatar));
+                        if (!r.count.permitirAvatar && !_pila) pool = pool.filter(x => !((getCardTemplate(x.id) || {}).isAvatar));
                         if (r.count.sinMarcaTemporalPropia) pool = pool.filter(x => !(x.tempEffects && x.tempEffects.some(t => t.sourceId === card.id)));
                         val = pool.length;
                     } else if (r.eventoActivo !== undefined) {
