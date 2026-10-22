@@ -2937,7 +2937,7 @@
                 // (rework) Chat de sala en el cartel de fin: MISMO chat que la sala (historial + en vivo)
                 setTimeout(() => {
                     const og = document.getElementById('endgame-overlay');
-                    if (!og || document.getElementById('eg-chat-box')) return;
+                    if (!og || !this.socket || document.getElementById('eg-chat-box')) return; // en local no hay sala ni chat
                     const cardEl = og.querySelector('.eg-card');
                     if (!cardEl) return;
                     const wrap = document.createElement('div');
@@ -13830,6 +13830,14 @@
 
         window.game = new Game();
         inicializarReglas();
+
+        // Un error que nadie atrapa -una cadena de carta lanzada desde un onclick sin await- moría
+        // en la consola y la Habilidad se cancelaba muda: así estuvo roto el visor de pilas del
+        // 27-ago al 22-oct-2026 sin que nadie lo viera. Ahora sale en rojo en el historial.
+        // `ev.error` falta en los errores de recursos y en los avisos del navegador: esos no.
+        const _avisarError = (e) => { try { console.error(e); game.logMsg(`Error interno: ${(e && e.message) || e}. Si se repite, avisa con una captura.`, 'error', true); } catch (_) {} };
+        window.addEventListener('unhandledrejection', ev => _avisarError(ev.reason));
+        window.addEventListener('error', ev => { if (ev.error) _avisarError(ev.error); });
 
         // --- REENVÍO DE ANIMACIONES A UN CLIENTE RECONECTADO (Toto, 31-jul-2026) ---
         // El reanudar-perfecto le devuelve al reconectado el ESTADO, pero no el espectáculo: su
