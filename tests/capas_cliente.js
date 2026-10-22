@@ -848,5 +848,17 @@ console.log('\n--- chapas de marca temporal ---');
     check('...y la chapa se va al caducar la marca', /card\.stealth = false;[\s\S]{0,600}game\.render\(\);\r?\n\s*return false;/.test(srcDsl));
 }
 
+// El visor de pilas con `opts` a null, que es lo que le pasa el BUSCAR del DSL cuando no hay
+// soloPrimeras: el valor por defecto solo cubre undefined, y reventaba antes de abrirse (la
+// cadena se tragaba la excepción y la búsqueda se cancelaba muda). Roto del 27-ago al
+// 22-oct-2026 sin que la batería lo viera, porque el harness sustituye el visor por un stub.
+{
+    let err = null, pr = null;
+    visor.style.display = 'none';
+    try { pr = game.openDeckSearchViewer('p1', [], 'X', null, 1, 'discard', null, false, null); } catch (e) { err = e; }
+    if (pr && pr.catch) pr.catch(e => { err = err || e; });
+    check('el visor de pilas se abre con opts = null (BUSCAR sin soloPrimeras)', !err && visor.style.display === 'flex', err ? err.message : 'display=' + visor.style.display);
+}
+
 console.log(fallos === 0 ? '\nSUITE capas_cliente: ' + comprobaciones + '/' + comprobaciones + ' comprobaciones — CAPAS CORRECTAS' : '\nSUITE capas_cliente: ' + fallos + ' FALLOS de ' + comprobaciones + ' comprobaciones');
 process.exit(fallos ? 1 : 0);

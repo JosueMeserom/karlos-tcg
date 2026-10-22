@@ -6669,6 +6669,10 @@
                         ? DSL._avisoVacio(buscado, zona, !!barajaDespues)
                         : 'No hay cartas elegibles aquí.';
                 }
+                // `null` también (el BUSCAR del DSL lo pasa cuando no hay soloPrimeras): el valor por
+                // defecto solo cubre `undefined`, y con null esto reventaba ANTES de abrir el visor,
+                // la cadena se tragaba la excepción y la búsqueda se cancelaba muda (Toto, 22-oct-2026).
+                opts = opts || {};
                 const multi = maxCount > 1;
                 const _esDescartes = zona === 'discard';
                 const _mirador = opts.mirador || playerId;
