@@ -4425,13 +4425,17 @@
                     // Por si el spec no dice quién empieza: sin esto se quedaría en null.
                     this.startingPlayerId = this.startingPlayerId || 'p1';
                     this.activePlayerId = this.activePlayerId || this.startingPlayerId;
-                    this.aplicarEscenarioForzado();
+                    const montado = this.aplicarEscenarioForzado();
                     localStorage.setItem('karlos_partida_en_curso', this.roomCode);
                     if (this.myPlayerId !== 'spectator') {
                         this.socket.emit('setupComplete', { roomCode: this.roomCode, role: this.myPlayerId });
-                        this.showTurnOverlay();
+                        if (!montado) this.showTurnOverlay();
                     }
                     if (this.myPlayerId === 'p1') this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'NOTIFY_SETUP_COMPLETE' });
+                    // Montado, sin cartel de turno, igual que al cargarlo desde el panel de debug: el cartel
+                    // ponía la fase en INICIO y al pulsarlo arrancaba el turno entero (robo incluido:
+                    // con el mazo vacío reciclaba los descartes), y el J2, que aún no había recibido
+                    // nada, seguía viendo la mesa de antes (Toto, 22-oct-2026).
                     return;
                 }
 
@@ -4777,6 +4781,10 @@
                 }
                 if (this.myPlayerId !== 'p1') {
                     this.logMsg('El anfitrión forzó un escenario: esperando el tablero...', 'system');
+                    // Y se lo PIDE, como el espectador: si el volcado del J1 llegó antes que esta
+                    // preparación, runInitialSetup lo acaba de pisar (mazo de 40, turno 'setup').
+                    // Si llega después, este pedido sobra y no rompe nada (Toto, 22-oct-2026).
+                    this.socket.emit('gameAction', { roomCode: this.roomCode, action: 'REQUEST_SYNC', requesterId: this.socket.id });
                     return true;
                 }
                 try {

@@ -106,6 +106,10 @@ check('el cliente lo lee de la config activa', /escenario: typeof c\.escenario =
 check('...y se salta la preparación entera', /if \(this\.hayEscenarioForzado\(\) && !ignorarInicioRapido\) \{/.test(idx));
 check('...cerrando el setup igual que el camino normal',
     /hayEscenarioForzado\(\) && !ignorarInicioRapido[\s\S]{0,900}setupComplete[\s\S]{0,300}NOTIFY_SETUP_COMPLETE/.test(idx));
+check('...y sin cartel de turno: se juega desde el escenario, no desde la fase de robo',
+    /const montado = this\.aplicarEscenarioForzado\(\);[\s\S]{0,400}if \(!montado\) this\.showTurnOverlay\(\);/.test(idx));
+check('...y quien no lo monta PIDE el estado (su preparación pisa un volcado que llegue antes)',
+    /esperando el tablero\.\.\.[\s\S]{0,500}action: 'REQUEST_SYNC', requesterId: this\.socket\.id/.test(idx));
 check('...validándolo otra vez antes de montarlo', /aplicarEscenarioForzado\(\)[\s\S]{0,900}validarEscenario\(spec\)/.test(idx));
 check('...y lo monta UN solo cliente, el resto lo recibe sincronizado',
     /aplicarEscenarioForzado\(\)[\s\S]{0,900}this\.myPlayerId !== 'p1'/.test(idx));
