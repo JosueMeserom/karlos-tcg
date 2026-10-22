@@ -117,17 +117,31 @@ const nombres = (arr) => arr.map(c => c.name);
 
     console.log('\n--- 3b. Robot de limpieza CM: una carta de la mano por una Ayuda de los descartes ---');
     {
-        const { g, paso } = await mesa({
+        const { ctx, g, paso } = await mesa({
             turno: 2, turnoDe: 'p1', empieza: 'p2',
             p1: { vanguardia: [{ carta: 'Robot de limpieza CM', furor: 1 }], mano: ['Mini-tigre', 'Guardia'],
                   descartes: ['Té helado', 'Oso con armadura'] },
             p2: { vanguardia: ['Agah'] },
         });
+        // Espía de la presentación: qué cartela lleva y qué costes la acompañan. Hace lo que la
+        // de verdad hace con el estado (colocar y consumir las marcas), sin animar nada.
+        const presentadas = [];
+        ctx.sandbox.animarPresentacionCarta = async (id, o, d, dorso, opts) => {
+            presentadas.push({ cartela: opts && opts.cartela, costes: (g._costesPresenta || []).slice() });
+            g._costesPresenta = [];
+            if (opts && typeof opts.colocar === 'function') await opts.colocar();
+        };
         await paso({ habilidad: 'Robot de limpieza CM' });
         await paso({ confirmar: true });
         await paso({ elegir: ['Mini-tigre'] });
+        check('elegir la carta de la mano aún no la descarta (el coste espera a la Ayuda)',
+            nombres(g.players.p1.hand).includes('Mini-tigre'), nombres(g.players.p1.hand));
         await paso({ elegir: ['Té helado'] });
         const p1 = g.players.p1, rob = enCampo(g, 'p1', 'Robot de limpieza CM');
+        const pr = presentadas[0] || {}, coste = (pr.costes || [])[0] || {};
+        check('el escaparate lleva la cartela de la Habilidad', /^RECOGIDA DE BASURA - Robot de limpieza CM/.test(pr.cartela || ''), pr.cartela);
+        check('...y la carta pagada va con él, con su flecha hacia el Robot',
+            coste.tipo === 'coste' && coste.zona === 'hand' && coste.apuntaA === rob.instanceId, JSON.stringify(pr.costes));
         check('la Ayuda pasa de los descartes a la mano', nombres(p1.hand).includes('Té helado') && !nombres(p1.discard).includes('Té helado'),
             `mano=${nombres(p1.hand)} descartes=${nombres(p1.discard)}`);
         check('...la carta elegida se descarta', nombres(p1.discard).includes('Mini-tigre') && !nombres(p1.hand).includes('Mini-tigre'));
@@ -166,6 +180,9 @@ const nombres = (arr) => arr.map(c => c.name);
         check('cancelar el visor: la carta elegida sigue en la mano', nombres(p1.hand).includes('Mini-tigre'), nombres(p1.hand));
         check('...la Ayuda sigue en descartes', nombres(p1.discard).includes('Té helado'));
         check('...y no se cobra Furor ni se gasta la acción', rob.furor === 1 && !rob.exhausted, `furor=${rob.furor} exhausted=${rob.exhausted}`);
+        check('...ni queda un coste aparcado o marcado para la siguiente presentación',
+            !(g._cobrosPendientes || []).length && !(g._costesPresenta || []).length,
+            `cobros=${(g._cobrosPendientes || []).length} marcas=${(g._costesPresenta || []).length}`);
     }
     {
         // Requisitos: sin Ayudas en descartes (aunque haya Ayudas en la MANO y en el campo nada

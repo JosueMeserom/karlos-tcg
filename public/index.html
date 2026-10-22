@@ -2287,7 +2287,7 @@
             const _fila = _rect('#p1-vanguard') || _rect('#p2-vanguard') || _rect('#game-board');
             const _tablero = _rect('#game-board');
             const cx = _fila ? _fila.left + _fila.width / 2 : window.innerWidth / 2;
-            const cy = _tablero ? _tablero.top + _tablero.height / 2 : window.innerHeight / 2;
+            let cy = _tablero ? _tablero.top + _tablero.height / 2 : window.innerHeight / 2;
             const W = 90, H = 126;
 
             // Un clon de escaparate: contenedor + volteador cara/dorso. Lo usan por igual la
@@ -2351,6 +2351,20 @@
             const _enTablero = (c) => c.zona === 'zona' || c.zona === 'vanguard' || c.zona === 'rearguard' || c.zona === 'event';
             const enCampo = costes.filter(_enTablero);
             const acomp   = costes.filter(c => !_enTablero(c));
+            // Un coste que señala a una carta DEL CAMPO (`apuntaA`) necesita aire hasta ella: el
+            // escaparate se pinta sobre el centro del tablero, o sea encima de las vanguardias, y
+            // tapaba al propio Robot con su flecha (22-oct-2026). Se aparta lo justo del lado
+            // contrario a esa carta.
+            try {
+                const _hueco = 70, _medio = (H * PRESENTA_ZOOM) / 2;
+                acomp.forEach(c => {
+                    const el = c.apuntaA && document.querySelector(`.card[data-id="${c.apuntaA}"]`);
+                    if (!el) return;
+                    const r = el.getBoundingClientRect();
+                    if (r.top + r.height / 2 > cy) cy = Math.min(cy, r.top - _hueco - _medio);
+                    else cy = Math.max(cy, r.bottom + _hueco + _medio);
+                });
+            } catch (err) { console.error(err); }
 
             // El BLOQUE (carta + acompañantes) va centrado en el campo, no la carta principal.
             const paso = W * PRESENTA_ZOOM + PRESENTA_GAP;
@@ -2444,6 +2458,24 @@
             _separarEtiquetas(_lineas.map(l => l.et));
             } catch (err) { console.error(err); }
 
+            // CARTELA (Toto, 22-oct-2026): QUÉ ha traído esta carta, encima del bloque. Solo la
+            // pone quien presenta algo conseguido (una búsqueda), nunca una carta jugada desde
+            // la mano: con cartela, alguien la ha conseguido; sin ella, alguien la ha jugado.
+            let cartela = null;
+            if (opts && opts.cartela) try {
+                cartela = document.createElement('div');
+                cartela.className = 'fmt-log';
+                cartela.style.cssText = 'position:fixed; z-index:3950; pointer-events:none; transform:translate(-50%,-100%);'
+                    + `left:${cx}px; top:${cy - (H * PRESENTA_ZOOM) / 2 - 14}px; max-width:90vw; text-align:center;`
+                    + 'background:rgba(8,10,18,0.82); border:1px solid #22d3ee; border-radius:8px; padding:4px 12px;'
+                    + 'color:#22d3ee; font-weight:bold; font-size:0.95rem; text-shadow:0 1px 3px #000;'
+                    + `opacity:0; transition:opacity ${PRESENTA_FLECHA_MS}ms ease;`;
+                cartela.innerHTML = g._fmtLog(opts.cartela);
+                document.body.appendChild(cartela);
+                void cartela.offsetWidth;
+                cartela.style.opacity = '1';
+            } catch (err) { console.error(err); }
+
             await g.sleep(PRESENTA_VIAJE);
 
             // La punta y la etiqueta aparecen con la flecha ya entera: puesta antes, el marcador
@@ -2457,8 +2489,43 @@
 
             // Flecha del ACOMPAÑANTE: brota del propio coste y corre al centro del bloque,
             // apuntando de vuelta hacia él.
-            if (flechas && acompCl.length) try {
-                const primero = acompCl[0];
+            // Los que pagan una HABILIDAD (`apuntaA`) no apuntan a la carta presentada sino a quien
+            // la usa, en el campo: lo que enseña el escaparate no es su precio (Toto, 22-oct-2026).
+            const _destinoDe = (a) => a.ref.apuntaA ? document.querySelector(`.card[data-id="${a.ref.apuntaA}"]`) : null;
+            if (flechas) try {
+                const _lin = [];
+                acompCl.forEach(a => {
+                    const el = _destinoDe(a);
+                    if (!el) return;
+                    const r = el.getBoundingClientRect();
+                    const tx0 = r.left + r.width / 2, ty0 = r.top + r.height / 2;
+                    const dx = tx0 - a.x, dy = ty0 - cy, dist = Math.hypot(dx, dy) || 1;
+                    const m0 = (H * PRESENTA_ZOOM) / 2 + 4, m1 = r.height / 2 + 12;
+                    const ox = a.x + dx * m0 / dist, oy = cy + dy * m0 / dist;
+                    const tx = tx0 - dx * m1 / dist, ty = ty0 - dy * m1 / dist;
+                    const L = Math.hypot(tx - ox, ty - oy);
+                    const color = PRESENTA_COLOR[a.ref.tipo] || PRESENTA_COLOR.coste;
+                    const ln = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                    ln.setAttribute('x1', ox); ln.setAttribute('y1', oy);
+                    ln.setAttribute('x2', tx); ln.setAttribute('y2', ty);
+                    ln.setAttribute('stroke', color); ln.setAttribute('stroke-width', '3');
+                    ln.setAttribute('stroke-linecap', 'round');
+                    ln.setAttribute('stroke-dasharray', L); ln.setAttribute('stroke-dashoffset', L);
+                    ln.style.transition = `stroke-dashoffset ${PRESENTA_FLECHA_MS}ms linear`;
+                    flechas.svg.appendChild(ln);
+                    void ln.getBoundingClientRect();
+                    ln.setAttribute('stroke-dashoffset', 0);
+                    const et = flechas.etiqueta((ox + tx) / 2, (oy + ty) / 2 - 12, a.ref.etiqueta || PRESENTA_ETIQ[a.ref.tipo] || PRESENTA_ETIQ.coste, color);
+                    _lin.push({ ln, et, color });
+                });
+                if (_lin.length) {
+                    _separarEtiquetas(_lin.map(l => l.et));
+                    setTimeout(() => _lin.forEach(({ ln, et, color }) => { ln.setAttribute('marker-end', `url(#${flechas.punta(color)})`); et.mostrar(); }), PRESENTA_FLECHA_MS);
+                }
+            } catch (err) { console.error(err); }
+            const _sinDestino = acompCl.filter(a => !_destinoDe(a));
+            if (flechas && _sinDestino.length) try {
+                const primero = _sinDestino[0];
                 const color = PRESENTA_COLOR[primero.ref.tipo] || PRESENTA_COLOR.coste;
                 const fl = document.createElement('div');
                 fl.style.cssText = 'position:absolute; transform:translate(-50%,-50%); pointer-events:none;'
@@ -2489,6 +2556,10 @@
                 flechas.capa.style.transition = `opacity ${PRESENTA_FLECHA_MS}ms ease`;
                 flechas.capa.style.opacity = '0';
                 setTimeout(() => flechas.capa.remove(), PRESENTA_FLECHA_MS + 60);
+            }
+            if (cartela) {
+                cartela.style.opacity = '0';
+                setTimeout(() => cartela.remove(), PRESENTA_FLECHA_MS + 60);
             }
 
             // 2.bis) PUNTO DE ESPERA (Toto, 13-ago-2026). Una carta que hace algo "antes de

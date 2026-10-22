@@ -7675,11 +7675,14 @@ const CARD_DB = [
               efectos: [
                 { op: "ELEGIR", de: "MANO", cantidad: 1, guardaIdsEnSelf: "robotLimpiezaPago",
                   titulo: "RECOGIDA DE BASURA: ELIGE LA CARTA QUE DESCARTAS" },
+                // Coste ANTES de la búsqueda pero aparcado hasta elegir la Ayuda (ver el aparcado de
+                // Activas diferidas en _runEffectList): así el escaparate lo enseña junto a ella,
+                // con su flecha hacia el Robot, y cerrar el visor sigue sin costar nada.
+                { op: "DESCARTAR", esCoste: true, target: { selfLista: "robotLimpiezaPago", zona: "MANO" } },
                 { op: "BUSCAR", en: "DESCARTES", cantidad: 1, destino: "MANO",
                   filtros: [ { campo: "type", op: "==", valor: "Ayuda" } ],
                   abortaSiCancelas: true, abortaSiVacio: true, titulo: "RECOGIDA DE BASURA: ELIGE UNA AYUDA",
-                  log: "{carta} recupera {objetivo} de los descartes." },
-                { op: "DESCARTAR", target: { selfLista: "robotLimpiezaPago", zona: "MANO" } } ] }
+                  log: "{carta} recupera {objetivo} de los descartes." } ] }
         ],
     },
 ];
@@ -8743,20 +8746,23 @@ const DSL = {
         return out;
     },
 
-    _marcarCoste(game, cartas, tipo, etiqueta) {
+    // `apuntaA` (Toto, 22-oct-2026): la flecha va a ESA carta del campo en vez de a la presentada.
+    // Una Activa no paga lo que enseña el escaparate -RECOGIDA DE BASURA paga para traer la Ayuda,
+    // no es el precio de la Ayuda-, así que su coste señala a quien usa la Habilidad.
+    _marcarCoste(game, cartas, tipo, etiqueta, apuntaA) {
         if (!game || !cartas) return;
         const lista = Array.isArray(cartas) ? cartas : [cartas];
         game._costesPresenta = game._costesPresenta || [];
         for (const c of lista) {
             if (!c || !c.instanceId) continue;
             if (game._costesPresenta.some(x => x.id === c.instanceId)) continue;
-            if (etiqueta) { game._costesPresenta.push({ id: c.instanceId, cardId: c.id, tipo: tipo, owner: c.owner, zona: c.location, etiqueta }); continue; }
+            if (etiqueta) { game._costesPresenta.push({ id: c.instanceId, cardId: c.id, tipo: tipo, owner: c.owner, zona: c.location, etiqueta, apuntaA }); continue; }
             // `zona`: dónde está la carta EN ESTE INSTANTE. Es lo que decide si acompaña a la
             // presentación o si se queda con una flecha. No vale mirar el DOM (era lo que hacía
             // el cliente): una carta ya descartada sigue dibujada en la mano hasta el siguiente
             // render, así que la Manzanahoria de Wolfgang se clasificaba como "en el campo" y se
             // quedaba en la mano con una flecha saliendo de ella (Toto, 13-ago-2026).
-            game._costesPresenta.push({ id: c.instanceId, cardId: c.id, tipo: tipo, owner: c.owner, zona: c.location });
+            game._costesPresenta.push({ id: c.instanceId, cardId: c.id, tipo: tipo, owner: c.owner, zona: c.location, apuntaA });
         }
     },
 
@@ -9197,7 +9203,12 @@ const DSL = {
                         // mano rival se ve boca arriba y no hay nada que tapar.
                         const _manoVisible = game.gameMode !== 'online' || _yo === pid
                             || _yo === 'spectator' || (game.players[pid] && game.players[pid].handExposedTo === _yo);
-                        const _opts = (_aFila || _aMano) ? {
+                        // CARTELA (Toto, 22-oct-2026): lo que sale de una búsqueda no lo ha JUGADO
+                        // nadie, lo ha conseguido algo. Sin decir qué, el rival no distingue la Ayuda
+                        // que trae RECOGIDA DE BASURA de una Ayuda jugada desde la mano.
+                        const _cartela = [habilidad && habilidad !== sourceCard.name ? habilidad : null, DSL._nombre(game, sourceCard)]
+                            .filter(Boolean).join(' - ');
+                        const _opts = Object.assign({ cartela: _cartela }, (_aFila || _aMano) ? {
                             ocultarAlLlegar: _aMano && !_manoVisible,
                             zonaSel: _destino,
                             colocar: () => {
@@ -9206,7 +9217,7 @@ const DSL = {
                                 if (typeof game.render === 'function') game.render();
                                 return t.instanceId;
                             },
-                        } : null;
+                        } : {});
                         await animarPresentacionCarta(t.id, _origen, _destino, _deDorso, _opts);
                         if (_aFila || _aMano) { _yaColocada = true; }
                     }
@@ -10473,7 +10484,20 @@ const DSL = {
                         const d = Math.abs(DSL._deltaStat(e, sourceCard, t, game, ownerId));
                         DSL._marcarCoste(game, [t], 'tributo', `Tributa ${d} FUR`);
                     }
-                } else DSL._marcarCoste(game, _vivos, 'coste');
+                } else DSL._marcarCoste(game, _vivos, 'coste', undefined,
+                    (sourceCard.location === 'vanguard' || sourceCard.location === 'rearguard') ? sourceCard.instanceId : undefined);
+            }
+            // Activa con el cobro aún DIFERIDO (Toto, 22-oct-2026): mismo aparcado que con una
+            // presentación armada, porque todavía se puede cancelar. RECOGIDA DE BASURA descarta
+            // la carta de la mano al elegir la Ayuda, no al elegir la carta; si cierras el visor,
+            // no pierdes nada. Sin _comprometer: el compromiso lo pone la siguiente elección.
+            if (e.esCoste && e.op !== 'ELEGIR' && !game._presentacionArmada
+                && DSL._cobroPendiente && DSL._cobroPendiente.id === sourceCard.instanceId) {
+                const _tg = targets.filter(Boolean);
+                (game._cobrosPendientes = game._cobrosPendientes || []).push(async () => {
+                    for (const t of _tg) await DSL._doEffect(e, sourceCard, t, game, ownerId, habilidad);
+                });
+                continue;
             }
             // El cobro se aparca hasta el escaparate (ver _marcarCoste). Sin presentación
             // armada -una Activa, un efecto de campo- se ejecuta aquí y ahora, como siempre.
@@ -11654,6 +11678,8 @@ const DSL = {
                 const _sinCobrar = !!(DSL._cobroPendiente && DSL._cobroPendiente.id === card.instanceId);
                 if (_diferir && _res && _res.ok === false && _sinCobrar) {
                     DSL._cobroPendiente = null;
+                    // Lo aparcado y su marca para el escaparate se tiran: no ha llegado a pagarse.
+                    game._cobrosPendientes = []; game._costesPresenta = [];
                     // Cancelado a mitad de la cadena de elecciones: no se cobra nada y la carta
                     // NO gasta su acción — solo se suelta el candado y se deshace la selección.
                     game.isActionLocked = false;
@@ -11666,6 +11692,7 @@ const DSL = {
                 if (DSL._cobroPendiente && DSL._cobroPendiente.id === card.instanceId) {
                     const _cp = DSL._cobroPendiente; DSL._cobroPendiente = null; _cp.fn();
                 }
+                await DSL._drenarCobros(game); // un coste aparcado que no llegó a drenar nadie
                 // Una pasada de pasivas SIEMPRE al cerrar (26-ago-2026, con The Knight). El
                 // cierre de abajo la hacía, pero solo cuando la carta NO se había agotado ya —y
                 // una Activa que ATACA agota dentro de performAttack, que corre su updatePassives
