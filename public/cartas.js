@@ -2395,7 +2395,7 @@ const CARD_DB = [
         name: "Diego Antonio", hp: 7, def: 9, atk: 9, type: "Personaje", subtype: "Ser vivo", tags: ["Usuario de VP", "Mafia"], gender: "M", rarity: "S", series: 1,
         // Requisito visible: a quién señala la flecha lima al presentarse (§14.bis).
         requisitoVisible: [ { quien: "TODOS", zona: "evento", filtros: [ { campo: "name", op: "==", valor: "Una buena razón" } ], uno: true } ],
-        text: "Requisito: 'Una buena razón' activo en cualquier campo. P: CÓLERA INFINITA: Al colocar: +1 de Furor y 3 Contadores; en vanguardia pierde 1 por turno y a 0 muere. No puede retirarse de forma normal. Al recibir un ataque normal invierte el cálculo: no sufre daño y daña al atacante. A: PACIFISMO (3F): Este turno no baja su contador.",
+        text: "Requisito: 'Una buena razón' activo en cualquier campo. P: CÓLERA INFINITA: Al colocar: +1 de Furor y 3 Contadores; en vanguardia pierde 1 por turno y, a 0, se destruye. No puede retirarse de forma normal. Al recibir un ataque normal invierte el cálculo: no sufre daño y daña al atacante. A: PACIFISMO (3F): Este turno no baja su contador.",
         passiveName: "CÓLERA INFINITA", activeName: "PACIFISMO", activeCost: 3,
         uncopyable: true, // Requiere los contadores exclusivos de Diego
         
@@ -2418,7 +2418,7 @@ const CARD_DB = [
                 { op: "MODIFICAR_STAT", target: { quien: "SELF" }, stat: "furor", delta: 1 },
                 { op: "MODIFICAR_CONTADORES", target: { quien: "SELF" }, contador: "diego_timer",
                   delta: 3, nombreContador: "Turnos de Cólera", icono: "⏳" } ] },
-            { trigger: "FIN_TURNO", resumenFase: "Pierde 1 Contador; a 0 muere", porHabilidad: "CÓLERA INFINITA", 
+            { trigger: "FIN_TURNO", resumenFase: "Pierde 1 Contador; a 0 se destruye", porHabilidad: "CÓLERA INFINITA", 
               efectos: [
                 { if: { campo: "location", op: "==", valor: "vanguard" },
                   op: "CUENTA_ATRAS", target: { quien: "SELF" },
