@@ -5,7 +5,8 @@
 # vienen con Node. Instalarlas aquí serían un par de minutos de compilar `sqlite3` nativo -y un
 # paso más que se puede romper- a cambio de nada.
 #
-# Node 20 porque es el que corre el servidor de verdad: un CI que prueba en otra versión distinta
+# Node 26 porque es el que corre el servidor de verdad (hasta noviembre de 2026 fue Node 20, ya sin
+# soporte; la batería pasa igual con 20, 24 y 26): un CI que prueba en otra versión distinta
 # de la de producción avisa tarde y a veces miente.
 name: Tests
 
@@ -22,7 +23,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '26'
 
       # `node --check` sobre lo que se puede parsear suelto: un error de sintaxis en el motor
       # dejaría a TODAS las suites en rojo con el mismo mensaje ilegible, así que se caza antes.

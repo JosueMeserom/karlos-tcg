@@ -138,7 +138,7 @@ npm test              # las 116 suites, unos 25 segundos
 npm test -- oculto    # solamente las que interesen mientras trabajas
 ```
 
-Se ejecutan solas en **GitHub Actions** en cada push y cada pull request (con Node 20, el mismo que el del servidor).
+Se ejecutan solas en **GitHub Actions** en cada push y cada pull request (con Node 26, el mismo que el del servidor).
 
 ---
 
